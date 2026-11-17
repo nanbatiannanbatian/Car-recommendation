@@ -103,12 +103,60 @@ python3 ice_board.py --pool ice_pool_full.json --category car_ice_phev --out run
 | 汽车之家 口碑 `rowcount` | 口碑样本量 | 评价条数 | `vdh_koubei_pull.py`（urllib） | 评价数 ≠ 评分，只作样本量 |
 | 汽车之家 参数页 `var config` | 配置阶梯 | 逐配置价格/电池/CLTC | `auto_trims.py` | SSR 里的 JSON |
 | C-NCAP 官网 | 安全成绩 | 综合得分率 | `fetch_cncap.py` | 首页 swiper 是**服务端渲染**，可直解 |
-| C-IASI | 碰撞（未解码） | 测评记录存在性 | `ice_crash.py` | 列表 JS 异步（需 XHR 逆向，暂缓）；等级图标无文字对照 |
+| C-IASI 官网测评稿 | 权威碰撞 + **可维修性事实** | G/G+/A/M/P 文字等级（5 分指数） | `ciasi_text_decode.py`（新增） | **等级图标没文字对照 ≠ 没文字稿**：官网 `/news/show-N.html` 结果发布稿是纯文字，2026-11 已解码 8 篇/30 款；早期稿只给分布不给逐车对应时标 `aggregate_only`，不猜 |
 | 工信部 购置税目录 | 备案预测 | 未上市纯电车型 | `filings.py` | 逐型可解析；命名与市场名不一致 |
 | 工信部 产品公告 | 生命周期次信号 | 在产/停产 | VDH `miit_gonggao/` | **无车型名主键**，只能半自动；`change_notice` 依赖 bs4/lxml |
 | 乘联会 CPCA | 大盘校验 | 厂商/级别聚合 | `fetch_sales.py` | 无车型级接口 |
 | 车质网 12365auto | 投诉（L2） | 投诉条目 | `fetch_complaints.py` | 按投诉编号去重累加；密度=投诉/万台 |
 | B站 | 视频证据初筛 | 搜索/CC 字幕 | `fetch_bili.py` | 不取弹幕/评论；AI 字幕需登录态，不做 |
+| **swoiow/autohome**（GitHub, Apache-2.0） | 参数/价格**交叉核验补全** | 指导价/kWh/CLTC/风阻/轴距/质保政策 | `swoiow_probe.py`（新增） | 月度更新、1666 款 CSV；**只出补全建议不写回、不进分**；车型名必须精确匹配（子串会把 EZ-60 误配成 EZ-6） |
+| 中汽流通协会 × 精真估 保值率月报 | 保值率事实（第三方） | 3 年保值率（品牌/级别/车型） | 人工摘取 / 待自动化 | 有公开网页报道（cada.cn / 中国汽车报），**无车型级 API**；EV 3 年保值率 44.8–45.7%，仅作事实列不进分 |
+| 市场监管总局 召回中心 samrdprc.org.cn | 质量/安全事实（L1 官方） | 召回编号/数量/缺陷描述/车型 VIN 范围 | 待接入（已验证可抓） | 公告为静态 HTML、`召回编号+车型+数量`结构化；**召回≠质量差**（主动召回常态化），只作事实/风险提示 |
+
+### 3.3 数据源扩展方案（2026-11-17 核实并落地）
+
+> 原则：**不为了"多"而加源**。每个新源必须通过三关：①能直接抓（已实测）②补的是真缺口（非重复）③不破坏打分纪律（事实列不进分）。
+
+**已核实可用（本次落地 2 个）**
+
+| 源 | 补什么缺口 | 落地状态 | 证据 / 边界 |
+|---|---|---|---|
+| C-IASI 官网文字稿 | 手册标注「等级图标未解码」+ 可维修性无官方口径 | ✅ **已落地** `ciasi_text_decode.py` | 实测 8 篇结果稿 / 30 款唯一车型；含逐车 `特斯拉Model Y 辅助=G` vs `享界S9T 辅助=G+`；「耐撞性与维修经济性」G/A/M/P 正是官方可维修性等级 |
+| swoiow/autohome | 价格未知落榜、3 款缺 kWh、风阻/CLTC 缺 | ✅ **已落地** `swoiow_probe.py` | 实测 1632 车型 CSV、EV 候选严格命中 16/39；字段含 `厂商指导价(元)`/`电池能量(kWh)`/`CLTC`/`风阻系数(Cd)`；只出建议不写回 |
+
+**已核实可用，但暂不自动化（留接口）**
+
+| 源 | 价值 | 为何暂缓 |
+|---|---|---|
+| 中汽流通协会保值率月报 | 直接回应"销量太低影响保值"——EV 3 年 44.8% 已公开 | 只有网页/PDF 报道、无稳定车型级 API；每月人工摘 3–5 个关注车型即可 |
+| samrdprc.org.cn 召回公告 | L1 官方质量事实（比车质网 L2 投诉更硬） | 召回是"负责任的主动行为"，不能简单当扣分；需先定"只披露不评分"的呈现规则 |
+| dongchedi-cli / OpenCLI（已部分在用） | 销量/口碑/参数交叉验证 | 已足够，重复接入无新信息 |
+
+**明确不接（避免踩坑）**
+
+| 源 | 原因 |
+|---|---|
+| Apify `sinodata/china-car-sales` | 付费 + 需 Apify token，与现有懂车帝直抓重复 |
+| 各类 CSDN "完整工程包" | 一次性 xlsx、无更新机制、字段不可溯源 |
+| 百度百科 / 自媒体转述 | 二手来源，项目红线要求一手源 |
+
+**落地命令（新源）**
+
+```bash
+# 1) C-IASI 文字解码（零依赖，直接跑）
+python3 ciasi_text_decode.py --start 100 --end 130 --out runs/car-ev-4boards/ciasi_decoded.json
+python3 ciasi_text_decode.py --selftest
+
+# 2) swoiow 参数补全（需先准备本地数据，一次性）
+git clone --depth 1 --filter=blob:none --sparse https://github.com/swoiow/autohome.git
+cd autohome && git sparse-checkout set data && cd ..
+python3 swoiow_probe.py --data-dir autohome/data \
+    --candidates runs/car-ev-4boards/candidates_trend.json \
+    --out runs/car-ev-4boards/swoiow_suggest.json
+python3 swoiow_probe.py --selftest
+```
+
+**两个解码器的共同纪律**：只作事实列/交叉核验，**不改 `SCORING_ENABLED=False` 红线、不进加权分**；匹配不确定时标 `aggregate_only` / 未匹配，**不猜、不填充**。
 
 ---
 
