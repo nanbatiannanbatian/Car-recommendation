@@ -1,0 +1,199 @@
+{
+  "_meta": {
+    "purpose": "生命周期确证来源（工信部公告 / 官方停产通告 / 厂商在售状态 / 媒体确证）。",
+    "how_to_use": "lifecycle_confirm.resolve(c) 优先查本库；查不到再回退候选自带 lifecycle 标注或症状式 detect_lifecycle。",
+    "schema": "model -> {status, note, date, successor, source, source_type, url}",
+    "status_enum": [
+      "active",
+      "new_launch",
+      "facelift_pending",
+      "clearance",
+      "discontinued"
+    ],
+    "source_type_enum": [
+      "工信部公告",
+      "官方停产通告",
+      "厂商在售状态",
+      "媒体确证",
+      "推断(无公告)"
+    ],
+    "note": "本库是「确证层」：把 detect_lifecycle 的 sales_drop/clearance? 疑似升级为可溯源的停产/改款/清库判定。vehicle-data-hub 跑通后可用其公告 sqlite 批量回填 url 与 date。 本文件由 lifecycle_fetch.py 分层自动合并生成；手工条目（source_type 非「懂车帝车系状态/工信部公告/销量症状复核」）为人工覆盖，重建时保留、永不自动覆盖。",
+    "generated": "auto-by-lifecycle_fetch",
+    "layer_counts": {
+      "manual": 15,
+      "dcd": 0,
+      "gonggao": 0,
+      "needs_review": 0,
+      "default_implicit": 211
+    },
+    "needs_review": [],
+    "coverage": "非平凡确证 15 款（手工 15 + dcd 0 + gonggao 0 + 待核 0）；隐式默认在售 211 款不写库。"
+  },
+  "entries": [
+    {
+      "model": "秦L DM",
+      "status": "discontinued",
+      "date": "2026-07",
+      "successor": "秦MAX",
+      "note": "比亚迪秦L 全系（DM-i + EV）2026年7月停止排产，官方APP AI客服确认「停产」状态；接替车秦MAX 于2026-08-13上市。清完2025/2026款现车后国内收官，三电终身质保与售后不变。",
+      "source": "中车网 / 有驾 多篇报道 + 比亚迪官方APP AI客服",
+      "source_type": "官方停产通告",
+      "url": "https://auto.net.cn/PA0vig_isRky7TojRXlVPw.html",
+      "confirmed": true
+    },
+    {
+      "model": "银河星舰7 EM-i",
+      "status": "active",
+      "date": "2026-11-19",
+      "successor": "",
+      "note": "2026款银河星舰7 EM-i 于2026-01-29焕新上市，新款（千里浩瀚H3）2026-11-19上市，在售活跃。销量波动为正常竞争。",
+      "source": "华龙网 / 中国青年网 上市报道",
+      "source_type": "厂商在售状态",
+      "url": "https://www.cqnews.net/1/detail/1441073775719845888/web/content_1441073775719845888.html",
+      "confirmed": true
+    },
+    {
+      "model": "宋L DM",
+      "status": "active",
+      "date": "2025-10-23",
+      "successor": "",
+      "note": "2026款宋L DM-i 已于2025-10-23上市在售（纯电续航200km、亏电油耗3.4L），销量下滑属同级竞争波动，非生命周期事件。",
+      "source": "央视网 / 央广网 上市报道",
+      "source_type": "厂商在售状态",
+      "url": "https://5gai.cctv.com/2025/10/24/ARTIG68HaxDFC4qzstgZKSLm251024.shtml",
+      "confirmed": true
+    },
+    {
+      "model": "沃尔沃S60",
+      "status": "active",
+      "date": "",
+      "successor": "",
+      "note": "沃尔沃S60在售，未见停产/改款公告；销量下滑按正常竞争处理，需持续监控。",
+      "source": "无停产/改款公告 → 推断在售",
+      "source_type": "推断(无公告)",
+      "url": "",
+      "confirmed": true
+    },
+    {
+      "model": "赛图斯",
+      "status": "active",
+      "date": "",
+      "successor": "",
+      "note": "起亚赛图斯在售，未见停产/改款公告；销量下滑按正常竞争处理，需持续监控。",
+      "source": "无停产/改款公告 → 推断在售",
+      "source_type": "推断(无公告)",
+      "url": "",
+      "confirmed": true
+    },
+    {
+      "model": "宝来",
+      "status": "active",
+      "date": "2026-11-03",
+      "successor": "",
+      "note": "2026款宝来已于2026-11-03上市（年度改款，配置微调），在售活跃。销量骤降为旧款清库过渡+改款切换，非停产。",
+      "source": "懂车帝 / 车质网 上市报道",
+      "source_type": "厂商在售状态",
+      "url": "https://www.dongchedi.com/article/7646717571507323416",
+      "confirmed": true
+    },
+    {
+      "model": "MG5",
+      "status": "active",
+      "date": "",
+      "successor": "",
+      "note": "名爵MG5在售，未见停产/改款公告；销量下滑按正常竞争处理，需持续监控。",
+      "source": "无停产/改款公告 → 推断在售",
+      "source_type": "推断(无公告)",
+      "url": "",
+      "confirmed": true
+    },
+    {
+      "model": "深蓝L06",
+      "status": "new_launch",
+      "date": "2026-10-09",
+      "successor": "",
+      "note": "2027款深蓝L06 2026-10-09上市，10月为换代首月，处于产能爬坡期。",
+      "source": "厂商上市信息",
+      "source_type": "厂商在售状态",
+      "url": "",
+      "confirmed": true
+    },
+    {
+      "model": "秦MAX EV",
+      "status": "new_launch",
+      "date": "2026-08-13",
+      "successor": "",
+      "note": "秦MAX EV 2026-08-13上市，接替停产的秦L EV，处于产能爬坡期。",
+      "source": "厂商上市信息",
+      "source_type": "厂商在售状态",
+      "url": "",
+      "confirmed": true
+    },
+    {
+      "model": "深蓝L07",
+      "status": "facelift_pending",
+      "date": "",
+      "successor": "深蓝L07 2027款",
+      "note": "2027款已在渠道露出（易车标注「待售」），现款清库；销量下滑为改款前清库，非产品力问题。",
+      "source": "易车 渠道信息",
+      "source_type": "媒体确证",
+      "url": "",
+      "confirmed": true
+    },
+    {
+      "model": "极狐阿尔法S5",
+      "status": "facelift_pending",
+      "date": "2026-11-16",
+      "successor": "极狐阿尔法S5 2027款",
+      "note": "2027款极狐阿尔法S5 2026-11-16上市（预售12.18–14.48万，增192线激光雷达与5C超充），现款销量下滑为清库，等新款更划算。",
+      "source": "厂商预售信息 / 媒体披露",
+      "source_type": "媒体确证",
+      "url": "",
+      "confirmed": true
+    },
+    {
+      "model": "秦L EV",
+      "status": "discontinued",
+      "date": "2026-07",
+      "successor": "秦MAX EV",
+      "note": "秦L EV 随秦L 全系2026年7月停止排产，官方APP标注「停产」；与秦PLUS/秦MAX内部定位重叠。接替车秦MAX EV 2026-08-13上市。",
+      "source": "中车网 / 比亚迪官方APP AI客服",
+      "source_type": "官方停产通告",
+      "url": "https://auto.net.cn/PA0vig_isRky7TojRXlVPw.html",
+      "confirmed": true
+    },
+    {
+      "model": "大众ID.AURA T6",
+      "status": "new_launch",
+      "date": "2026-09-20",
+      "successor": "",
+      "note": "2026-09-20上市，首个完整销售月即12,032台，仍处产能爬坡期。",
+      "source": "厂商上市信息",
+      "source_type": "厂商在售状态",
+      "url": "",
+      "confirmed": true
+    },
+    {
+      "model": "极狐阿尔法T5",
+      "status": "facelift_pending",
+      "date": "",
+      "successor": "极狐阿尔法T5 新款",
+      "note": "改款在即，9月起进入清库，月销132台不反映真实需求。",
+      "source": "媒体披露",
+      "source_type": "媒体确证",
+      "url": "",
+      "confirmed": true
+    },
+    {
+      "model": "小鹏MONA L05",
+      "status": "new_launch",
+      "date": "2026-10-29",
+      "successor": "",
+      "note": "2026-10-29上市、11月1日开始交付，10月零售0台属正常（未交付）。",
+      "source": "厂商上市信息",
+      "source_type": "厂商在售状态",
+      "url": "",
+      "confirmed": true
+    }
+  ]
+}

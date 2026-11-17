@@ -1,0 +1,7401 @@
+{
+ "version": "v6.3",
+ "generated_at": "2026-11-14 23:47:08",
+ "purpose": "L1 官方碰撞测评**存在性**证据；只作事实列与判档证据，不换算分数、不进 6 维加权，排名零影响。",
+ "discipline": {
+  "SCORING_ENABLED": false,
+  "grade_decoded": false,
+  "grade_note": "C-IASI 列表页用 level1/1..4.png 数字图标，详情页图例用 G+/G/A/M/P 字母图，官网无文字对照，故不解码等级；只把「有官方测评记录」当作事实。",
+  "no_extrapolation": "成绩对应具体测试年款/配置，不外推到同车系其它年款、动力或配置。",
+  "no_fuzzy_match": "只做精确归一化、品牌+车型拼接、显式白名单别名三种匹配；不做子串模糊匹配，避免途观L Pro→途观L 这类张冠李戴。",
+  "freshness_rule": {
+   "current_min_year": 2023,
+   "note": "详情页明确写出「20XX款」时用该年份（high 置信）；否则用 C-IASI 列表页按「YYYY年-评级」分段给出的发布年份作代理（medium 置信，与测试年款通常相差 ≤1 年）。年份 ≥2023 或为 C-NCAP 2024 年至今成绩，才认作可支撑判档的L1 近期证据；更早年款只进事实列。这是保守阈值，不是换代判定——本仓库没有车型换代数据，故不声称「2023+ 一定适用于现款」。"
+  }
+ },
+ "sources": {
+  "CIASI": {
+   "list_url": "https://www.ciasi.org.cn/get_products_list.html",
+   "page_url": "https://www.ciasi.org.cn/products/list-492.html",
+   "fetched_at": "2026-11-14 23:39:52",
+   "n_rows": 189,
+   "years": [
+    2018,
+    2019,
+    2020,
+    2021,
+    2022,
+    2023,
+    2024,
+    2025
+   ],
+   "access": "公开 GET，无签名、无登录态；限速 0.1s"
+  },
+  "CNCAP": {
+   "file": "cncap_scores.json",
+   "n_scores": 57,
+   "note": "C-NCAP 综合得分率（%）。来源：官网首页自动抓取（每批最新）+ 测评结果汇总（2024 年至今存量）。2026-11 起抓取自动化。",
+   "home": "https://www.c-ncap.org.cn/"
+  }
+ },
+ "cncap_meta": {
+  "问界M7": {
+   "source": "cncap_official_website",
+   "url": "https://www.c-ncap.org.cn/evaluation/8795ca2fcbefe8facddb468bfca8ddb6",
+   "date": "2026-11-14",
+   "year": null
+  },
+  "银河M9": {
+   "source": "cncap_official_website",
+   "url": "https://www.c-ncap.org.cn/evaluation/aae7caa16efd4d8dfb4d4bd24492b087",
+   "date": "2026-11-14",
+   "year": null
+  },
+  "问界M9": {
+   "source": "cncap_official_or_press"
+  },
+  "尚界H5": {
+   "source": "cncap_official_website",
+   "url": "https://www.c-ncap.org.cn/evaluation/d1eb736a0a70b881bfadbe3253d89f93",
+   "date": "2026-11-14",
+   "year": null
+  },
+  "问界M8": {
+   "source": "cncap_official_or_press"
+  },
+  "小米SU7": {
+   "source": "cncap_official_or_press"
+  },
+  "唐L": {
+   "source": "cncap_official_or_press"
+  },
+  "极狐阿尔法T5": {
+   "source": "cncap_official_or_press"
+  },
+  "极氪MIX": {
+   "source": "cncap_official_or_press"
+  },
+  "奥迪E5": {
+   "source": "cncap_official_website",
+   "url": "https://www.c-ncap.org.cn/evaluation/8952c43ef0c9aba5149f37de102e5d31",
+   "date": "2026-11-14",
+   "year": null
+  },
+  "理想i6": {
+   "source": "cncap_official_website",
+   "url": "https://www.c-ncap.org.cn/evaluation/638e3f9f6ababeed8afcc51217dd0c22",
+   "date": "2026-11-14",
+   "year": null
+  },
+  "乐道L90": {
+   "source": "cncap_official_or_press"
+  },
+  "马自达EZ-6": {
+   "source": "cncap_official_or_press"
+  },
+  "智己LS6": {
+   "source": "cncap_official_or_press"
+  },
+  "极氪7X": {
+   "source": "cncap_official_or_press"
+  },
+  "阿维塔06": {
+   "source": "cncap_official_website",
+   "url": "https://www.c-ncap.org.cn/evaluation/d65e5a21a0eb666231ea8dcfcbeddb3a",
+   "date": "2026-11-14",
+   "year": null
+  },
+  "理想L6": {
+   "source": "cncap_official_or_press"
+  },
+  "零跑C10": {
+   "source": "cncap_official_or_press"
+  },
+  "大众与众06": {
+   "source": "cncap_official_or_press"
+  },
+  "阿维塔11": {
+   "source": "cncap_official_or_press"
+  },
+  "阿维塔07": {
+   "source": "cncap_official_or_press"
+  },
+  "宝马i5": {
+   "source": "cncap_official_or_press"
+  },
+  "智界S7": {
+   "source": "cncap_official_or_press"
+  },
+  "极氪009": {
+   "source": "cncap_official_or_press"
+  },
+  "firefly萤火虫": {
+   "source": "cncap_official_or_press"
+  },
+  "享界S9": {
+   "source": "cncap_official_or_press"
+  },
+  "乐道L60": {
+   "source": "cncap_official_or_press"
+  },
+  "凯美瑞": {
+   "source": "cncap_official_or_press"
+  },
+  "英仕派": {
+   "source": "cncap_official_or_press"
+  },
+  "迈腾": {
+   "source": "cncap_official_or_press"
+  },
+  "别克世纪": {
+   "source": "cncap_official_or_press"
+  },
+  "方程豹豹8": {
+   "source": "cncap_official_or_press"
+  },
+  "小鹏P7+": {
+   "source": "cncap_official_or_press"
+  },
+  "林肯航海家": {
+   "source": "cncap_official_or_press"
+  },
+  "海狮07": {
+   "source": "cncap_official_or_press"
+  },
+  "魏牌高山": {
+   "source": "cncap_official_or_press"
+  },
+  "丰田bZ5": {
+   "source": "cncap_official_or_press"
+  },
+  "奥迪Q6L e-tron": {
+   "source": "cncap_official_or_press"
+  },
+  "小鹏X9": {
+   "source": "cncap_official_or_press"
+  },
+  "宝马X3": {
+   "source": "cncap_official_or_press"
+  },
+  "途观L Pro": {
+   "source": "cncap_official_or_press"
+  },
+  "铂智3X": {
+   "source": "cncap_official_or_press"
+  },
+  "深蓝L06": {
+   "source": "cncap_official_or_press"
+  },
+  "日产NX8": {
+   "source": "cncap_official_website",
+   "url": "https://www.c-ncap.org.cn/evaluation/9f5fb581d1cfad0bdd58d5bcc971a7af",
+   "date": "2026-11-14",
+   "year": null
+  },
+  "别克至境L7": {
+   "source": "cncap_official_website",
+   "url": "https://www.c-ncap.org.cn/evaluation/da9cfac5f7693da413eec090a02c10db",
+   "date": "2026-11-14",
+   "year": null
+  },
+  "尚界Z7": {
+   "source": "cncap_official_website",
+   "url": "https://www.c-ncap.org.cn/evaluation/2120462641737498625",
+   "date": "2026-11-14",
+   "year": null
+  },
+  "岚图泰山": {
+   "source": "cncap_official_website",
+   "url": "https://www.c-ncap.org.cn/evaluation/2114989120685080578",
+   "date": "2026-11-14",
+   "year": null
+  },
+  "奇瑞风云T11": {
+   "source": "cncap_official_website",
+   "url": "https://www.c-ncap.org.cn/evaluation/cfd9116f8b5e1aad901b3ebf4385da5a",
+   "date": "2026-11-14",
+   "year": null
+  },
+  "昊铂A800": {
+   "source": "cncap_official_website",
+   "url": "https://www.c-ncap.org.cn/evaluation/0aaf83ebab6cacc38d832b1cd1ef02cb",
+   "date": "2026-11-14",
+   "year": null
+  },
+  "红旗HS6": {
+   "source": "cncap_official_website",
+   "url": "https://www.c-ncap.org.cn/evaluation/7199cbd4a1c8a61a3634c3fd8e03aa5a",
+   "date": "2026-11-14",
+   "year": null
+  },
+  "大众与众08": {
+   "source": "cncap_official_website",
+   "url": "https://www.c-ncap.org.cn/evaluation/bfc7f66b5bfb8eefb2b8e2c4c9f4203d",
+   "date": "2026-11-14",
+   "year": null
+  },
+  "智己LS9": {
+   "source": "cncap_official_website",
+   "url": "https://www.c-ncap.org.cn/evaluation/ce573aadffb31703b593869b000bcad4",
+   "date": "2026-11-14",
+   "year": null
+  },
+  "小米YU7": {
+   "source": "cncap_official_website",
+   "url": "https://www.c-ncap.org.cn/evaluation/8b4ed82ccbbbdd27a57b70d73fef6b73",
+   "date": "2026-11-14",
+   "year": null
+  },
+  "奥迪A5L": {
+   "source": "cncap_official_website",
+   "url": "https://www.c-ncap.org.cn/evaluation/9fe7595c07eeb03f8b2b53ee409efae2",
+   "date": "2026-11-14",
+   "year": null
+  },
+  "零跑C11": {
+   "source": "cncap_official_or_press"
+  },
+  "长安启源A07": {
+   "source": "press",
+   "note": "2024-04 C-NCAP 公布；乘员保护 91.63%（A07）/ 94.30%（汉EV）"
+  },
+  "汉EV": {
+   "source": "press",
+   "note": "2024-04 C-NCAP 公布；乘员保护 91.63%（A07）/ 94.30%（汉EV）"
+  }
+ },
+ "alias_whitelist": {
+  "宝马3系": "3系",
+  "奥迪A6L": "A6 L",
+  "奔驰GLC": "GLC",
+  "红旗H5": "H5"
+ },
+ "pool_size": 187,
+ "coverage": {
+  "has_l1": 50,
+  "l1_current": 16,
+  "l1_historical_only": 34,
+  "cias": 48,
+  "cncap": 5,
+  "both": 3
+ },
+ "evidence": {
+  "212 T01": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "MG 07 PHEV": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "MG5": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "MG6": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "MG7": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "RAV4荣放": {
+   "has_l1": true,
+   "l1_current": false,
+   "l1_historical_only": true,
+   "sources": [
+    "CIASI"
+   ],
+   "cias": [
+    {
+     "seq": "10",
+     "brand": "丰田",
+     "model": "RAV4荣放",
+     "model_code": "CA64642XME6",
+     "cls": "SUV",
+     "manufacturer": "四川一汽丰田汽车有限公司",
+     "year": 2020,
+     "grades_raw": {
+      "耐撞性与维修经济性": null,
+      "车内乘员": "level1/2.png",
+      "车外行人": "levelold/G.png",
+      "辅助安全": "level1/2.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-804.html",
+     "test_year": 2020,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-804.html",
+     "freshness": {
+      "trim_year": 2020,
+      "year_basis": "publish_year_proxy",
+      "year_confidence": "medium",
+      "is_current": false
+     },
+     "matched_by": "exact"
+    }
+   ],
+   "cncap": null,
+   "matched_by": [
+    "exact"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "iCAR V25": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "东风风神L8 PHEV": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "五菱星光PHEV": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "五菱星光S PHEV": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "五菱星辰": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "亚洲龙": {
+   "has_l1": true,
+   "l1_current": false,
+   "l1_historical_only": true,
+   "sources": [
+    "CIASI"
+   ],
+   "cias": [
+    {
+     "seq": "11",
+     "brand": "丰田",
+     "model": "亚洲龙",
+     "model_code": "TV7256E6",
+     "cls": "轿车",
+     "manufacturer": "天津一汽丰田汽车有限公司",
+     "year": 2019,
+     "grades_raw": {
+      "耐撞性与维修经济性": "level1/5.png",
+      "车内乘员": "level1/2.png",
+      "车外行人": "levelold/G.png",
+      "辅助安全": "level1/2.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-828.html",
+     "test_year": 2019,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-828.html",
+     "freshness": {
+      "trim_year": 2019,
+      "year_basis": "publish_year_proxy",
+      "year_confidence": "medium",
+      "is_current": false
+     },
+     "matched_by": "exact"
+    }
+   ],
+   "cncap": null,
+   "matched_by": [
+    "exact"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "伊兰特": {
+   "has_l1": true,
+   "l1_current": false,
+   "l1_historical_only": true,
+   "sources": [
+    "CIASI"
+   ],
+   "cias": [
+    {
+     "seq": "10",
+     "brand": "现代",
+     "model": "伊兰特",
+     "model_code": "BH7152CCAS（2022款 1.5L GLS领先版）",
+     "cls": "轿车",
+     "manufacturer": "北京现代汽车有限公司",
+     "year": 2022,
+     "grades_raw": {
+      "耐撞性与维修经济性": "level1/5.png",
+      "车内乘员": "level1/2.png",
+      "车外行人": "levelold/A.png",
+      "辅助安全": "level1/3.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-746.html",
+     "test_year": 2022,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-746.html",
+     "freshness": {
+      "trim_year": 2022,
+      "year_basis": "detail_trim_text",
+      "year_confidence": "high",
+      "is_current": false
+     },
+     "matched_by": "exact"
+    }
+   ],
+   "cncap": null,
+   "matched_by": [
+    "exact"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "传祺GS4": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "传祺GS8": {
+   "has_l1": true,
+   "l1_current": true,
+   "l1_historical_only": false,
+   "sources": [
+    "CIASI"
+   ],
+   "cias": [
+    {
+     "seq": "7",
+     "brand": "传祺",
+     "model": "GS8",
+     "model_code": "GAC6501JDA6C",
+     "cls": "SUV",
+     "manufacturer": "广汽乘用车有限公司",
+     "year": 2023,
+     "grades_raw": {
+      "耐撞性与维修经济性": "level1/5.png",
+      "车内乘员": "level1/2.png",
+      "车外行人": "levelold/G.png",
+      "辅助安全": "level1/2.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-727.html",
+     "test_year": 2023,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-727.html",
+     "freshness": {
+      "trim_year": 2023,
+      "year_basis": "publish_year_proxy",
+      "year_confidence": "medium",
+      "is_current": true
+     },
+     "matched_by": "brand+model"
+    }
+   ],
+   "cncap": null,
+   "matched_by": [
+    "brand+model"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "冒险家": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "冠道": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "凌渡": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "凡尔赛C5 X": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "凯美瑞": {
+   "has_l1": true,
+   "l1_current": true,
+   "l1_historical_only": false,
+   "sources": [
+    "CIASI",
+    "CNCAP"
+   ],
+   "cias": [
+    {
+     "seq": "4",
+     "brand": "丰田",
+     "model": "凯美瑞",
+     "model_code": "GTM7200CEE",
+     "cls": "轿车",
+     "manufacturer": "广汽丰田汽车有限公司",
+     "year": 2018,
+     "grades_raw": {
+      "耐撞性与维修经济性": null,
+      "车内乘员": "level1/2.png",
+      "车外行人": "levelold/G.png",
+      "辅助安全": "level1/2.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-848.html",
+     "test_year": 2018,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-848.html",
+     "freshness": {
+      "trim_year": 2018,
+      "year_basis": "publish_year_proxy",
+      "year_confidence": "medium",
+      "is_current": false
+     },
+     "matched_by": "exact"
+    }
+   ],
+   "cncap": {
+    "model": "凯美瑞",
+    "overall_pct": 88.9,
+    "matched_by": "exact"
+   },
+   "matched_by": [
+    "exact"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "凯迪拉克CT5": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "凯迪拉克GT4": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "凯迪拉克XT4": {
+   "has_l1": true,
+   "l1_current": false,
+   "l1_historical_only": true,
+   "sources": [
+    "CIASI"
+   ],
+   "cias": [
+    {
+     "seq": "7",
+     "brand": "凯迪拉克",
+     "model": "XT4",
+     "model_code": "SGM6468EBA1",
+     "cls": "SUV",
+     "manufacturer": "上汽通用汽车有限公司",
+     "year": 2019,
+     "grades_raw": {
+      "耐撞性与维修经济性": null,
+      "车内乘员": "level1/2.png",
+      "车外行人": "levelold/G.png",
+      "辅助安全": "level1/2.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-824.html",
+     "test_year": 2019,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-824.html",
+     "freshness": {
+      "trim_year": 2019,
+      "year_basis": "publish_year_proxy",
+      "year_confidence": "medium",
+      "is_current": false
+     },
+     "matched_by": "brand+model"
+    }
+   ],
+   "cncap": null,
+   "matched_by": [
+    "brand+model"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "凯迪拉克XT5": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "凯迪拉克XT5 PHEV": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "创维HT-i": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "别克至境E7": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "勇士": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "北京X7": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "北京越野BJ30": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "北京越野BJ40": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "北京越野BJ40增程": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "博越L": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "博越REV": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "卡罗拉": {
+   "has_l1": true,
+   "l1_current": false,
+   "l1_historical_only": true,
+   "sources": [
+    "CIASI"
+   ],
+   "cias": [
+    {
+     "seq": "27",
+     "brand": "丰田",
+     "model": "卡罗拉",
+     "model_code": "TV7121N6",
+     "cls": "轿车",
+     "manufacturer": "天津一汽丰田汽车有限公司",
+     "year": 2019,
+     "grades_raw": {
+      "耐撞性与维修经济性": "level1/5.png",
+      "车内乘员": "level1/2.png",
+      "车外行人": "levelold/G.png",
+      "辅助安全": "level1/2.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-844.html",
+     "test_year": 2019,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-844.html",
+     "freshness": {
+      "trim_year": 2019,
+      "year_basis": "publish_year_proxy",
+      "year_confidence": "medium",
+      "is_current": false
+     },
+     "matched_by": "exact"
+    }
+   ],
+   "cncap": null,
+   "matched_by": [
+    "exact"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "卡罗拉锐放": {
+   "has_l1": true,
+   "l1_current": true,
+   "l1_historical_only": false,
+   "sources": [
+    "CIASI"
+   ],
+   "cias": [
+    {
+     "seq": "5",
+     "brand": "丰田",
+     "model": "卡罗拉锐放",
+     "model_code": "TV7207X6P",
+     "cls": "SUV",
+     "manufacturer": "一汽丰田汽车有限公司",
+     "year": 2024,
+     "grades_raw": {
+      "耐撞性与维修经济性": "level1/3.png",
+      "车内乘员": "level1/4.png",
+      "车外行人": "level1/1.png",
+      "辅助安全": "level1/2.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-882.html",
+     "test_year": 2024,
+     "rule_version": "2023",
+     "test_trim": "TV7207X6P（2023款 2.0L先锋版）",
+     "detail_url": "https://www.ciasi.org.cn/products/show-882.html",
+     "freshness": {
+      "trim_year": 2023,
+      "year_basis": "detail_trim_text",
+      "year_confidence": "high",
+      "is_current": true
+     },
+     "matched_by": "exact"
+    }
+   ],
+   "cncap": null,
+   "matched_by": [
+    "exact"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "君威": {
+   "has_l1": true,
+   "l1_current": false,
+   "l1_historical_only": true,
+   "sources": [
+    "CIASI"
+   ],
+   "cias": [
+    {
+     "seq": "1",
+     "brand": "别克",
+     "model": "君威",
+     "model_code": "SGM7157EBA1",
+     "cls": "轿车",
+     "manufacturer": "上汽通用汽车有限公司",
+     "year": 2020,
+     "grades_raw": {
+      "耐撞性与维修经济性": "level1/4.png",
+      "车内乘员": "level1/2.png",
+      "车外行人": "levelold/G.png",
+      "辅助安全": "level1/2.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-795.html",
+     "test_year": 2020,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-795.html",
+     "freshness": {
+      "trim_year": 2020,
+      "year_basis": "publish_year_proxy",
+      "year_confidence": "medium",
+      "is_current": false
+     },
+     "matched_by": "exact"
+    }
+   ],
+   "cncap": null,
+   "matched_by": [
+    "exact"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "君越": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "启辰D60": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "启辰大V": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "启辰星": {
+   "has_l1": true,
+   "l1_current": false,
+   "l1_historical_only": true,
+   "sources": [
+    "CIASI"
+   ],
+   "cias": [
+    {
+     "seq": "17",
+     "brand": "启辰",
+     "model": "星",
+     "model_code": "DFL6470MTN81",
+     "cls": "SUV",
+     "manufacturer": "东风汽车有限公司",
+     "year": 2020,
+     "grades_raw": {
+      "耐撞性与维修经济性": "level1/4.png",
+      "车内乘员": "level1/2.png",
+      "车外行人": "levelold/G.png",
+      "辅助安全": "level1/2.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-811.html",
+     "test_year": 2020,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-811.html",
+     "freshness": {
+      "trim_year": 2020,
+      "year_basis": "publish_year_proxy",
+      "year_confidence": "medium",
+      "is_current": false
+     },
+     "matched_by": "brand+model"
+    }
+   ],
+   "cncap": null,
+   "matched_by": [
+    "brand+model"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "哈弗H6": {
+   "has_l1": true,
+   "l1_current": false,
+   "l1_historical_only": true,
+   "sources": [
+    "CIASI"
+   ],
+   "cias": [
+    {
+     "seq": "3",
+     "brand": "哈弗",
+     "model": "H6",
+     "model_code": "CC6464RM08A",
+     "cls": "SUV",
+     "manufacturer": "长城汽车股份有限公司",
+     "year": 2020,
+     "grades_raw": {
+      "耐撞性与维修经济性": "level1/5.png",
+      "车内乘员": "level1/3.png",
+      "车外行人": "levelold/G.png",
+      "辅助安全": null,
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-797.html",
+     "test_year": 2020,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-797.html",
+     "freshness": {
+      "trim_year": 2020,
+      "year_basis": "publish_year_proxy",
+      "year_confidence": "medium",
+      "is_current": false
+     },
+     "matched_by": "brand+model"
+    }
+   ],
+   "cncap": null,
+   "matched_by": [
+    "brand+model"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "哈弗枭龙MAX": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "哈弗猛龙PHEV": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "坦克300": {
+   "has_l1": true,
+   "l1_current": false,
+   "l1_historical_only": true,
+   "sources": [
+    "CIASI"
+   ],
+   "cias": [
+    {
+     "seq": "9",
+     "brand": "魏牌",
+     "model": "坦克300",
+     "model_code": "CC2030BE21A",
+     "cls": "SUV",
+     "manufacturer": "长城汽车股份有限公司",
+     "year": 2021,
+     "grades_raw": {
+      "耐撞性与维修经济性": "level1/3.png",
+      "车内乘员": "level1/2.png",
+      "车外行人": "levelold/G.png",
+      "辅助安全": "level1/2.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-781.html",
+     "test_year": 2021,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-781.html",
+     "freshness": {
+      "trim_year": 2021,
+      "year_basis": "publish_year_proxy",
+      "year_confidence": "medium",
+      "is_current": false
+     },
+     "matched_by": "exact"
+    }
+   ],
+   "cncap": null,
+   "matched_by": [
+    "exact"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "坦克300 Hi4-T": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "型格": {
+   "has_l1": true,
+   "l1_current": false,
+   "l1_historical_only": true,
+   "sources": [
+    "CIASI"
+   ],
+   "cias": [
+    {
+     "seq": "3",
+     "brand": "本田",
+     "model": "型格",
+     "model_code": "GHA7150SAC6A（2022款 240TURBO 科技版）",
+     "cls": "轿车",
+     "manufacturer": "广汽本田汽车有限公司",
+     "year": 2022,
+     "grades_raw": {
+      "耐撞性与维修经济性": "level1/5.png",
+      "车内乘员": "level1/2.png",
+      "车外行人": "levelold/G.png",
+      "辅助安全": "level1/2.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-730.html",
+     "test_year": 2022,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-730.html",
+     "freshness": {
+      "trim_year": 2022,
+      "year_basis": "detail_trim_text",
+      "year_confidence": "high",
+      "is_current": false
+     },
+     "matched_by": "exact"
+    }
+   ],
+   "cncap": null,
+   "matched_by": [
+    "exact"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "大众CC": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "天籁": {
+   "has_l1": true,
+   "l1_current": false,
+   "l1_historical_only": true,
+   "sources": [
+    "CIASI"
+   ],
+   "cias": [
+    {
+     "seq": "14",
+     "brand": "日产",
+     "model": "天籁",
+     "model_code": "DFL7201VANF2",
+     "cls": "轿车",
+     "manufacturer": "东风汽车有限公司",
+     "year": 2019,
+     "grades_raw": {
+      "耐撞性与维修经济性": "level1/4.png",
+      "车内乘员": "level1/2.png",
+      "车外行人": "levelold/G.png",
+      "辅助安全": "level1/2.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-831.html",
+     "test_year": 2019,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-831.html",
+     "freshness": {
+      "trim_year": 2019,
+      "year_basis": "publish_year_proxy",
+      "year_confidence": "medium",
+      "is_current": false
+     },
+     "matched_by": "exact"
+    }
+   ],
+   "cncap": null,
+   "matched_by": [
+    "exact"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "奇骏": {
+   "has_l1": true,
+   "l1_current": false,
+   "l1_historical_only": true,
+   "sources": [
+    "CIASI"
+   ],
+   "cias": [
+    {
+     "seq": "10",
+     "brand": "日产",
+     "model": "奇骏",
+     "model_code": "DFL6470VTNM2",
+     "cls": "SUV",
+     "manufacturer": "东风汽车有限公司",
+     "year": 2021,
+     "grades_raw": {
+      "耐撞性与维修经济性": "level1/4.png",
+      "车内乘员": "level1/2.png",
+      "车外行人": "levelold/G.png",
+      "辅助安全": "level1/2.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-782.html",
+     "test_year": 2021,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-782.html",
+     "freshness": {
+      "trim_year": 2021,
+      "year_basis": "publish_year_proxy",
+      "year_confidence": "medium",
+      "is_current": false
+     },
+     "matched_by": "exact"
+    }
+   ],
+   "cncap": null,
+   "matched_by": [
+    "exact"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "奔驰A级": {
+   "has_l1": true,
+   "l1_current": false,
+   "l1_historical_only": true,
+   "sources": [
+    "CIASI"
+   ],
+   "cias": [
+    {
+     "seq": "6",
+     "brand": "奔驰",
+     "model": "A级",
+     "model_code": "BJ7138LEL",
+     "cls": "轿车",
+     "manufacturer": "北京奔驰汽车有限公司",
+     "year": 2020,
+     "grades_raw": {
+      "耐撞性与维修经济性": null,
+      "车内乘员": "level1/2.png",
+      "车外行人": "levelold/G.png",
+      "辅助安全": "level1/3.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-800.html",
+     "test_year": 2020,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-800.html",
+     "freshness": {
+      "trim_year": 2020,
+      "year_basis": "publish_year_proxy",
+      "year_confidence": "medium",
+      "is_current": false
+     },
+     "matched_by": "brand+model"
+    }
+   ],
+   "cncap": null,
+   "matched_by": [
+    "brand+model"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "奔驰C级": {
+   "has_l1": true,
+   "l1_current": true,
+   "l1_historical_only": false,
+   "sources": [
+    "CIASI"
+   ],
+   "cias": [
+    {
+     "seq": "9",
+     "brand": "奔驰",
+     "model": "C级",
+     "model_code": "BJ7154PEL",
+     "cls": "轿车",
+     "manufacturer": "北京奔驰汽车有限公司",
+     "year": 2023,
+     "grades_raw": {
+      "耐撞性与维修经济性": "level1/4.png",
+      "车内乘员": "level1/2.png",
+      "车外行人": "levelold/G.png",
+      "辅助安全": "level1/2.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-732.html",
+     "test_year": 2023,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-732.html",
+     "freshness": {
+      "trim_year": 2023,
+      "year_basis": "publish_year_proxy",
+      "year_confidence": "medium",
+      "is_current": true
+     },
+     "matched_by": "brand+model"
+    },
+    {
+     "seq": "9",
+     "brand": "奔驰",
+     "model": "C级",
+     "model_code": "BJ7204HE",
+     "cls": "轿车",
+     "manufacturer": "北京奔驰汽车有限公司",
+     "year": 2018,
+     "grades_raw": {
+      "耐撞性与维修经济性": null,
+      "车内乘员": "level1/2.png",
+      "车外行人": "levelold/A.png",
+      "辅助安全": "level1/2.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-853.html",
+     "test_year": 2018,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-853.html",
+     "freshness": {
+      "trim_year": 2018,
+      "year_basis": "publish_year_proxy",
+      "year_confidence": "medium",
+      "is_current": false
+     },
+     "matched_by": "brand+model"
+    }
+   ],
+   "cncap": null,
+   "matched_by": [
+    "brand+model"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "奔驰GLB": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "奔驰GLC": {
+   "has_l1": true,
+   "l1_current": false,
+   "l1_historical_only": true,
+   "sources": [
+    "CIASI"
+   ],
+   "cias": [
+    {
+     "seq": "22",
+     "brand": "奔驰",
+     "model": "GLC",
+     "model_code": "BJ6486LEAL",
+     "cls": "SUV",
+     "manufacturer": "北京奔驰汽车有限公司",
+     "year": 2019,
+     "grades_raw": {
+      "耐撞性与维修经济性": "level1/5.png",
+      "车内乘员": "level1/2.png",
+      "车外行人": "levelold/G.png",
+      "辅助安全": "level1/2.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-839.html",
+     "test_year": 2019,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-839.html",
+     "freshness": {
+      "trim_year": 2019,
+      "year_basis": "publish_year_proxy",
+      "year_confidence": "medium",
+      "is_current": false
+     },
+     "matched_by": "brand+model"
+    }
+   ],
+   "cncap": null,
+   "matched_by": [
+    "brand+model"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "奕炫": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "奥迪A3": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "奥迪A4L": {
+   "has_l1": true,
+   "l1_current": false,
+   "l1_historical_only": true,
+   "sources": [
+    "CIASI"
+   ],
+   "cias": [
+    {
+     "seq": "24",
+     "brand": "奥迪",
+     "model": "A4L",
+     "model_code": "FV7203FBDCG（2022款 40TFSI 时尚动感型）",
+     "cls": "轿车",
+     "manufacturer": "一汽-大众汽车有限公司",
+     "year": 2022,
+     "grades_raw": {
+      "耐撞性与维修经济性": "level1/4.png",
+      "车内乘员": "level1/2.png",
+      "车外行人": "levelold/G.png",
+      "辅助安全": "level1/2.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-768.html",
+     "test_year": 2022,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-768.html",
+     "freshness": {
+      "trim_year": 2022,
+      "year_basis": "detail_trim_text",
+      "year_confidence": "high",
+      "is_current": false
+     },
+     "matched_by": "brand+model"
+    }
+   ],
+   "cncap": null,
+   "matched_by": [
+    "brand+model"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "奥迪A5L": {
+   "has_l1": true,
+   "l1_current": true,
+   "l1_historical_only": false,
+   "sources": [
+    "CNCAP"
+   ],
+   "cias": null,
+   "cncap": {
+    "model": "奥迪A5L",
+    "overall_pct": 86.5,
+    "matched_by": "exact"
+   },
+   "matched_by": [
+    "exact"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "奥迪Q3": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "奥迪Q5L": {
+   "has_l1": true,
+   "l1_current": false,
+   "l1_historical_only": true,
+   "sources": [
+    "CIASI"
+   ],
+   "cias": [
+    {
+     "seq": "5",
+     "brand": "奥迪",
+     "model": "Q5L",
+     "model_code": "FV6481LAQDG",
+     "cls": "SUV",
+     "manufacturer": "一汽-大众汽车有限公司",
+     "year": 2020,
+     "grades_raw": {
+      "耐撞性与维修经济性": null,
+      "车内乘员": "level1/2.png",
+      "车外行人": "levelold/G.png",
+      "辅助安全": "level1/2.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-799.html",
+     "test_year": 2020,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-799.html",
+     "freshness": {
+      "trim_year": 2020,
+      "year_basis": "publish_year_proxy",
+      "year_confidence": "medium",
+      "is_current": false
+     },
+     "matched_by": "brand+model"
+    }
+   ],
+   "cncap": null,
+   "matched_by": [
+    "brand+model"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "威兰达": {
+   "has_l1": true,
+   "l1_current": false,
+   "l1_historical_only": true,
+   "sources": [
+    "CIASI"
+   ],
+   "cias": [
+    {
+     "seq": "13",
+     "brand": "丰田",
+     "model": "威兰达",
+     "model_code": "GTM6470FFXM",
+     "cls": "SUV",
+     "manufacturer": "广汽丰田汽车有限公司",
+     "year": 2020,
+     "grades_raw": {
+      "耐撞性与维修经济性": "level1/5.png",
+      "车内乘员": "level1/2.png",
+      "车外行人": "levelold/G.png",
+      "辅助安全": "level1/2.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-807.html",
+     "test_year": 2020,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-807.html",
+     "freshness": {
+      "trim_year": 2020,
+      "year_basis": "publish_year_proxy",
+      "year_confidence": "medium",
+      "is_current": false
+     },
+     "matched_by": "exact"
+    }
+   ],
+   "cncap": null,
+   "matched_by": [
+    "exact"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "威朗": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "威飒": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "宋L DM": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "宋Pro DM": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "宋Ultra DM": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "宝来": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "宝马3系": {
+   "has_l1": true,
+   "l1_current": false,
+   "l1_historical_only": true,
+   "sources": [
+    "CIASI"
+   ],
+   "cias": [
+    {
+     "seq": "24",
+     "brand": "宝马",
+     "model": "3系",
+     "model_code": "BMW7200AG",
+     "cls": "轿车",
+     "manufacturer": "华晨宝马汽车有限公司",
+     "year": 2019,
+     "grades_raw": {
+      "耐撞性与维修经济性": "level1/5.png",
+      "车内乘员": "level1/2.png",
+      "车外行人": "levelold/G.png",
+      "辅助安全": "level1/2.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-841.html",
+     "test_year": 2019,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-841.html",
+     "freshness": {
+      "trim_year": 2019,
+      "year_basis": "publish_year_proxy",
+      "year_confidence": "medium",
+      "is_current": false
+     },
+     "matched_by": "brand+model"
+    },
+    {
+     "seq": "10",
+     "brand": "宝马",
+     "model": "3系",
+     "model_code": "BMW7150BF",
+     "cls": "轿车",
+     "manufacturer": "华晨宝马汽车有限公司",
+     "year": 2018,
+     "grades_raw": {
+      "耐撞性与维修经济性": null,
+      "车内乘员": "level1/3.png",
+      "车外行人": "levelold/G.png",
+      "辅助安全": null,
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-854.html",
+     "test_year": 2018,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-854.html",
+     "freshness": {
+      "trim_year": 2018,
+      "year_basis": "publish_year_proxy",
+      "year_confidence": "medium",
+      "is_current": false
+     },
+     "matched_by": "brand+model"
+    }
+   ],
+   "cncap": null,
+   "matched_by": [
+    "brand+model"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "宝马X1": {
+   "has_l1": true,
+   "l1_current": true,
+   "l1_historical_only": false,
+   "sources": [
+    "CIASI"
+   ],
+   "cias": [
+    {
+     "seq": "4",
+     "brand": "宝马",
+     "model": "X1",
+     "model_code": "BMW6462AS",
+     "cls": "SUV",
+     "manufacturer": "华晨宝马汽车有限公司",
+     "year": 2023,
+     "grades_raw": {
+      "耐撞性与维修经济性": "level1/4.png",
+      "车内乘员": "level1/2.png",
+      "车外行人": "levelold/G.png",
+      "辅助安全": "level1/2.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-724.html",
+     "test_year": 2023,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-724.html",
+     "freshness": {
+      "trim_year": 2023,
+      "year_basis": "publish_year_proxy",
+      "year_confidence": "medium",
+      "is_current": true
+     },
+     "matched_by": "brand+model"
+    }
+   ],
+   "cncap": null,
+   "matched_by": [
+    "brand+model"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "宝马X3": {
+   "has_l1": true,
+   "l1_current": true,
+   "l1_historical_only": false,
+   "sources": [
+    "CIASI",
+    "CNCAP"
+   ],
+   "cias": [
+    {
+     "seq": "12",
+     "brand": "宝马",
+     "model": "X3",
+     "model_code": "BMW6475SX",
+     "cls": "SUV",
+     "manufacturer": "华晨宝马汽车有限公司",
+     "year": 2020,
+     "grades_raw": {
+      "耐撞性与维修经济性": "level1/5.png",
+      "车内乘员": "level1/2.png",
+      "车外行人": "levelold/G.png",
+      "辅助安全": "level1/2.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-806.html",
+     "test_year": 2020,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-806.html",
+     "freshness": {
+      "trim_year": 2020,
+      "year_basis": "publish_year_proxy",
+      "year_confidence": "medium",
+      "is_current": false
+     },
+     "matched_by": "brand+model"
+    }
+   ],
+   "cncap": {
+    "model": "宝马X3",
+    "overall_pct": 85.0,
+    "matched_by": "exact"
+   },
+   "matched_by": [
+    "brand+model",
+    "exact"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "宝骏云海PHEV": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "帕拉丁": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "帕萨特": {
+   "has_l1": true,
+   "l1_current": false,
+   "l1_historical_only": true,
+   "sources": [
+    "CIASI"
+   ],
+   "cias": [
+    {
+     "seq": "14",
+     "brand": "大众",
+     "model": "帕萨特",
+     "model_code": "SVW71423DT",
+     "cls": "轿车",
+     "manufacturer": "上汽大众汽车有限公司",
+     "year": 2020,
+     "grades_raw": {
+      "耐撞性与维修经济性": "level1/3.png",
+      "车内乘员": "level1/2.png",
+      "车外行人": "levelold/G.png",
+      "辅助安全": "level1/2.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-808.html",
+     "test_year": 2020,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-808.html",
+     "freshness": {
+      "trim_year": 2020,
+      "year_basis": "publish_year_proxy",
+      "year_confidence": "medium",
+      "is_current": false
+     },
+     "matched_by": "exact"
+    },
+    {
+     "seq": "18",
+     "brand": "大众",
+     "model": "帕萨特",
+     "model_code": "SVW71423CT",
+     "cls": "轿车",
+     "manufacturer": "上汽大众汽车有限公司",
+     "year": 2019,
+     "grades_raw": {
+      "耐撞性与维修经济性": "level1/3.png",
+      "车内乘员": "level1/4.png",
+      "车外行人": "levelold/G.png",
+      "辅助安全": "level1/2.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-835.html",
+     "test_year": 2019,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-835.html",
+     "freshness": {
+      "trim_year": 2019,
+      "year_basis": "publish_year_proxy",
+      "year_confidence": "medium",
+      "is_current": false
+     },
+     "matched_by": "exact"
+    }
+   ],
+   "cncap": null,
+   "matched_by": [
+    "exact"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "帕萨特PHEV": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "帝豪": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "影豹": {
+   "has_l1": true,
+   "l1_current": false,
+   "l1_historical_only": true,
+   "sources": [
+    "CIASI"
+   ],
+   "cias": [
+    {
+     "seq": "8",
+     "brand": "传祺",
+     "model": "影豹",
+     "model_code": "GAC7153BCW6B（2021款 270T J11版）",
+     "cls": "轿车",
+     "manufacturer": "广汽乘用车有限公司",
+     "year": 2022,
+     "grades_raw": {
+      "耐撞性与维修经济性": "level1/5.png",
+      "车内乘员": "level1/2.png",
+      "车外行人": "levelold/G.png",
+      "辅助安全": "level1/3.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-744.html",
+     "test_year": 2022,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-744.html",
+     "freshness": {
+      "trim_year": 2021,
+      "year_basis": "detail_trim_text",
+      "year_confidence": "high",
+      "is_current": false
+     },
+     "matched_by": "exact"
+    }
+   ],
+   "cncap": null,
+   "matched_by": [
+    "exact"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "思域": {
+   "has_l1": true,
+   "l1_current": false,
+   "l1_historical_only": true,
+   "sources": [
+    "CIASI"
+   ],
+   "cias": [
+    {
+     "seq": "7",
+     "brand": "本田",
+     "model": "思域",
+     "model_code": "DHW7151FECSF （2022款 180TURBO 尚动版）",
+     "cls": "轿车",
+     "manufacturer": "东风本田汽车有限公司",
+     "year": 2022,
+     "grades_raw": {
+      "耐撞性与维修经济性": "level1/5.png",
+      "车内乘员": "level1/2.png",
+      "车外行人": "levelold/G.png",
+      "辅助安全": "level1/2.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-743.html",
+     "test_year": 2022,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-743.html",
+     "freshness": {
+      "trim_year": 2022,
+      "year_basis": "detail_trim_text",
+      "year_confidence": "high",
+      "is_current": false
+     },
+     "matched_by": "exact"
+    },
+    {
+     "seq": "8",
+     "brand": "本田",
+     "model": "思域",
+     "model_code": "DHW7101FCCSE",
+     "cls": "轿车",
+     "manufacturer": "东风本田汽车有限公司",
+     "year": 2018,
+     "grades_raw": {
+      "耐撞性与维修经济性": null,
+      "车内乘员": "level1/4.png",
+      "车外行人": "levelold/G.png",
+      "辅助安全": "level1/2.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-852.html",
+     "test_year": 2018,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-852.html",
+     "freshness": {
+      "trim_year": 2018,
+      "year_basis": "publish_year_proxy",
+      "year_confidence": "medium",
+      "is_current": false
+     },
+     "matched_by": "exact"
+    }
+   ],
+   "cncap": null,
+   "matched_by": [
+    "exact"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "悦意07": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "捷达VA3": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "捷达VA7": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "捷达VS5": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "捷达VS7": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "捷达VS8": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "捷途X70": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "捷途X90": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "捷途大圣": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "捷途山海T1": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "捷途旅行者": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "捷途自由者": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "探岳": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "探岳L PHEV": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "探岳X": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "日产N6": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "星光560": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "星光560 PHEV": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "星瑞": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "星瑞L PLUS": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "星越L": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "星途ET5": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "星途凌云": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "星途瑶光": {
+   "has_l1": true,
+   "l1_current": true,
+   "l1_historical_only": false,
+   "sources": [
+    "CIASI"
+   ],
+   "cias": [
+    {
+     "seq": "25",
+     "brand": "星途",
+     "model": "瑶光",
+     "model_code": "SQR6480T22TBG",
+     "cls": "SUV",
+     "manufacturer": "奇瑞汽车股份有限公司",
+     "year": 2023,
+     "grades_raw": {
+      "耐撞性与维修经济性": "level1/4.png",
+      "车内乘员": "level1/2.png",
+      "车外行人": "levelold/G.png",
+      "辅助安全": "level1/2.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-762.html",
+     "test_year": 2023,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-762.html",
+     "freshness": {
+      "trim_year": 2023,
+      "year_basis": "publish_year_proxy",
+      "year_confidence": "medium",
+      "is_current": true
+     },
+     "matched_by": "brand+model"
+    }
+   ],
+   "cncap": null,
+   "matched_by": [
+    "brand+model"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "星途追风": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "智跑": {
+   "has_l1": true,
+   "l1_current": false,
+   "l1_historical_only": true,
+   "sources": [
+    "CIASI"
+   ],
+   "cias": [
+    {
+     "seq": "17",
+     "brand": "起亚",
+     "model": "智跑",
+     "model_code": "YQZ6444AE5",
+     "cls": "SUV",
+     "manufacturer": "东风悦达起亚汽车有限公司",
+     "year": 2018,
+     "grades_raw": {
+      "耐撞性与维修经济性": "level1/5.png",
+      "车内乘员": "level1/4.png",
+      "车外行人": "levelold/A.png",
+      "辅助安全": null,
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-861.html",
+     "test_year": 2018,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-861.html",
+     "freshness": {
+      "trim_year": 2018,
+      "year_basis": "publish_year_proxy",
+      "year_confidence": "medium",
+      "is_current": false
+     },
+     "matched_by": "exact"
+    }
+   ],
+   "cncap": null,
+   "matched_by": [
+    "exact"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "朗逸": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "本田CR-V": {
+   "has_l1": true,
+   "l1_current": true,
+   "l1_historical_only": false,
+   "sources": [
+    "CIASI"
+   ],
+   "cias": [
+    {
+     "seq": "10",
+     "brand": "本田",
+     "model": "CR-V",
+     "model_code": "DHW6471R3CSF",
+     "cls": "SUV",
+     "manufacturer": "东风本田汽车有限公司",
+     "year": 2023,
+     "grades_raw": {
+      "耐撞性与维修经济性": "level1/4.png",
+      "车内乘员": "level1/2.png",
+      "车外行人": "levelold/G.png",
+      "辅助安全": "level1/2.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-734.html",
+     "test_year": 2023,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-734.html",
+     "freshness": {
+      "trim_year": 2023,
+      "year_basis": "publish_year_proxy",
+      "year_confidence": "medium",
+      "is_current": true
+     },
+     "matched_by": "brand+model"
+    }
+   ],
+   "cncap": null,
+   "matched_by": [
+    "brand+model"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "本田HR-V": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "本田UR-V": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "林肯Z": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "标致4008": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "标致408": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "标致408X": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "标致5008": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "汉兰达": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "沃尔沃S60": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "沃尔沃XC40": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "沃尔沃XC60": {
+   "has_l1": true,
+   "l1_current": false,
+   "l1_historical_only": true,
+   "sources": [
+    "CIASI"
+   ],
+   "cias": [
+    {
+     "seq": "10",
+     "brand": "沃尔沃",
+     "model": "XC60",
+     "model_code": "VCC6474H27",
+     "cls": "SUV",
+     "manufacturer": "浙江豪情汽车制造有限公司",
+     "year": 2019,
+     "grades_raw": {
+      "耐撞性与维修经济性": "level1/5.png",
+      "车内乘员": "level1/2.png",
+      "车外行人": "levelold/G.png",
+      "辅助安全": "level1/2.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-827.html",
+     "test_year": 2019,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-827.html",
+     "freshness": {
+      "trim_year": 2019,
+      "year_basis": "publish_year_proxy",
+      "year_confidence": "medium",
+      "is_current": false
+     },
+     "matched_by": "brand+model"
+    }
+   ],
+   "cncap": null,
+   "matched_by": [
+    "brand+model"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "沃尔沃XC70": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "海狮06DM": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "海豹06DM": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "狮铂拓界": {
+   "has_l1": true,
+   "l1_current": true,
+   "l1_historical_only": false,
+   "sources": [
+    "CIASI"
+   ],
+   "cias": [
+    {
+     "seq": "6",
+     "brand": "起亚",
+     "model": "狮铂拓界",
+     "model_code": "YQZ6472TE6",
+     "cls": "SUV",
+     "manufacturer": "江苏悦达起亚汽车有限公司",
+     "year": 2023,
+     "grades_raw": {
+      "耐撞性与维修经济性": "level1/5.png",
+      "车内乘员": "level1/3.png",
+      "车外行人": "levelold/A.png",
+      "辅助安全": "level1/2.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-726.html",
+     "test_year": 2023,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-726.html",
+     "freshness": {
+      "trim_year": 2023,
+      "year_basis": "publish_year_proxy",
+      "year_confidence": "medium",
+      "is_current": true
+     },
+     "matched_by": "exact"
+    }
+   ],
+   "cncap": null,
+   "matched_by": [
+    "exact"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "瑞虎7": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "瑞虎8": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "瑞虎9": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "皇冠陆放": {
+   "has_l1": true,
+   "l1_current": false,
+   "l1_historical_only": true,
+   "sources": [
+    "CIASI"
+   ],
+   "cias": [
+    {
+     "seq": "1",
+     "brand": "丰田",
+     "model": "皇冠 陆放",
+     "model_code": "TV650025HEV",
+     "cls": "SUV",
+     "manufacturer": "天津一汽丰田汽车有限公司",
+     "year": 2022,
+     "grades_raw": {
+      "耐撞性与维修经济性": "level1/4.png",
+      "车内乘员": "level1/2.png",
+      "车外行人": "levelold/G.png",
+      "辅助安全": "level1/2.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-723.html",
+     "test_year": 2022,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-723.html",
+     "freshness": {
+      "trim_year": 2022,
+      "year_basis": "publish_year_proxy",
+      "year_confidence": "medium",
+      "is_current": false
+     },
+     "matched_by": "exact"
+    }
+   ],
+   "cncap": null,
+   "matched_by": [
+    "exact"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "皓影": {
+   "has_l1": true,
+   "l1_current": true,
+   "l1_historical_only": false,
+   "sources": [
+    "CIASI"
+   ],
+   "cias": [
+    {
+     "seq": "2",
+     "brand": "本田",
+     "model": "皓影",
+     "model_code": "GHA6471RAC6A",
+     "cls": "SUV",
+     "manufacturer": "广汽本田汽车有限公司",
+     "year": 2023,
+     "grades_raw": {
+      "耐撞性与维修经济性": "level1/4.png",
+      "车内乘员": "level1/2.png",
+      "车外行人": "levelold/G.png",
+      "辅助安全": "level1/2.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-721.html",
+     "test_year": 2023,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-721.html",
+     "freshness": {
+      "trim_year": 2023,
+      "year_basis": "publish_year_proxy",
+      "year_confidence": "medium",
+      "is_current": true
+     },
+     "matched_by": "exact"
+    },
+    {
+     "seq": "4",
+     "brand": "本田",
+     "model": "皓影",
+     "model_code": "GHA6460RAC6A",
+     "cls": "SUV",
+     "manufacturer": "广汽本田汽车有限公司",
+     "year": 2020,
+     "grades_raw": {
+      "耐撞性与维修经济性": "level1/5.png",
+      "车内乘员": "level1/2.png",
+      "车外行人": "levelold/G.png",
+      "辅助安全": "level1/2.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-798.html",
+     "test_year": 2020,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-798.html",
+     "freshness": {
+      "trim_year": 2020,
+      "year_basis": "publish_year_proxy",
+      "year_confidence": "medium",
+      "is_current": false
+     },
+     "matched_by": "exact"
+    }
+   ],
+   "cncap": null,
+   "matched_by": [
+    "exact"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "皓影 PHEV": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "皓极": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "皓瀚": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "福特烈马": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "秦L DM": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "秦PLUS DM": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "索纳塔": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "红旗H5": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "红旗H5 PHEV": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "红旗H6": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "红旗HS3": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "红旗HS3 PHEV": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "红旗HS5": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "胜达": {
+   "has_l1": true,
+   "l1_current": false,
+   "l1_historical_only": true,
+   "sources": [
+    "CIASI"
+   ],
+   "cias": [
+    {
+     "seq": "18",
+     "brand": "现代",
+     "model": "胜达",
+     "model_code": "BH6490MCAS",
+     "cls": "SUV",
+     "manufacturer": "北京现代汽车有限公司",
+     "year": 2020,
+     "grades_raw": {
+      "耐撞性与维修经济性": "level1/4.png",
+      "车内乘员": "level1/2.png",
+      "车外行人": "levelold/G.png",
+      "辅助安全": "level1/2.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-812.html",
+     "test_year": 2020,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-812.html",
+     "freshness": {
+      "trim_year": 2020,
+      "year_basis": "publish_year_proxy",
+      "year_confidence": "medium",
+      "is_current": false
+     },
+     "matched_by": "exact"
+    }
+   ],
+   "cncap": null,
+   "matched_by": [
+    "exact"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "航海家": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "艾瑞泽5": {
+   "has_l1": true,
+   "l1_current": false,
+   "l1_historical_only": true,
+   "sources": [
+    "CIASI"
+   ],
+   "cias": [
+    {
+     "seq": "13",
+     "brand": "奇瑞",
+     "model": "艾瑞泽5",
+     "model_code": "SQR7155J60T2",
+     "cls": "轿车",
+     "manufacturer": "奇瑞汽车股份有限公司",
+     "year": 2018,
+     "grades_raw": {
+      "耐撞性与维修经济性": "level1/5.png",
+      "车内乘员": "level1/4.png",
+      "车外行人": "levelold/A.png",
+      "辅助安全": null,
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-857.html",
+     "test_year": 2018,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-857.html",
+     "freshness": {
+      "trim_year": 2018,
+      "year_basis": "publish_year_proxy",
+      "year_confidence": "medium",
+      "is_current": false
+     },
+     "matched_by": "exact"
+    }
+   ],
+   "cncap": null,
+   "matched_by": [
+    "exact"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "艾瑞泽8": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "英仕派": {
+   "has_l1": true,
+   "l1_current": true,
+   "l1_historical_only": false,
+   "sources": [
+    "CNCAP"
+   ],
+   "cias": null,
+   "cncap": {
+    "model": "英仕派",
+    "overall_pct": 88.8,
+    "matched_by": "exact"
+   },
+   "matched_by": [
+    "exact"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "英菲尼迪QX50": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "荣威M7 DMH": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "荣威i5": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "蒙迪欧": {
+   "has_l1": true,
+   "l1_current": false,
+   "l1_historical_only": true,
+   "sources": [
+    "CIASI"
+   ],
+   "cias": [
+    {
+     "seq": "21",
+     "brand": "福特",
+     "model": "蒙迪欧",
+     "model_code": "CAF7205A61（2022款 EcoBoost 245 时尚型）",
+     "cls": "轿车",
+     "manufacturer": "长安福特汽车有限公司",
+     "year": 2022,
+     "grades_raw": {
+      "耐撞性与维修经济性": "level1/5.png",
+      "车内乘员": "level1/2.png",
+      "车外行人": "levelold/G.png",
+      "辅助安全": "level1/2.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-765.html",
+     "test_year": 2022,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-765.html",
+     "freshness": {
+      "trim_year": 2022,
+      "year_basis": "detail_trim_text",
+      "year_confidence": "high",
+      "is_current": false
+     },
+     "matched_by": "exact"
+    }
+   ],
+   "cncap": null,
+   "matched_by": [
+    "exact"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "蓝电E5": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "豪越L": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "豹5": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "赛图斯": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "起亚K3": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "起亚K5": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "轩逸": {
+   "has_l1": true,
+   "l1_current": false,
+   "l1_historical_only": true,
+   "sources": [
+    "CIASI"
+   ],
+   "cias": [
+    {
+     "seq": "18",
+     "brand": "日产",
+     "model": "轩逸",
+     "model_code": "DFL7162VANH6（2022款 1.6XL 悦享版 CVT）",
+     "cls": "轿车",
+     "manufacturer": "东风汽车有限公司",
+     "year": 2022,
+     "grades_raw": {
+      "耐撞性与维修经济性": "level1/4.png",
+      "车内乘员": "level1/2.png",
+      "车外行人": "levelold/G.png",
+      "辅助安全": "level1/2.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-755.html",
+     "test_year": 2022,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-755.html",
+     "freshness": {
+      "trim_year": 2022,
+      "year_basis": "detail_trim_text",
+      "year_confidence": "high",
+      "is_current": false
+     },
+     "matched_by": "exact"
+    }
+   ],
+   "cncap": null,
+   "matched_by": [
+    "exact"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "迈腾": {
+   "has_l1": true,
+   "l1_current": true,
+   "l1_historical_only": false,
+   "sources": [
+    "CIASI",
+    "CNCAP"
+   ],
+   "cias": [
+    {
+     "seq": "16",
+     "brand": "大众",
+     "model": "迈腾",
+     "model_code": "FV7157NADEG",
+     "cls": "轿车",
+     "manufacturer": "一汽-大众汽车有限公司",
+     "year": 2024,
+     "grades_raw": {
+      "耐撞性与维修经济性": "level1/2.png",
+      "车内乘员": "level1/2.png",
+      "车外行人": "level1/2.png",
+      "辅助安全": "level1/2.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-978.html",
+     "test_year": 2024,
+     "rule_version": "2023",
+     "test_trim": "FV7207NBDEG（大众迈腾 2024款 380TSI 尊贵版大迈包）",
+     "detail_url": "https://www.ciasi.org.cn/products/show-978.html",
+     "freshness": {
+      "trim_year": 2024,
+      "year_basis": "detail_trim_text",
+      "year_confidence": "high",
+      "is_current": true
+     },
+     "matched_by": "exact"
+    },
+    {
+     "seq": "3",
+     "brand": "大众",
+     "model": "迈腾",
+     "model_code": "FV7147BADBG",
+     "cls": "轿车",
+     "manufacturer": "一汽-大众汽车有限公司",
+     "year": 2018,
+     "grades_raw": {
+      "耐撞性与维修经济性": null,
+      "车内乘员": "level1/3.png",
+      "车外行人": "levelold/G.png",
+      "辅助安全": "level1/2.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-847.html",
+     "test_year": 2018,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-847.html",
+     "freshness": {
+      "trim_year": 2018,
+      "year_basis": "publish_year_proxy",
+      "year_confidence": "medium",
+      "is_current": false
+     },
+     "matched_by": "exact"
+    }
+   ],
+   "cncap": {
+    "model": "迈腾",
+    "overall_pct": 88.6,
+    "matched_by": "exact"
+   },
+   "matched_by": [
+    "exact"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "迈腾PHEV": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "逍客": {
+   "has_l1": true,
+   "l1_current": true,
+   "l1_historical_only": false,
+   "sources": [
+    "CIASI"
+   ],
+   "cias": [
+    {
+     "seq": "24",
+     "brand": "日产",
+     "model": "逍客",
+     "model_code": "DFL7130VTTL1",
+     "cls": "SUV",
+     "manufacturer": "东风汽车有限公司",
+     "year": 2023,
+     "grades_raw": {
+      "耐撞性与维修经济性": "level1/5.png",
+      "车内乘员": "level1/2.png",
+      "车外行人": "levelold/G.png",
+      "辅助安全": "level1/2.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-761.html",
+     "test_year": 2023,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-761.html",
+     "freshness": {
+      "trim_year": 2023,
+      "year_basis": "publish_year_proxy",
+      "year_confidence": "medium",
+      "is_current": true
+     },
+     "matched_by": "exact"
+    }
+   ],
+   "cncap": null,
+   "matched_by": [
+    "exact"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "途岳": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "途胜": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "途观L": {
+   "has_l1": true,
+   "l1_current": false,
+   "l1_historical_only": true,
+   "sources": [
+    "CIASI"
+   ],
+   "cias": [
+    {
+     "seq": "2",
+     "brand": "大众",
+     "model": "途观L",
+     "model_code": "SVW6474DFD",
+     "cls": "SUV",
+     "manufacturer": "上汽大众汽车有限公司",
+     "year": 2018,
+     "grades_raw": {
+      "耐撞性与维修经济性": null,
+      "车内乘员": "level1/4.png",
+      "车外行人": "levelold/A.png",
+      "辅助安全": "level1/2.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-846.html",
+     "test_year": 2018,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-846.html",
+     "freshness": {
+      "trim_year": 2018,
+      "year_basis": "publish_year_proxy",
+      "year_confidence": "medium",
+      "is_current": false
+     },
+     "matched_by": "exact"
+    }
+   ],
+   "cncap": null,
+   "matched_by": [
+    "exact"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "速腾": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "逸动": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "银河A7 EM": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "银河M7": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "银河星耀6": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "银河星耀7": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "银河星舰7 EM-i": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "锋兰达": {
+   "has_l1": true,
+   "l1_current": true,
+   "l1_historical_only": false,
+   "sources": [
+    "CIASI"
+   ],
+   "cias": [
+    {
+     "seq": "28",
+     "brand": "丰田",
+     "model": "锋兰达",
+     "model_code": "GTM7200VHEVR",
+     "cls": "SUV",
+     "manufacturer": "广汽丰田汽车有限公司",
+     "year": 2023,
+     "grades_raw": {
+      "耐撞性与维修经济性": "level1/4.png",
+      "车内乘员": "level1/2.png",
+      "车外行人": "levelold/G.png",
+      "辅助安全": "level1/2.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-787.html",
+     "test_year": 2023,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-787.html",
+     "freshness": {
+      "trim_year": 2023,
+      "year_basis": "publish_year_proxy",
+      "year_confidence": "medium",
+      "is_current": true
+     },
+     "matched_by": "exact"
+    }
+   ],
+   "cncap": null,
+   "matched_by": [
+    "exact"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "锐界": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "锐际": {
+   "has_l1": true,
+   "l1_current": false,
+   "l1_historical_only": true,
+   "sources": [
+    "CIASI"
+   ],
+   "cias": [
+    {
+     "seq": "5",
+     "brand": "福特",
+     "model": "锐际",
+     "model_code": "CAF6461AF64",
+     "cls": "SUV",
+     "manufacturer": "长安福特汽车有限公司",
+     "year": 2021,
+     "grades_raw": {
+      "耐撞性与维修经济性": "level1/4.png",
+      "车内乘员": "level1/2.png",
+      "车外行人": "levelold/G.png",
+      "辅助安全": "level1/2.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-777.html",
+     "test_year": 2021,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-777.html",
+     "freshness": {
+      "trim_year": 2021,
+      "year_basis": "publish_year_proxy",
+      "year_confidence": "medium",
+      "is_current": false
+     },
+     "matched_by": "exact"
+    }
+   ],
+   "cncap": null,
+   "matched_by": [
+    "exact"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "长城大狗": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "长安CS75": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "长安UNI-K": {
+   "has_l1": true,
+   "l1_current": false,
+   "l1_historical_only": true,
+   "sources": [
+    "CIASI"
+   ],
+   "cias": [
+    {
+     "seq": "2",
+     "brand": "长安",
+     "model": "UNI-K",
+     "model_code": "SC6493ABA6",
+     "cls": "SUV",
+     "manufacturer": "重庆长安汽车股份有限公司",
+     "year": 2021,
+     "grades_raw": {
+      "耐撞性与维修经济性": "level1/3.png",
+      "车内乘员": "level1/2.png",
+      "车外行人": "levelold/G.png",
+      "辅助安全": "level1/2.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-774.html",
+     "test_year": 2021,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-774.html",
+     "freshness": {
+      "trim_year": 2021,
+      "year_basis": "publish_year_proxy",
+      "year_confidence": "medium",
+      "is_current": false
+     },
+     "matched_by": "brand+model"
+    }
+   ],
+   "cncap": null,
+   "matched_by": [
+    "brand+model"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "长安UNI-V": {
+   "has_l1": true,
+   "l1_current": false,
+   "l1_historical_only": true,
+   "sources": [
+    "CIASI"
+   ],
+   "cias": [
+    {
+     "seq": "5",
+     "brand": "长安",
+     "model": "UNI-V",
+     "model_code": "SC7154CAB6（2022款 卓越型）",
+     "cls": "轿车",
+     "manufacturer": "重庆长安汽车股份有限公司",
+     "year": 2022,
+     "grades_raw": {
+      "耐撞性与维修经济性": "level1/5.png",
+      "车内乘员": "level1/2.png",
+      "车外行人": "levelold/G.png",
+      "辅助安全": "level1/2.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-733.html",
+     "test_year": 2022,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-733.html",
+     "freshness": {
+      "trim_year": 2022,
+      "year_basis": "detail_trim_text",
+      "year_confidence": "high",
+      "is_current": false
+     },
+     "matched_by": "brand+model"
+    }
+   ],
+   "cncap": null,
+   "matched_by": [
+    "brand+model"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "长安UNI-Z PHEV": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "长安启源Q07": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "雅阁": {
+   "has_l1": true,
+   "l1_current": true,
+   "l1_historical_only": false,
+   "sources": [
+    "CIASI"
+   ],
+   "cias": [
+    {
+     "seq": "26",
+     "brand": "本田",
+     "model": "雅阁",
+     "model_code": "GHA7151AAC6A",
+     "cls": "轿车",
+     "manufacturer": "广汽本田汽车有限公司",
+     "year": 2023,
+     "grades_raw": {
+      "耐撞性与维修经济性": "level1/4.png",
+      "车内乘员": "level1/2.png",
+      "车外行人": "levelold/G.png",
+      "辅助安全": "level1/2.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-785.html",
+     "test_year": 2023,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-785.html",
+     "freshness": {
+      "trim_year": 2023,
+      "year_basis": "publish_year_proxy",
+      "year_confidence": "medium",
+      "is_current": true
+     },
+     "matched_by": "exact"
+    },
+    {
+     "seq": "12",
+     "brand": "本田",
+     "model": "雅阁",
+     "model_code": "GHA7150AAC5B",
+     "cls": "轿车",
+     "manufacturer": "广汽本田汽车有限公司",
+     "year": 2018,
+     "grades_raw": {
+      "耐撞性与维修经济性": null,
+      "车内乘员": "level1/2.png",
+      "车外行人": "levelold/G.png",
+      "辅助安全": "level1/2.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-856.html",
+     "test_year": 2018,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-856.html",
+     "freshness": {
+      "trim_year": 2018,
+      "year_basis": "publish_year_proxy",
+      "year_confidence": "medium",
+      "is_current": false
+     },
+     "matched_by": "exact"
+    }
+   ],
+   "cncap": null,
+   "matched_by": [
+    "exact"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "雷凌": {
+   "has_l1": true,
+   "l1_current": false,
+   "l1_historical_only": true,
+   "sources": [
+    "CIASI"
+   ],
+   "cias": [
+    {
+     "seq": "13",
+     "brand": "丰田",
+     "model": "雷凌",
+     "model_code": "GTM7121LPCJM（2019款 185T进取版）",
+     "cls": "轿车",
+     "manufacturer": "广汽丰田汽车有限公司",
+     "year": 2019,
+     "grades_raw": {
+      "耐撞性与维修经济性": "level1/4.png",
+      "车内乘员": "level1/2.png",
+      "车外行人": "levelold/G.png",
+      "辅助安全": "level1/2.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-830.html",
+     "test_year": 2019,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-830.html",
+     "freshness": {
+      "trim_year": 2019,
+      "year_basis": "detail_trim_text",
+      "year_confidence": "high",
+      "is_current": false
+     },
+     "matched_by": "exact"
+    }
+   ],
+   "cncap": null,
+   "matched_by": [
+    "exact"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "领克03": {
+   "has_l1": true,
+   "l1_current": false,
+   "l1_historical_only": true,
+   "sources": [
+    "CIASI"
+   ],
+   "cias": [
+    {
+     "seq": "7",
+     "brand": "领克",
+     "model": "领克03",
+     "model_code": "MR7152D09",
+     "cls": "轿车",
+     "manufacturer": "浙江吉利汽车有限公司",
+     "year": 2020,
+     "grades_raw": {
+      "耐撞性与维修经济性": "level1/4.png",
+      "车内乘员": "level1/2.png",
+      "车外行人": "levelold/G.png",
+      "辅助安全": "level1/2.png",
+      "新能源汽车专项": null
+     },
+     "url": "https://www.ciasi.org.cn/products/show-801.html",
+     "test_year": 2020,
+     "rule_version": null,
+     "test_trim": null,
+     "detail_url": "https://www.ciasi.org.cn/products/show-801.html",
+     "freshness": {
+      "trim_year": 2020,
+      "year_basis": "publish_year_proxy",
+      "year_confidence": "medium",
+      "is_current": false
+     },
+     "matched_by": "exact"
+    }
+   ],
+   "cncap": null,
+   "matched_by": [
+    "exact"
+   ],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "领克07GT": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "领睿": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "风光580": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "风行T5": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "马自达CX-5": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "驱逐舰05": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "骐达TIIDA": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  },
+  "高尔夫": {
+   "has_l1": false,
+   "l1_current": false,
+   "l1_historical_only": false,
+   "sources": [],
+   "cias": null,
+   "cncap": null,
+   "matched_by": [],
+   "note": "C-IASI / C-NCAP 成绩对应具体测试年款与配置，不自动外推到同车系其它年款、动力或配置；等级图标未解码，不作分数。"
+  }
+ },
+ "ciasi_rows": [
+  {
+   "seq": "1",
+   "brand": "长安",
+   "model": "深蓝S09",
+   "model_code": "SC6522AAA6HEV",
+   "cls": "SUV",
+   "manufacturer": "重庆长安汽车股份有限公司",
+   "year": 2025,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/3.png",
+    "车内乘员": "level1/1.png",
+    "车外行人": "level1/1.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": "G.png"
+   },
+   "url": "https://www.ciasi.org.cn/products/show-983.html"
+  },
+  {
+   "seq": "2",
+   "brand": "丰田",
+   "model": "bZ5",
+   "model_code": "TV6480BEV",
+   "cls": "SUV",
+   "manufacturer": "一汽丰田汽车有限公司",
+   "year": 2025,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/1.png",
+    "车外行人": "level1/1.png",
+    "辅助安全": "level1/1.png",
+    "新能源汽车专项": "G.png"
+   },
+   "url": "https://www.ciasi.org.cn/products/show-984.html"
+  },
+  {
+   "seq": "3",
+   "brand": "本田",
+   "model": "P7",
+   "model_code": "GHA6480WAN0ABEV",
+   "cls": "SUV",
+   "manufacturer": "广汽本田汽车有限公司",
+   "year": 2025,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/1.png",
+    "车外行人": "level1/1.png",
+    "辅助安全": "level1/1.png",
+    "新能源汽车专项": "G.png"
+   },
+   "url": "https://www.ciasi.org.cn/products/show-985.html"
+  },
+  {
+   "seq": "4",
+   "brand": "腾势",
+   "model": "N9",
+   "model_code": "QCJ6530ABHEV1",
+   "cls": "SUV",
+   "manufacturer": "比亚迪汽车工业有限公司",
+   "year": 2025,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/1.png",
+    "车内乘员": "level1/1.png",
+    "车外行人": "level1/1.png",
+    "辅助安全": "level1/1.png",
+    "新能源汽车专项": "G.png"
+   },
+   "url": "https://www.ciasi.org.cn/products/show-993.html"
+  },
+  {
+   "seq": "5",
+   "brand": "奥迪",
+   "model": "A5L Sportback",
+   "model_code": "SVW72030AV",
+   "cls": "轿车",
+   "manufacturer": "上汽大众汽车有限公司",
+   "year": 2025,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/1.png",
+    "车外行人": "level1/1.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-994.html"
+  },
+  {
+   "seq": "6",
+   "brand": "大众",
+   "model": "探岳L",
+   "model_code": "FV6472MADEB",
+   "cls": "SUV",
+   "manufacturer": "一汽-大众汽车有限公司",
+   "year": 2025,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/1.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "level1/1.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-995.html"
+  },
+  {
+   "seq": "7",
+   "brand": "理想",
+   "model": "i8",
+   "model_code": "LXA6511BEVW04",
+   "cls": "SUV",
+   "manufacturer": "北京理想汽车有限公司",
+   "year": 2025,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/2.png",
+    "车内乘员": "level1/1.png",
+    "车外行人": "level1/1.png",
+    "辅助安全": "level1/1.png",
+    "新能源汽车专项": "G.png"
+   },
+   "url": "https://www.ciasi.org.cn/products/show-996.html"
+  },
+  {
+   "seq": "8",
+   "brand": "奇瑞",
+   "model": "智界R7",
+   "model_code": "SQR6500BEVEHY3",
+   "cls": "SUV",
+   "manufacturer": "奇瑞汽车股份有限公司",
+   "year": 2025,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/1.png",
+    "车外行人": "level1/1.png",
+    "辅助安全": "level1/1.png",
+    "新能源汽车专项": "G.png"
+   },
+   "url": "https://www.ciasi.org.cn/products/show-1003.html"
+  },
+  {
+   "seq": "9",
+   "brand": "领克",
+   "model": "900",
+   "model_code": "MR6521DPHEV101",
+   "cls": "SUV",
+   "manufacturer": "浙江吉利汽车有限公司",
+   "year": 2025,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/3.png",
+    "车内乘员": "level1/1.png",
+    "车外行人": "level1/1.png",
+    "辅助安全": "level1/1.png",
+    "新能源汽车专项": "G.png"
+   },
+   "url": "https://www.ciasi.org.cn/products/show-1004.html"
+  },
+  {
+   "seq": "10",
+   "brand": "小鹏",
+   "model": "P7",
+   "model_code": "NHQ7002BEVEA",
+   "cls": "轿车",
+   "manufacturer": "肇庆小鹏新能源投资有限公司",
+   "year": 2025,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/1.png",
+    "车外行人": "level1/1.png",
+    "辅助安全": "level1/1.png",
+    "新能源汽车专项": "G.png"
+   },
+   "url": "https://www.ciasi.org.cn/products/show-1005.html"
+  },
+  {
+   "seq": "11",
+   "brand": "蔚来",
+   "model": "ES8",
+   "model_code": "NAL6533BSEVE1",
+   "cls": "SUV",
+   "manufacturer": "蔚来汽车科技（安徽）有限公司",
+   "year": 2025,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/2.png",
+    "车内乘员": "level1/1.png",
+    "车外行人": "level1/1.png",
+    "辅助安全": "level1/1.png",
+    "新能源汽车专项": "G.png"
+   },
+   "url": "https://www.ciasi.org.cn/products/show-1000.html"
+  },
+  {
+   "seq": "12",
+   "brand": "理想",
+   "model": "i6",
+   "model_code": "LXA6503BEVW02",
+   "cls": "SUV",
+   "manufacturer": "北京理想汽车有限公司",
+   "year": 2025,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/2.png",
+    "车内乘员": "level1/1.png",
+    "车外行人": "level1/1.png",
+    "辅助安全": "level1/1.png",
+    "新能源汽车专项": "G.png"
+   },
+   "url": "https://www.ciasi.org.cn/products/show-1006.html"
+  },
+  {
+   "seq": "13",
+   "brand": "赛力斯",
+   "model": "问界M8",
+   "model_code": "SKE6521SSHEVAS",
+   "cls": "SUV",
+   "manufacturer": "赛力斯汽车有限公司",
+   "year": 2025,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/2.png",
+    "车内乘员": "level1/1.png",
+    "车外行人": "level1/1.png",
+    "辅助安全": "level1/1.png",
+    "新能源汽车专项": "G.png"
+   },
+   "url": "https://www.ciasi.org.cn/products/show-1008.html"
+  },
+  {
+   "seq": "14",
+   "brand": "尚界",
+   "model": "H5",
+   "model_code": "CSA6489YFSHEV1",
+   "cls": "SUV",
+   "manufacturer": "上海汽车集团股份有限公司",
+   "year": 2025,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/2.png",
+    "车内乘员": "level1/1.png",
+    "车外行人": "level1/1.png",
+    "辅助安全": "level1/1.png",
+    "新能源汽车专项": "G.png"
+   },
+   "url": "https://www.ciasi.org.cn/products/show-1009.html"
+  },
+  {
+   "seq": "15",
+   "brand": "方程豹",
+   "model": "钛7",
+   "model_code": "QCJ6500BG6HEV",
+   "cls": "SUV",
+   "manufacturer": "比亚迪汽车工业有限公司",
+   "year": 2025,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/3.png",
+    "车内乘员": "level1/1.png",
+    "车外行人": "level1/1.png",
+    "辅助安全": "level1/1.png",
+    "新能源汽车专项": "G.png"
+   },
+   "url": "https://www.ciasi.org.cn/products/show-1010.html"
+  },
+  {
+   "seq": "16",
+   "brand": "梅赛德斯-奔驰",
+   "model": "E级",
+   "model_code": "BJ7205REL",
+   "cls": "轿车",
+   "manufacturer": "北京奔驰汽车有限公司",
+   "year": 2025,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/3.png",
+    "车内乘员": "level1/1.png",
+    "车外行人": "level1/1.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-1011.html"
+  },
+  {
+   "seq": "17",
+   "brand": "小米",
+   "model": "YU7",
+   "model_code": "XMA6500LBEVR6",
+   "cls": "SUV",
+   "manufacturer": "小米汽车科技有限公司",
+   "year": 2025,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/3.png",
+    "车内乘员": "level1/1.png",
+    "车外行人": "level1/1.png",
+    "辅助安全": "level1/1.png",
+    "新能源汽车专项": "G.png"
+   },
+   "url": "https://www.ciasi.org.cn/products/show-1012.html"
+  },
+  {
+   "seq": "18",
+   "brand": "特斯拉",
+   "model": "Model Y",
+   "model_code": "TSL6480BEVAR5",
+   "cls": "SUV",
+   "manufacturer": "特斯拉（上海）有限公司",
+   "year": 2025,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/1.png",
+    "车外行人": "level1/1.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": "G.png"
+   },
+   "url": "https://www.ciasi.org.cn/products/show-1013.html"
+  },
+  {
+   "seq": "19",
+   "brand": "华彰",
+   "model": "享界S9T",
+   "model_code": "BJ7000K72BEV",
+   "cls": "轿车",
+   "manufacturer": "北京新能源汽车股份有限公司",
+   "year": 2025,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/1.png",
+    "车外行人": "level1/1.png",
+    "辅助安全": "level1/1.png",
+    "新能源汽车专项": "G.png"
+   },
+   "url": "https://www.ciasi.org.cn/products/show-1014.html"
+  },
+  {
+   "seq": "1",
+   "brand": "理想",
+   "model": "MEGA",
+   "model_code": "LXA6540BEVW01",
+   "cls": "MPV",
+   "manufacturer": "北京理想汽车有限公司",
+   "year": 2024,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/3.png",
+    "车内乘员": "level1/1.png",
+    "车外行人": "level1/1.png",
+    "辅助安全": "level1/1.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-971.html"
+  },
+  {
+   "seq": "2",
+   "brand": "宝马",
+   "model": "i5",
+   "model_code": "BMW7001AAEV",
+   "cls": "轿车",
+   "manufacturer": "华晨宝马汽车有限公司",
+   "year": 2024,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/3.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "level1/1.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-972.html"
+  },
+  {
+   "seq": "3",
+   "brand": "埃安",
+   "model": "昊铂HT",
+   "model_code": "GAM6490BEVH0N",
+   "cls": "SUV",
+   "manufacturer": "广汽乘用车有限公司",
+   "year": 2024,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/1.png",
+    "车外行人": "level1/1.png",
+    "辅助安全": "level1/1.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-973.html"
+  },
+  {
+   "seq": "4",
+   "brand": "小米",
+   "model": "SU7",
+   "model_code": "BJ7000MBEVR2",
+   "cls": "轿车",
+   "manufacturer": "北京汽车集团越野车有限公司",
+   "year": 2024,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/3.png",
+    "车内乘员": "level1/1.png",
+    "车外行人": "level1/1.png",
+    "辅助安全": "level1/1.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-881.html"
+  },
+  {
+   "seq": "5",
+   "brand": "丰田",
+   "model": "卡罗拉锐放",
+   "model_code": "TV7207X6P",
+   "cls": "SUV",
+   "manufacturer": "一汽丰田汽车有限公司",
+   "year": 2024,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/3.png",
+    "车内乘员": "level1/4.png",
+    "车外行人": "level1/1.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-882.html",
+   "test_year": 2024,
+   "rule_version": "2023",
+   "test_trim": "TV7207X6P（2023款 2.0L先锋版）",
+   "detail_url": "https://www.ciasi.org.cn/products/show-882.html"
+  },
+  {
+   "seq": "6",
+   "brand": "极氪",
+   "model": "007",
+   "model_code": "MR7005BEV11",
+   "cls": "轿车",
+   "manufacturer": "浙江极氪智能科技有限公司",
+   "year": 2024,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/1.png",
+    "车外行人": "level1/1.png",
+    "辅助安全": "level1/1.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-940.html"
+  },
+  {
+   "seq": "7",
+   "brand": "理想",
+   "model": "L6",
+   "model_code": "LXA6493SHEVX02",
+   "cls": "SUV",
+   "manufacturer": "北京理想汽车有限公司",
+   "year": 2024,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/3.png",
+    "车内乘员": "level1/1.png",
+    "车外行人": "level1/1.png",
+    "辅助安全": "level1/1.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-974.html"
+  },
+  {
+   "seq": "8",
+   "brand": "江淮",
+   "model": "瑞风RF8",
+   "model_code": "HFC6524A2HC7S",
+   "cls": "MPV",
+   "manufacturer": "安徽江淮汽车集团股份有限公司",
+   "year": 2024,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/3.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "level1/2.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-975.html"
+  },
+  {
+   "seq": "9",
+   "brand": "小鹏",
+   "model": "X9",
+   "model_code": "NHQ6530BEVHA",
+   "cls": "MPV",
+   "manufacturer": "肇庆小鹏新能源投资有限公司",
+   "year": 2024,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "level1/1.png",
+    "辅助安全": "level1/1.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-976.html"
+  },
+  {
+   "seq": "10",
+   "brand": "智己",
+   "model": "L6",
+   "model_code": "CSA7002EBEV1",
+   "cls": "轿车",
+   "manufacturer": "上海汽车集团股份有限公司",
+   "year": 2024,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "level1/1.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-911.html"
+  },
+  {
+   "seq": "11",
+   "brand": "赛力斯",
+   "model": "问界M9",
+   "model_code": "SKE6520SSHEVAS",
+   "cls": "SUV",
+   "manufacturer": "赛力斯汽车有限公司",
+   "year": 2024,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/2.png",
+    "车内乘员": "level1/1.png",
+    "车外行人": "level1/1.png",
+    "辅助安全": "level1/1.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-977.html"
+  },
+  {
+   "seq": "12",
+   "brand": "比亚迪",
+   "model": "宋L",
+   "model_code": "BYD7007BEVA",
+   "cls": "SUV",
+   "manufacturer": "比亚迪汽车工业有限公司",
+   "year": 2024,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/1.png",
+    "车外行人": "level1/1.png",
+    "辅助安全": "level1/1.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-903.html"
+  },
+  {
+   "seq": "13",
+   "brand": "零跑",
+   "model": "C16",
+   "model_code": "FZ6490BEVC16A",
+   "cls": "SUV",
+   "manufacturer": "零跑汽车有限公司",
+   "year": 2024,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/3.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "level1/1.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-906.html"
+  },
+  {
+   "seq": "14",
+   "brand": "大通",
+   "model": "大家9",
+   "model_code": "SH6531T1BEV-8",
+   "cls": "MPV",
+   "manufacturer": "上汽大通汽车有限公司",
+   "year": 2024,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/4.png",
+    "车外行人": "level1/2.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-916.html"
+  },
+  {
+   "seq": "15",
+   "brand": "特斯拉",
+   "model": "Model 3",
+   "model_code": "TSL7000BEVAR7",
+   "cls": "轿车",
+   "manufacturer": "特斯拉(上海）有限公司",
+   "year": 2024,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "level1/2.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-925.html"
+  },
+  {
+   "seq": "16",
+   "brand": "大众",
+   "model": "迈腾",
+   "model_code": "FV7157NADEG",
+   "cls": "轿车",
+   "manufacturer": "一汽-大众汽车有限公司",
+   "year": 2024,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/2.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "level1/2.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-978.html",
+   "test_year": 2024,
+   "rule_version": "2023",
+   "test_trim": "FV7207NBDEG（大众迈腾 2024款 380TSI 尊贵版大迈包）",
+   "detail_url": "https://www.ciasi.org.cn/products/show-978.html"
+  },
+  {
+   "seq": "17",
+   "brand": "马自达",
+   "model": "EZ-6",
+   "model_code": "CAM7002BABEV",
+   "cls": "轿车",
+   "manufacturer": "长安马自达汽车有限公司",
+   "year": 2024,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/1.png",
+    "车外行人": "level1/2.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-919.html"
+  },
+  {
+   "seq": "18",
+   "brand": "大众",
+   "model": "帕萨特Pro",
+   "model_code": "SVW72028CV",
+   "cls": "轿车",
+   "manufacturer": "上汽大众汽车有限公司",
+   "year": 2024,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/3.png",
+    "车内乘员": "level1/1.png",
+    "车外行人": "level1/1.png",
+    "辅助安全": "level1/1.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-979.html"
+  },
+  {
+   "seq": "19",
+   "brand": "乐道",
+   "model": "L60",
+   "model_code": "NAL6483BSEVZ1",
+   "cls": "SUV",
+   "manufacturer": "蔚来汽车科技（安徽）有限公司",
+   "year": 2024,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/2.png",
+    "车内乘员": "level1/1.png",
+    "车外行人": "level1/1.png",
+    "辅助安全": "level1/1.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-980.html"
+  },
+  {
+   "seq": "20",
+   "brand": "东风日产",
+   "model": "探陆",
+   "model_code": "DFL6510ATTR2",
+   "cls": "SUV",
+   "manufacturer": "东风汽车有限公司",
+   "year": 2024,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/2.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "level1/2.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-981.html"
+  },
+  {
+   "seq": "21",
+   "brand": "萤火虫",
+   "model": "firefly萤火虫",
+   "model_code": "NAL7000BSEVY1",
+   "cls": "轿车",
+   "manufacturer": "蔚来汽车科技（安徽）有限公司",
+   "year": 2024,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/2.png",
+    "车内乘员": "level1/1.png",
+    "车外行人": "level1/1.png",
+    "辅助安全": "level1/1.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-950.html"
+  },
+  {
+   "seq": "22",
+   "brand": "东风日产",
+   "model": "N7",
+   "model_code": "DFL7000NAA1BEV",
+   "cls": "轿车",
+   "manufacturer": "东风汽车有限公司",
+   "year": 2024,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "level1/2.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-992.html"
+  },
+  {
+   "seq": "1",
+   "brand": "丰田",
+   "model": "赛那",
+   "model_code": "GTM6521SHEVR",
+   "cls": "MPV",
+   "manufacturer": "广汽丰田汽车有限公司",
+   "year": 2023,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-720.html"
+  },
+  {
+   "seq": "2",
+   "brand": "本田",
+   "model": "皓影",
+   "model_code": "GHA6471RAC6A",
+   "cls": "SUV",
+   "manufacturer": "广汽本田汽车有限公司",
+   "year": 2023,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-721.html",
+   "test_year": 2023,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-721.html"
+  },
+  {
+   "seq": "3",
+   "brand": "理想",
+   "model": "L7",
+   "model_code": "LXA6502SHEVX1",
+   "cls": "SUV",
+   "manufacturer": "重庆理想汽车有限公司",
+   "year": 2023,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-722.html"
+  },
+  {
+   "seq": "4",
+   "brand": "宝马",
+   "model": "X1",
+   "model_code": "BMW6462AS",
+   "cls": "SUV",
+   "manufacturer": "华晨宝马汽车有限公司",
+   "year": 2023,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-724.html",
+   "test_year": 2023,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-724.html"
+  },
+  {
+   "seq": "5",
+   "brand": "上汽飞凡",
+   "model": "R7",
+   "model_code": "CSA6493YBEV1",
+   "cls": "轿车",
+   "manufacturer": "上海汽车集团股份有限公司",
+   "year": 2023,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-725.html"
+  },
+  {
+   "seq": "6",
+   "brand": "起亚",
+   "model": "狮铂拓界",
+   "model_code": "YQZ6472TE6",
+   "cls": "SUV",
+   "manufacturer": "江苏悦达起亚汽车有限公司",
+   "year": 2023,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/3.png",
+    "车外行人": "levelold/A.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-726.html",
+   "test_year": 2023,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-726.html"
+  },
+  {
+   "seq": "7",
+   "brand": "传祺",
+   "model": "GS8",
+   "model_code": "GAC6501JDA6C",
+   "cls": "SUV",
+   "manufacturer": "广汽乘用车有限公司",
+   "year": 2023,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-727.html",
+   "test_year": 2023,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-727.html"
+  },
+  {
+   "seq": "8",
+   "brand": "丰田",
+   "model": "凌放",
+   "model_code": "CA64812G",
+   "cls": "SUV",
+   "manufacturer": "一汽丰田汽车（成都）有限公司",
+   "year": 2023,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-728.html"
+  },
+  {
+   "seq": "9",
+   "brand": "奔驰",
+   "model": "C级",
+   "model_code": "BJ7154PEL",
+   "cls": "轿车",
+   "manufacturer": "北京奔驰汽车有限公司",
+   "year": 2023,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-732.html",
+   "test_year": 2023,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-732.html"
+  },
+  {
+   "seq": "10",
+   "brand": "本田",
+   "model": "CR-V",
+   "model_code": "DHW6471R3CSF",
+   "cls": "SUV",
+   "manufacturer": "东风本田汽车有限公司",
+   "year": 2023,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-734.html",
+   "test_year": 2023,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-734.html"
+  },
+  {
+   "seq": "11",
+   "brand": "比亚迪",
+   "model": "海豹",
+   "model_code": "BYD7006BEVA",
+   "cls": "轿车",
+   "manufacturer": "比亚迪汽车有限公司",
+   "year": 2023,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-735.html"
+  },
+  {
+   "seq": "12",
+   "brand": "合众",
+   "model": "哪吒S",
+   "model_code": "THZ7150SHEVS401",
+   "cls": "轿车",
+   "manufacturer": "合众新能源汽车股份有限公司",
+   "year": 2023,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-736.html"
+  },
+  {
+   "seq": "13",
+   "brand": "长城",
+   "model": "山海炮",
+   "model_code": "CC1030RS22A",
+   "cls": "皮卡",
+   "manufacturer": "长城汽车股份有限公司",
+   "year": 2023,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/3.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-737.html"
+  },
+  {
+   "seq": "14",
+   "brand": "长安",
+   "model": "欧尚Z6",
+   "model_code": "SC6471DBD6",
+   "cls": "SUV",
+   "manufacturer": "重庆铃耀汽车有限公司",
+   "year": 2023,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-738.html"
+  },
+  {
+   "seq": "15",
+   "brand": "现代",
+   "model": "沐飒",
+   "model_code": "BH7200MAAS",
+   "cls": "SUV",
+   "manufacturer": "北京现代汽车有限公司",
+   "year": 2023,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-739.html"
+  },
+  {
+   "seq": "16",
+   "brand": "马自达",
+   "model": "CX-50",
+   "model_code": "CAM6480B",
+   "cls": "SUV",
+   "manufacturer": "长安马自达汽车有限公司",
+   "year": 2023,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-741.html"
+  },
+  {
+   "seq": "17",
+   "brand": "岚图",
+   "model": "追光",
+   "model_code": "EQ7000AL1F2BEV",
+   "cls": "轿车",
+   "manufacturer": "东风汽车集团有限公司",
+   "year": 2023,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-742.html"
+  },
+  {
+   "seq": "18",
+   "brand": "精灵",
+   "model": "smart #3",
+   "model_code": "JL7000BEV52",
+   "cls": "SUV",
+   "manufacturer": "浙江豪情汽车制造有限公司",
+   "year": 2023,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-754.html"
+  },
+  {
+   "seq": "19",
+   "brand": "奥迪",
+   "model": "Q4 e-tron",
+   "model_code": "FV6469AABEV",
+   "cls": "SUV",
+   "manufacturer": "一汽-大众汽车有限公司",
+   "year": 2023,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/3.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-756.html"
+  },
+  {
+   "seq": "20",
+   "brand": "大众",
+   "model": "朗逸新锐",
+   "model_code": "SVW71527CD",
+   "cls": "轿车",
+   "manufacturer": "上汽大众汽车有限公司",
+   "year": 2023,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/2.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-757.html"
+  },
+  {
+   "seq": "21",
+   "brand": "别克",
+   "model": "E5",
+   "model_code": "SGM6491BABEV",
+   "cls": "SUV",
+   "manufacturer": "上汽通用汽车有限公司",
+   "year": 2023,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-758.html"
+  },
+  {
+   "seq": "22",
+   "brand": "智己",
+   "model": "LS7",
+   "model_code": "CSA6501LBEV5",
+   "cls": "SUV",
+   "manufacturer": "上海汽车集团股份有限公司",
+   "year": 2023,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-759.html"
+  },
+  {
+   "seq": "23",
+   "brand": "福特",
+   "model": "锐界L",
+   "model_code": "CAF6500B61",
+   "cls": "SUV",
+   "manufacturer": "长安福特汽车有限公司",
+   "year": 2023,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/3.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-760.html"
+  },
+  {
+   "seq": "24",
+   "brand": "日产",
+   "model": "逍客",
+   "model_code": "DFL7130VTTL1",
+   "cls": "SUV",
+   "manufacturer": "东风汽车有限公司",
+   "year": 2023,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-761.html",
+   "test_year": 2023,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-761.html"
+  },
+  {
+   "seq": "25",
+   "brand": "星途",
+   "model": "瑶光",
+   "model_code": "SQR6480T22TBG",
+   "cls": "SUV",
+   "manufacturer": "奇瑞汽车股份有限公司",
+   "year": 2023,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-762.html",
+   "test_year": 2023,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-762.html"
+  },
+  {
+   "seq": "26",
+   "brand": "本田",
+   "model": "雅阁",
+   "model_code": "GHA7151AAC6A",
+   "cls": "轿车",
+   "manufacturer": "广汽本田汽车有限公司",
+   "year": 2023,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-785.html",
+   "test_year": 2023,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-785.html"
+  },
+  {
+   "seq": "27",
+   "brand": "本田",
+   "model": "INSPIRE",
+   "model_code": "DHW7151CUCSF",
+   "cls": "轿车",
+   "manufacturer": "东风本田汽车有限公司",
+   "year": 2023,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-786.html"
+  },
+  {
+   "seq": "28",
+   "brand": "丰田",
+   "model": "锋兰达",
+   "model_code": "GTM7200VHEVR",
+   "cls": "SUV",
+   "manufacturer": "广汽丰田汽车有限公司",
+   "year": 2023,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-787.html",
+   "test_year": 2023,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-787.html"
+  },
+  {
+   "seq": "29",
+   "brand": "极石牌",
+   "model": "极石01",
+   "model_code": "BAW6510MB6SHEV",
+   "cls": "SUV",
+   "manufacturer": "北京汽车制造厂有限公司",
+   "year": 2023,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-788.html"
+  },
+  {
+   "seq": "30",
+   "brand": "日产",
+   "model": "艾睿雅",
+   "model_code": "DFL6460NAU4BEV",
+   "cls": "SUV",
+   "manufacturer": "东风汽车有限公司",
+   "year": 2023,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-789.html"
+  },
+  {
+   "seq": "31",
+   "brand": "阿维塔",
+   "model": "阿维塔12",
+   "model_code": "SC7001GBABEV",
+   "cls": "轿车",
+   "manufacturer": "重庆长安汽车股份有限公司",
+   "year": 2023,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/A.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-790.html"
+  },
+  {
+   "seq": "32",
+   "brand": "红旗",
+   "model": "HS7",
+   "model_code": "CA6500HA6T",
+   "cls": "SUV",
+   "manufacturer": "中国第一汽车集团有限公司",
+   "year": 2023,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-791.html"
+  },
+  {
+   "seq": "33",
+   "brand": "福特",
+   "model": "游骑侠",
+   "model_code": "JX1036PSF6",
+   "cls": "皮卡",
+   "manufacturer": "江铃汽车股份有限公司",
+   "year": 2023,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-792.html"
+  },
+  {
+   "seq": "34",
+   "brand": "大众",
+   "model": "ID.7 VIZZION",
+   "model_code": "FV7007AABEV",
+   "cls": "轿车",
+   "manufacturer": "一汽-大众汽车有限公司",
+   "year": 2023,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/3.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-793.html"
+  },
+  {
+   "seq": "35",
+   "brand": "魏牌",
+   "model": "蓝山",
+   "model_code": "CC6520BP00DPHEV",
+   "cls": "SUV",
+   "manufacturer": "长城汽车股份有限公司",
+   "year": 2023,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-794.html"
+  },
+  {
+   "seq": "1",
+   "brand": "丰田",
+   "model": "皇冠 陆放",
+   "model_code": "TV650025HEV",
+   "cls": "SUV",
+   "manufacturer": "天津一汽丰田汽车有限公司",
+   "year": 2022,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-723.html",
+   "test_year": 2022,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-723.html"
+  },
+  {
+   "seq": "2",
+   "brand": "奥迪",
+   "model": "A7L",
+   "model_code": "SVW72025AV（2022款 45TFSI S-line 筑梦型 流晶套装）",
+   "cls": "轿车",
+   "manufacturer": "上汽大众汽车有限公司",
+   "year": 2022,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-729.html"
+  },
+  {
+   "seq": "3",
+   "brand": "本田",
+   "model": "型格",
+   "model_code": "GHA7150SAC6A（2022款 240TURBO 科技版）",
+   "cls": "轿车",
+   "manufacturer": "广汽本田汽车有限公司",
+   "year": 2022,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-730.html",
+   "test_year": 2022,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-730.html"
+  },
+  {
+   "seq": "4",
+   "brand": "领克",
+   "model": "领克09",
+   "model_code": "MR6501D01 （2021款 六座 HALO）",
+   "cls": "SUV",
+   "manufacturer": "浙江吉利汽车有限公司",
+   "year": 2022,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/3.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-731.html"
+  },
+  {
+   "seq": "5",
+   "brand": "长安",
+   "model": "UNI-V",
+   "model_code": "SC7154CAB6（2022款 卓越型）",
+   "cls": "轿车",
+   "manufacturer": "重庆长安汽车股份有限公司",
+   "year": 2022,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-733.html",
+   "test_year": 2022,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-733.html"
+  },
+  {
+   "seq": "6",
+   "brand": "小鹏",
+   "model": "P5",
+   "model_code": "NHQ7000BEVDG（2022款 460G+）",
+   "cls": "轿车",
+   "manufacturer": "肇庆小鹏新能源投资有限公司",
+   "year": 2022,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-740.html"
+  },
+  {
+   "seq": "7",
+   "brand": "本田",
+   "model": "思域",
+   "model_code": "DHW7151FECSF （2022款 180TURBO 尚动版）",
+   "cls": "轿车",
+   "manufacturer": "东风本田汽车有限公司",
+   "year": 2022,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-743.html",
+   "test_year": 2022,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-743.html"
+  },
+  {
+   "seq": "8",
+   "brand": "传祺",
+   "model": "影豹",
+   "model_code": "GAC7153BCW6B（2021款 270T J11版）",
+   "cls": "轿车",
+   "manufacturer": "广汽乘用车有限公司",
+   "year": 2022,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/3.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-744.html",
+   "test_year": 2022,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-744.html"
+  },
+  {
+   "seq": "9",
+   "brand": "欧拉",
+   "model": "好猫",
+   "model_code": "CC7000BJ01BBEV（2022款 400Km标准续航 豪华型）",
+   "cls": "轿车",
+   "manufacturer": "长城汽车股份有限公司",
+   "year": 2022,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/3.png",
+    "车内乘员": "level1/3.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-745.html"
+  },
+  {
+   "seq": "10",
+   "brand": "现代",
+   "model": "伊兰特",
+   "model_code": "BH7152CCAS（2022款 1.5L GLS领先版）",
+   "cls": "轿车",
+   "manufacturer": "北京现代汽车有限公司",
+   "year": 2022,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/A.png",
+    "辅助安全": "level1/3.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-746.html",
+   "test_year": 2022,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-746.html"
+  },
+  {
+   "seq": "11",
+   "brand": "丰田",
+   "model": "凌尚",
+   "model_code": "GTM7200LM（2021款 豪华版）",
+   "cls": "轿车",
+   "manufacturer": "广汽丰田汽车有限公司",
+   "year": 2022,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-747.html"
+  },
+  {
+   "seq": "12",
+   "brand": "宝马",
+   "model": "X5",
+   "model_code": "BMW6517AX（2022款 xDrive30Li M运动套装）",
+   "cls": "SUV",
+   "manufacturer": "华晨宝马汽车有限公司",
+   "year": 2022,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-748.html"
+  },
+  {
+   "seq": "13",
+   "brand": "理想",
+   "model": "L9",
+   "model_code": "LXA6520SHEVX1（2022款 Max）",
+   "cls": "SUV",
+   "manufacturer": "重庆理想汽车有限公司",
+   "year": 2022,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-749.html"
+  },
+  {
+   "seq": "14",
+   "brand": "赛力斯",
+   "model": "问界M7",
+   "model_code": "SKE6500SSHEVR（2022款 两驱舒适版）",
+   "cls": "SUV",
+   "manufacturer": "重庆金康新能源汽车有限公司",
+   "year": 2022,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-750.html"
+  },
+  {
+   "seq": "15",
+   "brand": "大众",
+   "model": "ID.6 CROZZ",
+   "model_code": "FV6498BBBEV（2021款 长续航PURE+版）",
+   "cls": "SUV",
+   "manufacturer": "一汽-大众汽车有限公司",
+   "year": 2022,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/3.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-751.html"
+  },
+  {
+   "seq": "16",
+   "brand": "玛斯丹",
+   "model": "Mach-E",
+   "model_code": "CAF6470A1BEV（2021款 跃世后驱版（标准续航））",
+   "cls": "SUV",
+   "manufacturer": "长安福特汽车有限公司",
+   "year": 2022,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-752.html"
+  },
+  {
+   "seq": "17",
+   "brand": "蔚来",
+   "model": "ET5",
+   "model_code": "HFC7003CSEV1-W（2022款 75kWh）",
+   "cls": "轿车",
+   "manufacturer": "安徽江淮汽车集团股份有限公司",
+   "year": 2022,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/3.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-753.html"
+  },
+  {
+   "seq": "18",
+   "brand": "日产",
+   "model": "轩逸",
+   "model_code": "DFL7162VANH6（2022款 1.6XL 悦享版 CVT）",
+   "cls": "轿车",
+   "manufacturer": "东风汽车有限公司",
+   "year": 2022,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-755.html",
+   "test_year": 2022,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-755.html"
+  },
+  {
+   "seq": "19",
+   "brand": "零跑",
+   "model": "零跑C11",
+   "model_code": "FZ6480BEV06（2022款 豪华版）",
+   "cls": "SUV",
+   "manufacturer": "零跑汽车有限公司",
+   "year": 2022,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/A.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-763.html"
+  },
+  {
+   "seq": "20",
+   "brand": "大众",
+   "model": "凌渡L",
+   "model_code": "SVW71426CT（2022款 280TSI 热辣款）",
+   "cls": "轿车",
+   "manufacturer": "上汽大众汽车有限公司",
+   "year": 2022,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/3.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-764.html"
+  },
+  {
+   "seq": "21",
+   "brand": "福特",
+   "model": "蒙迪欧",
+   "model_code": "CAF7205A61（2022款 EcoBoost 245 时尚型）",
+   "cls": "轿车",
+   "manufacturer": "长安福特汽车有限公司",
+   "year": 2022,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-765.html",
+   "test_year": 2022,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-765.html"
+  },
+  {
+   "seq": "22",
+   "brand": "理想",
+   "model": "L8",
+   "model_code": "LXA6511SHEVX1（2023款 Pro）",
+   "cls": "SUV",
+   "manufacturer": "重庆理想汽车有限公司",
+   "year": 2022,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-766.html"
+  },
+  {
+   "seq": "23",
+   "brand": "极氪",
+   "model": "极氪001",
+   "model_code": "MR7001BEV08（ 2022款 超长续航单电机 WE版）",
+   "cls": "SUV",
+   "manufacturer": "浙江吉利汽车有限公司",
+   "year": 2022,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/3.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-767.html"
+  },
+  {
+   "seq": "24",
+   "brand": "奥迪",
+   "model": "A4L",
+   "model_code": "FV7203FBDCG（2022款 40TFSI 时尚动感型）",
+   "cls": "轿车",
+   "manufacturer": "一汽-大众汽车有限公司",
+   "year": 2022,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-768.html",
+   "test_year": 2022,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-768.html"
+  },
+  {
+   "seq": "25",
+   "brand": "比亚迪",
+   "model": "护卫舰07",
+   "model_code": "BYD6482ST6HEV2（2023款 100KM 豪华型）",
+   "cls": "SUV",
+   "manufacturer": "比亚迪汽车有限公司",
+   "year": 2022,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-769.html"
+  },
+  {
+   "seq": "26",
+   "brand": "别克",
+   "model": "别克世纪",
+   "model_code": "SGM6523UBA3（2023款 六座蕴世版）",
+   "cls": "MPV",
+   "manufacturer": "上汽通用汽车有限公司",
+   "year": 2022,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/A.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-770.html"
+  },
+  {
+   "seq": "27",
+   "brand": "荣威",
+   "model": "RX5",
+   "model_code": "CSA6473REAN（2023款 超感豪华版）",
+   "cls": "SUV",
+   "manufacturer": "上海汽车集团股份有限公司",
+   "year": 2022,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-771.html"
+  },
+  {
+   "seq": "28",
+   "brand": "北京",
+   "model": "魔方",
+   "model_code": "BJ6460U5XDK（2022款 黄金版）",
+   "cls": "SUV",
+   "manufacturer": "北京汽车股份有限公司",
+   "year": 2022,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/3.png",
+    "车内乘员": "level1/3.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-772.html"
+  },
+  {
+   "seq": "1",
+   "brand": "讴歌",
+   "model": "RDX",
+   "model_code": "GHA6480MAA6A",
+   "cls": "SUV",
+   "manufacturer": "广汽本田汽车有限公司",
+   "year": 2021,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/3.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-773.html"
+  },
+  {
+   "seq": "2",
+   "brand": "长安",
+   "model": "UNI-K",
+   "model_code": "SC6493ABA6",
+   "cls": "SUV",
+   "manufacturer": "重庆长安汽车股份有限公司",
+   "year": 2021,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/3.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-774.html",
+   "test_year": 2021,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-774.html"
+  },
+  {
+   "seq": "3",
+   "brand": "大众",
+   "model": "ID.4 X",
+   "model_code": "SVW6461AEV",
+   "cls": "SUV",
+   "manufacturer": "上汽大众汽车有限公司",
+   "year": 2021,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/2.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-775.html"
+  },
+  {
+   "seq": "4",
+   "brand": "马自达",
+   "model": "CX-30",
+   "model_code": "CAM7204B",
+   "cls": "SUV",
+   "manufacturer": "长安马自达汽车有限公司",
+   "year": 2021,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-776.html"
+  },
+  {
+   "seq": "5",
+   "brand": "福特",
+   "model": "锐际",
+   "model_code": "CAF6461AF64",
+   "cls": "SUV",
+   "manufacturer": "长安福特汽车有限公司",
+   "year": 2021,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-777.html",
+   "test_year": 2021,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-777.html"
+  },
+  {
+   "seq": "6",
+   "brand": "别克",
+   "model": "昂科威",
+   "model_code": "SGM6479EBA1",
+   "cls": "SUV",
+   "manufacturer": "上汽通用东岳汽车有限公司",
+   "year": 2021,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/4.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-778.html"
+  },
+  {
+   "seq": "7",
+   "brand": "丰田",
+   "model": "CH-R",
+   "model_code": "GTM7201XM",
+   "cls": "SUV",
+   "manufacturer": "广汽丰田汽车有限公司",
+   "year": 2021,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/3.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-779.html"
+  },
+  {
+   "seq": "8",
+   "brand": "雪铁龙",
+   "model": "天逸C5 AIRCROSS",
+   "model_code": "DC6456KXCB16",
+   "cls": "SUV",
+   "manufacturer": "神龙汽车有限公司",
+   "year": 2021,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/3.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": null,
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-780.html"
+  },
+  {
+   "seq": "9",
+   "brand": "魏牌",
+   "model": "坦克300",
+   "model_code": "CC2030BE21A",
+   "cls": "SUV",
+   "manufacturer": "长城汽车股份有限公司",
+   "year": 2021,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/3.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-781.html",
+   "test_year": 2021,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-781.html"
+  },
+  {
+   "seq": "10",
+   "brand": "日产",
+   "model": "奇骏",
+   "model_code": "DFL6470VTNM2",
+   "cls": "SUV",
+   "manufacturer": "东风汽车有限公司",
+   "year": 2021,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-782.html",
+   "test_year": 2021,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-782.html"
+  },
+  {
+   "seq": "11",
+   "brand": "别克",
+   "model": "GL8 ES 陆尊",
+   "model_code": "SGM6522UBB2",
+   "cls": "MPV",
+   "manufacturer": "上汽通用汽车有限公司",
+   "year": 2021,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/3.png",
+    "车外行人": "levelold/A.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-783.html"
+  },
+  {
+   "seq": "12",
+   "brand": "特斯拉",
+   "model": "Model Y",
+   "model_code": "TSL6480BEVAR0",
+   "cls": "SUV",
+   "manufacturer": "特斯拉（上海）有限公司",
+   "year": 2021,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-784.html"
+  },
+  {
+   "seq": "1",
+   "brand": "别克",
+   "model": "君威",
+   "model_code": "SGM7157EBA1",
+   "cls": "轿车",
+   "manufacturer": "上汽通用汽车有限公司",
+   "year": 2020,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-795.html",
+   "test_year": 2020,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-795.html"
+  },
+  {
+   "seq": "2",
+   "brand": "特斯拉",
+   "model": "Model 3",
+   "model_code": "TSL7000BEVAR0",
+   "cls": "轿车",
+   "manufacturer": "特斯拉（上海）有限公司",
+   "year": 2020,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/A.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-796.html"
+  },
+  {
+   "seq": "3",
+   "brand": "哈弗",
+   "model": "H6",
+   "model_code": "CC6464RM08A",
+   "cls": "SUV",
+   "manufacturer": "长城汽车股份有限公司",
+   "year": 2020,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/3.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": null,
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-797.html",
+   "test_year": 2020,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-797.html"
+  },
+  {
+   "seq": "4",
+   "brand": "本田",
+   "model": "皓影",
+   "model_code": "GHA6460RAC6A",
+   "cls": "SUV",
+   "manufacturer": "广汽本田汽车有限公司",
+   "year": 2020,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-798.html",
+   "test_year": 2020,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-798.html"
+  },
+  {
+   "seq": "5",
+   "brand": "奥迪",
+   "model": "Q5L",
+   "model_code": "FV6481LAQDG",
+   "cls": "SUV",
+   "manufacturer": "一汽-大众汽车有限公司",
+   "year": 2020,
+   "grades_raw": {
+    "耐撞性与维修经济性": null,
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-799.html",
+   "test_year": 2020,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-799.html"
+  },
+  {
+   "seq": "6",
+   "brand": "奔驰",
+   "model": "A级",
+   "model_code": "BJ7138LEL",
+   "cls": "轿车",
+   "manufacturer": "北京奔驰汽车有限公司",
+   "year": 2020,
+   "grades_raw": {
+    "耐撞性与维修经济性": null,
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/3.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-800.html",
+   "test_year": 2020,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-800.html"
+  },
+  {
+   "seq": "7",
+   "brand": "领克",
+   "model": "领克03",
+   "model_code": "MR7152D09",
+   "cls": "轿车",
+   "manufacturer": "浙江吉利汽车有限公司",
+   "year": 2020,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-801.html",
+   "test_year": 2020,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-801.html"
+  },
+  {
+   "seq": "8",
+   "brand": "江淮",
+   "model": "嘉悦A5",
+   "model_code": "HFC7152B1S",
+   "cls": "轿车",
+   "manufacturer": "安徽江淮汽车集团股份有限公司",
+   "year": 2020,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/3.png",
+    "车外行人": "levelold/A.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-802.html"
+  },
+  {
+   "seq": "9",
+   "brand": "马自达",
+   "model": "阿特兹",
+   "model_code": "CA7200ATE6A",
+   "cls": "轿车",
+   "manufacturer": "中国第一汽车集团有限公司",
+   "year": 2020,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/3.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-803.html"
+  },
+  {
+   "seq": "10",
+   "brand": "丰田",
+   "model": "RAV4荣放",
+   "model_code": "CA64642XME6",
+   "cls": "SUV",
+   "manufacturer": "四川一汽丰田汽车有限公司",
+   "year": 2020,
+   "grades_raw": {
+    "耐撞性与维修经济性": null,
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-804.html",
+   "test_year": 2020,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-804.html"
+  },
+  {
+   "seq": "11",
+   "brand": "荣威",
+   "model": "iMAX8",
+   "model_code": "CSA6511ZEAP",
+   "cls": "MPV",
+   "manufacturer": "上海汽车集团股份有限公司",
+   "year": 2020,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-805.html"
+  },
+  {
+   "seq": "12",
+   "brand": "宝马",
+   "model": "X3",
+   "model_code": "BMW6475SX",
+   "cls": "SUV",
+   "manufacturer": "华晨宝马汽车有限公司",
+   "year": 2020,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-806.html",
+   "test_year": 2020,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-806.html"
+  },
+  {
+   "seq": "13",
+   "brand": "丰田",
+   "model": "威兰达",
+   "model_code": "GTM6470FFXM",
+   "cls": "SUV",
+   "manufacturer": "广汽丰田汽车有限公司",
+   "year": 2020,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-807.html",
+   "test_year": 2020,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-807.html"
+  },
+  {
+   "seq": "14",
+   "brand": "大众",
+   "model": "帕萨特",
+   "model_code": "SVW71423DT",
+   "cls": "轿车",
+   "manufacturer": "上汽大众汽车有限公司",
+   "year": 2020,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/3.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-808.html",
+   "test_year": 2020,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-808.html"
+  },
+  {
+   "seq": "15",
+   "brand": "大众",
+   "model": "途昂",
+   "model_code": "SVW6505KVD",
+   "cls": "SUV",
+   "manufacturer": "上汽大众汽车有限公司",
+   "year": 2020,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-809.html"
+  },
+  {
+   "seq": "16",
+   "brand": "蔚来",
+   "model": "EC6",
+   "model_code": "HFC6483ECSEV6-W",
+   "cls": "SUV",
+   "manufacturer": "上海蔚来汽车有限公司",
+   "year": 2020,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/3.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-810.html"
+  },
+  {
+   "seq": "17",
+   "brand": "启辰",
+   "model": "星",
+   "model_code": "DFL6470MTN81",
+   "cls": "SUV",
+   "manufacturer": "东风汽车有限公司",
+   "year": 2020,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-811.html",
+   "test_year": 2020,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-811.html"
+  },
+  {
+   "seq": "18",
+   "brand": "现代",
+   "model": "胜达",
+   "model_code": "BH6490MCAS",
+   "cls": "SUV",
+   "manufacturer": "北京现代汽车有限公司",
+   "year": 2020,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-812.html",
+   "test_year": 2020,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-812.html"
+  },
+  {
+   "seq": "19",
+   "brand": "天际",
+   "model": "ME7",
+   "model_code": "QAC6461BEVAB",
+   "cls": "SUV",
+   "manufacturer": "福建天际汽车制造有限公司",
+   "year": 2020,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-813.html"
+  },
+  {
+   "seq": "20",
+   "brand": "理想",
+   "model": "ONE",
+   "model_code": "LXA6500SHEVM1",
+   "cls": "SUV",
+   "manufacturer": "重庆理想汽车有限公司",
+   "year": 2020,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-814.html"
+  },
+  {
+   "seq": "21",
+   "brand": "比亚迪",
+   "model": "汉EV",
+   "model_code": "BYD7009BEV1",
+   "cls": "轿车",
+   "manufacturer": "比亚迪汽车有限公司",
+   "year": 2020,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-815.html"
+  },
+  {
+   "seq": "22",
+   "brand": "比亚迪",
+   "model": "宋PLUS",
+   "model_code": "BYD6470ST6B",
+   "cls": "SUV",
+   "manufacturer": "比亚迪汽车有限公司",
+   "year": 2020,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-816.html"
+  },
+  {
+   "seq": "23",
+   "brand": "领克",
+   "model": "领克05",
+   "model_code": "MR6463D17",
+   "cls": "SUV",
+   "manufacturer": "浙江吉利汽车有限公司",
+   "year": 2020,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-817.html"
+  },
+  {
+   "seq": "1",
+   "brand": "本田",
+   "model": "凌派",
+   "model_code": "GHA7100GAC5A",
+   "cls": "轿车",
+   "manufacturer": "广汽本田汽车有限公司",
+   "year": 2019,
+   "grades_raw": {
+    "耐撞性与维修经济性": null,
+    "车内乘员": "level1/4.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-818.html"
+  },
+  {
+   "seq": "2",
+   "brand": "福特",
+   "model": "福克斯",
+   "model_code": "CAF7158A6P1",
+   "cls": "轿车",
+   "manufacturer": "长安福特汽车有限公司",
+   "year": 2019,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/3.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-819.html"
+  },
+  {
+   "seq": "3",
+   "brand": "北京",
+   "model": "绅宝D50",
+   "model_code": "BJ7151C4DCB",
+   "cls": "轿车",
+   "manufacturer": "北京汽车股份有限公司",
+   "year": 2019,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/4.png",
+    "车外行人": "levelold/A.png",
+    "辅助安全": null,
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-820.html"
+  },
+  {
+   "seq": "4",
+   "brand": "现代",
+   "model": "菲斯塔",
+   "model_code": "BH7140CAAV",
+   "cls": "轿车",
+   "manufacturer": "北京现代汽车有限公司",
+   "year": 2019,
+   "grades_raw": {
+    "耐撞性与维修经济性": null,
+    "车内乘员": "level1/4.png",
+    "车外行人": "levelold/A.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-821.html"
+  },
+  {
+   "seq": "5",
+   "brand": "东风风神",
+   "model": "AX7",
+   "model_code": "DFM6460D5B2",
+   "cls": "SUV",
+   "manufacturer": "东风汽车集团有限公司",
+   "year": 2019,
+   "grades_raw": {
+    "耐撞性与维修经济性": null,
+    "车内乘员": "level1/4.png",
+    "车外行人": "levelold/P.png",
+    "辅助安全": "level1/4.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-822.html"
+  },
+  {
+   "seq": "6",
+   "brand": "三菱",
+   "model": "欧蓝德",
+   "model_code": "GMC6472A",
+   "cls": "SUV",
+   "manufacturer": "广汽三菱汽车有限公司",
+   "year": 2019,
+   "grades_raw": {
+    "耐撞性与维修经济性": null,
+    "车内乘员": "level1/4.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-823.html"
+  },
+  {
+   "seq": "7",
+   "brand": "凯迪拉克",
+   "model": "XT4",
+   "model_code": "SGM6468EBA1",
+   "cls": "SUV",
+   "manufacturer": "上汽通用汽车有限公司",
+   "year": 2019,
+   "grades_raw": {
+    "耐撞性与维修经济性": null,
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-824.html",
+   "test_year": 2019,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-824.html"
+  },
+  {
+   "seq": "8",
+   "brand": "哈弗",
+   "model": "F5",
+   "model_code": "CC7154UM0A",
+   "cls": "SUV",
+   "manufacturer": "长城汽车股份有限公司",
+   "year": 2019,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/3.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": null,
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-825.html"
+  },
+  {
+   "seq": "9",
+   "brand": "比亚迪",
+   "model": "唐",
+   "model_code": "BYD6490ST6A",
+   "cls": "SUV",
+   "manufacturer": "比亚迪汽车工业有限公司",
+   "year": 2019,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-826.html"
+  },
+  {
+   "seq": "10",
+   "brand": "沃尔沃",
+   "model": "XC60",
+   "model_code": "VCC6474H27",
+   "cls": "SUV",
+   "manufacturer": "浙江豪情汽车制造有限公司",
+   "year": 2019,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-827.html",
+   "test_year": 2019,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-827.html"
+  },
+  {
+   "seq": "11",
+   "brand": "丰田",
+   "model": "亚洲龙",
+   "model_code": "TV7256E6",
+   "cls": "轿车",
+   "manufacturer": "天津一汽丰田汽车有限公司",
+   "year": 2019,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-828.html",
+   "test_year": 2019,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-828.html"
+  },
+  {
+   "seq": "12",
+   "brand": "吉利",
+   "model": "星越",
+   "model_code": "MR6463D03",
+   "cls": "SUV",
+   "manufacturer": "浙江吉利汽车有限公司",
+   "year": 2019,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/3.png",
+    "车内乘员": "level1/3.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-829.html"
+  },
+  {
+   "seq": "13",
+   "brand": "丰田",
+   "model": "雷凌",
+   "model_code": "GTM7121LPCJM（2019款 185T进取版）",
+   "cls": "轿车",
+   "manufacturer": "广汽丰田汽车有限公司",
+   "year": 2019,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-830.html",
+   "test_year": 2019,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-830.html"
+  },
+  {
+   "seq": "14",
+   "brand": "日产",
+   "model": "天籁",
+   "model_code": "DFL7201VANF2",
+   "cls": "轿车",
+   "manufacturer": "东风汽车有限公司",
+   "year": 2019,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-831.html",
+   "test_year": 2019,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-831.html"
+  },
+  {
+   "seq": "15",
+   "brand": "雪佛兰",
+   "model": "科鲁泽",
+   "model_code": "SGM7102LNA1",
+   "cls": "轿车",
+   "manufacturer": "上汽通用汽车有限公司",
+   "year": 2019,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": null,
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-832.html"
+  },
+  {
+   "seq": "16",
+   "brand": "马自达",
+   "model": "马自达3",
+   "model_code": "CAM7153M（2020款 1.5L MT质美版）",
+   "cls": "轿车",
+   "manufacturer": "长安马自达汽车有限公司",
+   "year": 2019,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-833.html"
+  },
+  {
+   "seq": "17",
+   "brand": "本田",
+   "model": "INSPIRE",
+   "model_code": "DHW7152CVCSF",
+   "cls": "轿车",
+   "manufacturer": "东风本田汽车有限公司",
+   "year": 2019,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/4.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-834.html"
+  },
+  {
+   "seq": "18",
+   "brand": "大众",
+   "model": "帕萨特",
+   "model_code": "SVW71423CT",
+   "cls": "轿车",
+   "manufacturer": "上汽大众汽车有限公司",
+   "year": 2019,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/3.png",
+    "车内乘员": "level1/4.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-835.html",
+   "test_year": 2019,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-835.html"
+  },
+  {
+   "seq": "19",
+   "brand": "长安",
+   "model": "CS75 PLUS",
+   "model_code": "SC6479BEH6",
+   "cls": "SUV",
+   "manufacturer": "合肥长安汽车有限公司",
+   "year": 2019,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-836.html"
+  },
+  {
+   "seq": "20",
+   "brand": "一汽奔腾",
+   "model": "T77",
+   "model_code": "CA6455A6",
+   "cls": "SUV",
+   "manufacturer": "中国第一汽车集团有限公司",
+   "year": 2019,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/4.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-837.html"
+  },
+  {
+   "seq": "21",
+   "brand": "小鹏",
+   "model": "G3",
+   "model_code": "HMA7001DEBEV",
+   "cls": "SUV",
+   "manufacturer": "广州小鹏汽车科技有限公司",
+   "year": 2019,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-838.html"
+  },
+  {
+   "seq": "22",
+   "brand": "奔驰",
+   "model": "GLC",
+   "model_code": "BJ6486LEAL",
+   "cls": "SUV",
+   "manufacturer": "北京奔驰汽车有限公司",
+   "year": 2019,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-839.html",
+   "test_year": 2019,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-839.html"
+  },
+  {
+   "seq": "23",
+   "brand": "吉普",
+   "model": "大指挥官",
+   "model_code": "GFA6491FTDBA",
+   "cls": "SUV",
+   "manufacturer": "广汽菲亚特克莱斯勒汽车有限公司",
+   "year": 2019,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-840.html"
+  },
+  {
+   "seq": "24",
+   "brand": "宝马",
+   "model": "3系",
+   "model_code": "BMW7200AG",
+   "cls": "轿车",
+   "manufacturer": "华晨宝马汽车有限公司",
+   "year": 2019,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-841.html",
+   "test_year": 2019,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-841.html"
+  },
+  {
+   "seq": "25",
+   "brand": "奥迪",
+   "model": "A6 L",
+   "model_code": "FV7201BBDDG",
+   "cls": "轿车",
+   "manufacturer": "一汽大众汽车有限公司",
+   "year": 2019,
+   "grades_raw": {
+    "耐撞性与维修经济性": null,
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-842.html"
+  },
+  {
+   "seq": "26",
+   "brand": "荣威",
+   "model": "RX5 MAX",
+   "model_code": "CSA6468NEMQ",
+   "cls": "SUV",
+   "manufacturer": "上海汽车集团股份有限公司",
+   "year": 2019,
+   "grades_raw": {
+    "耐撞性与维修经济性": null,
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-843.html"
+  },
+  {
+   "seq": "27",
+   "brand": "丰田",
+   "model": "卡罗拉",
+   "model_code": "TV7121N6",
+   "cls": "轿车",
+   "manufacturer": "天津一汽丰田汽车有限公司",
+   "year": 2019,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-844.html",
+   "test_year": 2019,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-844.html"
+  },
+  {
+   "seq": "1",
+   "brand": "别克",
+   "model": "昂科威",
+   "model_code": "SGM6475DAA1",
+   "cls": "SUV",
+   "manufacturer": "上汽通用东岳汽车有限公司",
+   "year": 2018,
+   "grades_raw": {
+    "耐撞性与维修经济性": null,
+    "车内乘员": "level1/3.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-845.html"
+  },
+  {
+   "seq": "2",
+   "brand": "大众",
+   "model": "途观L",
+   "model_code": "SVW6474DFD",
+   "cls": "SUV",
+   "manufacturer": "上汽大众汽车有限公司",
+   "year": 2018,
+   "grades_raw": {
+    "耐撞性与维修经济性": null,
+    "车内乘员": "level1/4.png",
+    "车外行人": "levelold/A.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-846.html",
+   "test_year": 2018,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-846.html"
+  },
+  {
+   "seq": "3",
+   "brand": "大众",
+   "model": "迈腾",
+   "model_code": "FV7147BADBG",
+   "cls": "轿车",
+   "manufacturer": "一汽-大众汽车有限公司",
+   "year": 2018,
+   "grades_raw": {
+    "耐撞性与维修经济性": null,
+    "车内乘员": "level1/3.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-847.html",
+   "test_year": 2018,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-847.html"
+  },
+  {
+   "seq": "4",
+   "brand": "丰田",
+   "model": "凯美瑞",
+   "model_code": "GTM7200CEE",
+   "cls": "轿车",
+   "manufacturer": "广汽丰田汽车有限公司",
+   "year": 2018,
+   "grades_raw": {
+    "耐撞性与维修经济性": null,
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-848.html",
+   "test_year": 2018,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-848.html"
+  },
+  {
+   "seq": "5",
+   "brand": "领克",
+   "model": "领克01",
+   "model_code": "JL6453C10",
+   "cls": "SUV",
+   "manufacturer": "浙江豪情汽车制造有限公司",
+   "year": 2018,
+   "grades_raw": {
+    "耐撞性与维修经济性": null,
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-849.html"
+  },
+  {
+   "seq": "6",
+   "brand": "五菱",
+   "model": "宝骏510",
+   "model_code": "LZW6420CJY",
+   "cls": "SUV",
+   "manufacturer": "上汽通用五菱汽车股份有限公司",
+   "year": 2018,
+   "grades_raw": {
+    "耐撞性与维修经济性": null,
+    "车内乘员": "level1/5.png",
+    "车外行人": "levelold/A.png",
+    "辅助安全": null,
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-850.html"
+  },
+  {
+   "seq": "7",
+   "brand": "魏牌",
+   "model": "VV5",
+   "model_code": "CC7203UM02A",
+   "cls": "SUV",
+   "manufacturer": "长城汽车股份有限公司",
+   "year": 2018,
+   "grades_raw": {
+    "耐撞性与维修经济性": null,
+    "车内乘员": "level1/3.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-851.html"
+  },
+  {
+   "seq": "8",
+   "brand": "本田",
+   "model": "思域",
+   "model_code": "DHW7101FCCSE",
+   "cls": "轿车",
+   "manufacturer": "东风本田汽车有限公司",
+   "year": 2018,
+   "grades_raw": {
+    "耐撞性与维修经济性": null,
+    "车内乘员": "level1/4.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-852.html",
+   "test_year": 2018,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-852.html"
+  },
+  {
+   "seq": "9",
+   "brand": "奔驰",
+   "model": "C级",
+   "model_code": "BJ7204HE",
+   "cls": "轿车",
+   "manufacturer": "北京奔驰汽车有限公司",
+   "year": 2018,
+   "grades_raw": {
+    "耐撞性与维修经济性": null,
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/A.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-853.html",
+   "test_year": 2018,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-853.html"
+  },
+  {
+   "seq": "10",
+   "brand": "宝马",
+   "model": "3系",
+   "model_code": "BMW7150BF",
+   "cls": "轿车",
+   "manufacturer": "华晨宝马汽车有限公司",
+   "year": 2018,
+   "grades_raw": {
+    "耐撞性与维修经济性": null,
+    "车内乘员": "level1/3.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": null,
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-854.html",
+   "test_year": 2018,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-854.html"
+  },
+  {
+   "seq": "11",
+   "brand": "雷诺",
+   "model": "科雷傲",
+   "model_code": "DFR6470SCE1",
+   "cls": "SUV",
+   "manufacturer": "东风雷诺汽车有限公司",
+   "year": 2018,
+   "grades_raw": {
+    "耐撞性与维修经济性": null,
+    "车内乘员": "level1/4.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/5.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-855.html"
+  },
+  {
+   "seq": "12",
+   "brand": "本田",
+   "model": "雅阁",
+   "model_code": "GHA7150AAC5B",
+   "cls": "轿车",
+   "manufacturer": "广汽本田汽车有限公司",
+   "year": 2018,
+   "grades_raw": {
+    "耐撞性与维修经济性": null,
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-856.html",
+   "test_year": 2018,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-856.html"
+  },
+  {
+   "seq": "13",
+   "brand": "奇瑞",
+   "model": "艾瑞泽5",
+   "model_code": "SQR7155J60T2",
+   "cls": "轿车",
+   "manufacturer": "奇瑞汽车股份有限公司",
+   "year": 2018,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/4.png",
+    "车外行人": "levelold/A.png",
+    "辅助安全": null,
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-857.html",
+   "test_year": 2018,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-857.html"
+  },
+  {
+   "seq": "14",
+   "brand": "现代",
+   "model": "领动",
+   "model_code": "BH7145TAV",
+   "cls": "轿车",
+   "manufacturer": "北京现代汽车有限公司",
+   "year": 2018,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/4.png",
+    "车外行人": "levelold/A.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-858.html"
+  },
+  {
+   "seq": "15",
+   "brand": "日产",
+   "model": "西玛",
+   "model_code": "DFL7253VAL2",
+   "cls": "轿车",
+   "manufacturer": "东风汽车有限公司",
+   "year": 2018,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/3.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/3.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-859.html"
+  },
+  {
+   "seq": "16",
+   "brand": "传祺",
+   "model": "GS7",
+   "model_code": "GAC6470C2B5",
+   "cls": "SUV",
+   "manufacturer": "广州汽车集团乘用车有限公司",
+   "year": 2018,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/3.png",
+    "车外行人": "levelold/M.png",
+    "辅助安全": null,
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-860.html"
+  },
+  {
+   "seq": "17",
+   "brand": "起亚",
+   "model": "智跑",
+   "model_code": "YQZ6444AE5",
+   "cls": "SUV",
+   "manufacturer": "东风悦达起亚汽车有限公司",
+   "year": 2018,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/4.png",
+    "车外行人": "levelold/A.png",
+    "辅助安全": null,
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-861.html",
+   "test_year": 2018,
+   "rule_version": null,
+   "test_trim": null,
+   "detail_url": "https://www.ciasi.org.cn/products/show-861.html"
+  },
+  {
+   "seq": "18",
+   "brand": "斯柯达",
+   "model": "柯迪亚克",
+   "model_code": "SVW6476GFD",
+   "cls": "SUV",
+   "manufacturer": "上汽大众汽车有限公司",
+   "year": 2018,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/2.png",
+    "车内乘员": "level1/4.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-862.html"
+  },
+  {
+   "seq": "19",
+   "brand": "丰田",
+   "model": "奕泽",
+   "model_code": "TV7203N",
+   "cls": "SUV",
+   "manufacturer": "天津一汽丰田汽车有限公司",
+   "year": 2018,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/3.png",
+    "车内乘员": "level1/2.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-863.html"
+  },
+  {
+   "seq": "20",
+   "brand": "众泰",
+   "model": "T600",
+   "model_code": "ZTA6460",
+   "cls": "SUV",
+   "manufacturer": "浙江众泰汽车制造有限公司",
+   "year": 2018,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/4.png",
+    "车内乘员": "level1/3.png",
+    "车外行人": "levelold/A.png",
+    "辅助安全": null,
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-864.html"
+  },
+  {
+   "seq": "21",
+   "brand": "江淮",
+   "model": "瑞风S3",
+   "model_code": "HFC7161MTV",
+   "cls": "SUV",
+   "manufacturer": "安徽江淮汽车集团股份有限公司",
+   "year": 2018,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/4.png",
+    "车外行人": "levelold/A.png",
+    "辅助安全": null,
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-865.html"
+  },
+  {
+   "seq": "22",
+   "brand": "别克",
+   "model": "GL8",
+   "model_code": "SGM6522UAA1",
+   "cls": "MPV",
+   "manufacturer": "上汽通用汽车有限公司",
+   "year": 2018,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/4.png",
+    "车外行人": "levelold/A.png",
+    "辅助安全": "level1/2.png",
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-866.html"
+  },
+  {
+   "seq": "23",
+   "brand": "比亚迪",
+   "model": "宋MAX",
+   "model_code": "BYD6470MT2",
+   "cls": "MPV",
+   "manufacturer": "比亚迪汽车工业有限公司",
+   "year": 2018,
+   "grades_raw": {
+    "耐撞性与维修经济性": "level1/5.png",
+    "车内乘员": "level1/5.png",
+    "车外行人": "levelold/G.png",
+    "辅助安全": null,
+    "新能源汽车专项": null
+   },
+   "url": "https://www.ciasi.org.cn/products/show-867.html"
+  }
+ ]
+}
