@@ -874,8 +874,7 @@ def tier_rules(cfg: dict) -> dict:
 
 
 def tier_report(cands: list[dict], cfg: dict, weights: list[float] | None = None,
-                label: str | None = None, airbag_gate: bool = False,
-                crash_gate: bool = False) -> dict:
+                label: str | None = None, airbag_gate: bool = False) -> dict:
     """按「稳定性 × 证据 × 市场验证」判三档，不排名次。
 
     为什么不分 1–10 名：名次的可解释性依赖于「分差大于算法噪声」。
@@ -964,34 +963,21 @@ def tier_report(cands: list[dict], cfg: dict, weights: list[float] | None = None
         if ev not in rules["t1_evidence"]:
             blockers.append(f"证据 {ev} 未达 {'/'.join(rules['t1_evidence'])}")
         if airbag_gate:
-            # 第1档气囊准入闸——三态，**只拦「明确缺失」，不拦「未核验」**。
-            # 为什么不再用 null 拦：null 表示「我们没取到证据」，是数据缺口，
-            # 不是产品缺陷。把 null 当 false 用，等于用我方的检索盲区去降一款车的档，
-            # 举证责任倒置；而且本价位侧气囊+气帘覆盖率 92%（35/38），
-            # 这种闸门几乎没有区分度，真正被它筛掉的只有「没查到的那几台」。
-            # airbags.json 的 policy A2 本来就写着「null 不参与修正也不触发硬伤提示」，
-            # 这里与之一致。未核验的车不降档，但必须打标进「待补清单」，不许悄悄放行。
+            # 第1档气囊准入闸：被推荐为「可直接买」的车，气囊配置基线必须可核验。
+            # 要求：官方/权威配置证据已核验（status=verified）+ 前排侧气囊与头部气帘齐备。
+            # 前排中央（远端）气囊为加分项、非普标配置，不设为硬闸（仍在「气囊」列可见）。
+            # 注意：vendor_claim 未逐项列明（字段为 null）同视为未达基线，而非「有气囊」。
             ab = c.get("airbags") or {}
-            miss = [lab for k, lab in (("airbag_front_side", "前排侧气囊"),
-                                       ("airbag_curtain", "头部气帘"))
-                    if ab.get(k) is False]
-            if miss:
-                blockers.append("带内气囊明确缺失：" + "/".join(miss))
+            if ab.get("status") != "verified":
+                blockers.append("气囊事实未核验（缺官方配置证据）")
             elif not (ab.get("airbag_front_side") is True
                       and ab.get("airbag_curtain") is True):
-                rec["airbag_pending"] = True
-                rec.setdefault("t1_notes", []).append(
-                    "气囊配置未核验：不因此降档（数据缺口不等于缺失），已列入待补清单")
-        if crash_gate:
-            # 第一档＝「不用取舍、可以直接去谈价」，被动安全不能只有插补值。
-            # 只认官方碰撞成绩（C-NCAP / C-IASI）；safety_basis 由 sync_cncap.py 写成，
-            # 是唯一权威源，不采信人工填的 evidence_status（两者曾出现过不一致）。
-            # Euro NCAP / ANCAP 同为官方政府背书的独立碰撞测评，中国品牌出口车常只有它。
-            # 早前白名单漏了 euro_ncap，导致 MG4 明明有 Euro NCAP 五星却被判「无官方成绩」。
-            basis = str(c.get("safety_basis") or "")
-            if basis not in ("cncap", "ciasi", "c-ncap", "ciasi_checked",
-                             "euro_ncap", "ancap"):
-                blockers.append("无官方碰撞成绩（安全分为插补值）")
+                miss = []
+                if ab.get("airbag_front_side") is not True:
+                    miss.append("前排侧气囊")
+                if ab.get("airbag_curtain") is not True:
+                    miss.append("头部气帘")
+                blockers.append("带内气囊未达 T1 基线：" + "/".join(miss))
         if (sales or 0) < rules["t1_min_sales"] and not quiet:
             blockers.append(f"月销 {(sales or 0):,}<{int(rules['t1_min_sales']):,}")
         elif (sales or 0) < rules["t1_min_sales"] and quiet and lc["status"] != "new_launch":
@@ -1029,8 +1015,7 @@ def tier_report(cands: list[dict], cfg: dict, weights: list[float] | None = None
     L.append("")
     L.append("| 档 | 条件（全部满足） | 含义 |")
     L.append("|---|---|---|")
-    ab_cond = "、气囊基线无明确缺失（未核验不拦，只标待补）" if airbag_gate else ""
-    ab_cond += "、有官方碰撞成绩（C-NCAP/C-IASI）" if crash_gate else ""
+    ab_cond = "、气囊基线已核验（侧/帘齐备、中央气囊未明确缺失）" if airbag_gate else ""
     L.append(f"| **第一档** | 基准算法命中 ≥{rules['t1_min_method_freq']:.0%}、"
              f"全情景命中 ≥{rules['t1_min_joint_freq']:.0%}、证据 ∈ {rules['t1_evidence']}、"
              f"趋势月销 ≥{int(rules['t1_min_sales']):,}{ab_cond} | 换算法换权重都在前列，不用取舍 |")

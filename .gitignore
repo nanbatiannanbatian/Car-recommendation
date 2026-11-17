@@ -1,13 +1,15 @@
+# 本机密钥与私有配置，永不提交
+key.txt
+config.json
+
+# 运行产物与缓存
+runs/
 __pycache__/
 *.pyc
-*.pyo
-*.bak*
-key.txt
-*.db
-*.sqlite
-runs/
-cache/
-.venv/
-venv/
-.env
-.DS_Store
+
+# 数据源缓存体积大且含站点快照，按需自行抓取
+*.doc
+
+# 版本升级前的本地备份，不进仓库
+*.bak-v63
+*.bak-24pct

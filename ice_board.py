@@ -44,9 +44,111 @@ def _fmt(n):
 
 def _lc_label(lc):
     lc = lc or {"status": "active"}
-    if lc.get("status") == "sales_drop":
+    st = lc.get("status")
+    if st == "sales_drop":
         return f"⚠骤降({lc.get('ratio')})"
-    return "在售"
+    return L.LC_LABEL.get(st, st or "在售")
+
+
+def _trend_arrow(tm):
+    """近 6 月销量迷你趋势：↑ 升 / ↓ 降 / → 平（用 trend_months 前后半均值比）。"""
+    vals = [v for v in (tm or {}).values() if isinstance(v, (int, float))]
+    if len(vals) >= 3:
+        h = len(vals) // 2
+        early = sum(vals[:h]) / max(1, h)
+        late = sum(vals[h:]) / max(1, len(vals) - h)
+        if late > early * 1.15:
+            return "↑"
+        if late < early * 0.85:
+            return "↓"
+    return "→"
+
+
+def _subtier_ice(ev, lc_status):
+    """T2 内细分：2A 证据较全可优先试驾 / 2B 有明确取舍点 / 2C 证据偏薄仅备选。"""
+    if ev == "C":
+        return "2C"
+    if lc_status in ("facelift_pending", "clearance", "new_launch", "sales_drop"):
+        return "2B"
+    return "2A"
+
+
+def _ev_desc(ev, crash, users):
+    """把 A/B/C 证据等级翻成描述性标签，切断与购买档位的混淆。
+    A 有两条路径（口碑≥100 或 L1 碰撞），这里显式标出依据。"""
+    users = users or 0
+    if ev == "A":
+        if crash == "L1" and users >= 100:
+            return "充分·口碑+碰撞", "eA"
+        if crash == "L1":
+            return "充分·官方碰撞", "eA"
+        return "充分·口碑", "eA"
+    if ev == "B":
+        return "中等", "eB"
+    return "薄弱", "eC"
+
+
+def _kendall(a, b):
+    """两套排序的 Kendall τ（只看共同元素），用于衡量名次稳定性。"""
+    common = [m for m in a if m in b]
+    if len(common) < 2:
+        return 1.0
+    ia = {m: i for i, m in enumerate(a)}
+    ib = {m: i for i, m in enumerate(b)}
+    c = d = 0
+    for i in range(len(common)):
+        for j in range(i + 1, len(common)):
+            x = ia[common[i]] - ia[common[j]]
+            y = ib[common[i]] - ib[common[j]]
+            if x * y > 0:
+                c += 1
+            elif x * y < 0:
+                d += 1
+    return (c - d) / (c + d) if (c + d) else 1.0
+
+
+def _discount_view(boards_data, ndim):
+    """评审敏感性：插补折扣系数扫描（不改默认分，只模拟 1−f×插补维 的名次影响）。"""
+    factors = (0.03, 0.05, 0.08)
+    cards = []
+    for b in boards_data:
+        sr = b.get("sub_rows") or []
+        if len(sr) < 3:
+            continue
+        default = [d["model"] for d in sr]
+        low = {d["model"]: d.get("low", 0) for d in sr}
+        tot = {d["model"]: float(d["total"]) for d in sr}
+        lines = []
+        for f in factors:
+            dsc = {m: tot[m] * (1 - f * low[m]) for m in default}
+            order = sorted(default, key=lambda m: -dsc[m])
+            tau = _kendall(default, order)
+            t10d, t10o = set(default[:10]), set(order[:10])
+            gained = sorted(t10o - t10d)
+            lost = sorted(t10d - t10o)
+            shifts = sum(1 for i, m in enumerate(default)
+                         if abs((i + 1) - (order.index(m) + 1)) >= 2)
+            lines.append(
+                f"<tr><td class='num'>{f:.2f}</td><td class='num'>{tau:.3f}</td>"
+                f"<td>{html.escape('、'.join(gained) or '—')}</td>"
+                f"<td>{html.escape('、'.join(lost) or '—')}</td>"
+                f"<td class='num'>{shifts}</td></tr>")
+        cards.append(
+            f"<h3 style='margin-top:12px'>{html.escape(b['label'])}</h3>"
+            "<table><thead><tr><th>折扣系数 f</th><th>Kendall τ</th><th>前十新进</th>"
+            "<th>前十掉出</th><th>位移≥2 款数</th></tr></thead><tbody>"
+            + "".join(lines) + "</tbody></table>")
+    if not cards:
+        return ""
+    return ("<h2>评审敏感性：插补折扣系数扫描<em>默认分不变，仅模拟</em></h2>"
+            "<div class='card'><p class='note'>DeepSeek 建议「加权分 ×（1 − 0.05 × 插补维数）」让薄证据车向均值收缩。"
+            "但 <b>0.05 是经验值、未经实测标定</b>，故本榜<b>不把它写进默认评分</b>；"
+            "这里把系数在 <b>0.03 / 0.05 / 0.08</b> 三档扫描，看结论对系数是否敏感——"
+            "τ 越接近 1、前十进出越少，说明折扣影响越小、该建议对本文结论非关键。</p>"
+            + "".join(cards) +
+            "<div class='note'>读法：若某车在不同系数下反复进出前十，说明它<b>高度依赖同榜中位插补撑名次</b>，"
+            "与表中「插补维」列应一致；这类车看图时自动降权即可，无需改用折扣分。"
+            "<b>本视图不进入正式榜、不影响三档判定。</b></div></div>")
 
 
 def _table_rows(rows, by, ci_groups, n, ci=None):
@@ -62,6 +164,7 @@ def _table_rows(rows, by, ci_groups, n, ci=None):
             "cls": c["cls"], "price": c["price"],
             "trend": _fmt(c["trend_sales"]), "oct": _fmt(c["sales_oct"]),
             "trend_raw": c.get("trend_sales"), "oct_raw": c.get("sales_oct"),
+            "tm": c.get("trend_months") or {},
             "total": f"{r['total']:.1f}", "users": c.get("koubei_users") or 0,
             "evidence": r["evidence"],
             "group": ci_groups.get(r["model"], "—"),
@@ -155,11 +258,11 @@ def render_board_md(board, passed, dropped, rows, tt, tiers, cfg, n):
     L_.append(f"> 两个前十不一样，正说明「加权榜 ≠ 销量榜」；"
               f"本榜销量维权重 **{mw * 100:.0f}%**（配置实配值，见正文权重表）。")
     L_.append("> v6.3 起候选池改为**全量核验**（388 款不按销量截断），销量不再在入池处"
-              "二次出现；但数据源本身是销量榜、评分仍含 market 24%，整张榜**依然偏市场热度**。"
+              "二次出现；但数据源本身是销量榜、评分仍含 market 22%，整张榜**依然偏市场热度**。"
               "漏斗切换的影响见 `funnel_sensitivity.md`，权重/插补敏感性见 `sensitivity.md`。")
     L_.append("")
-    # 三档
-    t = tiers.get("tiers") or {}
+    # 三档（tiers 可能传外层 {"tiers":{...}}，也可能已是内层 {"T1":..}；两者都兼容）
+    t = tiers.get("tiers") or (tiers if isinstance(tiers, dict) else {}) or {}
     L_ += ["### 三档分级（沿用项目判档框架）", "",
            f"- **第一档 · 可推荐（{len(t.get('T1') or [])} 款）**："
            f"{'、'.join(t.get('T1') or []) or '空的'}",
@@ -207,6 +310,35 @@ th{background:#f1f4f9;color:var(--sub);font-weight:600}tr:hover td{background:#f
 .warn{background:#fff6e8;color:var(--warn);border-left:3px solid #e0a13a;padding:10px 14px;border-radius:4px;margin:12px 0;font-size:13.5px}
 .note{color:var(--sub);font-size:12.5px;margin-top:9px}
 .pill{display:inline-block;background:#eef1f6;border-radius:12px;padding:2px 10px;margin:2px 4px 2px 0;font-size:12.5px}
+.decision{background:#f7f9fc;border:1px solid #d8e2f0;border-left:4px solid #1b64d1;border-radius:10px;padding:14px 16px;margin:6px 0 14px}
+.decision h3{margin:0 0 10px;font-size:14px;color:#1b64d1}
+.dgrid{display:grid;grid-template-columns:1fr 1.5fr 1fr;gap:12px}
+@media(max-width:820px){.dgrid{grid-template-columns:1fr}}
+.dcard{background:#fff;border:1px solid var(--line);border-radius:9px;padding:10px 12px}
+.dcard .dh{font-weight:700;font-size:13px;margin-bottom:6px}
+.dcard.t1{border-color:#bfe3cd}.dcard.t1 .dh{color:#0f6b3f}
+.dcard.t2{border-color:#cdd9f0}.dcard.t2 .dh{color:#1b64d1}
+.dcard.t3{border-color:#e3ddd2}.dcard.t3 .dh{color:var(--sub)}
+.dsub{margin:6px 0;font-size:12px}.dsub b{color:#33405a}
+.dcard ul{margin:4px 0 0;padding-left:16px}.dcard li{margin:3px 0;font-size:12.5px;line-height:1.45}
+.dcard li.empty{color:var(--sub);list-style:none;margin-left:-16px}
+.dtag{display:inline-block;font-size:10px;background:#eef3fd;color:#33405a;border-radius:4px;padding:0 4px;margin-left:3px}
+.dprice{color:var(--sub);font-size:11px;margin-left:3px}
+.dnote{font-size:11.5px;color:var(--sub);margin:6px 0 0}
+.rank td,.rank th{white-space:nowrap}
+.rk{width:30px;color:var(--sub);font-variant-numeric:tabular-nums}
+.md b{font-size:13.5px}
+.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.big{font-weight:700;font-size:14.5px}
+.ev{display:inline-block;width:20px;height:20px;line-height:20px;text-align:center;border-radius:5px;font-size:11.5px;font-weight:700}
+.evpill{display:inline-block;padding:1px 7px;border-radius:5px;font-size:11px;font-weight:600;white-space:nowrap}
+.eA{background:#e3f2e8;color:#0f6b3f}.eB{background:#fdf4e3;color:#b26a00}.eC{background:#fdecec;color:#a52222}
+.tier{display:inline-block;padding:1px 7px;border-radius:5px;font-size:11px;font-weight:600}
+.tier.t1{background:#e3f2e8;color:#0f6b3f}.tier.t2{background:#eef2fa;color:#1b64d1}.tier.t3{background:#f2f0ec;color:var(--sub)}
+.cr{display:inline-block;padding:1px 6px;border-radius:5px;font-size:11px}
+.cr.l1{background:#e3f2e8;color:#0f6b3f}.cr.lishi{background:#fdf4e3;color:#b26a00}.cr.none{background:#f2f0ec;color:var(--sub)}
+.lcc{display:inline-block;padding:1px 7px;border-radius:5px;font-size:11px}
+.lcc.lc-ok{color:#0f6b3f}.lcc.lc-warn{background:#fdf4e3;color:#b26a00;font-weight:700}.lcc.lc-mid{color:#b26a00}
 </style></head><body><div class="wrap">"""]
     parts.append(f"<h1>2026 年 10 月 · 燃油与混动四榜</h1><div class='lead'>"
                  f"紧凑型 / 中型 × 轿车 / SUV，各前十 ｜ 数据源 {esc(meta['as_of'])} ｜ "
@@ -233,6 +365,58 @@ th{background:#f1f4f9;color:var(--sub);font-weight:600}tr:hover td{background:#f
 <span class="pill">插混 {meta['by_power'].get('PHEV')}</span>
 <span class="pill">增程 {meta['by_power'].get('EREV')}</span>
 <div class="note">未取到名称/级别的车系不猜、不入池，逐条列在 report.md 的待补清单。</div></div>""")
+    # ---- 一页纸决策摘要（T1 / 2A·2B·2C / T3）----
+    def _decision_card_ice(b):
+        tiers = b.get("tiers") or {}
+        t1 = tiers.get("T1") or []
+        t2 = tiers.get("T2") or []
+        t3 = tiers.get("T3") or []
+        srows = {d["model"]: d for d in (b.get("sub_rows") or [])}
+
+        def li(name, tag=""):
+            d = srows.get(name, {})
+            price = d.get("price")
+            p = (f" <span class='dprice'>{esc(price)}万</span>"
+                 if price not in (None, "", "—") else "")
+            tg = (f" <span class='dtag'>{esc(tag)}</span>" if tag else "")
+            return f"<li><b>{esc(name)}</b>{p}{tg}</li>"
+
+        a2, b2, c2 = [], [], []
+        for nm in t2:
+            d = srows.get(nm, {})
+            ev = d.get("evidence") or "?"
+            st = (d.get("lc") or {}).get("status") or "active"
+            sub = _subtier_ice(ev, st)
+            if sub == "2A":
+                tag = "可优先试驾"
+            elif sub == "2B":
+                tag = {"sales_drop": "销量骤降·先查生命周期", "clearance": "清库",
+                       "facelift_pending": "等新款", "new_launch": "爬坡期"}.get(st, "有取舍")
+            else:
+                tag = "仅备选"
+            (a2 if sub == "2A" else b2 if sub == "2B" else c2).append((nm, tag))
+
+        def cap(lst, k=8):
+            items = "".join(li(nm, tg) for nm, tg in lst[:k]) or "<li class='empty'>—</li>"
+            more = (f"<li class='empty'>…等 {len(lst)} 款</li>" if len(lst) > k else "")
+            return items + more
+
+        t1_items = "".join(li(n) for n in t1) or "<li class='empty'>（本榜空）</li>"
+        t3_items = "".join(li(n) for n in t3[:6]) or "<li class='empty'>—</li>"
+        t3_items += (f"<li class='empty'>…等 {len(t3)} 款</li>" if len(t3) > 6 else "")
+        t1_note = ('<p class="dnote">第1档空＝<b>证据缺口，不是车不能买</b>；'
+                   '可先试驾下列 2A 车（未达第1档多因缺 L4 口碑样本≥100 或 L1 官方碰撞）。</p>'
+                   if not t1 else "")
+        return f"""<div class="decision"><h3>一页纸决策摘要</h3>
+  <div class="dgrid">
+    <div class="dcard t1"><div class="dh">第1档 · 优先试驾</div><ul>{t1_items}</ul>{t1_note}</div>
+    <div class="dcard t2"><div class="dh">第2档 · 按偏好取舍</div>
+      <div class="dsub"><b>2A 可优先试驾</b><ul>{cap(a2)}</ul></div>
+      <div class="dsub"><b>2B 取舍点</b><ul>{cap(b2)}</ul></div>
+      <div class="dsub"><b>2C 仅备选</b><ul>{cap(c2)}</ul></div></div>
+    <div class="dcard t3"><div class="dh">第3档 · 证据不足/暂缓</div><ul>{t3_items}</ul></div>
+  </div></div>"""
+
     for b in boards_data:
         parts.append(f"<h2>{esc(b['label'])}</h2>")
         # 落榜名单（正文可见）
@@ -247,38 +431,68 @@ th{background:#f1f4f9;color:var(--sub);font-weight:600}tr:hover td{background:#f
                          f"<tbody>{rows_d}</tbody></table>"
                          f"<div class='note'>落榜≠车不好：多因未取得可核验官方指导价（懂车帝榜单价与经销商价同值，"
                          "不足以替代指导价），或价格/级别闸未过；下期核到即可入池。</div></details>")
+        dc_html = _decision_card_ice(b)
+        from collections import Counter
+        gsize = Counter(d["group"] for d in (b.get("sub_rows") or []) if d["group"] != "—")
+        tiers = b.get("tiers") or {}
+        t1m = set(tiers.get("T1") or [])
+        t2m = set(tiers.get("T2") or [])
+        t3m = set(tiers.get("T3") or [])
         parts.append(f"<div class='card'><div class='note'>候选 {b['n_pass']+b['n_drop']} 款 → 过闸 <b>{b['n_pass']}</b> 款，"
-                     f"落榜 {b['n_drop']} 款{drop_html}</div><table><thead><tr>"
-                     "<th>#</th><th>车型</th><th>动力</th><th>官方级别</th><th>指导价(万)</th>"
-                     "<th>6月趋势销量</th><th>10月销量</th><th>加权分</th>"
-                     "<th>名次区间(95%)</th><th>口碑样本</th>"
-                     "<th>证据</th><th>官方碰撞(判档)</th><th>同档组</th><th>插补维</th><th>生命周期</th></tr></thead><tbody>")
+                     f"落榜 {b['n_drop']} 款{drop_html}</div>{dc_html}"
+                     "<table class='rank'><thead><tr>"
+                     "<th>档组</th><th>车型</th><th>动力</th><th>指导价(万)</th>"
+                     "<th>趋势月销</th><th>加权分</th><th>证据</th>"
+                     "<th>官方碰撞</th><th>生命周期</th><th>三档</th><th>插补维</th></tr></thead><tbody>")
         for d in b["rows"]:
-            lcsd = (d.get("lc") or {}).get("status") == "sales_drop"
-            lc_txt = _lc_label(d.get("lc"))
-            lc_cell = (f"<td style='color:#b26a00;font-weight:700'>{esc(lc_txt)}</td>"
-                       if lcsd else f"<td>{esc(lc_txt)}</td>")
-            parts.append(f"<tr><td>{d['rank']}</td><td class='b'>{esc(d['model'])}</td>"
-                         f"<td><span class='tag'>{esc(d['power'])}</span></td><td>{esc(d['cls'])}</td>"
-                         f"<td>{esc(d['price'])}</td><td>{esc(d['trend'])}</td><td>{esc(d['oct'])}</td>"
-                         f"<td class='b'>{esc(d['total'])}</td><td>{esc(d.get('ci'))}</td>"
-                         f"<td>{d['users']}</td>"
-                         f"<td>{esc(d['evidence'])}</td>"
-                         f"<td>{esc(d.get('crash') or '—')}</td>"
-                         f"<td>{d['group']}</td><td>{d['low']}/{ndim}</td>{lc_cell}</tr>")
-        # 同档组：前十同组提示
+            g = d["group"]
+            is_gi = isinstance(g, int) and g >= 1
+            letter = chr(ord("A") + g - 1) if is_gi else "—"
+            tie = "≈" if (is_gi and gsize.get(g, 0) > 1) else ""
+            arr = _trend_arrow(d.get("tm"))
+            ts = d.get("trend_raw")
+            stxt = f"{arr} {int(ts):,}" if isinstance(ts, (int, float)) else "—"
+            price = d.get("price")
+            price_disp = price if price not in (None, "", "—") else "—"
+            ev = d["evidence"]
+            crash = d.get("crash") or "—"
+            ev_label, evcls = _ev_desc(ev, crash, d.get("users"))
+            crash_html = {"L1": "<span class='cr l1'>近测</span>",
+                          "史": "<span class='cr lishi'>仅历史</span>",
+                          "—": "<span class='cr none'>无记录</span>"}.get(crash, esc(crash))
+            lc = d.get("lc") or {"status": "active"}
+            lcsd = lc.get("status") == "sales_drop"
+            lc_cls = "lc-warn" if lcsd else ("lc-ok" if lc.get("status") == "active" else "lc-mid")
+            if d["model"] in t1m:
+                tier_html = "<span class='tier t1'>第1档</span>"
+            elif d["model"] in t2m:
+                tier_html = f"<span class='tier t2'>{_subtier_ice(ev, lc.get('status'))}</span>"
+            elif d["model"] in t3m:
+                tier_html = "<span class='tier t3'>第3档</span>"
+            else:
+                tier_html = "—"
+            parts.append(
+                f"<tr><td class='rk'>{letter}{tie}</td>"
+                f"<td class='md'><b>{esc(d['model'])}</b></td>"
+                f"<td><span class='tag'>{esc(d['power'])}</span></td>"
+                f"<td class='num'>{esc(price_disp)}</td>"
+                f"<td class='num'>{stxt}</td>"
+                f"<td class='num big'>{round(float(d['total']))}</td>"
+                f"<td><span class='evpill {evcls}' title='原始等级 {esc(ev)}'>{esc(ev_label)}</span></td>"
+                f"<td>{crash_html}</td>"
+                f"<td><span class='lcc {lc_cls}'>{esc(_lc_label(lc))}</span></td>"
+                f"<td>{tier_html}</td>"
+                f"<td class='num'>{d['low']}/{ndim}</td></tr>")
         top_groups = [d["group"] for d in b["rows"] if d["group"] != "—"]
         same_grp = (len(top_groups) > 0 and len(set(top_groups)) == 1)
         board_drops = [d for d in b["rows"] if (d.get("lc") or {}).get("status") == "sales_drop"]
-        note_parts = ["同档组＝bootstrap 名次区间重叠（<b>不是分差&lt;1 分</b>）：同组车只是「换权重后名次会换位」，" 
-                      "组内谁排前是算法噪声，不要按名次选车；",
-                      "插补维越多说明证据越薄；",
-                      "官方碰撞 <b>L1</b>＝近 3 年有官方测评记录（可走 L1 路径达证据 A），"
-                      "<b>史</b>＝仅历史年款不外推、不作判档，<b>—</b>＝两源无记录；均不换算分数；",
-                      "销量为车系合计口径，只作市场验证。"]
-        parts.append("</tbody></table><div class='note'>" + " ".join(note_parts) + "</div>")
-        if same_grp:
-            parts.append(f"<div class='warn'>⚠️ 本榜前十同属一个 bootstrap 组（组 {top_groups[0]}），"
+        parts.append("</tbody></table><div class='note'>"
+                     "<b>档组</b>＝同字母即<b>名次不可辨</b>（bootstrap 名次 95% 区间重叠；≈ 标并列，组内顺序无意义）；"
+                     "<b>加权分已粗化为整数</b>，只比相对强弱、不读精确差；"
+                     "<b>官方碰撞</b> 近测/仅历史/无记录＝L1/史/—，只作事实与判档证据、不换算分数；"
+                     "<b>插补维</b>越多证据越薄。三档＝能不能买，与名次是两套逻辑，见上方决策摘要。</div>")
+        if same_grp and isinstance(top_groups[0], int):
+            parts.append(f"<div class='warn'>⚠️ 本榜前十同属一个档组（{chr(ord('A')+top_groups[0]-1)} 组），"
                          "名次区间大面积重叠、逐名次不可辨；请按空间/动力/预算偏好选，"
                          "不要拿第 1 到第 10 当真实差距。</div>")
         if board_drops:
@@ -287,6 +501,26 @@ th{background:#f1f4f9;color:var(--sub);font-weight:600}tr:hover td{background:#f
                                      f"仅 {d['lc'].get('ratio')}）" for d in board_drops)
                          + "。销量骤降可能是清库/改款在即/已停产，不一定是产品力下滑；"
                          "名次按 6 月趋势中位数平滑，未反映最新月崩塌。</div>")
+        _seen, passed_ev = set(), []
+        for _d in (b.get("sub_rows") or []):
+            _st = (_d.get("lc") or {}).get("status")
+            if _st in (None, "active") or _d["model"] in _seen:
+                continue
+            _seen.add(_d["model"])
+            passed_ev.append((_d["model"], _lc_label(_d.get("lc"))))
+        life_ev = b.get("life_events") or []
+        if life_ev or passed_ev:
+            bits = []
+            for e in life_ev:
+                s = f"<b>{esc(e['model'])}</b>：{esc(e['label'])}"
+                if e.get("successor"):
+                    s += f"（接替 <b>{esc(e['successor'])}</b>）"
+                bits.append(s)
+            bits += [f"<b>{esc(m)}</b>：{esc(s)}" for m, s in passed_ev]
+            tail = "；".join(bits[:12]) + (f" …等 {len(bits)} 款" if len(bits) > 12 else "")
+            extra = ("该细分刚发生产品换代，<b>建议关注新车数据后再决策</b>，别只看到旧车落榜。"
+                     if any(e.get("successor") for e in life_ev) else "")
+            parts.append(f"<div class='note'><b>近期事件（换代/停产/清库）</b>：{tail}。{extra}</div>")
         parts.append("</div>")
         # 分动力视图
         for grp, title in (("燃油", "燃油 / 不插电 HEV"), ("混动", "混动（插混 + 增程）")):
@@ -295,6 +529,17 @@ th{background:#f1f4f9;color:var(--sub);font-weight:600}tr:hover td{background:#f
             if not sub:
                 continue
             cnt = len(all_sub)
+            if cnt < 5:
+                # 样本 <5：取消名次，改无序清单（排名无统计意义）
+                items = "".join(
+                    f"<li><b>{esc(d['model'])}</b> · {esc(d['price'])}万 · 加权 "
+                    f"{round(float(d['total']))}</li>" for d in all_sub)
+                parts.append(f"<div class='card'><h3 style='margin-top:0'>{title} "
+                             f"清单（共 {cnt} 款，样本&lt;5 不排名）</h3>"
+                             f"<ul>{items}</ul>"
+                             "<div class='note'>样本不足 5 款，<b>取消名次</b>：任何排序都无统计意义，"
+                             "仅供了解该细分有哪些车过闸。</div></div>")
+                continue
             parts.append(f"<div class='card'><h3 style='margin-top:0'>{title} "
                          f"分列（共 {cnt} 款，按同一套加权分）</h3>"
                          "<table><thead><tr><th>#</th><th>车型</th><th>动力</th><th>指导价</th>"
@@ -307,6 +552,7 @@ th{background:#f1f4f9;color:var(--sub);font-weight:600}tr:hover td{background:#f
                 parts.append(f"<tr><td colspan='6'><div class='note'>该细分仅 {cnt} 款过闸，"
                              "不足 10 款；尾部名次只是细分内相对次序，无统计意义。</div></td></tr>")
             parts.append("</tbody></table></div>")
+    parts.append(_discount_view(boards_data, ndim))
     parts.append(f"""<h2>评分覆盖率（{ndim} 维 × {audit['n_rows']} 款）</h2><div class="card"><table>
 <thead><tr><th>维度</th><th>有真实数据</th><th>插补(low)</th><th>覆盖率</th></tr></thead><tbody>""")
     for k in audit["dims"]:
@@ -334,15 +580,15 @@ th{background:#f1f4f9;color:var(--sub);font-weight:600}tr:hover td{background:#f
 <h3 style='margin-top:14px'>逐维公式与判定规则</h3><ul>{rules}</ul></div>""")
 
     # ---- 证据等级 A/B/C 定义（评审⑤）----
-    parts.append("""<div class="card"><h2 style="margin-top:0">证据等级 A / B / C 定义</h2>
-<p class="note">本榜证据等级<b>与纯电榜的 A/B/C 不同义</b>，且<b>第一档 ≠ 碰撞安全已验证</b>。两条并行路径：</p>
+    parts.append("""<div class="card"><h2 style="margin-top:0">证据充分度（充分 / 中等 / 薄弱）——已与「三档」解耦</h2>
+<p class="note">本榜把原来的 A/B/C 改成<b>描述性标签</b>，避免与「能不能买（三档）」混淆。二者是<b>两套独立逻辑</b>：
+证据充分度只说「这条结论的证据有多硬」，三档（第1 / 2A / 2B / 2C / 第3档）说「现在值不值得优先看」。<b>第一档 ≠ 碰撞安全已验证</b>。</p>
 <ul>
-<li><b>A</b> ＝（口碑样本 ≥100 <b>且</b> 级别+指导价齐备）<b>或</b>（有近期 L1 官方碰撞测评记录，走 L1 路径）；</li>
-<li><b>B</b> ＝ 口碑样本 30–99（无 L1 近期记录）；</li>
-<li><b>C</b> ＝ 口碑样本 &lt;30（无 L1 近期记录）。</li>
+<li><b>充分</b>（内部 A）＝ 口碑样本 ≥100 <b>且</b> 级别+指导价齐备，<b>或</b> 有近期 L1 官方碰撞测评记录（任一即可）。表中进一步标「充分·口碑 / 充分·官方碰撞 / 充分·口碑+碰撞」，让读者知道依据；</li>
+<li><b>中等</b>（内部 B）＝ 口碑样本 30–99（无 L1 近期记录）；</li>
+<li><b>薄弱</b>（内部 C）＝ 口碑样本 &lt;30（无 L1 近期记录）。</li>
 </ul>
-<p class="note">⚠️ 所以「样本 14 → A」<b>不矛盾</b>：如 锋兰达 样本仅 14，但有近期 L1 官方碰撞测评，走 L1 路径得 A；
-而 天籁 样本 46 却没有 L1 记录，落在 B。读者看到 A 应先看「官方碰撞」列是否 L1，再判断依据。</p></div>""")
+<p class="note">⚠️ 两点澄清：①「样本 14 却记充分」<b>不矛盾</b>——如 锋兰达 样本仅 14，但有近期 L1 官方碰撞测评，走碰撞路径；而 天籁 样本 46 无 L1，只到「中等」。②<b>本榜第一档（T1）要求证据充分（内部 A）</b>，所以不存在「第1档却是薄弱证据」；反过来「证据充分」的车仍可能因<b>销量偏低 / 算法稳定性不足</b>被放进第3档——这正是把证据与档位分开的意义。</p></div>""")
 
     # ---- 生命周期专章（评审④）----
     if lc_items:
@@ -467,9 +713,19 @@ def main():
                 groups[nm] = gi
         sub_rows = _table_rows(rows, by, groups, len(rows))
         drops_out = [(c["model"], res["failed"], res["notes"]) for c, res in dropped]
+        life_events = []
+        for c, res in dropped:
+            if "lifecycle_out" in (res.get("failed") or []):
+                _lc = L.lifecycle_of(c)
+                life_events.append({
+                    "model": c["model"],
+                    "label": L.LC_LABEL.get(_lc.get("status"), _lc.get("status")),
+                    "successor": _lc.get("successor") or "",
+                })
         boards_data.append({"label": label, "rows": data, "sub_rows": sub_rows,
                             "n_pass": len(passed), "n_drop": len(dropped),
-                            "drops": drops_out})
+                            "drops": drops_out, "tiers": tr.get("tiers") or {},
+                            "life_events": life_events})
         summary["boards"][label] = {
             "candidates": len(sub), "passed": len(passed), "dropped": len(dropped),
             "top10": [r["model"] for r in rows[:a.top]],
@@ -575,9 +831,11 @@ def main():
         "口碑分(0–5)×2；缺失维按同榜中位插补并标 `low`。", "",
         "逐维公式与判定规则：", "",
         *_rules, "",
-        "> **口径修正（v6.2）**：配置 `dimensions[market].gap` 写「权重上限 22%」，"
-        "但实配权重是 **24%**——旧版报告照抄了 22%，与代码不符，现统一按实配值披露。"
-        "是否把 market 下调到设计上限 22% **会改动名次**，属待决策项，本期未动。", "",
+        "> **口径修正（v6.6）**：`dimensions[market]` 本期由漂移的 **24% 回调至设计上限 22%**"
+        "（其余五维等比放大、合计仍为 1.0）。实测影响：四榜 **top10 交集均 10/10**，Kendall τ 0.78–0.96；"
+        "唯一档位变化是**中型轿车的「迈腾」掉出第1档**（T1 由 2 款→1 款，仅余 银河星耀7）。"
+        "即：去掉 2pp「市场热度」权重不改变谁进前十，但会让个别靠销量撑档的车降档——这正是「销量≠产品力」的体现。"
+        "旧 24% 配置留档 `categories/car_ice_phev.json.bak-24pct`。", "",
         f"> **插补比例要说清**：space / control / cabin / quality 四维真实覆盖均只有 "
         f"{audit['coverage'].get('space', 0)}/{audit['n_rows']}（{_cov_pct:.1f}%），"
         f"其余 {audit['imputed'].get('space', 0)} 款靠同榜中位插补。"
