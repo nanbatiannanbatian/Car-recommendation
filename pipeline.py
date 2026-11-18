@@ -32,6 +32,7 @@ import airbags               # noqa: E402
 import spec_facts            # noqa: E402
 import trims                 # noqa: E402
 import forecast as FC        # noqa: E402
+import quality_score as QS   # noqa: E402
 
 
 def parse_sliders(s):
@@ -91,6 +92,8 @@ def main():
                                        "；给出则在每榜后附「未上市预测区」")
     ap.add_argument("--complaints", help="车质网投诉聚合 JSON（fetch_complaints 产物）"
                                          "；给出则报告附「投诉反馈」参考区")
+    ap.add_argument("--quality", action="store_true",
+                    help="把质量与品控作为第 8 维进综合打分；可与 --complaints 联用")
     ap.add_argument("--no-thirdparty", action="store_true",
                     help="跳过第三方实测/拆车证据（默认启用，走 adjust 封顶通道）")
     ap.add_argument("--airbag-gate", action="store_true",
@@ -168,6 +171,10 @@ def main():
         "in": len(cands), "passed": 0, "dropped": 0, "sliders": custom,
         "boards": {}, "tiers": {}, "review": {},
     }
+    if a.quality:
+        cands, _ = QS.apply(cands, cdata)
+        parts += ["---", "", QS.report(cands), ""]
+        summary["quality"] = QS.coverage(cands)
     for board in L.board_items(cfg):
         label = board.get("label") or "全部"
         sub = L.filter_board(cands, board)

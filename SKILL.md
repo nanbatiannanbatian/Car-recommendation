@@ -741,6 +741,31 @@ python3 admit.py --candidates runs/x/candidates.json --check   # 复核现有池
 **实测修正了 6 处人工分**，其中偏差最大的是：丰田 bZ5 人工 9.0 → 实测 86.7% 对应 8.0；
 日产 NX8 人工 7.4 → 实测 92.2% 对应 8.9。人工看参数猜安全，偏差可以到 1.5 分。
 
+### `sync_cell_brand.py` — 电芯核验表回填候选池（v6.x，2026-11-18）
+
+**踩过的坑**：`cell_facts.json`（2026-11-16 核验表，37 款）note 明写「本表只补事实，
+不改候选池快照」，结果 baseline/v3/v4 候选池的 `cell_brand` 长期停在 null。
+39 款候选里有 **16 款**池内为空、事实库却有明确电芯（含丰田 bZ5 的弗迪刀片、
+大众ID.AURA T6 的宁德时代、秦MAX EV 的弗迪二代刀片）。懂车帝/汽车之家/易车
+三源都写弗迪，事实库 11-16 就核验入库，但快照一直没同步——用户当场指出才发现。
+
+**为什么没被发现**：主链路 `score_rows()` 读预填 `scores`，不读 `cell_brand`，
+所以打分结果没错（这些车的人工三电分本就按一线电芯给了，均分 8.2–8.7）；
+但配置级比较榜 `spec_score.score_powertrain()` **读** `cell_brand`，会因此漏掉
+一线电芯 +0.7。元数据不一致在打分榜里潜伏，到比较榜才暴露。
+
+```bash
+python3 sync_cell_brand.py --check cands.json                 # 只体检，报 MISSING/CONFLICT
+python3 sync_cell_brand.py --apply cands.json                 # 回填空值+写来源，自动 .bak-cell
+python3 sync_cell_brand.py --check cands.json --json audit.json
+```
+
+**规则**：单一事实源 = `cell_facts.json`。池空+事实有值=MISSING→回填并写
+`cell_brand_src`（file/verified/source_url/tier）；两边都有值但不同=CONFLICT→
+**只报告不自动覆盖**（如「上汽时代」vs「上汽时代(宁德合资)」，需人工判）。
+**绝不改 scores/adjust**——回填后重跑 pipeline 报告逐字一致（39 款分数零改动）。
+生成月度候选池后应先跑 `--check`，把 MISSING 清零再出榜。
+
 **结果**：中型 SUV 榜 safety 恢复区分度（sd 0.26，8.0–9.0）；
 其余三个榜仍落在 8.7（sd 0.00–0.07）——**这几个榜的 safety 权重实际失效，报告里会自动标出来。**
 这不是打分规则的问题，是这些车确实没有第三方验证。
@@ -1393,3 +1418,33 @@ python3 ev_battery_board.py --candidates <候选池.json> --out <目录>
 
 
 
+
+
+## 数据源扩展（2026-11-17 核实落地，不进分）
+
+### C-IASI 官方文字等级解码 `ciasi_text_decode.py`
+
+手册旧标「等级图标未解码」是误解：C-IASI 结果发布稿（`ciasi.org.cn/news/show-N.html`）是**纯文字** G/G+/A/M/P。零依赖解码 5 分指数；「耐撞性与维修经济性」=官方可维修性事实列。
+```bash
+python3 ciasi_text_decode.py --start 100 --end 130 --out <目录>/ciasi_decoded.json
+python3 ciasi_text_decode.py --selftest
+```
+实测 8 篇/30 款；早期稿只给分布不给逐车对应时标 `aggregate_only`（不猜）。只作事实列，**不进加权分**。
+
+### swoiow/autohome 参数补全探针 `swoiow_probe.py`
+
+GitHub `swoiow/autohome`（Apache-2.0，月度，1666 款 CSV）含指导价/kWh/CLTC/风阻/轴距/质保政策。
+```bash
+git clone --depth 1 --filter=blob:none --sparse https://github.com/swoiow/autohome.git
+cd autohome && git sparse-checkout set data && cd ..
+python3 swoiow_probe.py --data-dir autohome/data --candidates <候选池.json> --out <目录>/swoiow_suggest.json
+python3 swoiow_probe.py --selftest
+```
+实测严格命中 16/39。**只出补全建议、不写回候选池、不进分**；严格精确匹配（子串会把 EZ-60 误配 EZ-6、S5 误配 S，自检已覆盖）。
+
+### 暂不自动化（已核实可用，留接口）
+
+- **中汽流通协会×精真估保值率月报**：EV 3 年保值率 45.1%（2026-10），网页/PDF 无车型级 API，人工摘关注车型即可。
+- **samrdprc.org.cn 召回公告**：静态 HTML，召回编号/车型/数量/缺陷结构化；召回≠质量差，先定「只披露不评分」呈现规则再接。
+
+完整方案见 `车辆榜单引擎_架构与运维手册.md` §3.2–3.3。

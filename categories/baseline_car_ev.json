@@ -85,7 +85,7 @@
       },
       "trend_sales": 2144,
       "trend_note": "10月单月",
-      "cell_brand": null,
+      "cell_brand": "宁德时代(时代长安)",
       "cell_multi_source": false,
       "crash": "C-NCAP 90.8%（2025）",
       "evidence_status": "A",
@@ -130,7 +130,13 @@
         "2026-09": 2706,
         "2026-10": 2454
       },
-      "sales_upper_bound": 2144
+      "sales_upper_bound": 2144,
+      "cell_brand_src": {
+        "file": "categories/cell_facts.json",
+        "verified": "2026-11-16",
+        "source_url": "https://www.autohome.com.cn/config/series/7692.html",
+        "tier": 1
+      }
     },
     {
       "model": "风云A9",
@@ -147,7 +153,7 @@
       },
       "trend_sales": 5859,
       "trend_note": "10月单月",
-      "cell_brand": null,
+      "cell_brand": "得壹能源(奇瑞犀牛自研)",
       "cell_multi_source": false,
       "crash": "无官方成绩",
       "evidence_status": "B",
@@ -190,7 +196,13 @@
         "2026-09": 6393,
         "2026-10": 5540
       },
-      "sales_upper_bound": 5859
+      "sales_upper_bound": 5859,
+      "cell_brand_src": {
+        "file": "categories/cell_facts.json",
+        "verified": "2026-11-16",
+        "source_url": "https://car.m.yiche.com/fengyune05/peizhi/?from=ybm",
+        "tier": 2
+      }
     },
     {
       "model": "秦MAX EV",
@@ -207,7 +219,7 @@
       },
       "trend_sales": 3635,
       "trend_note": "10月单月",
-      "cell_brand": null,
+      "cell_brand": "弗迪(第二代刀片)",
       "cell_multi_source": false,
       "crash": "无官方成绩",
       "evidence_status": "B",
@@ -252,6 +264,12 @@
         "status": "new_launch",
         "date": "2026-08-13",
         "note": "8 月 13 日上市，接替停产的秦L"
+      },
+      "cell_brand_src": {
+        "file": "categories/cell_facts.json",
+        "verified": "2026-11-16",
+        "source_url": "https://byd.com/cn/parameter-comparison?goodsId=161",
+        "tier": 1
       }
     },
     {
@@ -269,7 +287,7 @@
       },
       "trend_sales": 4564,
       "trend_note": "10月单月",
-      "cell_brand": null,
+      "cell_brand": "弗迪(刀片)",
       "cell_multi_source": false,
       "crash": "无官方成绩",
       "evidence_status": "B",
@@ -326,6 +344,12 @@
         "2026-08": 5059,
         "2026-09": 4874,
         "2026-10": 5872
+      },
+      "cell_brand_src": {
+        "file": "categories/cell_facts.json",
+        "verified": "2026-11-16",
+        "source_url": "https://baike.baidu.com/item/比亚迪海豹06EV/65747710",
+        "tier": 1
       }
     },
     {
@@ -476,7 +500,7 @@
       },
       "trend_sales": 2147,
       "trend_note": "10月单月",
-      "cell_brand": null,
+      "cell_brand": "神盾金砖(吉利自研/耀宁)",
       "cell_multi_source": false,
       "crash": "无官方成绩",
       "evidence_status": "C",
@@ -518,6 +542,12 @@
         "2026-08": 2402,
         "2026-09": 2832,
         "2026-10": 2804
+      },
+      "cell_brand_src": {
+        "file": "categories/cell_facts.json",
+        "verified": "2026-11-16",
+        "source_url": "https://www.galaxy-geely.com/A7EV",
+        "tier": 2
       }
     },
     {
@@ -535,7 +565,7 @@
       },
       "trend_sales": 697,
       "trend_note": "10月单月",
-      "cell_brand": null,
+      "cell_brand": "宁德时代(时代长安)",
       "cell_multi_source": false,
       "crash": "无官方成绩",
       "evidence_status": "B",
@@ -586,6 +616,12 @@
         "status": "facelift_pending",
         "date": "",
         "note": "2027 款已在渠道露出（易车标注「待售」），现款清库"
+      },
+      "cell_brand_src": {
+        "file": "categories/cell_facts.json",
+        "verified": "2026-11-16",
+        "source_url": "https://www.autohome.com.cn/config/series/7738.html",
+        "tier": 1
       }
     },
     {
@@ -603,7 +639,7 @@
       },
       "trend_sales": 4390,
       "trend_note": "10月单月",
-      "cell_brand": null,
+      "cell_brand": "宁德时代",
       "cell_multi_source": false,
       "crash": "无官方成绩",
       "evidence_status": "C",
@@ -652,6 +688,12 @@
         "status": "facelift_pending",
         "date": "2026-11-16",
         "note": "2027 款 11 月 16 日上市，预售 12.18–14.48 万，新增 192 线激光雷达、骁龙 8775A 舱驾一体、5C 超充（650/750km）、148L 前备厢"
+      },
+      "cell_brand_src": {
+        "file": "categories/cell_facts.json",
+        "verified": "2026-11-16",
+        "source_url": "https://www.autohome.com.cn/config/series/7327.html",
+        "tier": 1
       }
     },
     {
@@ -669,7 +711,7 @@
       },
       "trend_sales": 294,
       "trend_note": "10月单月",
-      "cell_brand": null,
+      "cell_brand": "宁德时代(时代一汽)",
       "cell_multi_source": false,
       "crash": "无官方成绩",
       "evidence_status": "C",
@@ -711,6 +753,12 @@
         "2026-08": 181,
         "2026-09": 293,
         "2026-10": 345
+      },
+      "cell_brand_src": {
+        "file": "categories/cell_facts.json",
+        "verified": "2026-11-16",
+        "source_url": "https://www.autohome.com.cn/config/series/7705.html",
+        "tier": 1
       }
     },
     {
@@ -728,7 +776,7 @@
       },
       "trend_sales": 1968,
       "trend_note": "10月单月",
-      "cell_brand": null,
+      "cell_brand": "弗迪(刀片)",
       "cell_multi_source": false,
       "crash": "无官方成绩",
       "evidence_status": "B",
@@ -789,6 +837,12 @@
         "date": "2026-07",
         "successor": "秦MAX",
         "note": "2026 年 7 月停止排产，官方 APP 标注「停产」；原因是与秦 PLUS、秦重叠，价格带被自家产品挤占，非产品本身崩塌"
+      },
+      "cell_brand_src": {
+        "file": "categories/cell_facts.json",
+        "verified": "2026-11-16",
+        "source_url": "https://www.autohome.com.cn/config/series/7588.html",
+        "tier": 1
       }
     },
     {
@@ -806,7 +860,7 @@
       },
       "trend_sales": 1592,
       "trend_note": "10月单月",
-      "cell_brand": null,
+      "cell_brand": "弗迪(刀片)",
       "cell_multi_source": false,
       "crash": "无官方成绩",
       "evidence_status": "B",
@@ -849,6 +903,12 @@
         "2026-08": 2413,
         "2026-09": 1199,
         "2026-10": 882
+      },
+      "cell_brand_src": {
+        "file": "categories/cell_facts.json",
+        "verified": "2026-11-16",
+        "source_url": "https://car.m.yiche.com/yiqifengtianbz3/peizhi/?from=ybm",
+        "tier": 1
       }
     },
     {
@@ -866,7 +926,7 @@
       },
       "trend_sales": 6963,
       "trend_note": "10月单月",
-      "cell_brand": null,
+      "cell_brand": "宁德时代(巧克力换电)",
       "cell_multi_source": false,
       "crash": "无官方成绩",
       "evidence_status": "B",
@@ -910,6 +970,12 @@
         "2026-08": 5484,
         "2026-09": 6985,
         "2026-10": 6892
+      },
+      "cell_brand_src": {
+        "file": "categories/cell_facts.json",
+        "verified": "2026-11-16",
+        "source_url": "https://k.sina.com.cn/article_7879996685_1d5af350d06802n70o.html",
+        "tier": 1
       }
     },
     {
@@ -927,7 +993,7 @@
       },
       "trend_sales": 696,
       "trend_note": "10月单月",
-      "cell_brand": null,
+      "cell_brand": "国轩高科",
       "cell_multi_source": false,
       "crash": "无官方成绩",
       "evidence_status": "B",
@@ -980,6 +1046,12 @@
         "2026-08": 706,
         "2026-09": 369,
         "2026-10": 685
+      },
+      "cell_brand_src": {
+        "file": "categories/cell_facts.json",
+        "verified": "2026-11-16",
+        "source_url": "https://car.m.yiche.com/yuzhong07/peizhi/?from=ybm",
+        "tier": 2
       }
     },
     {
@@ -997,7 +1069,7 @@
       },
       "trend_sales": 12032,
       "trend_note": "10月单月",
-      "cell_brand": null,
+      "cell_brand": "宁德时代(时代一汽)",
       "cell_multi_source": false,
       "crash": "C-NCAP 已抽车未测",
       "evidence_status": "B",
@@ -1042,6 +1114,12 @@
         "status": "new_launch",
         "date": "2026-09-20",
         "note": "9 月 20 日上市，首个完整销售月即 12,032 台，仍处产能爬坡"
+      },
+      "cell_brand_src": {
+        "file": "categories/cell_facts.json",
+        "verified": "2026-11-16",
+        "source_url": "http://car.e23.cn/content/2026-10-15/2026A1500001.html",
+        "tier": 1
       }
     },
     {
@@ -1475,7 +1553,7 @@
       },
       "trend_sales": 3730,
       "trend_note": "10月单月",
-      "cell_brand": null,
+      "cell_brand": "中创新航",
       "cell_multi_source": false,
       "crash": "无官方成绩",
       "evidence_status": "B",
@@ -1532,7 +1610,13 @@
         "2026-09": 5103,
         "2026-10": 5155
       },
-      "sales_upper_bound": 3730
+      "sales_upper_bound": 3730,
+      "cell_brand_src": {
+        "file": "categories/cell_facts.json",
+        "verified": "2026-11-16",
+        "source_url": "https://www.autohome.com.cn/config/series/7717.html",
+        "tier": 2
+      }
     },
     {
       "model": "长安启源Q06",
@@ -1549,7 +1633,7 @@
       },
       "trend_sales": 6414,
       "trend_note": "10月单月",
-      "cell_brand": null,
+      "cell_brand": "中创新航",
       "cell_multi_source": false,
       "crash": "无官方成绩",
       "evidence_status": "B",
@@ -1591,7 +1675,13 @@
         "2026-09": 2724,
         "2026-10": 10105
       },
-      "sales_upper_bound": 6414
+      "sales_upper_bound": 6414,
+      "cell_brand_src": {
+        "file": "categories/cell_facts.json",
+        "verified": "2026-11-16",
+        "source_url": "https://dealer.yiche.com/100204758/news/202609/1477509485.html",
+        "tier": 2
+      }
     },
     {
       "model": "丰田bZ5",
@@ -1608,7 +1698,7 @@
       },
       "trend_sales": 929,
       "trend_note": "10月单月",
-      "cell_brand": null,
+      "cell_brand": "弗迪(刀片)",
       "cell_multi_source": false,
       "crash": "C-NCAP 86.7% 五星",
       "evidence_status": "A",
@@ -1652,6 +1742,12 @@
         "2026-08": 1135,
         "2026-09": 1415,
         "2026-10": 350
+      },
+      "cell_brand_src": {
+        "file": "categories/cell_facts.json",
+        "verified": "2026-11-16",
+        "source_url": "https://www.autohome.com.cn/config/series/7713.html",
+        "tier": 1
       }
     },
     {
