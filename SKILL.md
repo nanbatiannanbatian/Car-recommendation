@@ -1,10 +1,32 @@
+---
+name: car-recommendation
+display_name: 可信购车榜单引擎
+display_name_en: Trustworthy Car Recommendation Engine
+description: 购车推荐、车型横评、汽车排行榜、纯电/燃油混动对比、碰撞安全与电池电芯核验场景使用。用可执行口径闸门约束级别/动力/价格/证据，产出可复现、可审计的榜单与预测，不依赖 LLM 主观排名。
+description_zh: 用可执行口径与证据分层，生成可复现、可审计的购车榜单与车型横评，覆盖纯电/燃油混动、碰撞安全与电池电芯核验。
+description_en: Generate reproducible, auditable car rankings and comparisons with executable ranking gates and evidence layering, covering EV/ICE/PHEV, crash safety and battery cell facts.
+examples_zh:
+  - "帮我出一份 15-20 万纯电轿车的可信榜单"
+  - "对比这两款车的碰撞安全成绩和电池参数"
+  - "核验某车型是否属于中型车、指导价多少"
+examples_en:
+  - "Build a trustworthy ranking of EV sedans priced 15-20万"
+  - "Compare crash test scores and battery specs of these two cars"
+  - "Verify a model's official class and guide price"
+version: 5.6.0
+author: "nanbatiannanbatian"
+---
+
 # Car recommendation —— 可信购车榜单引擎（v5.6）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
 >
-> 安装：整个文件夹复制到 `~/.workbuddy/skills/` 下；`pip install -r requirements.txt`；
-> **无需任何 API key**（链路无模型调用）。上手三条命令：
+> 从 WorkBuddy 技能市场安装后即可使用，**无需配置任何 API key 或账号**
+> （榜单链路不调用模型）。直接用自然语言提问即可，例如「帮我出一份 15-20 万纯电轿车榜单」。
+>
+> 进阶用户也可以在命令行直接调用底层脚本（安装 Python 3.10+ 后执行
+> `pip install -r requirements.txt`）：
 >
 >     python3 monthly.py --dry-run
 >     python3 filings.py --list
@@ -1376,6 +1398,45 @@ v6.1/v6.2 报告写「第一档全空是因为没有官方碰撞证据」——*
 - **不把 C-IASI 等级换算成分数**：图标映射无官方文字对照，解码即猜测。
 - **仍非全市场穷举**：数据源是销量榜，汽车之家 5372 车系中无销量记录的车不在池内。
 - 名称未匹配 55 款、级别拒绝 146 款（全量池）均逐条披露、不猜。
+
+---
+
+## 用户偏好档：电池优先（参考，不改默认分）
+
+默认榜用 7 维 MCDA；但有些用户的核心诉求是「电池品牌 > 同价位度数 > 销量」。本 skill 提供两个对照版，**都不改默认榜**。
+
+### 首选：`ev_cell_board.py`（严格版，2026-11-16 新增，结论以它为准）
+
+```bash
+python3 build_cell_facts.py                      # 生成 categories/cell_facts.json（37 款逐车核验）
+python3 ev_cell_board.py --candidates <池.json> --out <目录>
+# → cell_board.json（四榜 + 逐车档位/桶内位次/销量判定）
+# → sensitivity_selfmade.json（自研并入一线的名次对照）
+```
+
+**三条规则 → 代码**：
+1. **电芯**：分层不打分。1=宁德系（**含时代一汽/时代长安/上汽时代等合资**）/弗迪；2=二线（国轩·中创新航·亿纬·欣旺达·蜂巢·因湃·正力）或宁德混装、厂商自研；3=新路线（半固态）。tier 是第一顺位。
+2. **同价位度数**：不跨价位比绝对 kWh，用 **kWh/万元** 作二级键。⚠️ 别用「2 万分桶内的位次分位」当排序键——独占一桶的车会拿到 1/1 满分，首版就因此把 54kWh/10.53 万的贝塔 S3 顶到中型轿车第 1。
+3. **销量**：**硬门槛**，月销 <1000 移出推荐区单列「销量不足区」，1000–1500 标偏低。不用扣分——扣分只是降几名，低销量车仍在推荐位。
+
+**为什么另起脚本**：`ev_battery_board.py` 把 `cell_brand` 未披露的车一律压第 3 档 → 中型轿车 13 款里 11 款被压，**等于拿取证盲区罚车**（与气囊闸门同一个错误）。严格版先补事实：`categories/cell_facts.json` 37 条，每条带 url+quote+核验日期，记的是**评分配置对应的那一款电池**（同车系换配置可能换电芯）。
+
+**实测（2026-10 数据月）**：四榜第 1 = 中型轿车 极狐贝塔S3（宁德 54kWh/10.53万，但绝对度数最低）、中大型轿车 长安启源A07（宁德 77.94）、中型SUV 大众ID.AURA T6（宁德·时代一汽 77.5/14.99，月销12,032）、中大型SUV 极狐阿尔法T7（宁德 84.8）。关键发现：① **MG 07 评分配置 610 版是上汽清陶半固态 67kWh**，只有 845 版才是宁德 91kWh——按「宁德/弗迪为佳」它落第 3 档；② 度数冠军大众与众09（91.96kWh 宁德）月销 69 台被门槛拦下；③ **自研是否算一线只影响中型轿车**：若算，风云A9 从第 8 到第 1（70.11kWh、5.40/万、月销5,859），其余三榜几乎不动。
+
+### 旧版：`ev_battery_board.py`（保留，仅供追溯）
+
+```bash
+python3 ev_battery_board.py --candidates <候选池.json> --out <目录>
+# → 电池优先榜.html + battery_rank.json（逐车与现榜名次对照 + Kendall τ）
+```
+
+**规则（字典序）**：电池档 1（弗迪 / 宁德单源）> 2（二线 / 宁德混装 / **厂商自研**：吉利神盾·金砖、广汽弹匣；2026 LFP 6C/12C 已追平）> 3（未披露 / 新路线）；档内按「度数分位×0.7 + 销量分位×0.3 − 低销量扣分」；月销 &lt;800 扣 2.5、&lt;1500 扣 1。若你把自研视作一线，把脚本 `tier_of` 的自研分支改成 `return 1, ...` 即可。
+
+**数据边界（必读）**：① 只有电池品牌，**分不出宁德整包 / 宁德电芯**，统一「宁德系」、单源第 1 档、混装第 2 档；② `cell_brand` 未披露车在旧版被压第 3 档（**不代表电池差，只代表没核到**，严格版已补齐 37 款）；③ trims 少量无度数 → 标「缺」。配置见 `categories/ev_battery_profile.json`。
+
+实测（2026-11 EV 池）：与现榜 Kendall τ = 中型轿车 0.41 / 中型SUV 0.38 / 中大型轿车 **-0.33** / 中大型SUV 0.47——中大型轿车分歧最大（电池逻辑更看重宁德/大电池；吉利神盾自研在第 2 档、低销量车被下调）。
+
+**2026 认知更新**：LFP 电芯的 6C/12C 已在弗迪 / 宁德 / 国轩 / 吉利等多家量产，**纸面差距缩小**；真正差距在整包能量密度、CTB/CTP、BMS、热管理、低温、循环寿命、量产一致性与售后/超充生态。**质保是风险缓释、不是质量保证**（终身质保多限首任车主 / 全程 4S / 年里程 &lt;3 万 / 过户失效；正常老化不在保；8 年健康度均值 &gt;80% 但出保车实测 65–75%）——定车前核对：年限 / 能否过户 / 衰减阈值 / 是否保正常衰减。**可维修性**：集成度越高越难修（传统三级 &gt; CTP &gt; CTB &gt; CTC）；二代刀片实测需磨/切/锤 + 整包冷冻约 40 小时、环氧灌封，电芯级现场几乎不可修；2026-04「能修不换」让约 75% 局部故障可模组级修（LFP 限价 ~150 元/kWh），但一体化粘接的 CTB/CTC 仍难。选购核对：集成方式 + 长质保 + 车损险。
 
 
 
