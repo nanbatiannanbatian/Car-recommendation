@@ -96,12 +96,6 @@ def main():
                     help="把质量与品控作为第 8 维进综合打分；可与 --complaints 联用")
     ap.add_argument("--no-thirdparty", action="store_true",
                     help="跳过第三方实测/拆车证据（默认启用，走 adjust 封顶通道）")
-    ap.add_argument("--airbag-gate", action="store_true",
-                    help="把「气囊基线已核验（前排侧气囊+前后排头部气帘齐备）」"
-                         "作为第一档硬门槛；未核验的车不降分、只不进第一档")
-    ap.add_argument("--crash-gate", action="store_true",
-                    help="把「有官方碰撞成绩（C-NCAP/C-IASI）」作为第一档硬门槛；"
-                         "只读 safety_basis，不采信人工填写的 evidence_status")
     ap.add_argument("--no-airbags", action="store_true",
                     help="跳过被动安全气囊事实列与无成绩车受限修正（回测对照用）")
     ap.add_argument("--no-spec-facts", action="store_true",
@@ -196,7 +190,7 @@ def main():
         _band = ((board.get("gates") or {}).get("price_band") or [None, None])[1]
         parts.append(L.top_table(passed, cfg, wv, 10, band=_band)["report"])
         parts.append("")
-        parts.append(L.tier_report(passed, cfg, wv, label, airbag_gate=a.airbag_gate, crash_gate=a.crash_gate)["report"])
+        parts.append(L.tier_report(passed, cfg, wv, label)["report"])
         parts.append("")
         parts.append(L.review_report(passed, cfg, wv)["report"])
         parts.append("")
@@ -209,7 +203,7 @@ def main():
         if fdata:
             fitems = (fdata.get("boards") or {}).get(label) or []
             parts += FC.render_board(label, fitems, len(passed))
-        summary["tiers"][label] = L.tier_report(passed, cfg, wv, label, airbag_gate=a.airbag_gate, crash_gate=a.crash_gate)["tiers"]
+        summary["tiers"][label] = L.tier_report(passed, cfg, wv, label)["tiers"]
         summary["review"][label] = L.review_report(passed, cfg, wv)["verdict"]
 
     # 1b 被动安全配置事实列（全局一节，逐条带来源；不计入加权）

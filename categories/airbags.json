@@ -95,15 +95,15 @@
       "model": "MG 07 纯电",
       "trim": "610 激光雷达版",
       "trim_scope": "all_trims",
-      "airbag_front_side": true,
-      "airbag_curtain": true,
+      "airbag_front_side": null,
+      "airbag_curtain": null,
       "airbag_center": null,
-      "source": "58汽车 2026款 MG 07 纯电 845 旗舰版 逐项参数配置（被动安全）＋太平洋汽车《名爵 MG 07 纯电拆解》（转述官方口径：全系标配）＋车质网试驾实测车（610 旗舰版）",
-      "url": "https://appsm.58che.com/haoche/dealer/detail/85726_291494.html",
-      "date": "2026-11-15",
-      "source_type": "config_table_aggregator",
-      "quote": "58汽车参数配置·安全配置：前排侧气囊 ●、前排头部气囊(气帘) ●、后排头部气囊(气帘) ●、后排侧气囊 -、膝部气囊 -。太平洋汽车《名爵 MG 07 纯电拆解》：「名爵 MG 07 纯电版全系配备前排正面双气囊、前排侧面双气囊、覆盖全车乘员侧窗的侧气帘（官方口径）」。车质网原创试驾（2026款纯电610旗舰版）：「前排侧气囊、前/后排头部气囊(气帘)均未缺席」。",
-      "note": "v3 补录：原先三项记 null 是因为只采到「全系 6 气囊」这一营销口径、未逐项列明，属取证不足，不是产品缺失——官网/58汽车/车质网的逐项配置与官方口径都写明前排侧气囊与前后排头部气帘齐备。现有逐项配置表（含 trim）＋官方口径转述＋实测车三源交叉，侧气囊与气帘记 true。前排中央（远端）气囊三个来源均未列出该项，记 null（不推断为无），与「不数气囊、不把营销口径映射成布尔」的 A6 规则一致。「全系 6 气囊」原 claim 仍留档于 categories/thirdparty_tests.json。"
+      "source": "上汽MG（央视专题/太平洋汽车转述），已存于 categories/thirdparty_tests.json",
+      "url": "https://hj.pcauto.com.cn/wap/article/3525068",
+      "date": "2026-08-21",
+      "source_type": "vendor_claim",
+      "quote": "全系 6 气囊 + 远端后排侧气囊；车身扭转刚度 43972 N·m/deg",
+      "note": "「6 气囊」没有逐项列明，「远端后排侧气囊」是后排侧气囊而非前排中央气囊，两者不可混。三项全记 null，claim 只留档。这条是 A6 的反例：不数气囊。"
     },
     {
       "model": "小鹏MONA L05",
