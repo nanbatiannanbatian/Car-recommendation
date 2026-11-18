@@ -37,11 +37,9 @@ pip install -r requirements.txt        # 见仓库 README
 两种取法（选你能跑通的）：
 
 **A. 用 vehicle-data-hub 的 dcd 抓取**（推荐，若其 dcd 爬虫可用）
-```bash
-# 把本榜所有 dcd_series_id 导成一行一个，喂给 dcd 抓取，得到每个车系的 sale_status
-.venv/bin/python main.py fetch <车型名> --source dcd     # 或仓库提供的 dcd 批量方式
-# 整理成下面 1.3 的 dcd-status.json 形态
-```
+该步骤在 **vehicle-data-hub 仓库**内完成（属外部依赖工具，不在本 skill 包内）：把本榜所有
+`dcd_series_id` 导成一行一个，用其 dcd 抓取入口按车型取 `sale_status`，再整理成下面 1.3 的
+`dcd-status.json` 形态。具体命令以 vehicle-data-hub 仓库的 README 为准。
 
 **B. 直接打懂车帝车系 API / 页面**（若 dcd 爬虫不便）
 懂车帝车系页 `/series/<dcd_series_id>` 的接口返回 `sale_status` 类字段
@@ -51,13 +49,10 @@ pip install -r requirements.txt        # 见仓库 README
 
 ### 1.2 产出「工信部公告」提取 JSON（次信号，需名称对照）
 
-公告库无车型名主键，所以这一步是**半自动**：用 `gonggao query --vehicle-name <市场名>`
-逐车查，人工/脚本把结果落成 `status`：
-
-```bash
-.venv/bin/python main.py gonggao query --vehicle-name "秦L DM" --latest-batch
-# 看输出判断是否仍在公告内 / 已无延续批次 → discontinued 或 active
-```
+公告库无车型名主键，所以这一步是**半自动**：在 **vehicle-data-hub 仓库**（外部依赖工具，
+不在本 skill 包内）用其 `gonggao query --vehicle-name <市场名>` 入口逐车查，人工/脚本把结果
+落成 `status`。判断口径：看输出是否仍在公告内 / 已无延续批次 → `discontinued` 或 `active`；
+具体命令以 vehicle-data-hub 仓库的 README 为准。
 
 落成 **`gonggao.json`**（见 1.3）。**只有当公告结论与 dcd 冲突时它才生效**（优先级：
 手工 > 公告 > dcd > 症状复核 > 默认），日常绝大多数车由 dcd 覆盖即可。
@@ -147,11 +142,11 @@ python koubei_merge.py \
 生命周期/口碑数据更新后，重跑两榜让改动生效：
 
 ```bash
-# 纯电四榜（airbag_gate 第1档气囊闸已在 build_html.py 接通）
-cd /path/to/runs/car-ev-4boards && python build_html.py
+# 纯电四榜（airbag_gate 第1档气囊闸已在 pipeline.py 接通）
+python pipeline.py --category car_ev --candidates <候选池.json> --out <输出目录>
 
-# 燃油混动四榜
-cd /path/to/runs/car-ice-4boards && python ice_board.py --pool ice_pool_full.json \
+# 燃油混动四榜（用本 skill 内置的 ice_board.py）
+python ice_board.py --pool ice_pool_full.json \
    --category car_ice_phev --out 四榜报告.html --top 10
 ```
 

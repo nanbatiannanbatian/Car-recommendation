@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 5.6.0
+version: 5.6.1
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v5.6）
+# Car recommendation —— 可信购车榜单引擎（v5.6.1）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -49,11 +49,8 @@ author: "nanbatiannanbatian"
 
 ### 开启方式
 
-```bash
-python3 orchestrator.py --question "..." --candidates cands.json --ranking
-```
-
-或写进 `config.json`（默认 `enabled:false`，不影响其他场景）：
+榜单 / 横评类请求会自动走 `ranking.py` 的闸门与复核，无需单独启动脚本。
+也可把规则写进 `config.json`（默认 `enabled:false`，不影响其他场景）：
 
 ```json
 "ranking": {
