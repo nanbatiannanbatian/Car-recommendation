@@ -276,7 +276,7 @@ def render(data, summary, title, as_of):
                          f"{num(v) if isinstance(v,(int,float)) else '—'}</td>")
             H.append(f"<td class='totalcell'><span class='score'>{num(r.get('total'))}</span></td></tr>")
         H.append("</tbody></table>")
-        # 配置切换联动脚本：更新两表该行 + 重排主榜（档位/三榜不动）
+        # 配置切换联动脚本：三表联动（主榜/总分构成/产品力），事件委托绑定
         if tb:
             s2 = json.dumps(tb, ensure_ascii=False)
             js = r"""<script>
@@ -285,7 +285,7 @@ function trimCellVals(model,idx){
   var t=TRIMDATA[model].trims[idx],sc=t.scores||{},charge=String(t.charge||''),
       cell=String(t.cell_supplier||'—'),kwh=t.battery_kwh,price=t.price;
   var mv=charge.match(/(900|800|400)\s*V/);
-  return {name:t.name,price:price,total:t.total,scores:sc,
+  return {name:t.name,price:price,total:t.total,power:t.power_score,scores:sc,
     cell:cell+(mv?' · '+mv[1]+'V':''),
     kwh:(kwh&&price)?(kwh/price).toFixed(2):'—'};
 }
@@ -306,7 +306,22 @@ function applyTrim(model,idx){
   });
   var sb=document.getElementById('scoreBoard');
   if(sb){var sr=sb.querySelector('tr'+q);if(sr)sr.children[2].textContent=v.name+' ¥'+v.price;}
+  // 产品力榜：更新产品力分与价格
+  var pb=document.getElementById('powerBoard');
+  if(pb){var pr=pb.querySelector('tr'+q);
+    if(pr){
+      if(pr.querySelector('.c-power'))pr.querySelector('.c-power').innerHTML='<span class="score">'+v.power+'</span>';
+      if(pr.querySelector('.c-ppprice'))pr.querySelector('.c-ppprice').textContent=v.price;
+    }
+  }
   sortMain();
+  sortPower();
+}
+function mainRankOf(model){
+  var r=document.querySelector('#mainBoard tr[data-model="'+model+'"] .c-rank');
+  if(!r)return null;
+  var m=String(r.textContent).match(/\d+/);
+  return m?parseInt(m[0]):null;
 }
 function sortMain(){
   var tb=document.querySelector('#mainBoard tbody');if(!tb)return;
@@ -318,12 +333,30 @@ function sortMain(){
   rs.forEach(function(r,i){tb.appendChild(r);
     var rc=r.querySelector('.c-rank');if(rc)rc.innerHTML='<span class="rank">'+(i+1)+'</span>';});
 }
-document.querySelectorAll('.trimsel').forEach(function(sel){
-  sel.addEventListener('change',function(){
-    var m=this.getAttribute('data-model'),idx=parseInt(this.value);
-    applyTrim(m,idx);
-    document.querySelectorAll('.trimsel[data-model="'+m+'"]').forEach(function(o){o.value=idx;});
+function sortPower(){
+  var tb=document.querySelector('#powerBoard tbody');if(!tb)return;
+  var rs=Array.prototype.slice.call(tb.querySelectorAll('tr'));
+  rs.sort(function(a,b){
+    var ae=a.querySelector('.c-power'),be=b.querySelector('.c-power');
+    var av=ae?parseFloat(ae.textContent)||0:0,bv=be?parseFloat(be.textContent)||0:0;
+    return bv-av;});
+  rs.forEach(function(r,i){tb.appendChild(r);
+    var pr=r.querySelector('.c-prank');if(pr)pr.textContent=i+1;
+    var mr=mainRankOf(r.getAttribute('data-model'));
+    if(mr!=null){
+      var mc=r.querySelector('.c-mainrank');if(mc)mc.textContent='#'+mr;
+      var d=mr-(i+1),dc=r.querySelector('.c-delta');
+      if(dc){dc.textContent=(d>0?'+':'')+d;
+        dc.className='c-delta '+(d>0?'delta-up':d<0?'delta-down':'');}
+    }
   });
+}
+document.addEventListener('change',function(ev){
+  var sel=ev.target;
+  if(!sel.classList||!sel.classList.contains('trimsel'))return;
+  var m=sel.getAttribute('data-model'),idx=parseInt(sel.value);
+  applyTrim(m,idx);
+  document.querySelectorAll('.trimsel[data-model="'+m+'"]').forEach(function(o){o.value=idx;});
 });
 </script>""".replace('__DATA__',s2)
             H.append(js)
@@ -381,15 +414,33 @@ document.querySelectorAll('.trimsel').forEach(function(sel){
         H.append("<h2>纯产品力总榜 <span>辅助榜 · 剔除性价比、全池混排 · 不改主榜任何名次</span></h2>")
         H.append('<div class="rule">主榜（8 维含性价比）仍是唯一权威排序；本榜只回答「不看价格谁的产品力更强」。'
                  '<b>rank_delta</b> 正数＝性价比拖累，负数＝靠性价比抬升了主榜名次。</div>')
-        H.append("<table><thead><tr><th>#</th><th>车型</th><th>产品力分</th><th>主榜名次</th>"
-                 "<th>rank_delta</th><th>价格</th></tr></thead><tbody>")
+        tbpp = meta.get("trim_board") or {}
+        H.append('<div class="rule">下拉框切换配置后，本榜产品力分（剔除性价比的 7 维）实时重算并重排；'
+                 '与主榜/总分构成联动。rank_delta 仍按主榜当前名次计算（正=性价比拖累，负=靠性价比抬升）。</div>')
+        H.append('<table id="powerBoard"><thead><tr><th>#</th><th>车型</th><th>产品力分</th>'
+                 '<th>主榜名次</th><th>rank_delta</th><th>价格</th></tr></thead><tbody>')
         for it in pp.get("items") or []:
             d = it.get("rank_delta")
             dcls = "delta-up" if isinstance(d, int) and d > 0 else ("delta-down" if isinstance(d, int) and d < 0 else "")
-            H.append(f"<tr><td>{it.get('power_rank')}</td><td class='name'>{e(it.get('model'))}</td>"
-                     f"<td><span class='score'>{num(it.get('power_score'), 2)}</span></td>"
-                     f"<td>#{e(it.get('main_rank'))}</td><td class='{dcls}'>"
-                     f"{f'{d:+d}' if isinstance(d,int) else '—'}</td><td>{e(it.get('price'))}</td></tr>")
+            mdl = it.get("model")
+            td = tbpp.get(mdl) or {}
+            sel = ""
+            if td.get("trims"):
+                best = td.get("best_trim")
+                opts = "".join(
+                    f'<option value="{i}"'
+                    f'{" selected" if t.get("name")==best else ""}>'
+                    f'{e(t.get("name"))}</option>'
+                    for i, t in enumerate(td["trims"]))
+                sel = (f'<br><select class="trimsel" data-model="{e(mdl)}" '
+                       f'style="font-size:11px;max-width:150px">{opts}</select>')
+            H.append(f"<tr data-model='{e(mdl)}'><td class='c-prank'>{it.get('power_rank')}</td>"
+                     f"<td class='name'>{e(mdl)}{sel}</td>"
+                     f"<td class='c-power'><span class='score'>{num(it.get('power_score'), 2)}</span></td>"
+                     f"<td class='c-mainrank'>#{e(it.get('main_rank'))}</td>"
+                     f"<td class='{dcls} c-delta'>"
+                     f"{f'{d:+d}' if isinstance(d,int) else '—'}</td>"
+                     f"<td class='c-ppprice'>{e(it.get('price'))}</td></tr>")
         H.append("</tbody></table>")
 
     # ---- 体验证据修正（v9.3.1，用户确认展示）

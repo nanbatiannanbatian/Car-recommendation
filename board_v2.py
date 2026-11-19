@@ -266,8 +266,11 @@ def product_power_board(rows: list[dict], cands: list[dict], cfg: dict,
             for m in models:
                 band_of[m] = label
     items = []
+    best_detail = {r["model"]: r.get("best_trim_detail") for r in rows}
     for mdl, c in by_model.items():
-        sc = c.get("scores") or {}
+        # v9.7.6：与主榜同口径——用最高配置的 scores（不再是车系基础分）
+        bd = best_detail.get(mdl)
+        sc = (bd.get("scores") if bd else None) or c.get("scores") or {}
         if any(k not in sc for k in keys):
             continue  # 维度不全的车不进产品力榜
         pp = sum(sc[k] * W[k] for k in keys) / tw * 10
@@ -276,7 +279,7 @@ def product_power_board(rows: list[dict], cands: list[dict], cfg: dict,
             "power_score": round(pp, 2),
             "main_score": main_score.get(mdl),
             "main_rank": main_rank.get(mdl),
-            "price": price_of(c),
+            "price": (bd.get("price") if bd else None) or price_of(c),
             "band": band_of.get(mdl, ""),
         })
     items.sort(key=lambda x: -x["power_score"])

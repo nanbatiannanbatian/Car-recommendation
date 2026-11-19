@@ -148,11 +148,15 @@ def annotate_all(cands: list[dict], cfg: dict) -> dict:
             for d in ds:
                 sc[d["dim"]] = round(max(0, min(10, sc.get(d["dim"], 8) + d["delta"])), 2)
             conf = min((d["conf"] for d in ds), key=lambda x: CONF_ORDER[x]) if ds else "high"
+            # 产品力分：剔除 value 的 7 维按原权重归一化×10（与 product_power_board 同口径）
+            pp_keys = [k for k in W if k != "value"]
+            pp_tw = sum(W[k] for k in pp_keys)
+            pp_score = round(sum(sc.get(k, 0) * W[k] for k in pp_keys) / pp_tw * 10, 2) if pp_tw else None
             trims.append({
                 "name": t.get("name"), "price": t.get("price"),
                 "battery_kwh": t.get("battery_kwh"), "cell_supplier": t.get("cell_supplier"),
                 "charge": t.get("charge"), "cltc_km": t.get("cltc_km"),
-                "scores": sc, "total": weighted_total(sc),
+                "scores": sc, "total": weighted_total(sc), "power_score": pp_score,
                 "confidence": conf, "deltas": ds,
                 "note": t.get("note", ""), "score_source": "annotated",
             })
