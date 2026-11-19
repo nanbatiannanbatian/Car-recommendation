@@ -13,7 +13,7 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 8.0.0
+version: 8.1.0
 author: "nanbatiannanbatian"
 ---
 
@@ -1585,3 +1585,46 @@ python3 board_v2.py --candidates subset.json --out <出榜目录>   # 接回 v7 
 检索「中型SUV+纯电」命中 22 款（旧临时池仅 12 款），T6 在列——遗漏根治。
 品控权重 10%→15% 指纹 cdd863c069c5→9d0f36579a16，50 款可重算、17 款缺 quality 被标记。
 验证报告：`runs/car_midsuv_ev_202610/总候选池验证报告.md`。
+
+---
+
+## v8.1 · 按需候选摄入 `--intake`：搜榜→有效销量→入池→复用/待采（2026-11-19）
+
+### 为什么要改（用户明确否决 automation）
+上一轮提议把 `--ingest` 接进月度自动化，用户否决：**自动化不符合 skill 的模式**。
+改为 skill 内**按需触发**的一条命令——每次提问手动调用，不挂任何定时器/automation。
+同时解决三个入口口径割裂的问题：`discover.py` 用「近3月中位」、`fetch_dcd_sales.py` 用
+「逐月中位数+新车爬坡」、总池 `--discover-in` 被动接收清单——v8.1 统一成一条链。
+
+### 一条命令完成用户要求的闭环
+```bash
+# 实时拉懂车帝四口径逐月榜（提问时手动触发，不自动）
+python3 master_pool.py --intake --month 202610 --months 6 \
+    --min-sales 1000 --power BEV --price-max 40 --apply
+# 离线复现（用已落盘的逐月榜快照，结果可复现、不联网）
+python3 master_pool.py --intake --sales-cache dcd_snapshot.json --month 202610 \
+    --min-sales 1000 --apply
+```
+链路：① 拉懂车帝纯电/插混/增程/全部四口径逐月榜 → ② 每车按**现行有效销量**口径算
+（逐月中位数；新车爬坡期取中位与最新月较大值）——直接 import `fetch_dcd_sales._trend_pick`，
+**不重造口径** → ③ 达标筛选（有效销量门槛 + 价格带 + 动力，均为提问条件）→
+④ 池内命中**直接刷新销量/标签复用**，池外未命中**建 needs_data 档案待采 8 维证据** →
+⑤ 出 `intake_report.json`（复用/待采/淘汰清单 + 待采字段）。默认 **dry-run**，`--apply` 才写回。
+
+### 关键纪律
+- **有效销量单一事实源**：复用 `fetch_dcd_sales._trend_pick`，两处不会口径漂移。
+  一车多动力（只在「全部」榜出现）标 `sales_scope=series_total`——销量是车系合计**上限**，
+  纯电≤该值，只作发现/门槛，不当纯电值用。
+- **不挂 automation**：这是按需命令，每次提问由人触发；SKILL 不注册任何定时任务。
+- **池内复用不覆盖打分**：刷新的是销量事实与检索标签（trend_sales/price_wan/brand），
+  scores/adjust 一律不动——与 `merge_car` 幂等纪律一致。
+- **池外不猜标签/分数**：新车只带名字/品牌/价格/销量，`cls` 留空、scores 为空，标 needs_data，
+  待人工确认官方二级分类并采集 8 维证据后才 ready。
+- **可离线复现**：`--sales-cache` 读逐月榜快照（结构 `{rows:[{name,brand,months:{bev/phev/all:{月:销量}}}]}`），
+  同快照同参数必得同结果，便于审计「为什么这款入池/落榜」。
+
+### 验收（2026-11-19）
+`python3 master_pool.py --selftest` 9 项全过（新增有效销量中位/新车爬坡、榜单行纯电/车系合计判定）。
+用 baseline 缓存的 36 款逐月销量造快照跑 intake：达标 19 款全池内复用；注入 1 款池外新车
+（800/1500/2600）→ 有效销量 1500、`needs_data` 建档、总池 67→68；dry-run 不写回、`--apply` 才写。
+验证产物：`runs/car_midsuv_ev_202610/dcd_snapshot_202610.json` + `intake_report_dryrun.json`。

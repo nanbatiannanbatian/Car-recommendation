@@ -16,9 +16,12 @@
 
 闭环（回答用户「每次先根据提问去懂车帝销量榜获取候选，池里有的直接用，没有的重新采集」）
 ------------------------------------------------------------------------------------------
-  1. 提问 → `discover.py` 拉懂车帝销量榜 → 得到当期在售车型清单（pool 外候选）
-  2. `--discover-in discover.json` 把清单吸收进总池：已命中的刷新销量，未命中的建
-     `needs_data` 档案（有名字/价格/销量，缺 scores，需重新采集 8 维证据）
+  1. 提问 → `--intake` 一条命令拉懂车帝四口径逐月榜 → 按现行「有效销量」口径
+     （逐月中位数 + 新车爬坡取最新月，复用 fetch_dcd_sales._trend_pick）算有效销量
+     → 达标的：池内命中直接刷新销量/标签，池外未命中建 `needs_data` 档案待采 8 维证据。
+     ⚠ 这是按需触发的 skill 命令，不挂任何 automation/定时器——每次提问手动调用。
+     `--sales-cache <快照.json>` 可离线复现；不给则实时联网拉榜。默认 dry-run，`--apply` 写回。
+  2. `--discover-in discover.json`（旧入口，现由 --intake 取代）吸收已算好的清单
   3. `--ingest <各run候选池.json>` 把任何已采集过 scores 的池吸收进总池（幂等、补空缺、记来源）
   4. `--query --cls 中型SUV --power BEV ...` 按标签检索 → 输出可直接喂 board_v2 的候选子集
   5. `--rescore --config ...` 打分逻辑变更后全池重算总分 / 标记缺维车待重采集
@@ -34,6 +37,8 @@
 CLI
 ---
     python3 master_pool.py --init [--out categories/master_pool.json]
+    python3 master_pool.py --intake [--sales-cache 快照.json] [--month 202610] [--months 6] \
+                            [--min-sales 1000] [--power BEV] [--price-max 40] [--apply]
     python3 master_pool.py --ingest a.json b.json ... [--out ...]
     python3 master_pool.py --discover-in discover.json [--out ...]
     python3 master_pool.py --query --cls 中型SUV --power BEV --body SUV \
@@ -50,6 +55,7 @@ import hashlib
 import json
 import os
 import re
+import statistics
 import sys
 from collections import Counter, defaultdict
 
@@ -398,6 +404,196 @@ def cmd_discover_in(args):
     return 0
 
 
+# ---------------------------------------------------------------- 按需候选摄入（intake）
+# 用户要求的 skill 模式（2026-11-19，明确不挂 automation）：
+#   提问 → 拉懂车帝等销量榜 → 按现行「有效销量」口径计算 → 达标的纳入总池
+#   → 池里有的直接用（刷新销量/标签），没有的建 needs_data 档案（待采 8 维证据）
+# 有效销量口径与 fetch_dcd_sales._trend_pick 完全一致（逐月中位数 + 新车爬坡取最新月），
+# 直接 import 复用，不重造，避免两处口径漂移。
+
+def effective_sales(series_by_month: dict, lifecycle: str = "") -> tuple[int, str]:
+    """按现行口径算有效销量：逐月中位数；新车爬坡期取中位与最新月的较大值。
+
+    直接复用 fetch_dcd_sales._trend_pick —— 这是 skill 里 trend_sales 的唯一口径来源。
+    series_by_month: {"2026-05": 6723, ...}（值为正数）。
+    返回 (有效销量, 口径说明)。
+    """
+    vals = {m: int(v) for m, v in (series_by_month or {}).items() if (v or 0) > 0}
+    if not vals:
+        return 0, "无销量"
+    med0 = round(statistics.median(list(vals.values())))
+    try:
+        import fetch_dcd_sales as FD
+        eff, how = FD._trend_pick({"lifecycle": {"status": lifecycle}}, vals, med0, "有效销量")
+        return int(eff), how
+    except Exception:
+        # 兜底：与 _trend_pick 同逻辑（fetch 模块不可用时）
+        lc = str(lifecycle or "").lower()
+        if lc == "new_launch" and len(vals) >= 2:
+            latest_k = max(vals)
+            if vals[latest_k] > med0:
+                return vals[latest_k], f"有效销量新车爬坡，取最新月 {latest_k}（中位 {med0:,} 已低估）"
+        return med0, f"有效销量{len(vals)}个月中位数"
+
+
+def _load_sales_rows(args) -> list[dict]:
+    """两种销量来源：① --sales-cache 读已落盘的懂车帝逐月榜快照（离线可复现）；
+    ② 否则调用 fetch_dcd_sales 实时拉四口径逐月榜。返回统一行结构：
+       {name, brand, series_id, months:{bev/phev/all -> {月:销量}}, min_price, max_price}"""
+    if getattr(args, "sales_cache", None):
+        d = json.load(open(args.sales_cache, encoding="utf-8"))
+        rows = d.get("rows", d.get("data", d if isinstance(d, list) else []))
+        if isinstance(rows, dict):
+            rows = list(rows.values())
+        return [r for r in rows if isinstance(r, dict) and (r.get("name") or r.get("series_name"))]
+
+    # 实时拉（按需，仅在用户点名搜榜时执行；本命令本身不挂任何定时器）
+    import fetch_dcd_sales as FD
+    months = [str(m) for m in FD.month_list(args.month, args.months)]
+    series: dict[str, dict] = {}
+    for m in months:
+        for ne in ("1", "2", ""):
+            rows, _ = FD.fetch_all(m, ne)
+            bucket = {"1": "bev", "2": "phev", "": "all"}[ne]
+            for r in rows:
+                k = FD.norm(r["series_name"])
+                rec = series.setdefault(k, {"name": r["series_name"], "brand": r.get("brand", ""),
+                                            "series_id": r.get("series_id"),
+                                            "months": {"bev": {}, "phev": {}, "all": {}},
+                                            "min_price": r.get("min_price"), "max_price": r.get("max_price")})
+                rec["months"][bucket][m] = r.get("sales") or 0
+    return list(series.values())
+
+
+def _row_to_sales(row: dict) -> dict | None:
+    """把一行榜单算出有效销量 + 动力判定。纯电榜优先 → 插混 → 全部榜兜底(车系合计上界)。
+    返回 {name, brand, power, eff, method, scope, min_price, max_price, series_id} 或 None。"""
+    name = row.get("name") or row.get("series_name")
+    if not name:
+        return None
+    months = row.get("months") or {}
+    bev = {m: v for m, v in months.get("bev", {}).items() if (v or 0) > 0}
+    phev = {m: v for m, v in months.get("phev", {}).items() if (v or 0) > 0}
+    allv = {m: v for m, v in months.get("all", {}).items() if (v or 0) > 0}
+    lc = str(row.get("lifecycle") or "")
+    out = {"name": name, "brand": row.get("brand", ""), "series_id": row.get("series_id"),
+           "min_price": row.get("min_price"), "max_price": row.get("max_price")}
+    if bev:
+        eff, how = effective_sales(bev, lc)
+        out.update(power="BEV", eff=eff, method=how, scope="pure_bev")
+    elif phev and not allv:
+        out.update(power="PHEV", eff=0, method="仅插混榜命中", scope="phev")
+    elif allv:
+        eff, how = effective_sales(allv, lc)
+        out.update(power="", eff=eff, method=how + "（非纯电）", scope="series_total")
+    else:
+        return None
+    return out
+
+
+def cmd_intake(args):
+    """按需候选摄入：搜榜 → 有效销量 → 达标筛选 → 池内复用/池外建档。默认 dry-run。"""
+    import json as _json
+    pool = load_pool(args.pool)
+    cfg = load_config(args.config)
+    idx = index_by_key(pool)
+
+    rows = _load_sales_rows(args)
+    sales = [s for s in (_row_to_sales(r) for r in rows) if s]
+    # 只保留纯电有效供给：BEV 直接命中；series_total 保留但标注上界；PHEV-only 剔除
+    sales = [s for s in sales if s["power"] != "PHEV"]
+    for s in sales:
+        if s["scope"] == "series_total":
+            s["sales_note"] = "懂车帝三动力细分榜均未收录（一车多动力未拆名），有效销量为车系合计上限，纯电≤该值"
+
+    # 达标筛选：有效销量门槛 + 价格带 + 动力（提问条件）
+    qualified, rejected = [], Counter()
+    for s in sales:
+        if s["eff"] < args.min_sales:
+            rejected["销量不足"] += 1
+            continue
+        mp = _num(s.get("min_price"))
+        if args.price_min and (mp is None or mp < args.price_min):
+            rejected["价格低于下界"] += 1
+            continue
+        if args.price_max and (mp is None or mp > args.price_max):
+            rejected["价格高于上界"] += 1
+            continue
+        if args.power and s["power"] and s["power"].upper() not in [x.upper() for x in args.power.split(",")]:
+            rejected["动力不符"] += 1
+            continue
+        qualified.append(s)
+
+    # 池内命中：刷新销量/标签，直接用；池外：建 needs_data 档案待采
+    reused, created = [], []
+    src = os.path.basename(args.sales_cache) if getattr(args, "sales_cache", None) else \
+          f"dcd_live:{args.month}x{args.months}"
+    for s in qualified:
+        k = canon(s["name"])
+        facts = {"trend_sales": s["eff"], "trend_method": s["method"],
+                 "sales_scope": s["scope"], "sales_source": src}
+        if s.get("sales_note"):
+            facts["sales_note"] = s["sales_note"]
+        if s.get("min_price") is not None:
+            facts["min_price"] = s["min_price"]
+        if k in idx:
+            car = idx[k]
+            for fk, fv in facts.items():
+                car["facts"][fk] = fv
+            if not car["tags"].get("price_wan") and s.get("min_price") is not None:
+                car["tags"]["price_wan"] = _num(s["min_price"])
+            if s.get("brand") and not car["tags"].get("brand"):
+                car["tags"]["brand"] = s["brand"]
+            car["searchable"] = build_searchable(car["model"], car["tags"]["cls"],
+                                                 car["tags"]["power"], car["tags"]["brand"],
+                                                 car["tags"]["price_wan"])
+            srcs = car["meta"]["source_history"] if "meta" in car else None
+            reused.append(s["name"])
+        else:
+            rec = {"model": s["name"], "brand": s["brand"], "power": s["power"] or "BEV",
+                   "price_guide": [_num(s["min_price"])] if s.get("min_price") is not None else None,
+                   "trend_sales": s["eff"], "note": "销量榜发现入池，级别待确认、8维证据待采集"}
+            car = make_car(rec, "intake:" + src, cfg)
+            car["pool_status"] = "needs_data"
+            for fk, fv in facts.items():
+                car["facts"][fk] = fv
+            pool["cars"].append(car)
+            idx[k] = car
+            created.append(s["name"])
+
+    if args.apply:
+        for car in pool["cars"]:
+            car["candidate"]["scores"] = dict(car["scores"])
+            car["candidate"]["adjust"] = car["adjust"]
+        pool["meta"]["as_of"] = "2026-11-19"
+        save_pool(pool, args.pool)
+
+    # 报告：待采集清单（池外新建）+ 可直接出榜子集（池内 ready）
+    report = {
+        "meta": {"source": src, "as_of": args.month, "months": args.months,
+                 "min_sales": args.min_sales, "price": [args.price_min, args.price_max],
+                 "power": args.power or "全部", "applied": bool(args.apply),
+                 "effective_sales_method": "逐月中位数 + 新车爬坡取最新月（fetch_dcd_sales._trend_pick）"},
+        "summary": {"榜单行": len(rows), "有有效销量": len(sales), "达标": len(qualified),
+                    "池内复用": len(reused), "池外待采": len(created), "淘汰": dict(rejected)},
+        "池内复用": reused, "池外待采": created,
+        "待采字段": ["cls(官方二级分类)", "trim(评分配置+指导价)", "8维scores(三电/安全/智驾/空间/性价比/操控/车机/品控)",
+                 "电芯/800V/kWh/电耗", "crash安全证据"],
+    }
+    rp = args.intake_report or os.path.join(os.path.dirname(os.path.abspath(args.pool)), "intake_report.json")
+    _json.dump(report, open(rp, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+
+    print(f"候选摄入（{'已写回' if args.apply else 'dry-run 未写回'}）")
+    print(f"  销量来源 {src} | 榜单 {len(rows)} 行 → 有销量 {len(sales)} → 达标 {len(qualified)}")
+    print(f"  池内复用 {len(reused)}：{reused[:8]}")
+    print(f"  池外待采 {len(created)}：{created[:12]}")
+    print(f"  淘汰：{dict(rejected)}")
+    print(f"  报告 → {rp}")
+    if not args.apply:
+        print("  （加 --apply 才写回总池）")
+    return 0
+
+
 def car_matches(c: dict, args) -> bool:
     t = c["tags"]
     if args.cls and not any(x in str(t.get("cls", "")) for x in args.cls.split(",")):
@@ -582,6 +778,18 @@ def selftest():
     hits = [c for c in p["cars"] if car_matches(c, ns)]
     assert len(hits) == 1 and hits[0]["model"] == "测试A"
     print("  [7] 标签检索 ✓")
+    # 8 有效销量口径（与 fetch_dcd_sales 一致）
+    med, _ = effective_sales({"2026-05": 100, "2026-06": 200, "2026-07": 300})
+    assert med == 200, med
+    ramp, _ = effective_sales({"2026-08": 6, "2026-09": 2332, "2026-10": 8131}, "new_launch")
+    assert ramp == 8131, ramp  # 新车爬坡取最新月，不被中位低估
+    print("  [8] 有效销量口径（中位/新车爬坡）✓")
+    # 9 榜单行→销量判定
+    bevrow = _row_to_sales({"name": "某纯电车", "months": {"bev": {"2026-09": 2000, "2026-10": 3000}}})
+    assert bevrow["power"] == "BEV" and bevrow["eff"] == 2500 and bevrow["scope"] == "pure_bev", bevrow
+    allrow = _row_to_sales({"name": "某多动力车", "months": {"all": {"2026-09": 500, "2026-10": 700}}})
+    assert allrow["scope"] == "series_total" and "非纯电" in allrow["method"], allrow
+    print("  [9] 榜单行销量判定（纯电/车系合计）✓")
     print("全部通过 ✓")
 
 
@@ -594,6 +802,7 @@ def main():
     sub.add_argument("--init", action="store_true")
     sub.add_argument("--ingest", nargs="+", metavar="FILE")
     sub.add_argument("--discover-in", metavar="FILE")
+    sub.add_argument("--intake", action="store_true", help="按需摄入：搜榜→有效销量→达标入池→复用/待采(默认dry-run)")
     sub.add_argument("--query", action="store_true")
     sub.add_argument("--audit", action="store_true")
     sub.add_argument("--stats", action="store_true")
@@ -611,7 +820,13 @@ def main():
     ap.add_argument("--ready-only", action="store_true", help="只要数据齐全可直接出榜的车")
     ap.add_argument("--out-subset", help="query 结果输出到文件（候选池格式）")
     ap.add_argument("--by", default="cls", help="stats 分组字段")
-    ap.add_argument("--apply", action="store_true", help="rescore 写回（默认 dry-run）")
+    ap.add_argument("--apply", action="store_true", help="rescore/intake 写回（默认 dry-run）")
+    # intake 专用
+    ap.add_argument("--sales-cache", help="懂车帝逐月榜快照 json（离线可复现）；不给则实时拉")
+    ap.add_argument("--month", default="202610", help="数据月（截止），默认 202610")
+    ap.add_argument("--months", type=int, default=6, help="逐月回看月数，默认 6")
+    ap.add_argument("--min-sales", type=int, default=1000, help="有效销量门槛，默认 1000")
+    ap.add_argument("--intake-report", help="intake 报告输出路径")
     a = ap.parse_args()
     if a.selftest:
         return selftest()
@@ -623,6 +838,8 @@ def main():
     if a.discover_in:
         a.discover = a.discover_in
         return cmd_discover_in(a)
+    if a.intake:
+        return cmd_intake(a)
     if a.query:
         a.out = a.out_subset
         return cmd_query(a)
