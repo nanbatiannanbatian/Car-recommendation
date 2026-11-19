@@ -339,12 +339,8 @@ def main_cell(key: str, row: dict, cand: dict, grade: str = "") -> str:
             v = cand.get("trend_sales")
         return str(v) if v not in (None, "") else "—"
     if key == "total":
-        if row.get("total") is None:
-            return "—"
-        basis = row.get("score_basis") or ("配置" if row.get("config_anchored_total") is not None else "车系")
-        label = {"annotated_trim": "配置", "verified_trim": "标注配置",
-                 "spec_score_anchored": "规则配置"}.get(basis, basis)
-        return f"{float(row['total']):.1f}（{label}）"
+        # v9.7.7：去掉「（配置）」标签——主榜标题已写明按最高配置排序，单元格保持纯数字
+        return f"{float(row['total']):.1f}" if row.get("total") is not None else "—"
     if key == "tier":
         return str(row.get("tier") or "")
     if key == "evidence":
@@ -544,11 +540,9 @@ def selftest() -> int:
         bad.append("主榜配置/价格未跟随最高配置")
     if "宁德" not in main_cell("cell_brand", rt, rt) or "800V" not in main_cell("cell_brand", rt, rt):
         bad.append("电池来源未跟随最高配置")
-    # v9.7.1：总分口径标记
-    if "（配置）" not in main_cell("total", {"total": 85.0, "config_anchored_total": 85.0}, {}):
-        bad.append("配置分口径未标记")
-    if "（车系）" not in main_cell("total", {"total": 80.0}, {}):
-        bad.append("车系分口径未标记")
+    # v9.7.7：加权分纯数字（无「（配置）」标签）
+    if main_cell("total", {"total": 85.0}, {}) != "85.0":
+        bad.append("加权分非纯数字")
     # v9.7.0：逐配置对比区块
     data4 = dict(data); data4["meta"] = dict(data["meta"])
     data4["meta"]["trim_board"] = {"A车": {"trims": [{"name": "x"}]}}

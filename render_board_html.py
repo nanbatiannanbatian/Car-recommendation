@@ -143,7 +143,7 @@ def render(data, summary, title, as_of):
         grades = BV.fact_grades(rows)
         H.append("<h2>打分主榜 <span>按每车最高配置分排序（锚定到车系分量纲）· 事实列不参与排序</span></h2>")
         H.append('<div class="rule">v9.7.1：每款车取其<b>最高分配置</b>参与排名，逐配置分经标准差锚定到车系分量纲'
-                 '（买车买的是具体配置）。分数后标注「配置」=该车最高配置分；「车系」=无配置数据、沿用原车系分。'
+                 '（买车买的是具体配置）。无配置数据的车沿用原车系分。'
                  '点下方「逐配置对比」可展开看每款车的全部配置。</div>')
         H.append('<div class="rule">按<b>评分配置</b>逐车评分（配置不同分不同）；指导价/月销/kWh·万元/'
                  '电池来源为事实列不计分。kWh·万元 <b style="color:#1a7f37">▲优</b>（本池前25%）/'
@@ -294,7 +294,7 @@ function applyTrim(model,idx){
   var q='[data-model="'+model+'"]';
   document.querySelectorAll('#mainBoard tr'+q+',#scoreBoard tr'+q).forEach(function(row){
     var c=function(k){return row.querySelector('.'+k);};
-    if(c('c-total'))c('c-total').innerHTML='<span class="score">'+v.total+'（配置）</span>';
+    if(c('c-total'))c('c-total').innerHTML='<span class="score">'+v.total+'</span>';
     if(c('c-trim'))c('c-trim').textContent=v.name;
     if(c('c-price'))c('c-price').textContent=v.price;
     if(c('c-cell'))c('c-cell').textContent=v.cell;

@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 9.7.6
+version: 9.7.7
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v9.7.6）
+# Car recommendation —— 可信购车榜单引擎（v9.7.7）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -2380,3 +2380,11 @@ MG07 845版 87.9 #1、深蓝L06 87.8 #2（分差0.1，在算法噪声内）。
   `applyTrim` 同步更新三表的分/配置/价格等；新增 `sortPower()` 按新产品力分重排产品力榜、
   重编名次与 rank_delta（主榜名次从当前 DOM 实时读取）。
 - 验收：39 下拉框、node --check JS 通过、全 selftest + A/B 26 项通过。
+
+---
+
+## v9.7.7 · 主榜加权分去掉「（配置）」标签（2026-11-20）
+
+用户指出加权分单元格里的「（配置）」多余（主榜标题已写明按最高配置排序）。
+- `main_cell('total')` 改为纯数字；页面说明文字与 JS 联动（applyTrim）同步去掉标签。
+- selftest 改为断言加权分是纯数字。全 selftest + node --check 通过。
