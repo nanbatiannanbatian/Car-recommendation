@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 9.6.0
+version: 9.6.1
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v9.6.0）
+# Car recommendation —— 可信购车榜单引擎（v9.6.1）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -2181,3 +2181,27 @@ Model Y value 6.5→7.28、总分 76.8→77.7、#17→#15；蔚来ES6 -0.10、�
 ### 效果
 12–18万榜页面 12 个 h2（原 9 + 三榜并列/稳健性/审查边界），主榜 11 列实测正确。
 全 selftest + A/B 25 项通过。
+
+---
+
+## v9.6.1 · 档位补齐 + 电压并入电池来源 + 总分构成加列（2026-11-19，用户确认后实施）
+
+用户指出三处：档位列空、「未采集（800V）」不对（车辆信息里有电压）、电池来源要区分宁德电芯/整包。
+用户确认：电压并入「电池来源」列、总分构成加「评分配置」+「指导价」列。
+
+### 实现
+- **档位**：build 新增 `tiers` 参数，从 `summary.tiers` 反查每车 T1/T2/T3 → 中文「第一/二/三档」写进
+  main_board 行。CLI 与 pipeline 都传。落榜车（秦L EV）无档位正确。
+- **电压**：新建 `categories/battery_platform.json`（14 款，按**评分配置**判定电压——关键：
+  MG 07 评分配置是 610 激光雷达版=400V 而非 845 版 800V；极狐S5 带内最低配 400V；
+  红旗天工05 550青春版 400V 而非 850版 900V）。电压并入「电池来源」列显示「宁德时代 · 400V」。
+  查不到的（极狐贝塔S3/大众与众07）标「未披露」不猜。
+- **封装形式**：同库记录 cell/pack。公开数据普遍只给电芯品牌、不披露整包集成商，
+  如实标「宁德时代电芯·未披露整包集成商」；比亚迪/CTB 明确自产整包的才标。
+- **800V 披露**：从 `rank_v2_policy.fact_reference_columns` 移除 is_800v（电压改由电池来源列展示），
+  页面不再出现误导性的「未采集（800V）」。
+- **总分构成**：HTML/MD 都加「评分配置」「指导价(万)」两列，逐车明细更可读。
+
+### 验收
+12–18万榜主榜首行：深蓝L06 / 第一档 / 宁德时代·400V；总分构成 13 列（含评分配置+指导价）。
+selftest 加电压并入与档位中文断言；全 selftest + A/B 通过。

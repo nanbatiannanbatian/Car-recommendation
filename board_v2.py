@@ -341,8 +341,15 @@ def build(cands: list[dict], cfg: dict, policy: dict,
           facts: dict[str, dict] | None = None,
           weights: list[float] | None = None,
           per_band: int = 10,
-          no_experience: bool = False) -> dict:
+          no_experience: bool = False,
+          tiers: dict[str, str] | None = None,
+          battery_platform: dict | None = None) -> dict:
     facts = facts or {}
+    # v9.6.1：电压/封装事实库（按评分配置）；调用方可覆盖
+    if battery_platform is None:
+        _bp_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                "categories", "battery_platform.json")
+        battery_platform = (_load(_bp_path).get("values") or {}) if os.path.exists(_bp_path) else {}
     # v9.3.0：建池时自动应用体验证据（只调 adas/control）；
     # --no-experience 或 no_experience=True 可关闭（A/B 对照用）
     import copy
@@ -359,6 +366,10 @@ def build(cands: list[dict], cfg: dict, policy: dict,
         r["trim"] = _c.get("trim")
         r["evidence_status"] = _c.get("evidence_status")
         r["lifecycle"] = _c.get("lifecycle")
+        # v9.6.1：档位（从 summary.tiers 反查）、电压/封装（按评分配置）
+        r["tier"] = (tiers or {}).get(r["model"]) or r.get("tier") or ""
+        _bp = battery_platform.get(r["model"], {})
+        r["battery_detail"] = _bp   # {voltage, cell, pack, trim, src}
     bands = band_subboards(rows, cands, policy)
     analyses = analysis_blocks(cands, cfg, weights)
     return {
@@ -443,9 +454,15 @@ def cli(argv=None):
     # v9.0.1：默认加载随包事实库，不再漏喂 kWh/电耗/CLTC；--facts 可覆盖
     import board_view as BV
     facts = BV.load_fact_library(a.facts)
-    data = build(cands, cfg, policy, facts, per_band=a.per_band,
-                 no_experience=a.no_experience)
     _sum = _load(a.summary) if a.summary and os.path.exists(a.summary) else None
+    # v9.6.1：从 summary.tiers 反查每车档位
+    _tiers = {}
+    for tmap in (_sum or {}).get("tiers", {}).values():
+        for tk, label in (("T1", "第一档"), ("T2", "第二档"), ("T3", "第三档")):
+            for nm in (tmap.get(tk) or []):
+                _tiers[nm] = label
+    data = build(cands, cfg, policy, facts, per_band=a.per_band,
+                 no_experience=a.no_experience, tiers=_tiers)
     md = render_md(data, _sum)
     if a.out:
         os.makedirs(a.out, exist_ok=True)
@@ -509,13 +526,14 @@ def render_md(data: dict, summary: dict | None = None) -> str:
         dims = meta.get("dimensions") or []
         L += ["", "## 总分构成（维度明细）", "",
               "> 表头括号是该维权重，格内是原始维分（0–10）；加权分 = Σ(维分×权重) × 10 + adjust。", ""]
-        L += ["| # | 车型 | " + " | ".join(BV.dimension_lines(meta)) + " | 加权分 |",
-              "|---|---|" + "---|" * (len(dims) + 1)]
+        L += ["| # | 车型 | 评分配置 | 指导价(万) | " + " | ".join(BV.dimension_lines(meta)) + " | 加权分 |",
+              "|---|---|---|---|" + "---|" * (len(dims) + 1)]
         for r in rows:
             sc = r.get("scores") or {}
             cells = [f"{sc[d['key']]:.1f}" if isinstance(sc.get(d['key']), (int, float)) else "—"
                      for d in dims]
-            L.append(f"| {r['rank']} | {r['model']} | " + " | ".join(cells) + f" | {r['total']:.1f} |")
+            L.append(f"| {r['rank']} | {r['model']} | {BV.main_cell('trim', r, r)} | "
+                     f"{BV.main_cell('price', r, r)} | " + " | ".join(cells) + f" | {r['total']:.1f} |")
 
     if "tiers" in ids:
         t = (summary or {}).get("tiers") or {}

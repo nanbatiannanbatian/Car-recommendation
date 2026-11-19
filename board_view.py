@@ -280,8 +280,14 @@ def main_cell(key: str, row: dict, cand: dict, grade: str = "") -> str:
         mark = " ▲" if grade == "优" else (" ▼" if grade == "弱" else "")
         return f"{v}{mark}" if v not in (None, "—", "") else "—"
     if key == "cell_brand":
+        # v9.6.1：电压并入电池来源；按评分配置判定电压，不按车系
+        bp = row.get("battery_detail") or {}
         v = fr.get("电芯")
-        return str(v) if v not in (None, "—", "") else "—"
+        brand = str(v) if v not in (None, "—", "") else str(bp.get("cell") or "—")
+        volt = bp.get("voltage")
+        if volt and volt != "未披露":
+            brand = f"{brand} · {volt}"
+        return brand
     return "—"
 
 
@@ -430,6 +436,14 @@ def selftest() -> int:
     for rid in ("three_board", "robustness", "audit_boundary"):
         if rid not in act3:
             bad.append(f"分析区块 {rid} 未激活")
+    # v9.6.1：电池来源含电压（按评分配置）、档位中文
+    rtest = {"model": "A", "tier": "第一档", "fact_ref": {"电芯": "宁德时代"},
+             "battery_detail": {"voltage": "400V", "cell": "宁德时代电芯"}}
+    bsrc = main_cell("cell_brand", rtest, rtest)
+    if "400V" not in bsrc or "宁德" not in bsrc:
+        bad.append(f"电池来源未含电压: {bsrc}")
+    if main_cell("tier", rtest, rtest) != "第一档":
+        bad.append("档位未显示")
     if bad:
         print("[selftest FAIL]", bad)
         return 1

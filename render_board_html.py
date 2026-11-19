@@ -181,13 +181,15 @@ def render(data, summary, title, as_of):
     if "score_breakdown" in ids:
         dims = meta.get("dimensions") or []
         H.append("<h2>总分构成 <span>8 维原始分 · 加权分＝Σ(维分×权重)×10 + adjust</span></h2>")
-        H.append('<table><thead><tr><th>#</th><th>车型</th>')
+        H.append('<table><thead><tr><th>#</th><th>车型</th><th>评分配置</th><th>指导价(万)</th>')
         for d in dims:
             H.append(f"<th>{e(d.get('label'))}<br><small>{float(d.get('weight',0))*100:.1f}%</small></th>")
         H.append("<th>加权分</th></tr></thead><tbody>")
         for r in rows:
             sc = r.get("scores") or {}
-            H.append(f"<tr><td>{rank_badge(r.get('rank'))}</td><td class='name'>{e(r.get('model'))}</td>")
+            H.append(f"<tr><td>{rank_badge(r.get('rank'))}</td><td class='name'>{e(r.get('model'))}</td>"
+                     f"<td class='ref'>{e(BV.main_cell('trim', r, r))}</td>"
+                     f"<td>{e(BV.main_cell('price', r, r))}</td>")
             for d in dims:
                 v = sc.get(d["key"])
                 cls = "delta-up" if isinstance(v, (int, float)) and v >= 9 else (

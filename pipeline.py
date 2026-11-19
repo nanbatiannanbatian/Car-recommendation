@@ -318,7 +318,12 @@ def main():
                 cfg_v2 = json.load(open(bv_cfg_path, encoding="utf-8"))
                 pol = json.load(open(policy_path, encoding="utf-8"))
                 facts_v2 = BView.load_fact_library()   # v9.0.1 默认带事实库
-                data_v2 = BV.build(cands, cfg_v2, pol, facts_v2)
+                _tiers_v2 = {}
+                for tmap in (summary.get("tiers") or {}).values():
+                    for tk, label in (("T1", "第一档"), ("T2", "第二档"), ("T3", "第三档")):
+                        for nm in (tmap.get(tk) or []):
+                            _tiers_v2[nm] = label
+                data_v2 = BV.build(cands, cfg_v2, pol, facts_v2, tiers=_tiers_v2)
                 doc = RH.render(data_v2, summary, a.html_title, a.as_of)
                 hp = os.path.join(a.out, "榜单.html")
                 open(hp, "w", encoding="utf-8").write(doc)
