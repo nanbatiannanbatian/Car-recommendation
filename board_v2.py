@@ -24,8 +24,10 @@ v2 把它们收敛成一套：
 分段汇总总榜（v8.3，默认展示模板）
 ------------------------------------
 用户规则：排行榜如果没有价位段，就分几个价位段，每段取前几名，最后把这几段汇总成总榜。
-`segmented_summary()` 实现：按价位段分组 → 每段按主榜分数取前 per_band 名 →
-汇总后按主榜分数降序，形成一张「各价位段都有代表」的总榜。分数仍来自主榜，不重新打分。
+`segmented_summary()` 实现：按价位段分组 → 每段按主榜分数取前 per_band 名（默认 10）→
+汇总后按主榜分数降序，形成一张「各价位段各有前 10 代表」的总榜。分数仍来自主榜，不重新打分。
+用户口径：回答「全价位前 10」时，不是全池混排取前 10（会被高端车垄断），而是入门/主流/高端
+各列前 10 再汇总——这样每个价位段的前 10 都看得到，段内选车逻辑各自成立。
 与价位段子榜的区别：子榜是全量分组视图；分段汇总总榜是各段前几名拼成的 Top N 总榜。
 
 CLI
@@ -165,8 +167,8 @@ def band_subboards(rows: list[dict], cands: list[dict], policy: dict) -> list[di
 
 # ---------------------------------------------------------------- 分段汇总总榜
 def segmented_summary(rows: list[dict], cands: list[dict], policy: dict,
-                      per_band: int = 5) -> dict:
-    """分段汇总总榜：每个价位段取分数前 per_band 名，汇总成一张总榜。
+                      per_band: int = 10) -> dict:
+    """分段汇总总榜：每个价位段取分数前 per_band 名（默认10），汇总成一张总榜。
 
     - 回答「排行榜没有价位段就分段、每段取前几、汇总成总榜」。
     - 价值：保证每个价位段都有车进总榜，避免高端车凭产品力垄断前列；
@@ -203,7 +205,7 @@ def segmented_summary(rows: list[dict], cands: list[dict], policy: dict,
 def build(cands: list[dict], cfg: dict, policy: dict,
           facts: dict[str, dict] | None = None,
           weights: list[float] | None = None,
-          per_band: int = 5) -> dict:
+          per_band: int = 10) -> dict:
     facts = facts or {}
     rows = main_board(cands, cfg, weights)
     by_model = {c["model"]: c for c in cands}
@@ -252,7 +254,7 @@ def cli(argv=None):
     ap.add_argument("--config", default=os.path.join(HERE, "categories", "car_ev_1218_quality.json"))
     ap.add_argument("--policy", default=os.path.join(HERE, "categories", "rank_v2_policy.json"))
     ap.add_argument("--facts", help="事实参数 json（按 model 索引），用于参考列")
-    ap.add_argument("--per-band", type=int, default=5, help="分段汇总总榜每段取前几名（默认5）")
+    ap.add_argument("--per-band", type=int, default=10, help="分段汇总总榜每段取前几名（默认10）")
     ap.add_argument("--out", help="输出目录，写 board_v2_data.json / board_v2.md")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args(argv)
@@ -288,7 +290,7 @@ def render_md(data: dict) -> str:
         L.append(f"| {r['rank']} | {r['model']} | {r['total']:.1f} | {r.get('tier','')} | {ref} |")
     ss = data.get("segmented_summary", {})
     if ss:
-        L += ["", f"## 分段汇总总榜（各价位段前 {ss.get('per_band', 5)} 名 → 汇总成总榜）", "",
+        L += ["", f"## 分段汇总总榜（各价位段前 {ss.get('per_band', 10)} 名 → 汇总成总榜）", "",
               "先按价位段各取前几名，再按主榜分数汇成一榜；分数全部来自主榜，不重新打分。", ""]
         L += ["| # | 车型 | 加权分 | 价位段 | 段内名次 |", "|---|---|---|---|---|"]
         for it in ss["items"]:
@@ -342,8 +344,8 @@ def run_selftest():
     assert any(r["model"] == "贵价车" for r in data["main_board"]), "贵价车被硬排除"
     # 6) 分段汇总总榜：每段不超过 per_band、汇总按分数降序、分数来自主榜、各段都有代表
     ss = data["segmented_summary"]
-    assert ss["per_band"] == 5
-    assert all(b["n_taken"] <= 5 for b in ss["bands"]), "分段取数超过 per_band"
+    assert ss["per_band"] == 10
+    assert all(b["n_taken"] <= 10 for b in ss["bands"]), "分段取数超过 per_band"
     ss_scores = [it["score"] for it in ss["items"]]
     assert ss_scores == sorted(ss_scores, reverse=True), "分段汇总总榜未按分数降序"
     assert all(it["score"] == all_scores[it["model"]] for it in ss["items"]), "汇总分数与主榜不一致"
