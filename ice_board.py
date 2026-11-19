@@ -155,11 +155,14 @@ def render_board_md(board, passed, dropped, rows, tt, tiers, cfg, n):
     L_.append(f"> 两个前十不一样，正说明「加权榜 ≠ 销量榜」；"
               f"本榜销量维权重 **{mw * 100:.0f}%**（配置实配值，见正文权重表）。")
     L_.append("> v6.3 起候选池改为**全量核验**（388 款不按销量截断），销量不再在入池处"
-              "二次出现；但数据源本身是销量榜、评分仍含 market 24%，整张榜**依然偏市场热度**。"
+              f"二次出现；但数据源本身是销量榜、评分仍含 market {mw * 100:.0f}%"
+              "（配置实配值，不再写死），整张榜**依然偏市场热度**。"
               "漏斗切换的影响见 `funnel_sensitivity.md`，权重/插补敏感性见 `sensitivity.md`。")
     L_.append("")
-    # 三档
-    t = tiers.get("tiers") or {}
+    # 三档：兼容外层 {"tiers":{...}} 与内层 {"T1":..,"T2":..,"T3":..} 两种入参。
+    # 调用处传的是 tr.get("tiers")（内层）；只写 tiers.get("tiers") 会把三档全部取空，
+    # 报告出现「第一档 0 款」的误导性结论（v8.3.3 回归，已修）。
+    t = tiers.get("tiers") or (tiers if isinstance(tiers, dict) else {}) or {}
     L_ += ["### 三档分级（沿用项目判档框架）", "",
            f"- **第一档 · 可推荐（{len(t.get('T1') or [])} 款）**："
            f"{'、'.join(t.get('T1') or []) or '空的'}",
@@ -491,6 +494,9 @@ def main():
     # ---- 复现节：权重 / 公式 / 覆盖率全部现算，不手抄、不藏在附录 ----
     _dims = cfg["dimensions"]
     _wsum = sum(float(d["weight"]) for d in _dims)
+    # 配置实配值，供复现节动态披露；禁止在文案里写死 22%/24%（曾因写死漂移）
+    _market_w = next((float(d["weight"]) for d in _dims
+                      if d.get("key") == "market"), 0.0)
     _wrows = ["| 维度 | 权重 | 口径与缺口 | 真实覆盖 | 插补(low) |",
               "|---|---|---|---|---|"]
     for _d in _dims:
@@ -575,9 +581,11 @@ def main():
         "口碑分(0–5)×2；缺失维按同榜中位插补并标 `low`。", "",
         "逐维公式与判定规则：", "",
         *_rules, "",
-        "> **口径修正（v6.2）**：配置 `dimensions[market].gap` 写「权重上限 22%」，"
-        "但实配权重是 **24%**——旧版报告照抄了 22%，与代码不符，现统一按实配值披露。"
-        "是否把 market 下调到设计上限 22% **会改动名次**，属待决策项，本期未动。", "",
+        f"> **口径修正（v6.6）**：`dimensions[market]` 本期为 **{_market_w:.0%}**"
+        "（设计上限 22%，v6.6 已由漂移的 24% 回调至该值；此处从配置实配值动态读取，"
+        "不再在模板里写死百分比）。回调对四榜 Top10 交集无影响（10/10），"
+        "仅影响个别靠销量撑档的车型是否进第 1 档——见下方三档分级。"
+        "旧 24% 配置留档 `categories/car_ice_phev.json.bak-24pct`。", "",
         f"> **插补比例要说清**：space / control / cabin / quality 四维真实覆盖均只有 "
         f"{audit['coverage'].get('space', 0)}/{audit['n_rows']}（{_cov_pct:.1f}%），"
         f"其余 {audit['imputed'].get('space', 0)} 款靠同榜中位插补。"
