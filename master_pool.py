@@ -594,6 +594,45 @@ def cmd_intake(args):
     return 0
 
 
+def cmd_verify(args):
+    """多源交叉核验（v8.2）：所有已落盘事实源比对同一字段 → 一致/冲突/单源/缺失。
+    --apply 时把核验摘要(verify_flags)写回总池每车，不改 scores/adjust。"""
+    import cross_verify as CV
+    models = [m.strip() for m in args.verify_models.split(",")] if getattr(args, "verify_models", None) else None
+    result, S = CV.verify_all(root=HERE, models=models,
+                              dcd_path=getattr(args, "sales_cache", None) or "",
+                              pool_only=not getattr(args, "verify_all_sources", False))
+    out_dir = getattr(args, "verify_out", None) or os.path.join(HERE, "runs", "cross_verify_latest")
+    jp, mp, data = CV.write_report(result, out_dir)
+
+    # 写回核验摘要到总池（只加 verify 字段，绝不动 scores/adjust）
+    if args.apply:
+        pool = load_pool(args.pool)
+        idx = index_by_key(pool)
+        written = 0
+        for car, fields in result.items():
+            if car in idx:
+                ff = {f: a for f, a in fields.items() if isinstance(a, dict) and "status" in a}
+                idx[car]["verify"] = {
+                    "as_of": "2026-11-19",
+                    "conflicts": [f for f, a in ff.items() if a["status"] == "CONFLICT"],
+                    "single_source": [f for f, a in ff.items() if a["status"] == "SINGLE"],
+                    "verified_fields": [f for f, a in ff.items() if a.get("verified")],
+                }
+                written += 1
+        save_pool(pool, args.pool)
+        print(f"  核验摘要已写回 {written} 款（仅 verify 字段，scores/adjust 未动）")
+
+    print(f"多源交叉核验（{'已写回' if args.apply else 'dry-run 未写回'}）")
+    print(f"  车型 {data['summary']['车型']} | 冲突 {data['summary']['冲突项']} | 单源 {data['summary']['单源项']}")
+    from collections import Counter
+    print(f"  冲突字段分布：{dict(Counter(c['field'] for c in data['冲突清单']))}")
+    print(f"  JSON → {jp}\n  MD   → {mp}")
+    if not args.apply:
+        print("  （加 --apply 才把核验摘要写回总池）")
+    return 0
+
+
 def car_matches(c: dict, args) -> bool:
     t = c["tags"]
     if args.cls and not any(x in str(t.get("cls", "")) for x in args.cls.split(",")):
@@ -790,6 +829,17 @@ def selftest():
     allrow = _row_to_sales({"name": "某多动力车", "months": {"all": {"2026-09": 500, "2026-10": 700}}})
     assert allrow["scope"] == "series_total" and "非纯电" in allrow["method"], allrow
     print("  [9] 榜单行销量判定（纯电/车系合计）✓")
+    # 10 多源交叉核验模块可加载 + 裁决纪律
+    try:
+        import cross_verify as CV
+        assert CV.adjudicate("x", [])["status"] == "MISSING"
+        one = [{"value": 1, "display": 1, "source": "a", "rank": 50, "url": "", "date": "", "detail": ""}]
+        assert CV.adjudicate("x", one)["status"] == "SINGLE"
+        diff = one + [{"value": 2, "display": 2, "source": "b", "rank": 40, "url": "", "date": "", "detail": ""}]
+        assert CV.adjudicate("x", diff)["status"] == "CONFLICT"  # 非网查分歧不静默选值
+        print("  [10] 多源交叉核验裁决纪律 ✓")
+    except ImportError:
+        print("  [10] cross_verify 未安装，跳过")
     print("全部通过 ✓")
 
 
@@ -803,6 +853,7 @@ def main():
     sub.add_argument("--ingest", nargs="+", metavar="FILE")
     sub.add_argument("--discover-in", metavar="FILE")
     sub.add_argument("--intake", action="store_true", help="按需摄入：搜榜→有效销量→达标入池→复用/待采(默认dry-run)")
+    sub.add_argument("--verify", action="store_true", help="多源交叉核验：所有已落盘事实源比对→冲突标旗→网查确认回填(调cross_verify.py)")
     sub.add_argument("--query", action="store_true")
     sub.add_argument("--audit", action="store_true")
     sub.add_argument("--stats", action="store_true")
@@ -827,6 +878,9 @@ def main():
     ap.add_argument("--months", type=int, default=6, help="逐月回看月数，默认 6")
     ap.add_argument("--min-sales", type=int, default=1000, help="有效销量门槛，默认 1000")
     ap.add_argument("--intake-report", help="intake 报告输出路径")
+    ap.add_argument("--verify-out", help="verify 核验报告输出目录")
+    ap.add_argument("--verify-models", help="verify 只核验指定车型（逗号分隔）")
+    ap.add_argument("--verify-all-sources", action="store_true", help="verify 含池外源车（默认只核验总池内）")
     a = ap.parse_args()
     if a.selftest:
         return selftest()
@@ -840,6 +894,8 @@ def main():
         return cmd_discover_in(a)
     if a.intake:
         return cmd_intake(a)
+    if a.verify:
+        return cmd_verify(a)
     if a.query:
         a.out = a.out_subset
         return cmd_query(a)

@@ -40,6 +40,8 @@ NEW_FILES = [
     "categories/rank_v2_policy.json",           # v7.0 榜单策略配置
     "master_pool.py",                           # v8.0 总候选池（单一事实源）
     "categories/master_pool.json",              # v8.0 总池数据（67款，随代码同步）
+    "cross_verify.py",                          # v8.2 多源交叉核验
+    "categories/verified_overrides.json",       # v8.2 网查确认回填表
 ]
 
 

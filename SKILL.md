@@ -13,7 +13,7 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 8.1.0
+version: 8.2.0
 author: "nanbatiannanbatian"
 ---
 
@@ -1628,3 +1628,67 @@ python3 master_pool.py --intake --sales-cache dcd_snapshot.json --month 202610 \
 用 baseline 缓存的 36 款逐月销量造快照跑 intake：达标 19 款全池内复用；注入 1 款池外新车
 （800/1500/2600）→ 有效销量 1500、`needs_data` 建档、总池 67→68；dry-run 不写回、`--apply` 才写。
 验证产物：`runs/car_midsuv_ev_202610/dcd_snapshot_202610.json` + `intake_report_dryrun.json`。
+
+---
+
+## v8.2 · 多源交叉核验 cross_verify：所有数据源都查、比对、冲突网查确认（2026-11-19）
+
+### 为什么要改（用户明确要求）
+用户指出：候选摄入只查懂车帝一个源不够——**「别只查一个，要所有数据源都查，
+最后比对，对不上的网上找资料确认」**。此前 `--intake` 只用懂车帝销量榜，
+而 skill 里其实早已落盘 12 个车型级事实源，却从未交叉比对。
+
+### 12 个已落盘事实源（覆盖字段）
+`C-NCAP成绩(57款)` / `C-IASI评级(189条)` / `电芯核验表cell_facts(37款)` /
+`官方级别缓存levels(29款)` / `逐配置表trims(35款)` / `气囊库airbags(38款)` /
+`生命周期lifecycle(15款)` / `口碑koubei(50款)` / `第三方实测thirdparty(7条)` /
+`懂车帝销量快照` / `基准池baseline(39款)` / `总池master_pool(67款)`。
+每个源能给同一款车的不同字段提供**带来源/URL/日期**的值。
+
+### 四态裁决（字段级，继承「不猜」红线）
+对每车 × 每字段汇总所有源的值 → 按证据等级裁决：
+- **AGREE** 多源一致；或网查确认(verified_web)覆盖。
+- **CONFLICT** 多源分歧——**除网查确认外，任何分歧一律列出，绝不静默挑一个当事实**
+  （曾踩坑：等级覆盖把车系合计/纯电、配置价/车系价的分歧悄悄抹平）。
+- **SINGLE** 只有单源（证据单薄，标注来源）。
+- **MISSING** 所有源都没有。
+证据等级：网查确认(100) > C-NCAP/C-IASI(90) > 官方配置表(85) > 电芯核验表(80)
+> 懂车帝(60) > 基准池(55) > 总池(50) > 缓存(40-45)。
+
+### 网查确认闭环（用户要求的「对不上的网上找资料确认」）
+```
+多源比对 → CONFLICT清单 → agent/人工联网核实 → 写 categories/verified_overrides.json
+        → 重跑 cross_verify（verified_web 作为 rank100 覆盖）→ 冲突清零
+```
+`verified_overrides.json` 每条必带 url/date/note，只写 ≥2 个独立权威源一致的值。
+实测：星海V6 电芯「总池未披露 vs 核验表欣旺达」→ 网查 5 源（搜狐/易车/头条/太平洋/零部件明细）
+一致确认欣旺达 → 写确认表 → 重跑该字段从 CONFLICT 变 AGREE，冲突 20→19。
+**销量/价格口径差（车系合计vs纯电、中位vs当期、配置价vs车系价）属「已解释的口径差」，
+保留 CONFLICT 并在 cause 字段写明，不强行裁决**——这是诚实，不是缺陷。
+
+### 关键纪律
+- **只产出核验表，不进打分链**：`scores/adjust/total` 零改动（selftest + 写回实测验证）。
+- **量纲隔离**：C-NCAP 得分率(%) 与 safety 分(10分制) 不混为同一字段（曾混淆，已修）。
+- **表述差异归一**：电芯括号注解（「上汽时代(宁德合资)」→「上汽时代」）比对时剥离、展示保留，
+  避免把同一答案的不同写法误报冲突（修复后电芯冲突 4→1，剩下的 1 个是真分歧）。
+- **跨库车名对齐**：内联 filings 的 name_keys 规则（品牌剥离/希腊字母别名/纯电后缀），
+  零依赖（不 import 需要 requests 的 filings 模块）。
+- **默认只核验总池 67 款**（`--all-sources` 才含池外源车），报告才有「我的候选池」意义。
+- 按需手动触发，不挂 automation。
+
+### 用法
+```bash
+python3 cross_verify.py --selftest
+python3 master_pool.py --verify --dcd-cache 快照.json --verify-out 报告目录           # 全池核验，dry-run
+python3 master_pool.py --verify --verify-models 丰田bZ5 --apply                        # 单车核验+写回摘要
+python3 cross_verify.py --conflicts-only                                              # 只看冲突清单
+# 冲突 → 网查 → 写 categories/verified_overrides.json → 重跑冲突清零
+```
+`--apply` 时把核验摘要（conflicts/single_source/verified_fields）写回总池每车的 `verify` 字段，
+只加核验元数据、不动打分。
+
+### 验收（2026-11-19）
+cross_verify selftest 6 项 + master_pool selftest 10 项全过。
+总池 67 款核验：19 个冲突全部为已解释口径差（16 price + 3 trend_sales），
+电芯真冲突经网查确认清零；185 个单源项（多为 C-NCAP 官方成绩与逐配置 kWh，标注来源）。
+写回实测 scores 改动 0 款。报告：`runs/car_midsuv_ev_202610/cross_verify/cross_verify.md/.json`。
