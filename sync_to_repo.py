@@ -48,6 +48,7 @@ NEW_FILES = [
     "experience_score.py",                      # v9.3.0 体验证据评分修正（adas/control）
     "categories/experience_facts.json",         # v9.3.0 体验证据库（网查可核验来源）
     "categories/residual_values.json",          # v9.5.0 保值率库（中汽流通协会×精真估）
+    "PHEV_SCENE_GUIDE.md",                      # v9.5.1 插混按场景选车指南（方法论附注，不进评分）
 ]
 
 

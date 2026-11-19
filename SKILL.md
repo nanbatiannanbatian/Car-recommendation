@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 9.5.0
+version: 9.5.1
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v9.5.0）
+# Car recommendation —— 可信购车榜单引擎（v9.5.1）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -2144,3 +2144,15 @@ A/B 矩阵 26 项、全部 selftest 通过。
 ### 效果
 Model Y value 6.5→7.28、总分 76.8→77.7、#17→#15；蔚来ES6 -0.10、零跑C11 -0.13（低保值率轻扣）。
 核心短板（智驾6.0、容量最小非800V）未变，保值率补不回大差距。A/B 26项、全部 selftest 通过。
+
+---
+
+## v9.5.1 · 插混按场景选车指南（2026-11-19）
+
+用户转述抖音博主观点「插混只推荐比亚迪——最早/单档最简/销量高维保便/自产电池质保好」，要求写入报告一节。
+新增 `PHEV_SCENE_GUIDE.md`（方法论附注，不进评分）：逐条核实四条说法，
+结论「他把风险最低的选择包装成唯一正确的选择」；给出按场景分支的选型表
+（市区通勤→DM-i、北方均衡→吉利雷神、高速四驱→长城Hi4、满载山区→奇瑞鲲鹏、无桩→油混）。
+明确为什么不写进打分：market维已计销量、quality已间接体现故障率、场景相关不能做普适加分、
+无跨品牌同口径故障率数据、插混榜本就不设safety维（证据覆盖仅8.6%）。
+来源：易车/有驾/头条多源横评交叉，无单一厂商软文。
