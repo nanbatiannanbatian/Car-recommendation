@@ -308,6 +308,10 @@ def build(cands: list[dict], cfg: dict, policy: dict,
             "band_subboards_skip_reason": (
                 "提问已给价位段，候选只落一个段；子榜＝主榜原样重列且会丢价格缺失车，已跳过。"
                 if not bands else ""),
+            # v8.3.9：主榜 8 维标签/权重随数据出，供 md/html 渲染维度明细（不硬编码）
+            "dimensions": [{"key": d["key"], "label": d["label"],
+                            "weight": d["weight"]} for d in cfg["dimensions"]],
+            "fact_reference_columns": list(policy.get("fact_reference_columns") or []),
         },
         "main_board": rows,
         "band_subboards": bands,
@@ -386,11 +390,37 @@ def cli(argv=None):
 def render_md(data: dict) -> str:
     L = [f"# {data['meta']['title']}", "",
          "> 名次来源：**8维加权打分榜（唯一主榜）**。kWh/万元、电耗等为『参考·不计分』列。", ""]
+    # 事实列覆盖披露：哪些字段本榜有数据、哪些缺失（不猜不造，明确标出）
+    fact_cols = (data.get("meta", {}).get("fact_reference_columns") or [])
+    if fact_cols:
+        have = [c["label"] for c in fact_cols
+                if any((r.get("fact_ref") or {}).get(c["label"]) not in (None, "—", "")
+                       for r in data["main_board"])]
+        lack = [c["label"] for c in fact_cols if c["label"] not in have]
+        if lack:
+            L += ["> **事实参考列覆盖**：本榜有数据的是 " + "、".join(have) + "；"
+                  "「—」表示未采集到该字段（" + "、".join(lack) + "），不以估计值填充。", ""]
     L += ["## 全价位打分主榜", "", "| # | 车型 | 加权分 | 档位 | 事实参考列（不计分） |",
           "|---|---|---|---|---|"]
     for r in data["main_board"]:
         ref = " · ".join(f"{k} {v}" for k, v in r["fact_ref"].items() if v != "—")
         L.append(f"| {r['rank']} | {r['model']} | {r['total']:.1f} | {r.get('tier','')} | {ref} |")
+
+    # v8.3.9：总分维度明细——每行 8 维原始分 + 加权贡献，让用户看穿总分怎么来的
+    dims = data["meta"].get("dimensions") or []
+    if dims:
+        L += ["", "## 总分构成（8 维明细）", "",
+              "> 表头括号是该维权重，格内是原始维分（0–10）；加权分 = Σ(维分×权重) × 10 + adjust。", ""]
+        head = "| # | 车型 | " + " | ".join(f"{d['label']}({d['weight']*100:.1f}%)" for d in dims) + " | 加权分 |"
+        sep = "|---|---|" + "---|" * (len(dims) + 1)
+        L += [head, sep]
+        for r in data["main_board"]:
+            sc = r.get("scores") or {}
+            cells = []
+            for d in dims:
+                v = sc.get(d["key"])
+                cells.append(f"{v:.1f}" if isinstance(v, (int, float)) else "—")
+            L.append(f"| {r['rank']} | {r['model']} | " + " | ".join(cells) + f" | {r['total']:.1f} |")
     ss = data.get("segmented_summary", {})
     if ss and ss.get("skipped"):
         pass  # v8.3.8：单段无数据，整块不渲染（连「已跳过」说明也不占版面）
@@ -487,6 +517,10 @@ def run_selftest():
     assert "## 价位段子榜" not in md1, "单段无数据，价位段子榜整块不应渲染"
     assert "已跳过" not in md1, "单段不应留「已跳过」说明占版面"
     assert "纯产品力总榜" in md1, "单段榜产品力榜应在"
+    # 8) v8.3.9：维度明细从 meta 出，含全部 8 维标签与权重
+    assert len(data["meta"]["dimensions"]) == 8, "meta 应带 8 维标签/权重"
+    assert "总分构成" in render_md(data), "md 应渲染维度明细"
+    assert "三电(18.0%)" in render_md(data), "维度表头应带权重"
     # 7) 纯产品力总榜：降序 / 覆盖全池 / main_score 与主榜一致 / 只改 value 不改产品力分
     pp = data["product_power_board"]
     assert pp["excluded_dimension"] == "value"

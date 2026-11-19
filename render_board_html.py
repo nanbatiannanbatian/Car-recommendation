@@ -121,6 +121,15 @@ def render(data, summary, title, as_of):
 ③ 多段全价位榜额外给价位段子榜与分段汇总（复用主榜分数）；「不看价格比产品力」看下方纯产品力辅助榜。</div>"""]
 
     # 主榜
+    # 事实列覆盖披露
+    fcols = meta.get("fact_reference_columns") or []
+    if fcols:
+        have = [c["label"] for c in fcols
+                if any((r.get("fact_ref") or {}).get(c["label"]) not in (None, "—", "") for r in rows)]
+        lack = [c["label"] for c in fcols if c["label"] not in have]
+        if lack:
+            H.append(f'<div class="rule">事实参考列覆盖：本榜有数据的是 <b>{e("、".join(have))}</b>；'
+                     f'「—」表示未采集（{e("、".join(lack))}），不以估计值填充。</div>')
     H.append("<h2>打分主榜 <span>8 维加权总分排序 · 参考列不参与排序</span></h2>")
     H.append("<table><thead><tr><th>#</th><th>车型</th><th>加权分</th><th>档位</th>"
              "<th>证据</th><th style='text-align:left'>事实参考列 · 不计分</th></tr></thead><tbody>")
@@ -131,6 +140,26 @@ def render(data, summary, title, as_of):
                  f"<td>{tier_badge(r.get('tier'))}</td><td>{e(r.get('evidence'))}</td>"
                  f"<td class='ref'>{e(ref) if ref else '—'}</td></tr>")
     H.append("</tbody></table>")
+
+    # v8.3.9：总分维度明细
+    dims = meta.get("dimensions") or []
+    if dims:
+        H.append("<h2>总分构成 <span>8 维原始分 · 加权分＝Σ(维分×权重)×10 + adjust</span></h2>")
+        H.append('<table><thead><tr><th>#</th><th>车型</th>')
+        for d in dims:
+            H.append(f"<th>{e(d.get('label'))}<br><small>{float(d.get('weight',0))*100:.1f}%</small></th>")
+        H.append("<th>加权分</th></tr></thead><tbody>")
+        for r in rows:
+            sc = r.get("scores") or {}
+            H.append(f"<tr><td>{rank_badge(r.get('rank'))}</td><td class='name'>{e(r.get('model'))}</td>")
+            for d in dims:
+                v = sc.get(d["key"])
+                # 维分色阶：>=9 强(红系)、8-9 中、<8 弱(绿系) —— 中国习惯涨红跌绿
+                cls = "delta-up" if isinstance(v, (int, float)) and v >= 9 else (
+                    "delta-down" if isinstance(v, (int, float)) and v < 8 else "")
+                H.append(f"<td class='{cls}'>{num(v) if isinstance(v,(int,float)) else '—'}</td>")
+            H.append(f"<td><span class='score'>{num(r.get('total'))}</span></td></tr>")
+        H.append("</tbody></table>")
 
     # 三档（来自 pipeline summary，可选）
     tiers = {}

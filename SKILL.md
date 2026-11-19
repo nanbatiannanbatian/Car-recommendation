@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 8.3.8
+version: 8.3.9
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v8.3.8）
+# Car recommendation —— 可信购车榜单引擎（v8.3.9）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -1909,3 +1909,24 @@ v8.3.7 让价位段子榜和分段汇总在单价位段时「跳过」，但仍�
 
 ### 验收
 12–18万榜页面只剩：打分主榜 → 三档分级 → 纯产品力总榜；全部 selftest + A/B 24 项矩阵通过。
+
+---
+
+## v8.3.9 · 总分维度明细 + 事实列覆盖披露（2026-11-19）
+
+### 为什么要改
+用户问「为什么没有事实榜数据」和「能不能把总分每一项列出来」。
+查证：v7.0 起事实榜按用户决定降级为参考列（不再单独成榜），本榜候选只有指导价/电芯/销量
+三个字段有数据，kWh/电耗/CLTC/800V 无数据源——显示「—」是对的（不猜不造），
+但页面没说明，容易被误读成「数据丢了」。同时每条只有加权总分，看不到 8 维怎么构成。
+
+### 实现
+- `board_v2.build()` 的 `meta` 随数据带出 `dimensions`（标签+权重）与 `fact_reference_columns`。
+- 主榜后新增**总分构成表**：每车 8 维原始分（表头带权重）+ 加权分，md 和 html 都有；
+  html 维分 ≥9 标红、<8 标绿（中国习惯），不改变任何排序。
+- 主榜前新增**事实列覆盖披露**：列出本榜有数据的字段与「—」字段，明确说明不以估计值填充。
+
+### 验收
+12–18万榜：维度明细 8 列全出（三电18%/安全16.2%/智驾13.5%/空间12.6%/性价比11.7%/操控9%/车机9%/品控10%），
+覆盖披露写明「有数据=指导价/电芯/趋势月销；缺=电池/kWh·万元/电耗/CLTC/800V」。
+selftest 加断言（meta 8 维、md 含维度表与权重、覆盖披露）。全部 selftest + A/B 24 项通过。
