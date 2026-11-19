@@ -190,9 +190,10 @@ def render(data, summary, title, as_of):
         tb = meta.get("trim_board") or {}
         if tb:
             H.append('<h2>逐配置对比 <span>点车型展开 · 同车不同配置的相对差别</span></h2>')
-            H.append('<div class="rule">每个配置按 spec_score 规则单独算 8 维分，'
-                     '★ 为该车最高分配置。注意：配置表缺悬架/算力等参数，逐配置分有插补维度，'
-                     '<b>只用于同车不同配置的相对对比，不作跨车绝对排名，也不改主榜名次</b>。</div>')
+            H.append('<div class="rule">每个配置按 spec_score 规则单独算分，<b>★＝该车最高分配置，也是主榜用来排名的配置</b>。'
+                     '看对比请盯「三电」列和最后一列「得分理由」——例如 MG07 845版靠 800V+1.0、12min快充+1.4、'
+                     '一线电芯+0.7、845km+0.8 把三电从 7.3 拉到 9.9。'
+                     '注意：配置表缺悬架/算力等参数，逐配置分有插补维度，只作同车配置相对对比。</div>')
             for r in rows:
                 td = tb.get(r["model"])
                 if not td or not td.get("trims"):
@@ -203,10 +204,13 @@ def render(data, summary, title, as_of):
                          f'（{e(best)} · {td["n_trims"]} 配置，最高 {e(td.get("best_total"))}）</summary>')
                 H.append('<table style="margin-top:8px"><thead><tr><th>配置</th><th>指导价(万)</th>'
                          '<th>电量kWh</th><th>电芯</th><th>电压/快充</th><th>三电</th><th>智驾</th>'
-                         '<th>性价比</th><th>配置总分</th><th>插补</th></tr></thead><tbody>')
+                         '<th>性价比</th><th>配置总分</th><th>插补</th>'
+                         '<th style="text-align:left">三电得分理由 / 关键差异</th></tr></thead><tbody>')
                 for t in td["trims"]:
                     sc = t.get("scores") or {}
                     flag = " ★" if t.get("name") == best else ""
+                    why = "、".join((t.get("reasons") or {}).get("powertrain") or []) or "—"
+                    note = t.get("note") or ""
                     H.append(f"<tr><td class='name'>{e(t.get('name'))}{flag}</td>"
                              f"<td>{e(t.get('price'))}</td><td>{e(t.get('battery_kwh'))}</td>"
                              f"<td class='ref'>{e(t.get('cell_supplier'))}</td>"
@@ -214,7 +218,9 @@ def render(data, summary, title, as_of):
                              f"<td>{num(sc.get('powertrain'))}</td><td>{num(sc.get('adas'))}</td>"
                              f"<td>{num(sc.get('value'))}</td>"
                              f"<td><span class='score'>{e(t.get('total'))}</span></td>"
-                             f"<td style='color:#b8860b'>{e(t.get('n_imputed'))}维</td></tr>")
+                             f"<td style='color:#b8860b'>{e(t.get('n_imputed'))}维</td>"
+                             f"<td class='ref' style='font-size:11px'>{e(why)}"
+                             f"{'<br><i>'+e(note)+'</i>' if note else ''}</td></tr>")
                 H.append('</tbody></table>')
                 H.append(f'<div style="font-size:11px;color:#7b8590">来源：{e(td.get("source"))} '
                          f'· 核验 {e(td.get("date"))}</div></details>')

@@ -320,9 +320,16 @@ def main_cell(key: str, row: dict, cand: dict, grade: str = "") -> str:
     if key == "model":
         return str(row.get("model", ""))
     if key == "trim":
+        # v9.7.2：主榜展示排名所用的最高配置（不是带内推荐配置）
+        bd = row.get("best_trim_detail")
+        if bd:
+            return bd.get("name") or "—"
         t = row.get("trim") or cand.get("trim") or {}
         return (t.get("name") if isinstance(t, dict) else str(t)) or "—"
     if key == "price":
+        bd = row.get("best_trim_detail")
+        if bd and bd.get("price") is not None:
+            return str(bd["price"])
         t = row.get("trim") or cand.get("trim") or {}
         p = (t.get("price") if isinstance(t, dict) else None) or cand.get("price")
         return f"{p}" if p not in (None, "") else "—"
@@ -355,7 +362,15 @@ def main_cell(key: str, row: dict, cand: dict, grade: str = "") -> str:
         return (f"优：{'、'.join(v['pros'])}｜短：{'、'.join(v['cons'])}｜"
                 f"适合：{v['audience']}｜{v['advice']}")
     if key == "cell_brand":
-        # v9.6.1：电压并入电池来源；按评分配置判定电压，不按车系
+        # v9.7.2：电池来源跟随最高配置（845版=宁德+800V，不是610版的清陶+400V）
+        bd = row.get("best_trim_detail")
+        if bd:
+            brand = str(bd.get("cell_supplier") or "—")
+            charge = str(bd.get("charge") or "")
+            import re
+            mv = re.search(r"(900|800|400)\s*V", charge)
+            volt = (mv.group(1) + "V") if mv else None
+            return f"{brand} · {volt}" if volt else brand
         bp = row.get("battery_detail") or {}
         v = fr.get("电芯")
         brand = str(v) if v not in (None, "—", "") else str(bp.get("cell") or "—")
@@ -519,6 +534,14 @@ def selftest() -> int:
         bad.append(f"电池来源未含电压: {bsrc}")
     if main_cell("tier", rtest, rtest) != "第一档":
         bad.append("档位未显示")
+    # v9.7.2：评分配置/价格/电池来源跟随最高配置
+    rt = {"model": "A", "trim": {"name": "610版", "price": 12.69},
+          "best_trim_detail": {"name": "845版", "price": 14.99,
+                               "cell_supplier": "宁德时代", "charge": "800V / 5C，30-80% 约12min"}}
+    if main_cell("trim", rt, rt) != "845版" or main_cell("price", rt, rt) != "14.99":
+        bad.append("主榜配置/价格未跟随最高配置")
+    if "宁德" not in main_cell("cell_brand", rt, rt) or "800V" not in main_cell("cell_brand", rt, rt):
+        bad.append("电池来源未跟随最高配置")
     # v9.7.1：总分口径标记
     if "（配置）" not in main_cell("total", {"total": 85.0, "config_anchored_total": 85.0}, {}):
         bad.append("配置分口径未标记")

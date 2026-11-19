@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 9.7.1
+version: 9.7.2
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v9.7.1）
+# Car recommendation —— 可信购车榜单引擎（v9.7.2）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -2278,3 +2278,23 @@ selftest 加电压并入与档位中文断言；全 selftest + A/B 通过。
 
 ### 验收
 selftest 加配置/车系口径标记断言；全 selftest + A/B 26 项通过。
+
+---
+
+## v9.7.2 · 主榜配置/价格/电池来源跟随最高配置 + 逐配置对比可读化（2026-11-19）
+
+用户指出两点：①主榜排名用了845版、但"评分配置/指导价"列仍显示610版（12.69万），分数与配置对不上；
+②逐配置对比看不出意义。
+
+### 修复
+- `build()` 在锚定时把最高配置完整详情写进 `row.best_trim_detail`。
+- `main_cell()` 的 trim/price/cell_brand 优先读 best_trim_detail：
+  MG07 主榜现显示 **845 激光雷达版 / 14.99万 / 宁德时代·800V / 88.5（配置）**，与排名同源。
+  `fact_columns` 的 kWh/万元、电池、电芯也按最高配置重算（91kWh÷14.99=6.07）。
+- 逐配置对比表新增「三电得分理由 / 关键差异」列，显示 spec_score 的加分项
+  （800V+1.0、12min快充+1.4、一线电芯+0.7、845km+0.8）与配置库 note
+  （"换整条三电路线：+24kWh/+235km/快充20→12min/电机176→235kW"），并加阅读指引。
+- selftest 断言配置/价格/电芯电压都跟随最高配置。
+
+### 验收
+全 selftest + A/B 26 项通过。MG07 #1 的配置、价格、电池、分数完全同源。

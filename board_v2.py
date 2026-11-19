@@ -382,6 +382,11 @@ def build(cands: list[dict], cfg: dict, policy: dict,
                             max(0, min(100, smu + (bv - bmu) / bsd * ssd)), 1)
                         r["best_trim"] = trim_data[r["model"]].get("best_trim")
                         r["best_trim_raw"] = bv
+                        # v9.7.2：主榜显示的配置/价格/电压/电芯都切到最高配置
+                        best_detail = next(
+                            (t for t in trim_data[r["model"]].get("trims", [])
+                             if t.get("name") == r["best_trim"]), None)
+                        r["best_trim_detail"] = best_detail
                         # 主榜分与名次都由锚定配置分决定
                         r["series_total"] = r["total"]   # 保留车系分作对照
                         r["total"] = r["config_anchored_total"]
@@ -391,6 +396,18 @@ def build(cands: list[dict], cfg: dict, policy: dict,
     by_model = {c["model"]: c for c in cands}
     for r in rows:
         r["fact_ref"] = fact_columns(by_model[r["model"]], facts, policy)
+        # v9.7.2：kWh/万元、电量、电芯按最高配置重算（与主榜分数/配置同口径）
+        bd = r.get("best_trim_detail")
+        if bd:
+            fr = r["fact_ref"]
+            kwh, price = bd.get("battery_kwh"), bd.get("price")
+            if kwh is not None:
+                fr["电池"] = kwh
+            if kwh and price:
+                fr["kWh/万元"] = round(float(kwh) / float(price), 2)
+                fr.pop("kWh/万元_缺失原因", None)
+            if bd.get("cell_supplier"):
+                fr["电芯"] = bd["cell_supplier"]
         # 档位优先取候选自带 tier，其次取 set_tiers() 注入的全局表
         r["tier"] = by_model[r["model"]].get("tier") or _tier_of(r["model"])
         # v9.6.0：主榜单表多列所需字段随行带出（页面只读，不改分）
