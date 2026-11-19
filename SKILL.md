@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 9.7.3
+version: 9.7.4
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v9.7.3）
+# Car recommendation —— 可信购车榜单引擎（v9.7.4）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -2320,3 +2320,28 @@ selftest 加配置/车系口径标记断言；全 selftest + A/B 26 项通过。
   深蓝L06 88.5 #1；红旗天工05 因顶配900V/98kWh 升 #3（评分配置原本是550青春版400V）。
 - 分数标签改中文「（配置）」；`meta.total_basis=annotated_trim`。
 - selftest 断言 845版人工口径分 > 610版；全 selftest + A/B 26 项通过。
+
+---
+
+## v9.7.4 · 修配置匹配 bug：35款里34款delta基准错误（2026-11-19）
+
+用户问「深蓝L06 670Ultra激光版加权分怎么算的」，列公式时发现：
+`scored_trim="560 Ultra 激光版"` 与配置表实际 `"纯电版 560Ultra激光版"` **精确匹配失败**，
+fallback 到第一个配置 560Max 作 delta 基准 → 误加「新增激光雷达 +0.8」（实际两个配置都有激光雷达）。
+
+### 影响范围与修复
+- 抽查 35 款：**34 款精确匹配失败**，几乎所有 delta 都算在错误基准上。
+- `find_ref()` 模糊匹配（归一去年份/前缀/空格 + 数字串与关键配置词打分）：成功率 1/35 → 12/35。
+- 仍匹配失败的 23 款（配置名过模糊如"带内主力配置"）：**不下任何 delta**（宁可不加分，
+  不在错基准上加分），其逐配置分 = 车系基础分。
+- 深蓝L06 修正：670Ultra 88.5 → **87.8**（去掉误加的智驾+0.8，多了合理的性价比delta
+  kWh/万元4.32→4.92）。
+
+### 修正后深蓝L06 670Ultra 计算（用户要的公式）
+base 车系8维 + delta(三电续航+0.33/电量+0.25、性价比+0.28)，权重×10：
+三电8.88×0.18 + 安全8.90×0.162 + 智驾8.70×0.135 + 空间8.30×0.126 +
+性价比9.28×0.117 + 操控9.30×0.09 + 车机8.80×0.09 + 品控8.00×0.10 = 8.775 → **87.8**
+
+### 效果
+MG07 845版 87.9 #1、深蓝L06 87.8 #2（分差0.1，在算法噪声内）。
+全 selftest + A/B 26 项通过。

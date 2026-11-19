@@ -90,6 +90,42 @@ def deltas_for(trim: dict, ref: dict) -> list[dict]:
 CONF_ORDER = {"low": 0, "medium": 1, "high": 2}
 
 
+def find_ref(name: str, trims: list[dict]) -> dict | None:
+    """模糊匹配评分配置（v9.7.4：35款里34款精确匹配失败，必须模糊匹配）。
+
+    scored_trim 常写成「560 Ultra 激光版」，配置表实际是「纯电版 560Ultra激光版」；
+    用归一化（去空格/去年份/去"纯电版"前缀）+ 关键数字串双重判定。
+    """
+    def norm(s: str) -> str:
+        s = str(s or "")
+        for junk in ("纯电版", "纯电", "款", "版", " ", "　"):
+            s = s.replace(junk, "")
+        import re
+        s = re.sub(r"20\d{2}", "", s)
+        return s.lower()
+
+    target = norm(name)
+    if not target:
+        return None
+    # 1) 归一化后完全相等
+    for t in trims:
+        if norm(t.get("name")) == target:
+            return t
+    # 2) 关键数字串（如 560/610/670）+ 关键配置词（激光/ultra/max）交集
+    import re
+    nums = set(re.findall(r"\d{3,4}", target))
+    words = {w for w in ("激光", "ultra", "max", "plus", "pro", "智行", "旗舰") if w in target}
+    best, score = None, 0
+    for t in trims:
+        tn = norm(t.get("name"))
+        tnums = set(re.findall(r"\d{3,4}", tn))
+        twords = {w for w in ("激光", "ultra", "max", "plus", "pro", "智行", "旗舰") if w in tn}
+        sc = len(nums & tnums) * 2 + len(words & twords)
+        if sc > score:
+            best, score = t, sc
+    return best if score >= 2 else None
+
+
 def annotate_all(cands: list[dict], cfg: dict) -> dict:
     """给每个车的所有配置生成人工口径分（base_scores + delta）。"""
     tdb = load_trims()
@@ -103,11 +139,11 @@ def annotate_all(cands: list[dict], cfg: dict) -> dict:
         if not base:
             continue
         ref_name = entry.get("scored_trim") or ""
-        ref = next((t for t in entry["trims"] if t.get("name") == ref_name),
-                   entry["trims"][0])
+        ref = find_ref(ref_name, entry["trims"])
         trims = []
         for t in entry["trims"]:
-            ds = deltas_for(t, ref)
+            # v9.7.4：匹配不到参考配置时不下 delta（宁可不加分，不在错基准上加分）
+            ds = deltas_for(t, ref) if (ref and t is not ref) else []
             sc = dict(base)
             for d in ds:
                 sc[d["dim"]] = round(max(0, min(10, sc.get(d["dim"], 8) + d["delta"])), 2)
