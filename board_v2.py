@@ -288,6 +288,55 @@ def product_power_board(rows: list[dict], cands: list[dict], cfg: dict,
 
 
 # ---------------------------------------------------------------- 组装
+def analysis_blocks(cands: list[dict], cfg: dict, weights: list[float] | None = None,
+                    board_label: str | None = None) -> dict:
+    """三榜并列 / 稳健性 / 审查边界的结构化数据（复用 pipeline 同款 gate 逻辑）。"""
+    out = {}
+    try:
+        import leaderboard as LB
+        import pipeline as PL
+        items = LB.board_items(cfg)
+        bd = next((b for b in items if not board_label or (b.get("label") or "") == board_label),
+                  items[0] if items else {})
+        sub = LB.filter_board(cands, bd)
+        passed, dropped, _ = PL.gate_report(sub, cfg, bd)
+        if not passed:
+            return {}
+        sc = LB.score_rows(passed, cfg, weights)
+        by = {c["model"]: c for c in passed}
+        tri = LB.tri_report(sc, cfg, passed, 10, weights)
+        s_rank = {m: i for i, m in enumerate(tri["sales"], 1)}
+        w_rank = {m: i for i, m in enumerate(tri["weighted"], 1)}
+        b_rank = {m: i for i, m in enumerate(tri["bt"], 1)}
+        out["three_board"] = {
+            "rows": [{"model": r["model"], "sales": by.get(r["model"], {}).get("trend_sales"),
+                      "sales_rank": s_rank.get(r["model"]), "weighted_rank": w_rank.get(r["model"]),
+                      "bt_rank": b_rank.get(r["model"]),
+                      "delta": (s_rank.get(r["model"], 0) - w_rank.get(r["model"], 0))
+                               if s_rank.get(r["model"]) and w_rank.get(r["model"]) else None}
+                     for r in sc[:10]],
+            "overlap": tri["overlap"], "bt_top": tri["bt"][:5],
+            "bt_scores": {m: tri["bt_scores"].get(m) for m in tri["bt"][:5]},
+        }
+        rb = LB.robust_report(passed, cfg, weights)
+        out["robustness"] = {
+            "kendall_mean": rb.get("kendall_mean"), "n_runs": rb.get("n_runs"),
+            "n_methods": rb.get("n_methods"), "n_schemes": rb.get("n_schemes"),
+            "per_alt": {m: {"hits": a.get("method_hits"), "verdict": a.get("method_verdict")}
+                        for m, a in (rb.get("per_alt") or {}).items()},
+            "scheme_top": rb.get("scheme_top"),
+        }
+        rv = LB.review_report(passed, cfg, weights)
+        out["audit_boundary"] = {
+            "verdict": rv.get("verdict"), "blocking": rv.get("blocking") or [],
+            "boundary": rv.get("boundary") or [], "warn": rv.get("warn") or [],
+            "info": rv.get("info") or [],
+        }
+    except Exception as ex:
+        out["_error"] = f"{type(ex).__name__}: {ex}"
+    return out
+
+
 def build(cands: list[dict], cfg: dict, policy: dict,
           facts: dict[str, dict] | None = None,
           weights: list[float] | None = None,
@@ -305,7 +354,13 @@ def build(cands: list[dict], cfg: dict, policy: dict,
         r["fact_ref"] = fact_columns(by_model[r["model"]], facts, policy)
         # 档位优先取候选自带 tier，其次取 set_tiers() 注入的全局表
         r["tier"] = by_model[r["model"]].get("tier") or _tier_of(r["model"])
+        # v9.6.0：主榜单表多列所需字段随行带出（页面只读，不改分）
+        _c = by_model[r["model"]]
+        r["trim"] = _c.get("trim")
+        r["evidence_status"] = _c.get("evidence_status")
+        r["lifecycle"] = _c.get("lifecycle")
     bands = band_subboards(rows, cands, policy)
+    analyses = analysis_blocks(cands, cfg, weights)
     return {
         "meta": {
             "title": policy.get("title", "统一榜单"),
@@ -329,6 +384,9 @@ def build(cands: list[dict], cfg: dict, policy: dict,
             "experience_enabled": not no_experience,
             # v9.0：生命周期事实随数据出（历史页面有、v8.x 漏渲染）
             "lifecycle": {c["model"]: c["lifecycle"] for c in cands if c.get("lifecycle")},
+            "three_board": analyses.get("three_board", {}),
+            "robustness": analyses.get("robustness", {}),
+            "audit_boundary": analyses.get("audit_boundary", {}),
         },
         "main_board": rows,
         "band_subboards": bands,
@@ -436,25 +494,16 @@ def render_md(data: dict, summary: dict | None = None) -> str:
 
     if "main_board" in ids:
         grades = BV.fact_grades(rows)
+        labels = [BV.MAIN_COL_LABELS[k] for k in BV.MAIN_BOARD_COLUMNS]
         L += ["## 打分主榜", "",
-              "> 事实列标记：▲=本池前25%（电耗越低越好/kWh·万元越高越好）、▼=本池后25%、"
-              "（上界）=车系合计非纯电值。着色/标记不参与打分、非跨榜可比。", "",
-              "| # | 车型 | 加权分 | 档位 | 证据 | 事实参考列（不计分） |",
-              "|---|---|---|---|---|---|"]
+              "> 按评分配置逐车评分；指导价/月销/kWh·万元/电池来源为事实列不计分。"
+              "▲=本池前25%、▼=后25%；月销 ≤ 为车系合计上界。证据 A=官方碰撞/B=口碑样本够/C=新上市。", "",
+              "| " + " | ".join(labels) + " |", "|" + "---|" * len(labels)]
         for r in rows:
-            fr = r.get("fact_ref") or {}
             gmap = grades.get(r["model"], {})
-            parts = []
-            for k in BV.MAIN_FACT_FIELDS:      # 折中：主榜只留 3 项
-                v = fr.get(k)
-                if v in (None, "—", ""):
-                    continue
-                g = gmap.get(k, "")
-                suffix = " ▲" if g == "优" else (" ▼" if g == "弱" else "")
-                parts.append(f"{k} {v}{suffix}")
-            L.append(f"| {r['rank']} | {r['model']} | {r['total']:.1f} | "
-                     f"{r.get('tier','')} | {r.get('evidence','')} | {' · '.join(parts) if parts else '—'} |")
-        L.append("\n> 完整事实（指导价/电量/CLTC/月销/800V）见下方「逐车取证依据」表。")
+            cells = [BV.main_cell(k, r, r, gmap.get("kWh/万元", ""))
+                     for k in BV.MAIN_BOARD_COLUMNS]
+            L.append("| " + " | ".join(cells) + " |")
 
     if "score_breakdown" in ids:
         dims = meta.get("dimensions") or []
@@ -566,6 +615,48 @@ def render_md(data: dict, summary: dict | None = None) -> str:
 
     if "reproduce" in ids:
         L += ["", "## 复现说明", ""] + [f"- {t}" for t in BV.reproduce_text(meta)]
+
+    if "three_board" in ids:
+        tb = meta["three_board"]
+        L += ["", "## 三榜并列 · 换视角看名次", "",
+              "> 销量序＝市场认不认；加权序＝产品维度综合分；BT 共识序＝10 种算法两两胜负后的"
+              "Bradley-Terry 共识（非平均名次）。差值 ≥3 为显著分歧。", "",
+              "| # | 车型 | 趋势月销 | 销量序 | 加权序 | BT共识序 | 销量↔加权 |",
+              "|---|---|---|---|---|---|---|"]
+        for i, r in enumerate(tb["rows"], 1):
+            d = r.get("delta")
+            ds = f"**{d:+d}**" if isinstance(d, int) and abs(d) >= 3 else (f"{d:+d}" if isinstance(d, int) else "—")
+            L.append(f"| {i} | {r['model']} | {r.get('sales','—')} | {r.get('sales_rank','—')} | "
+                     f"{r.get('weighted_rank','—')} | {r.get('bt_rank','—')} | {ds} |")
+        L += ["", f"三榜前十的三方交集：**{tb.get('overlap')}/10**。",
+              "BT 共识前5：" + " → ".join(m for m in tb.get("bt_top", []))]
+
+    if "robustness" in ids:
+        rb = meta["robustness"]
+        L += ["", "## 稳健性 · 名次到底硬不硬", "",
+              f"- 10 种聚合 × {rb.get('n_schemes')} 套权重 = {rb.get('n_runs')} 次排序；"
+              f"两两 Kendall τ 均值 **{float(rb.get('kendall_mean') or 0):.3f}**"
+              "（0.8≤τ<0.9：大体一致但前几名有方法敏感性）。", ""]
+        pa = rb.get("per_alt") or {}
+        for m in (rows[:5] if rows else []):
+            a = pa.get(m["model"]) or {}
+            if a.get("hits") is not None:
+                L.append(f"- {m['model']}：{a.get('hits')}/{rb.get('n_methods')} 种算法进前三"
+                         f"（{a.get('verdict','—')}）")
+
+    if "audit_boundary" in ids:
+        ab = meta["audit_boundary"]
+        L += ["", "## 审查边界 · 必须披露的已知缺口", "",
+              f"> {ab.get('verdict','')}", ""]
+        for title, key in [("🟠 结论边界（修不了）", "boundary"),
+                           ("🟡 提示级（须在榜上披露）", "warn"),
+                           ("⚪ 说明级", "info")]:
+            items = ab.get(key) or []
+            if items:
+                L += [f"### {title}", ""]
+                for it in items:
+                    L.append(f"- {it if isinstance(it, str) else json.dumps(it, ensure_ascii=False)}")
+                L.append("")
 
     return "\n".join(L)
 

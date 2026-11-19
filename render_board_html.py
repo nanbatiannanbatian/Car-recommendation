@@ -138,41 +138,44 @@ def render(data, summary, title, as_of):
             H.append(f'<div class="rule">事实参考列覆盖：本榜有数据的是 <b>{e("、".join(have))}</b>；'
                      f'「—」表示未采集（{e("、".join(lack))}），不以估计值填充。</div>')
 
-    # ---- 打分主榜（v9.1.0：事实列按三分法着色，只展示不改分）
+    # ---- 打分主榜（v9.6.0：单表多列，含评分配置/指导价/月销/证据/周期/kWh万元/电池来源）
     if "main_board" in ids:
         grades = BV.fact_grades(rows)
-        H.append("<h2>打分主榜 <span>8 维加权总分排序 · 参考列不参与排序</span></h2>")
-        H.append('<div class="rule">事实列着色图例：<b style="color:#1a7f37">优（本池前25%）</b> · '
-                 '<span style="color:#7b8590">中</span> · '
-                 '<b style="color:#b42318">弱（本池后25%）</b> · '
-                 '<span style="color:#aab0b6">未采集/上界（车系合计）</span>。'
-                 '仅「电耗」「kWh/万元」按本池分位着色；电芯/CLTC/电量是事实标签不分优劣，'
-                 '着色不影响名次、非跨榜可比。</div>')
-        H.append("<table><thead><tr><th>#</th><th>车型</th><th>加权分</th><th>档位</th>"
-                 "<th>证据</th><th style='text-align:left'>事实参考列 · 不计分</th></tr></thead><tbody>")
+        H.append("<h2>打分主榜 <span>8 维加权总分排序 · 评分配置逐车不同 · 事实列不参与排序</span></h2>")
+        H.append('<div class="rule">按<b>评分配置</b>逐车评分（配置不同分不同）；指导价/月销/kWh·万元/'
+                 '电池来源为事实列不计分。kWh·万元 <b style="color:#1a7f37">▲优</b>（本池前25%）/'
+                 '<b style="color:#b42318">▼弱</b>（后25%）；月销 <i>≤</i> 为车系合计上界。'
+                 '证据 A=官方碰撞成绩 / B=口碑样本够 / C=新上市或样本不足。</div>')
+        H.append("<table><thead><tr>" + "".join(f"<th>{e(BV.MAIN_COL_LABELS[k])}</th>"
+                 for k in BV.MAIN_BOARD_COLUMNS) + "</tr></thead><tbody>")
         for r in rows:
-            fr = r.get("fact_ref") or {}
+            cand = r
             gmap = grades.get(r["model"], {})
-            parts = []
-            for k in BV.MAIN_FACT_FIELDS:      # 折中：主榜只留 3 项，不挤
-                v = fr.get(k)
-                if v in (None, "—", ""):
-                    continue
-                g = gmap.get(k, "")
-                txt = str(v)
-                if g == "优":
-                    parts.append(f'<b style="color:{BV.grade_color(g)}">{e(k)} {e(txt)} ▲</b>')
-                elif g == "弱":
-                    parts.append(f'<b style="color:{BV.grade_color(g)}">{e(k)} {e(txt)} ▼</b>')
+            H.append("<tr>")
+            for k in BV.MAIN_BOARD_COLUMNS:
+                val = BV.main_cell(k, r, cand, gmap.get("kWh/万元", ""))
+                if k == "rank":
+                    H.append(f"<td>{rank_badge(r.get('rank'))}</td>")
+                elif k == "model":
+                    H.append(f"<td class='name'>{e(val)}</td>")
+                elif k == "total":
+                    H.append(f"<td><span class='score'>{e(val)}</span></td>")
+                elif k == "tier":
+                    H.append(f"<td>{tier_badge(r.get('tier'))}</td>")
+                elif k == "evidence":
+                    cls = {"A": "delta-up", "C": "delta-down"}.get(val, "")
+                    H.append(f"<td class='{cls}'>{e(val)}</td>")
+                elif k == "kwh_per_wan":
+                    g = gmap.get("kWh/万元", "")
+                    H.append(f'<td style="color:{BV.grade_color(g) if g else "inherit"}">{e(val)}</td>')
+                elif k == "trim":
+                    H.append(f"<td class='ref'>{e(val)}</td>")
+                elif k == "cell_brand":
+                    H.append(f"<td class='ref'>{e(val)}</td>")
                 else:
-                    parts.append(f"{e(k)} {e(txt)}")
-            H.append(f"<tr><td>{rank_badge(r.get('rank'))}</td><td class='name'>{e(r.get('model'))}</td>"
-                     f"<td><span class='score'>{num(r.get('total'))}</span></td>"
-                     f"<td>{tier_badge(r.get('tier'))}</td><td>{e(r.get('evidence'))}</td>"
-                     f"<td class='ref'>{' · '.join(parts) if parts else '—'}</td></tr>")
+                    H.append(f"<td>{e(val)}</td>")
+            H.append("</tr>")
         H.append("</tbody></table>")
-        H.append('<div style="font-size:12px;color:#7b8590;margin-top:6px">'
-                 '完整事实（指导价/电量/CLTC/月销/800V）见下方「逐车取证依据」表。</div>')
 
     # ---- 总分构成
     if "score_breakdown" in ids:
@@ -350,6 +353,65 @@ def render(data, summary, title, as_of):
                  'border-radius:12px;padding:14px 18px"><ul>')
         for t in BV.reproduce_text(meta): H.append(f"<li>{e(t)}</li>")
         H.append("</ul></div>")
+
+    # ---- 三榜并列
+    if "three_board" in ids:
+        tb = meta["three_board"]
+        H.append("<h2>三榜并列 <span>销量序 / 加权序 / BT 共识序 · 换视角看名次</span></h2>")
+        H.append('<div class="rule">销量序＝市场认不认；加权序＝产品维度综合分；'
+                 'BT 共识序＝10 种算法两两胜负后的 Bradley-Terry 共识（非平均名次）。'
+                 '「销量↔加权」差值绝对值 ≥3 加粗：正=被销量低估，负=卖得好但产品分不出彩。</div>')
+        H.append("<table><thead><tr><th>#</th><th>车型</th><th>趋势月销</th><th>销量序</th>"
+                 "<th>加权序</th><th>BT共识序</th><th>销量↔加权</th></tr></thead><tbody>")
+        for i, r in enumerate(tb.get("rows") or [], 1):
+            d = r.get("delta")
+            cls = "delta-up" if isinstance(d, int) and d >= 3 else (
+                "delta-down" if isinstance(d, int) and d <= -3 else "")
+            txt = f"{d:+d}" if isinstance(d, int) else "—"
+            H.append(f"<tr><td>{rank_badge(i)}</td><td class='name'>{e(r.get('model'))}</td>"
+                     f"<td>{e(r.get('sales'))}</td><td>{e(r.get('sales_rank'))}</td>"
+                     f"<td>{e(r.get('weighted_rank'))}</td><td>{e(r.get('bt_rank'))}</td>"
+                     f"<td class='{cls}'>{txt}</td></tr>")
+        H.append("</tbody></table>")
+        H.append(f'<div style="font-size:12px;color:#7b8590;margin-top:6px">'
+                 f'三榜前十的三方交集：<b>{e(tb.get("overlap"))}/10</b>。BT 共识前5：'
+                 f'{e(" → ".join(tb.get("bt_top") or []))}</div>')
+
+    # ---- 稳健性
+    if "robustness" in ids:
+        rb = meta["robustness"]
+        h2 = f"{float(rb.get('kendall_mean') or 0):.3f}"
+        H.append(f"<h2>稳健性 <span>名次到底硬不硬 · Kendall τ={e(h2)}</span></h2>")
+        H.append('<div class="rule">换 10 种聚合 × 多套权重，看名次会不会变。'
+                 'τ 0.8–0.9＝大体一致但前几名有方法敏感性；'
+                 '「稳定」只说明算法层面一致，不代表输入证据可信。</div>')
+        H.append("<table><thead><tr><th>车型</th><th>算法进前三</th><th>判定</th></tr></thead><tbody>")
+        pa = rb.get("per_alt") or {}
+        for r in rows[:10]:
+            a = pa.get(r.get("model")) or {}
+            if a.get("hits") is not None:
+                H.append(f"<tr><td class='name'>{e(r.get('model'))}</td>"
+                         f"<td>{e(a.get('hits'))}/{e(rb.get('n_methods'))}</td>"
+                         f"<td>{e(a.get('verdict'))}</td></tr>")
+        H.append("</tbody></table>")
+
+    # ---- 审查边界
+    if "audit_boundary" in ids:
+        ab = meta["audit_boundary"]
+        H.append("<h2>审查边界 <span>必须披露的已知缺口</span></h2>")
+        H.append(f'<div class="warn"><b>{e(ab.get("verdict"))}</b></div>')
+        for title, key, color in [("🟠 结论边界（修不了，写进结论）", "boundary", "#c8442e"),
+                                  ("🟡 提示级（须在榜上披露）", "warn", "#b8860b"),
+                                  ("⚪ 说明级", "info", "#7b8590")]:
+            items = ab.get(key) or []
+            if not items:
+                continue
+            H.append(f'<div class="card" style="background:#fff;border:1px solid var(--line);'
+                     f'border-radius:12px;padding:12px 16px;margin:8px 0">'
+                     f'<b style="color:{color}">{title}</b><ul>')
+            for it in items:
+                H.append(f"<li>{e(it if isinstance(it, str) else json.dumps(it, ensure_ascii=False))}</li>")
+            H.append("</ul></div>")
 
     H.append(f"""<div class="foot">可信购车榜单引擎 · 展示区块注册表 board_view.py（{len(active)} 项已渲染）<br>
 主榜调用 leaderboard.score_rows，事实列不计分、子榜复用分数均由 selftest 验证。</div>

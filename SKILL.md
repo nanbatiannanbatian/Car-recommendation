@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 9.5.1
+version: 9.6.0
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v9.5.1）
+# Car recommendation —— 可信购车榜单引擎（v9.6.0）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -2156,3 +2156,28 @@ Model Y value 6.5→7.28、总分 76.8→77.7、#17→#15；蔚来ES6 -0.10、�
 明确为什么不写进打分：market维已计销量、quality已间接体现故障率、场景相关不能做普适加分、
 无跨品牌同口径故障率数据、插混榜本就不设safety维（证据覆盖仅8.6%）。
 来源：易车/有驾/头条多源横评交叉，无单一厂商软文。
+
+---
+
+## v9.6.0 · 主榜单表多列 + 三个分析区块入页面（2026-11-19，用户确认后实施）
+
+用户给了参考榜单链接，肯定其 UI：加权前十有评分配置、指导价/月销/证据/周期列、kWh万元/电池来源，
+以及生命周期提示、三榜并列、稳健性、审查边界。用户确认：单表多列、不要气囊列、三个分析区块全做。
+
+### 实现
+- 主榜从 6 列改 11 列单表：#/车型/评分配置/指导价/趋势月销/加权分/档位/证据/周期/kWh万元/电池来源。
+  `board_view.MAIN_BOARD_COLUMNS` + `MAIN_COL_LABELS` + `main_cell()` 单点定义，两版渲染器共用；
+  评分配置/证据/周期随 main_board 行带出（构建时加，不改分）。周期显示中文（新车爬坡/改款清库等）。
+  气囊列按用户要求不做（数据在 airbags.json 另存、覆盖不全）。
+- 三个分析区块复用 pipeline 同款 gate 逻辑（`analysis_blocks()` 调 leaderboard 的
+  tri_report/robust_report/review_report），结构化写进 meta：
+  - three_board：销量序/加权序/BT共识序前十 + 差值≥3加粗 + 三方交集
+  - robustness：Kendall τ（当前 0.850）/60 次排序/逐车算法命中
+  - audit_boundary：可交付但只能说到同档 + 结论边界/提示级/说明级
+  全部注册进 BLOCKS 契约（17 项区块、11 项必要）。
+- 数据来自我们自己的 report（τ=0.850、交集7/10），**不抄参考榜单的数字**（那份 τ=0.802 是不同配置跑的）。
+- selftest 加断言：列清单完整、三区块激活。
+
+### 效果
+12–18万榜页面 12 个 h2（原 9 + 三榜并列/稳健性/审查边界），主榜 11 列实测正确。
+全 selftest + A/B 25 项通过。

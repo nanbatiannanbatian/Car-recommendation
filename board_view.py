@@ -53,7 +53,21 @@ BLOCKS = [
      "desc": "打分公式/稳健性怎么读/闸门规则/为什么这样排除"},
     {"id": "reproduce", "title": "复现说明", "when": "always",
      "desc": "同输入必得同输出、无模型调用、数据来源与命令"},
+    {"id": "three_board", "title": "三榜并列", "when": "has_three_board",
+     "desc": "销量序/加权序/BT共识序三视角对照，差值≥3加粗"},
+    {"id": "robustness", "title": "稳健性", "when": "has_robustness",
+     "desc": "Kendall τ/算法命中/权重敏感性——名次到底硬不硬"},
+    {"id": "audit_boundary", "title": "审查边界", "when": "has_audit",
+     "desc": "结论边界/提示级/说明级——必须披露的已知缺口"},
 ]
+
+# v9.6.0：主榜单表多列（参考用户上传的优秀榜单，去掉气囊列）
+# 每项 (表头, 取值函数)；取值函数 (row, by_model, grades) -> 字符串
+MAIN_BOARD_COLUMNS = [
+    "rank", "model", "trim", "price", "sales", "total", "tier",
+    "evidence", "period", "kwh_per_wan", "cell_brand",
+]
+
 
 BLOCK_IDS = [b["id"] for b in BLOCKS]
 
@@ -61,6 +75,7 @@ BLOCK_IDS = [b["id"] for b in BLOCKS]
 REQUIRED_BLOCK_IDS = [
     "main_board", "score_breakdown", "tiers", "product_power",
     "evidence_notes", "lifecycle", "method_boundary", "reproduce",
+    "three_board", "robustness", "audit_boundary",   # v9.6.0 三个分析区块
 ]
 
 
@@ -97,6 +112,9 @@ def active_blocks(data: dict, summary: dict | None = None) -> list[dict]:
         "multi_band": multi_band,
         "has_product_power": bool((data.get("product_power_board") or {}).get("items")),
         "has_experience": bool((meta.get("experience_adjust") or {})),
+        "has_three_board": bool((meta.get("three_board") or {}).get("rows")),
+        "has_robustness": bool((meta.get("robustness") or {}).get("kendall_mean")),
+        "has_audit": bool((meta.get("audit_boundary") or {}).get("verdict")),
         "has_notes": _has_evidence_notes(data, summary),
         "has_lifecycle": _has_lifecycle(data, summary),
         "has_dropped": _has_dropped(summary),
@@ -211,6 +229,62 @@ EXPERIENCE_DIM_LABELS = {
 }
 
 
+LIFECYCLE_STATUS_CN = {
+    "new_launch": "新车爬坡", "facelift_pending": "改款清库",
+    "discontinued": "已停产", "clearance": "清库",
+    "stable": "在售", "sales_collapse": "销量待确认",
+}
+
+
+def lifecycle_status_cn(status: str) -> str:
+    return LIFECYCLE_STATUS_CN.get(str(status or ""), str(status) if status else "—")
+
+
+MAIN_COL_LABELS = {
+    "rank": "#", "model": "车型", "trim": "评分配置", "price": "指导价(万)",
+    "sales": "趋势月销", "total": "加权分", "tier": "档位", "evidence": "证据",
+    "period": "周期", "kwh_per_wan": "kWh/万元", "cell_brand": "电池来源",
+}
+
+
+def main_cell(key: str, row: dict, cand: dict, grade: str = "") -> str:
+    """主榜单表单元格取值（两版渲染器共用，避免各写一份漂移）。"""
+    fr = row.get("fact_ref") or {}
+    if key == "rank":
+        return str(row.get("rank", ""))
+    if key == "model":
+        return str(row.get("model", ""))
+    if key == "trim":
+        t = row.get("trim") or cand.get("trim") or {}
+        return (t.get("name") if isinstance(t, dict) else str(t)) or "—"
+    if key == "price":
+        t = row.get("trim") or cand.get("trim") or {}
+        p = (t.get("price") if isinstance(t, dict) else None) or cand.get("price")
+        return f"{p}" if p not in (None, "") else "—"
+    if key == "sales":
+        v = fr.get("趋势月销")
+        if v in (None, "—", ""):
+            v = cand.get("trend_sales")
+        return str(v) if v not in (None, "") else "—"
+    if key == "total":
+        return f"{float(row.get('total', 0)):.1f}" if row.get("total") is not None else "—"
+    if key == "tier":
+        return str(row.get("tier") or "")
+    if key == "evidence":
+        return str(row.get("evidence_status") or cand.get("evidence_status") or row.get("evidence") or "—")
+    if key == "period":
+        lc = row.get("lifecycle") or cand.get("lifecycle") or {}
+        return lifecycle_status_cn(lc.get("status")) if isinstance(lc, dict) else lifecycle_status_cn(lc)
+    if key == "kwh_per_wan":
+        v = fr.get("kWh/万元")
+        mark = " ▲" if grade == "优" else (" ▼" if grade == "弱" else "")
+        return f"{v}{mark}" if v not in (None, "—", "") else "—"
+    if key == "cell_brand":
+        v = fr.get("电芯")
+        return str(v) if v not in (None, "—", "") else "—"
+    return "—"
+
+
 def experience_dim_label(dim: str) -> str:
     return EXPERIENCE_DIM_LABELS.get(dim, dim)
 
@@ -268,11 +342,8 @@ def lifecycle_line(model: str, info) -> str:
         return f"{model}：{info}"
     if not isinstance(info, dict):
         return f"{model}：{info}"
-    status = {
-        "new_launch": "新车爬坡期", "facelift_pending": "改款在即（现款清库）",
-        "discontinued": "已停产", "clearance": "清库",
-        "stable": "在售稳定", "sales_collapse": "销量下滑待确认",
-    }.get(str(info.get("status") or ""), str(info.get("status") or "状态未知"))
+    status = LIFECYCLE_STATUS_CN.get(str(info.get("status") or ""),
+                                      str(info.get("status") or "状态未知"))
     parts = [f"{model}：{status}"]
     if info.get("date"):
         parts.append(f"日期 {info['date']}")
@@ -347,6 +418,18 @@ def selftest() -> int:
         bad.append("主榜/取证表字段有重复")
     if all_facts and not set(all_facts) <= split:
         bad.append(f"事实字段拆分遗漏: {set(all_facts) - split}")
+    # v9.6.0：主榜多列 + 三个分析区块契约
+    if len(MAIN_BOARD_COLUMNS) < 10 or "trim" not in MAIN_BOARD_COLUMNS or "cell_brand" not in MAIN_BOARD_COLUMNS:
+        bad.append("主榜列清单不完整")
+    data3 = dict(data)
+    data3["meta"] = dict(data["meta"])
+    data3["meta"]["three_board"] = {"rows": [{"model": "A"}]}
+    data3["meta"]["robustness"] = {"kendall_mean": 0.85}
+    data3["meta"]["audit_boundary"] = {"verdict": "test"}
+    act3 = {b["id"] for b in active_blocks(data3, None)}
+    for rid in ("three_board", "robustness", "audit_boundary"):
+        if rid not in act3:
+            bad.append(f"分析区块 {rid} 未激活")
     if bad:
         print("[selftest FAIL]", bad)
         return 1
