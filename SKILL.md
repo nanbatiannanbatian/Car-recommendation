@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 8.3.3
+version: 8.3.4
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v5.6.1）
+# Car recommendation —— 可信购车榜单引擎（v8.3.4）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -796,11 +796,11 @@ python3 sync_cell_brand.py --check cands.json --json audit.json
 改了 skill 代码却没同步，改动只活在 skill 本地，永远上不了 GitHub。
 **用户明确要求：每次修改 skill 代码后，必须同步到 omni-debate 仓库并提交。**
 
-```bash
-python3 sync_to_repo.py --check              # 先体检：列出将同步哪些文件（只读）
-python3 sync_to_repo.py --apply              # 执行同步：白名单复制 + baseline 仓库端回填
-# 然后进仓库 git add -A && git commit && git push
-```
+作者本地维护用（**该脚本不随 skill 发布**，含本机仓库路径，故不在包内）：
+`sync_to_repo.py --check` 先体检列出将同步哪些文件（只读），
+`sync_to_repo.py --apply` 执行同步（白名单复制 + baseline 仓库端回填），
+然后进仓库 `git add -A && git commit && git push`。
+安装本 skill 的用户无需关心这一步——发布包里已经同步好了。
 
 **同步规则**：白名单 = 仓库已有 `*.py`/`categories/*.json`/根 `*.md`（以 skill 为准）
 + 新增代码（quality_score/sync_cell_brand/sync_to_repo/car_ev_1218_quality.json）。
@@ -1778,3 +1778,33 @@ selftest 7 项全过（新增：产品力榜降序、覆盖全池、携带主榜
 宋Ultra EV #14→#8（↑6，价格缺失未归类但仍在全池榜）。
 报告 `runs/car_midsuv_ev_202610/分段价位榜_中型纯电SUV_202610.html` 已改为双榜并存展示，
 「低价位能否超越」一节沿用同源口径，措辞不再称"唯一剥离口径"。
+
+---
+
+## v8.3.4 · 发布前 A/B 回归修复与全能力覆盖测试（2026-11-19）
+
+### 为什么要改
+发布候选（v8.3.3）与已发布版（v5.6.1）做同输入 A/B 回归时，发现 2 处**渲染层退化**
+（不改分、不改名次，但会输出误导性结论），且原测试只覆盖 4 个问题、未覆盖 skill 其余能力。
+
+### 修复（均在 `ice_board.py`）
+1. **三档分级全空**：`render_board_md()` 入参 `tiers` 是调用处解包后的内层 dict
+  （`{"T1":[…],"T2":[…],"T3":[…]}`），新版只读 `tiers.get("tiers")` 导致四个分榜三档全 0 款。
+   恢复兼容回退 `tiers.get("tiers") or (tiers if isinstance(tiers, dict) else {}) or {}`。
+   验证：四榜三档数与 v5.6.1 完全一致（0/13/21、2/26/33、3/17/15、1/18/28）。
+2. **market 权重披露写反**：文案写死 24%，但配置实配 22%。改为从 `cfg["dimensions"]`
+   动态取 `market` 权重（`_market_w`），正文与「全量核验」段共用同一值，杜绝再次漂移。
+
+### 全能力覆盖测试（离线可复现）
+`run_ab.py` 从 `test-v5.6.1`（基线）与 `test-v8.3.1`（候选）各导出隔离代码，清缓存后喂
+完全相同输入，跑 4 个问题 + **24 项能力矩阵**：8 项 selftest、5 项数据事实库校验、
+3 项总池专有（新版）、4 项稳健性解释（三榜并列/客观赋权/反方审查/滑杆）、2 项专项榜、
+生命周期变点、质量第 8 维 + 气囊/碰撞闸门。
+结果：新版 **24/24 全过**，老版 17/24（7 项为新版专有，按设计跳过）；
+4 问主榜名次与老版一致，Q1/Q2/Q4 报告逐字节相同。
+另修两处测试脚手架问题：历史池 `trim` 字符串需规范化为 dict；
+`board_v2 --config` 维度数须匹配候选（7 维 Q2 用 `car_compact_1218`），否则产品力榜空榜。
+
+### 发布
+两处退化修复 + 全能力回归通过后，同步到 GitHub `test-v8.3.1` 分支提交
+（`a9369ba`）；以该分支作为发布候选，版本号 v8.3.4。
