@@ -13,7 +13,7 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 7.0.0
+version: 8.0.0
 author: "nanbatiannanbatian"
 ---
 
@@ -1529,3 +1529,59 @@ python3 board_v2.py --candidates <带scores候选池.json> --facts <事实参数
 主榜：极氪7X 86.4 / 阿维塔07 83.3 / 腾势N7 80.3 … Model Y 76.8（第8）。
 Kendall τ=0.913（10 算法×6 权重情景）。事实榜的零跑C11 kWh/万元第1、Model Y 电耗第1，
 在 v2 里都只是参考列——综合名次分别是第9、第8，印证「参考不计分」。
+
+---
+
+## v8.0 · 总候选池：单一事实源，根治「临时拼池漏车」（2026-11-19）
+
+### 为什么要改（T6 遗漏的直接教训）
+出「中型纯电 SUV 全价位打分榜」时，候选池沿用了上次「Model Y 同级事实榜」的 12 款
+（偏 15–34 万），T6(14.99万)、极狐T5、零跑C10、深蓝S07、bZ5 等整批 12–18 万车
+**从未进池**——不是算错分，是根本没被纳入。根因：没有总池，每次出榜临时从某个 run
+目录捡一份候选池，覆盖全靠人记得。v8.0 把散落各 run 的候选池收敛成一份持久化总池。
+
+### 核心：一份总池 `categories/master_pool.json`
+所有搜索过/采集过/发现过的车都进池（含被排除的车，excluded 也留档），每款车带：
+- **可检索标签**：级别(cls)/动力(power)/车身(body)/品牌/价格(price_wan)/价位段/证据等级/生命周期；
+- **完整数据**：8 维 scores + adjust + 事实(kWh/电耗/续航/电芯) + 原始 candidate 记录（可直接喂 board_v2）；
+- **来源溯源**：provenance 数组记录该车从哪些池吸收而来；
+- **状态**：ready（数据齐）/ needs_rescore（缺维待重采集）/ needs_data（销量榜发现、无任何打分）。
+
+### 提问闭环（用户要求的「先按提问去懂车帝销量榜取候选，池里有的直接用，没有的重新采集」）
+1. 提问 → `discover.py` 拉懂车帝四口径销量榜 → 当期在售车型清单
+2. `master_pool.py --discover-in discover.json` → 池内车刷新销量，池外车建 needs_data 待采集档案
+3. `master_pool.py --ingest <任意候选池.json>...` → 把已采集 scores 的池幂等吸收（补空缺、记来源、不覆盖）
+4. `master_pool.py --query --cls 中型SUV --power BEV --body SUV --price-max 40 [--ready-only]` → 标签检索
+5. `board_v2.py` 用检索结果出榜——候选来源从此唯一，不再临时拼池
+
+### 逻辑变更全池重算（用户要求的「新加逻辑要把旧池重新更新一遍」）
+打分配置（维度键/权重/排除维）算 SHA256 指纹存进池 meta。配置一变指纹就变，
+`--rescore --config <新配置> [--apply]` 对全池：
+- 8 维齐全的车 → 用新权重机械重算总分，打新指纹；
+- 缺维的车（如新增品控维后旧池 17 款缺 quality）→ 标 needs_rescore，**不填假分**，列出缺哪些维；
+- `--audit` 随时体检：指纹是否一致、缺级别/价格、待采集清单、价位段覆盖（防「全价位榜却没低价车」复发）。
+
+### 关键纪律（继承既有红线）
+- **官方安全分权威覆盖**：safety 冲突按证据分级裁决——`safety_basis=cncap/ciasi` 的对齐分(rank3)
+  覆盖仅 crash 文本声称有成绩的旧人工分(rank2)，后者覆盖无依据分(rank0/1)。
+  实测修正深蓝L06 7.6→8.9、极狐T5 9.5→9.0、bZ5 9.0→8.0、NX8 7.4→8.9（与 v5.9 一致）。
+- **不猜标签/分数**：级别来自官方字段，缺失留空并在 audit 报出；重算不填假分。
+- **幂等**：多次 ingest 只补空缺，冲突逐条报出供人工裁决；顶层 scores/adjust 与 candidate 同步。
+
+### 用法
+```bash
+python3 master_pool.py --selftest
+python3 master_pool.py --init
+python3 master_pool.py --ingest 池1.json 池2.json ...
+python3 master_pool.py --query --cls 中型SUV --power BEV --out subset.json
+python3 master_pool.py --audit
+python3 master_pool.py --stats --by cls
+python3 master_pool.py --rescore --config <新配置> --apply
+python3 board_v2.py --candidates subset.json --out <出榜目录>   # 接回 v7 出榜
+```
+
+### 验收（2026-11-19，吸收 6 个来源池）
+67 款入池：中型SUV 22 / 中型车 15 / 紧凑SUV 9 / 紧凑车 8 / 中大型车 7 / 中大型SUV 6。
+检索「中型SUV+纯电」命中 22 款（旧临时池仅 12 款），T6 在列——遗漏根治。
+品控权重 10%→15% 指纹 cdd863c069c5→9d0f36579a16，50 款可重算、17 款缺 quality 被标记。
+验证报告：`runs/car_midsuv_ev_202610/总候选池验证报告.md`。

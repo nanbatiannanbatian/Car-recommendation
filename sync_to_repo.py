@@ -38,6 +38,8 @@ NEW_FILES = [
     "board_v2.py",                              # v7.0 统一榜单引擎
     "categories/car_ev_1218_quality.json",
     "categories/rank_v2_policy.json",           # v7.0 榜单策略配置
+    "master_pool.py",                           # v8.0 总候选池（单一事实源）
+    "categories/master_pool.json",              # v8.0 总池数据（67款，随代码同步）
 ]
 
 
