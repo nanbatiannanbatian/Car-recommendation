@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 9.3.1
+version: 9.4.0
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v9.3.1）
+# Car recommendation —— 可信购车榜单引擎（v9.4.0）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -2071,3 +2071,32 @@ A/B 矩阵加第 26 项体验自检。
 用户确认"增加页面渲染"：board_view 注册表加 `experience_adjust` 区块（14项），
 有审计数据时在 HTML/Markdown 展示"车型/维度/前→后/调整量/依据来源（可点开的URL）"，
 无证据的车不出现该区块。selftest 加区块激活断言；Q1 榜实测 9 款车的调整全部带来源链接呈现。
+
+---
+
+## v9.4.0 · 车机/能耗体验分 + 拆车置信因子 + 多平台数据接入（2026-11-19，用户确认全做）
+
+### 为什么要改
+用户问"除智驾操控还有哪些维度该加体验""拆车数据有没有价值""易车/汽车之家数据能否接"。
+调研结论：车机与三电能耗最该加（现有只看芯片型号/容量电压，同样是看配置单）；
+拆车有价值但不能打分（单样本不可推广整批次，skill 红线已不认单条拆车）。
+
+### 实现
+- 体验证据库扩到四维（adas/control/cabin/powertrain）：24 条 / 10 款。
+  新增车机口碑（极氪7X 三级菜单深+误唤醒、鸿蒙座舱流畅、蔚来多屏领先）、
+  能耗实测（懂车帝五车高速续航达成率：Model Y 61.7% 但样本 62.5kWh vs 官方 78.4kWh 存疑已降权；
+  极氪7X 55.32%、小鹏G6 达成率约85%/70%）。
+- 小数方向（0.3）= 温和调整，整数 ±1 = 明确证据；跨口径不混算。
+- 拆车证据作**置信度因子不打分**：`teardown_confidence()` 从 thirdparty_tests.json 读
+  teardown/stiffness 证据写进审计字段，遵循"单条拆车不推广整批次"红线。
+- `EXPERIENCE_DIM_LABELS` 统一维度中文标签（board_view 单点定义），页面四维都显示。
+
+### 多平台数据接入判断（已写入证据分级）
+懂车帝（自购统一标准+36车NOA，最可审计，已接）> 汽车之家（AH-100 标准公开 ISO3888-2/FIA车手，
+单车型为主）> 易车（AutoLab 自建基地，栏目制覆盖有限）> 太平洋（转述二手，不接）。
+已接来源含懂车帝/新浪/汽车之家口碑/网易/什么值得买；AH-100 量化结果待逐车采集。
+
+### 效果
+21 款中型纯电 SUV 榜：极氪7X 四维 智驾8.5/操控9.0/车机8.3/三电8.3，总分 86.4→84.6 仍 #1；
+小鹏G6 #11→#8、问界M5 #13→#10（各↑3）；腾势N7/深蓝S07/乐道L60 因车机或能耗证据下修。
+A/B 矩阵 26 项、全部 selftest 通过。

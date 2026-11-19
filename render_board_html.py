@@ -280,7 +280,7 @@ def render(data, summary, title, as_of):
                     else f'{e(s.get("source_type"))} {e(s.get("date"))}'
                     for s in srcs)
                 claim = " ".join(str(s.get("claim") or "")[:90] for s in srcs[:1])
-                dlabel = "智驾" if dim == "adas" else ("操控" if dim == "control" else e(dim))
+                dlabel = BV.experience_dim_label(dim)
                 H.append(f"<tr><td class='name'>{e(model)}</td><td>{dlabel}</td>"
                          f"<td>{num(det.get('before'))} → {num(det.get('after'))}</td>"
                          f"<td class='{dcls}'>{dtxt}</td>"

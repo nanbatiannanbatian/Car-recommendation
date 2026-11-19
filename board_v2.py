@@ -522,7 +522,7 @@ def render_md(data: dict, summary: dict | None = None) -> str:
                 delta = det.get("delta", 0)
                 if not delta:
                     continue
-                dlabel = "智驾" if dim == "adas" else ("操控" if dim == "control" else dim)
+                dlabel = BV.experience_dim_label(dim)
                 srcs = det.get("evidence") or []
                 ref = "; ".join(
                     f"{s.get('source_type')} {s.get('date')} {s.get('url')}" for s in srcs)

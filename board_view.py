@@ -205,6 +205,15 @@ def fact_grades(rows: list[dict]) -> dict[str, dict[str, str]]:
     return out
 
 
+EXPERIENCE_DIM_LABELS = {
+    "adas": "智驾", "control": "操控", "cabin": "车机", "powertrain": "三电/能耗",
+}
+
+
+def experience_dim_label(dim: str) -> str:
+    return EXPERIENCE_DIM_LABELS.get(dim, dim)
+
+
 def grade_color(g: str) -> str:
     """优绿 / 中灰 / 弱红 / 未采集与上界浅灰 —— 与股市红涨绿跌区分，这里绿=好。"""
     return {"优": "#1a7f37", "弱": "#b42318", "中": "#7b8590",

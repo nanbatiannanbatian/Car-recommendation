@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""体验证据评分修正 —— 把 categories/experience_facts.json 的体验证据应用到 adas/control 两维。
+"""体验证据评分修正 —— 把 categories/experience_facts.json 的体验证据应用到 adas/control/cabin/powertrain 四维。
 
 为什么需要（v9.3.0）：
 原评分公式里 adas/control 只按硬件配置打（激光雷达/算力/悬架/零百），
@@ -8,9 +8,11 @@
 本模块把有来源、可核验的体验证据纳入这两维，无证据的车保持原分并标注"仅硬件口径"。
 
 纪律（红线）：
-- 只调 adas / control 两维，其它维、总分公式、权重一律不碰
+- 只调 adas/control/cabin/powertrain 四维，safety/space/value/quality 与总分公式一律不碰
 - 每维调整封顶 ±max_adjust_per_dimension（默认1.5），来源分级加权
 - 无证据不插补；同车型多条证据按方向相加后封顶
+- 小数方向(如0.3)=温和调整，整数±1=明确强弱证据
+- 拆车证据只作置信度因子、不打分（单条拆车不可推广到整批次）
 - 应用后写入 candidate["experience_adjust"] 审计字段（明细+前后分数），便于回溯
 
 用法：
@@ -26,7 +28,7 @@ from collections import defaultdict
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 LIB = os.path.join(HERE, "categories", "experience_facts.json")
-DIMS = ("adas", "control")
+DIMS = ("adas", "control", "cabin", "powertrain")
 
 
 def load_library(path: str | None = None) -> dict:
@@ -59,6 +61,30 @@ def adjustments(model: str, lib: dict) -> dict:
     return {d: (round(acc[d], 2), src[d]) for d in DIMS}
 
 
+def teardown_confidence(model: str) -> dict:
+    """拆车证据 → 置信度因子（不打分）。
+
+    遵循 skill 红线：单条拆车视频/个例不打分、不推广整批次；
+    但拆车能验证配置表没写的真实结构（全铝悬架/CTB/副车架衬套），
+    因此只提高该车型硬件项的置信标记，供审计与展示，不进分数。
+    """
+    path = os.path.join(HERE, "categories", "thirdparty_tests.json")
+    if not os.path.exists(path):
+        return {"has_teardown": False, "items": [], "note": "证据库缺失"}
+    src = json.load(open(path, encoding="utf-8"))
+    hits = [e for e in src.get("entries", [])
+            if e.get("model") == model and
+            e.get("kind") in ("teardown_chassis", "stiffness", "teardown_body")]
+    return {
+        "has_teardown": bool(hits),
+        "items": [{"kind": e.get("kind"), "source_type": e.get("source_type"),
+                   "claim": str(e.get("claim", ""))[:100], "url": e.get("url", "")}
+                  for e in hits],
+        "note": ("有拆车/刚度实证：结构事实置信提高，但不加分、不推广整批次品控"
+                 if hits else "无拆车实证"),
+    }
+
+
 def apply_experience(cands: list[dict], lib: dict | None = None,
                      enabled: bool = True) -> list[dict]:
     """把体验证据应用到候选（原地改 scores），并写审计字段。"""
@@ -84,6 +110,7 @@ def apply_experience(cands: list[dict], lib: dict | None = None,
             "before": before,
             "dimensions": detail,
             "n_evidence": sum(len(adj[d][1]) for d in DIMS),
+            "teardown_confidence": teardown_confidence(model),
         }
     return cands
 
@@ -119,11 +146,23 @@ def selftest() -> int:
         bad.append("apply 越界改了其它维/总分")
     if r["experience_adjust"]["dimensions"]["adas"]["basis"] != "硬件+体验证据":
         bad.append("审计字段 basis 错误")
+    # 四维扩展 + 拆车置信因子
+    c2 = [{"model":"极狐阿尔法S5","scores":{"adas":8.0,"control":8.0,"cabin":8.0,"powertrain":8.0},"total":80}]
+    apply_experience(c2, lib)
+    if c2[0]["scores"]["cabin"] != 8.0:
+        bad.append("无车机证据车被调分")
+    tc = teardown_confidence("极狐阿尔法S5")
+    if not tc["has_teardown"]:
+        bad.append("拆车置信因子未识别")
+    if teardown_confidence("不存在XYZ")["has_teardown"]:
+        bad.append("无拆车车误报置信")
+    if c2[0]["experience_adjust"]["dimensions"]["adas"]["before"] != 8.0:
+        bad.append("审计 before 错误")
     if bad:
         print("[selftest FAIL]", bad)
         return 1
     print(f"[selftest OK] 证据库 {len(lib['entries'])} 条 / {len({e['model'] for e in lib['entries']})} 款；"
-          "极氪7X 智驾下修操控上修；无证据不动；只改两维")
+          "极氪7X 智驾下修操控上修；无证据不动；只改四维")
     return 0
 
 
