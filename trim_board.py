@@ -37,16 +37,38 @@ def load_trims(path: str | None = None) -> dict[str, dict]:
 
 
 def spec_from_trim(trim: dict, base_spec: dict | None = None) -> dict:
-    """把 trims.json 的一个配置 → spec_score 入参。缺项留空让 spec_score 插补。"""
+    """把 trims.json 的一个配置 → spec_score 入参。缺项留空让 spec_score 插补。
+
+    v9.7.1 修复：v9.7.0 只映射了 kwh/电压/激光雷达，漏了 cltc_km(→range_km)、
+    cell_supplier(→cell_brand)、charge里的10-80分钟(→charge_10_80_min)，
+    导致所有配置三电都是基线 6.0、只剩 value 随价格降 → "最高分=最低配"的假象。
+    """
     s = dict(base_spec or {})
     s["kwh"] = trim.get("battery_kwh") or s.get("kwh")
     charge = str(trim.get("charge") or "")
     s["platform_800v"] = ("800V" in charge) or ("900V" in charge) or s.get("platform_800v", False)
+    # 续航：配置表 cltc_km → spec_score range_km
+    if trim.get("cltc_km") is not None:
+        s["range_km"] = trim["cltc_km"]
+    # 电芯：cell_supplier → cell_brand（一线品牌识别用）
+    if trim.get("cell_supplier"):
+        s["cell_brand"] = trim["cell_supplier"]
+    # 快充时间：从 "30–80% 约 20min" / "10-80% 12min" 抽分钟数
+    import re
+    m = re.search(r"(\d+)\s*[-–]\s*80%[^0-9]*(\d+)\s*min", charge)
+    if m:
+        s["charge_10_80_min"] = int(m.group(2))
+    else:
+        m2 = re.search(r"(\d+)\s*min", charge)
+        if m2:
+            s["charge_10_80_min"] = int(m2.group(1))
     kcs = [str(x) for x in (trim.get("key_configs") or [])]
     if any("激光雷达" in x for x in kcs):
         s["adas_lidar"] = True
     if any("城区" in x and "NOA" in x.upper() for x in kcs):
         s["adas_city_noa"] = True
+    if any("高速" in x and "NOA" in x.upper() for x in kcs):
+        s["adas_highway_noa"] = True
     return s
 
 

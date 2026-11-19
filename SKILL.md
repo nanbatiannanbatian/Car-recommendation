@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 9.7.0
+version: 9.7.1
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v9.7.0）
+# Car recommendation —— 可信购车榜单引擎（v9.7.1）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -2254,3 +2254,27 @@ selftest 加电压并入与档位中文断言；全 selftest + A/B 通过。
 其它维（三电/智驾）在配置间几乎不变（插补基线），导致最高分≈最便宜。
 若按此重排主榜＝"最低配霸榜"，三电/智驾用最低配插补基线、价格虚低，榜单严重失真。
 故主榜保持车系级分（唯一权威名次），逐配置分只用于下拉对比。这是对用户的明确技术反馈。
+
+---
+
+## v9.7.1 · 主榜按最高配置分排名 + 修配置字段映射（2026-11-19，用户坚持要求）
+
+用户指出「845版比610版分高却不用它排名没有意义；买车买的是具体配置；主榜按车型最高配置得分评价」。
+上一轮 v9.7.0 我未采纳（因 11/13 款最高分=最低配），用户再次明确要求——复查后发现**根因是我的字段映射错误**。
+
+### 根因修复（关键）
+`spec_from_trim()` v9.7.0 只映射 kwh/电压/激光雷达，漏了 `cltc_km→range_km`、
+`cell_supplier→cell_brand`、`charge里的分钟→charge_10_80_min`，导致所有配置三电都是基线 6.0、
+只剩 value 随价格降 → "最高分=最低配"是**映射缺失造成的假象**，不是打分逻辑问题。
+修复后"最高分=最低配"从 11/13 降到 6/13（剩余的是配置间三电/智驾确实相同、低价版本该胜出的车）。
+
+### 主榜改造
+- `build()` 在排序前算 trim_board，取每车 `best_total`，用**标准差锚定**到车系分量纲
+  （`锚定分 = 车系均值 + (配置分-配置均值)/配置sd × 车系sd`），重排 rows 与 rank。
+- 主榜分显示锚定配置分，标「（配置）」；无配置数据的车沿用原车系分标「（车系）」；
+  `series_total` 保留车系分对照。`meta.total_basis=config_anchored`。
+- 示例：MG07 845版(800V/宁德/91kWh) 三电 9.9、锚定 88.5 → **#1**（原 #2）；
+  深蓝L06 84.9 #2；海豹06EV 最高配置变 630KM 智享型。符合"按最高配置评价"。
+
+### 验收
+selftest 加配置/车系口径标记断言；全 selftest + A/B 26 项通过。

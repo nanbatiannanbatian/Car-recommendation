@@ -360,6 +360,34 @@ def build(cands: list[dict], cfg: dict, policy: dict,
     import experience_score as ES
     cands = ES.apply_experience(copy.deepcopy(cands), enabled=not no_experience)
     rows = main_board(cands, cfg, weights)
+    # v9.7.1：主榜按「每车最高配置分」评价（用户要求：买车买具体配置）
+    # 逐配置分经标准差锚定到车系分量纲；无配置数据的车沿用原车系分。
+    trim_data = {}
+    try:
+        import trim_board as TB
+        trim_data = TB.build_trim_board(cands, cfg, rows)
+    except Exception:
+        pass
+    if trim_data:
+        import statistics as _st
+        bests = {m: d["best_total"] for m, d in trim_data.items() if d.get("best_total") is not None}
+        if len(bests) >= 3:
+            bmu, bsd = _st.mean(bests.values()), _st.pstdev(bests.values())
+            smu, ssd = _st.mean([r["total"] for r in rows]), _st.pstdev([r["total"] for r in rows])
+            if bsd > 1e-6 and ssd > 1e-6:
+                for r in rows:
+                    bv = bests.get(r["model"])
+                    if bv is not None:
+                        r["config_anchored_total"] = round(
+                            max(0, min(100, smu + (bv - bmu) / bsd * ssd)), 1)
+                        r["best_trim"] = trim_data[r["model"]].get("best_trim")
+                        r["best_trim_raw"] = bv
+                        # 主榜分与名次都由锚定配置分决定
+                        r["series_total"] = r["total"]   # 保留车系分作对照
+                        r["total"] = r["config_anchored_total"]
+                rows.sort(key=lambda r: (-r["total"], r["model"]))
+                for i, r in enumerate(rows, 1):
+                    r["rank"] = i
     by_model = {c["model"]: c for c in cands}
     for r in rows:
         r["fact_ref"] = fact_columns(by_model[r["model"]], facts, policy)
@@ -376,12 +404,6 @@ def build(cands: list[dict], cfg: dict, policy: dict,
         r["battery_detail"] = _bp   # {voltage, cell, pack, trim, src}
     bands = band_subboards(rows, cands, policy)
     analyses = analysis_blocks(cands, cfg, weights)
-    # v9.7.0：逐配置评分（下拉对比用，不改主榜名次）
-    try:
-        import trim_board as TB
-        trim_data = TB.build_trim_board(cands, cfg, rows)
-    except Exception:
-        trim_data = {}
     return {
         "meta": {
             "title": policy.get("title", "统一榜单"),
@@ -409,6 +431,11 @@ def build(cands: list[dict], cfg: dict, policy: dict,
             "robustness": analyses.get("robustness", {}),
             "audit_boundary": analyses.get("audit_boundary", {}),
             "trim_board": trim_data,
+            # v9.7.1：主榜分数口径（config_anchored=按最高配置分，series=车系分）
+            "total_basis": "config_anchored" if any(
+                r.get("config_anchored_total") is not None for r in rows) else "series",
+            "total_basis_note": "主榜分＝该车型最高配置分经标准差锚定到车系分量纲；"
+                                "series_total 保留车系分对照；无配置数据的车沿用车系分",
         },
         "main_board": rows,
         "band_subboards": bands,

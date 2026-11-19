@@ -332,7 +332,10 @@ def main_cell(key: str, row: dict, cand: dict, grade: str = "") -> str:
             v = cand.get("trend_sales")
         return str(v) if v not in (None, "") else "—"
     if key == "total":
-        return f"{float(row.get('total', 0)):.1f}" if row.get("total") is not None else "—"
+        if row.get("total") is None:
+            return "—"
+        base = "配置" if row.get("config_anchored_total") is not None else "车系"
+        return f"{float(row['total']):.1f}（{base}）"
     if key == "tier":
         return str(row.get("tier") or "")
     if key == "evidence":
@@ -516,6 +519,11 @@ def selftest() -> int:
         bad.append(f"电池来源未含电压: {bsrc}")
     if main_cell("tier", rtest, rtest) != "第一档":
         bad.append("档位未显示")
+    # v9.7.1：总分口径标记
+    if "（配置）" not in main_cell("total", {"total": 85.0, "config_anchored_total": 85.0}, {}):
+        bad.append("配置分口径未标记")
+    if "（车系）" not in main_cell("total", {"total": 80.0}, {}):
+        bad.append("车系分口径未标记")
     # v9.7.0：逐配置对比区块
     data4 = dict(data); data4["meta"] = dict(data["meta"])
     data4["meta"]["trim_board"] = {"A车": {"trims": [{"name": "x"}]}}
