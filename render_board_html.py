@@ -154,7 +154,8 @@ def render(data, summary, title, as_of):
             fr = r.get("fact_ref") or {}
             gmap = grades.get(r["model"], {})
             parts = []
-            for k, v in fr.items():
+            for k in BV.MAIN_FACT_FIELDS:      # 折中：主榜只留 3 项，不挤
+                v = fr.get(k)
                 if v in (None, "—", ""):
                     continue
                 g = gmap.get(k, "")
@@ -163,8 +164,6 @@ def render(data, summary, title, as_of):
                     parts.append(f'<b style="color:{BV.grade_color(g)}">{e(k)} {e(txt)} ▲</b>')
                 elif g == "弱":
                     parts.append(f'<b style="color:{BV.grade_color(g)}">{e(k)} {e(txt)} ▼</b>')
-                elif g == "上界":
-                    parts.append(f'<span style="color:{BV.grade_color(g)};font-style:italic">{e(k)} {e(txt)}（上界）</span>')
                 else:
                     parts.append(f"{e(k)} {e(txt)}")
             H.append(f"<tr><td>{rank_badge(r.get('rank'))}</td><td class='name'>{e(r.get('model'))}</td>"
@@ -172,6 +171,8 @@ def render(data, summary, title, as_of):
                      f"<td>{tier_badge(r.get('tier'))}</td><td>{e(r.get('evidence'))}</td>"
                      f"<td class='ref'>{' · '.join(parts) if parts else '—'}</td></tr>")
         H.append("</tbody></table>")
+        H.append('<div style="font-size:12px;color:#7b8590;margin-top:6px">'
+                 '完整事实（指导价/电量/CLTC/月销/800V）见下方「逐车取证依据」表。</div>')
 
     # ---- 总分构成
     if "score_breakdown" in ids:
@@ -261,14 +262,23 @@ def render(data, summary, title, as_of):
         H.append("<h2>逐车取证依据 <span>取证要点 / 证据等级 / 销量口径 · 可逐条质疑</span></h2>")
         H.append("<table><thead><tr><th style='text-align:left'>车型</th><th>证据</th>"
                  "<th style='text-align:left'>取证要点与事实</th></tr></thead><tbody>")
+        grades = BV.fact_grades(rows)
         for r in rows:
             note = r.get("note") or "—"
             fr = r.get("fact_ref") or {}
+            gmap = grades.get(r["model"], {})
             extras = []
-            if fr.get("电芯"): extras.append(f"电芯 {fr['电芯']}")
-            if fr.get("趋势月销"): extras.append(f"趋势月销 {fr['趋势月销']}")
-            if fr.get("指导价"): extras.append(f"指导价 {fr['指导价']}万")
-            detail = e(note) + (f"<br><span style='color:#7b8590'>{' · '.join(e(x) for x in extras)}</span>"
+            for k in BV.DETAIL_FACT_FIELDS:     # 折中：主榜移出的字段在这里补齐
+                v = fr.get(k)
+                if v in (None, "—", ""):
+                    continue
+                txt = f"{v}万" if k == "指导价" else str(v)
+                g = gmap.get(k, "")
+                if g == "上界":
+                    extras.append(f'<i style="color:{BV.grade_color(g)}">{e(k)} {e(txt)}（上界）</i>')
+                else:
+                    extras.append(f"{e(k)} {e(txt)}")
+            detail = e(note) + (f"<br><span style='color:#7b8590'>{' · '.join(extras)}</span>"
                                 if extras else "")
             H.append(f"<tr><td class='name'>{e(r.get('model'))}</td><td>{e(r.get('evidence'))}</td>"
                      f"<td class='ref'>{detail}</td></tr>")

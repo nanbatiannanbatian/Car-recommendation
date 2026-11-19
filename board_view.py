@@ -19,6 +19,8 @@
   - 两版渲染器（md/html）展示同一组区块，不允许一边有一边没有
 """
 from __future__ import annotations
+import json
+import os
 
 # ---------------------------------------------------------------- 区块注册表
 # id, 标题, 适用条件 key, 说明（供 selftest / 文档）
@@ -142,6 +144,11 @@ def fact_coverage(meta: dict, rows: list[dict]) -> tuple[list[str], list[str]]:
 # 第三类：趋势月销 → ≤上界的车系合计值标灰斜体，不参与分位比较；指导价不着色
 RANKED_FACT_FIELDS = {"电耗": "low", "kWh/万元": "high"}   # label -> 方向
 PLAIN_FACT_FIELDS = {"电芯", "CLTC", "电池", "800V", "指导价"}
+
+# v9.2.0 折中布局：主榜参考列只留 3 项（带色/事实标签），其余移到逐车取证表。
+# 这样主榜一行 ~35 字符而不是 80+，两表都不挤。
+MAIN_FACT_FIELDS = ["kWh/万元", "电耗", "电芯"]                    # 主榜参考列，按此顺序
+DETAIL_FACT_FIELDS = ["指导价", "电池", "CLTC", "趋势月销", "800V"]  # 逐车取证表补全
 
 
 def fact_grades(rows: list[dict]) -> dict[str, dict[str, str]]:
@@ -310,6 +317,16 @@ def selftest() -> int:
         bad.append("月销上界未识别")
     if [r["total"] for r in grows] != [90, 89, 88, 87, 86]:
         bad.append("着色改了分数")
+    # v9.2.0：折中布局字段拆分——主榜3项 + 取证表5项 = 全部8项，不重不漏
+    all_facts = [c["label"] for c in
+                 (json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                     "categories", "rank_v2_policy.json"), encoding="utf-8"))
+                  .get("fact_reference_columns") or [])]
+    split = set(MAIN_FACT_FIELDS) | set(DETAIL_FACT_FIELDS)
+    if len(split) != len(MAIN_FACT_FIELDS) + len(DETAIL_FACT_FIELDS):
+        bad.append("主榜/取证表字段有重复")
+    if all_facts and not set(all_facts) <= split:
+        bad.append(f"事实字段拆分遗漏: {set(all_facts) - split}")
     if bad:
         print("[selftest FAIL]", bad)
         return 1

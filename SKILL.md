@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 9.1.0
+version: 9.2.0
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v9.1.0）
+# Car recommendation —— 可信购车榜单引擎（v9.2.0）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -2011,3 +2011,22 @@ kWh/万元 作为既有参考项正常显示（如 MG 07 5.28、风云A9 5.40，
 ### 验收
 12–18万榜实测：MG 07 kWh/万元 5.28 ▲、电耗 12.3 ▼；深蓝L06 电耗 11.5 ▲、
 月销 `≤5758（上界）`。三版 selftest 与 A/B 25 项矩阵全过。
+
+---
+
+## v9.2.0 · 折中布局：主榜参考列精简 + 取证表补全（2026-11-19，用户确认后实施）
+
+### 为什么要改
+主榜参考列塞了 8 项事实（每行 80+ 字符），跟 11 列的总分构成表放一起太挤；
+用户确认「折中方案」——不合表，但让两表视觉成组、参考列瘦身。
+
+### 实现
+- `board_view.MAIN_FACT_FIELDS = [kWh/万元, 电耗, 电芯]`：主榜只留这 3 项（带色标），
+  一行从 80+ 字符降到 ~35 字符；`DETAIL_FACT_FIELDS = [指导价, 电池, CLTC, 趋势月销, 800V]`
+  移到「逐车取证依据」表完整呈现（月销上界仍标灰斜体）。
+- 两版渲染器只按这两个常量取字段；主榜下方加一句引导「完整事实见逐车取证依据表」。
+- selftest 断言：8 项事实被 3+5 拆分且**不重不漏**、着色不改分。
+
+### 验收
+主榜参考列实测 31–41 字符（例：kWh/万元 4.32 · 电耗 11.5 · 电芯 宁德时代），
+取证表补全指导价/电量/CLTC/月销；三版 selftest 与 A/B 25 项矩阵全过。

@@ -430,15 +430,16 @@ def render_md(data: dict, summary: dict | None = None) -> str:
             fr = r.get("fact_ref") or {}
             gmap = grades.get(r["model"], {})
             parts = []
-            for k, v in fr.items():
+            for k in BV.MAIN_FACT_FIELDS:      # 折中：主榜只留 3 项
+                v = fr.get(k)
                 if v in (None, "—", ""):
                     continue
                 g = gmap.get(k, "")
-                suffix = " ▲" if g == "优" else (" ▼" if g == "弱" else
-                          ("（上界）" if g == "上界" else ""))
+                suffix = " ▲" if g == "优" else (" ▼" if g == "弱" else "")
                 parts.append(f"{k} {v}{suffix}")
             L.append(f"| {r['rank']} | {r['model']} | {r['total']:.1f} | "
                      f"{r.get('tier','')} | {r.get('evidence','')} | {' · '.join(parts) if parts else '—'} |")
+        L.append("\n> 完整事实（指导价/电量/CLTC/月销/800V）见下方「逐车取证依据」表。")
 
     if "score_breakdown" in ids:
         dims = meta.get("dimensions") or []
@@ -497,13 +498,17 @@ def render_md(data: dict, summary: dict | None = None) -> str:
                      f"#{it['main_rank']} | {f'{d:+d}' if isinstance(d,int) else '—'} | {it.get('price','—')} |")
 
     if "evidence_notes" in ids:
-        L += ["", "## 逐车取证依据（点开可复核）", ""]
+        L += ["", "## 逐车取证依据（点开可复核）", "",
+              "> 承接主榜参考列之外的完整事实（指导价/电量/CLTC/月销/800V）。", ""]
         for r in rows:
             note = r.get("note") or "—"
             fr = r.get("fact_ref") or {}
             extras = []
-            if fr.get("电芯"): extras.append(f"电芯 {fr['电芯']}")
-            if fr.get("趋势月销"): extras.append(f"趋势月销 {fr['趋势月销']}")
+            for k in BV.DETAIL_FACT_FIELDS:     # 折中：主榜移出的字段在这里补齐
+                v = fr.get(k)
+                if v in (None, "—", ""):
+                    continue
+                extras.append(f"{k} {v}{'万' if k == '指导价' else ''}")
             L.append(f"- **{r['model']}**（证据 {r.get('evidence','?')}）：{note}"
                      + (f"｜{' · '.join(extras)}" if extras else ""))
 
