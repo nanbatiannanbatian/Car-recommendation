@@ -172,6 +172,12 @@ def render(data, summary, title, as_of):
                     H.append(f"<td class='ref'>{e(val)}</td>")
                 elif k == "cell_brand":
                     H.append(f"<td class='ref'>{e(val)}</td>")
+                elif k == "verdict":
+                    v = BV.car_verdict(r, r)
+                    H.append(f"<td class='ref' style='font-size:12px;line-height:1.5'>"
+                             f"<b style='color:#1a7f37'>优</b> {'、'.join(e(x) for x in v['pros'])}<br>"
+                             f"<b style='color:#b42318'>短</b> {'、'.join(e(x) for x in v['cons'])}<br>"
+                             f"适合：{e(v['audience'])}｜<b>{e(v['advice'])}</b></td>")
                 else:
                     H.append(f"<td>{e(val)}</td>")
             H.append("</tr>")

@@ -82,6 +82,10 @@ def fact_columns(c: dict, facts: dict[str, dict], policy: dict) -> dict:
             v = kwh
         elif k == "kwh_per_wan":
             v = round(kwh / price, 2) if (kwh and price) else None
+            # v9.6.2：缺失时写明原因，避免读者误以为"前10才算"
+            if v is None:
+                out["kWh/万元_缺失原因"] = (
+                    "缺电量" if not kwh else ("缺配置价" if not price else "数据缺失"))
         elif k == "consumption":
             v = _num(f.get("consumption") or c.get("consumption"))
         elif k == "cltc":

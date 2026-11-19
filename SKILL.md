@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 9.6.1
+version: 9.6.2
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v9.6.1）
+# Car recommendation —— 可信购车榜单引擎（v9.6.2）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -2205,3 +2205,28 @@ Model Y value 6.5→7.28、总分 76.8→77.7、#17→#15；蔚来ES6 -0.10、�
 ### 验收
 12–18万榜主榜首行：深蓝L06 / 第一档 / 宁德时代·400V；总分构成 13 列（含评分配置+指导价）。
 selftest 加电压并入与档位中文断言；全 selftest + A/B 通过。
+
+---
+
+## v9.6.2 · 缺失理由 + 评价列 + report质量分修复（2026-11-19，用户确认后实施）
+
+用户确认三件事：kWh/万元缺失写明理由、主榜加评价列（机械生成）、修report质量分脱节。
+另提出质疑「投诉数是否没考虑销量」——核查后确认代码已做销量归一化，但指出两个真问题并一并披露。
+
+### 实现
+- **kWh/万元缺失理由**：`fact_columns` 写 `kWh/万元_缺失原因`（缺电量/缺配置价/数据缺失），
+  `main_cell` 显示「—（缺配置价）」。查明13/14名为空非"前10才算"，是数据缺口：
+  秦L EV 事实库无 kwh；大众与众07 有 kwh 但评分配置无具体指导价（只有区间）。
+- **评价列**：`board_view.car_verdict()` 纯规则机械生成（无模型调用、可复现）：
+  优点（各维≥8.5打标签）/短板（<7.0、月销上界、CLTC缺、改款在即）/适合人群（最高维映射）/
+  建议（三档+证据C+落榜）。主榜第12列，HTML三行彩色、Markdown单行。selftest断言完整性。
+- **report质量分脱节修复**：report.md 是投诉数据补齐前的旧快照（写8.18/8.0），
+  候选池已是5.73。带 `--complaints` 重跑 pipeline 后一致（海豹06EV 5.73/high 21条46每万台；
+  风云A9 5.73/medium 12条20.5每万台）。
+- **质量分口径披露**：用户质疑「卖得多投诉多」——核查确认已按销量归一化（投诉/万台+对数压缩），
+  但补充披露4点：分母单月销量vs90天投诉口径不对齐（保守高估）、投诉自选择偏差、
+  「无投诉」=低置信非质量好、PPH正向对冲+密度封顶。写进 quality_score.report。
+
+### 用户质疑的结论
+"没投诉不一定好、有投诉不一定差" —— 后半句代码已处理（归一化+PPH+封顶），
+前半句体现在低置信标注，但之前页面只显示分数不显示置信，report已明确列出置信列与披露语。

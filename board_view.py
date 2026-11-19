@@ -65,7 +65,7 @@ BLOCKS = [
 # 每项 (表头, 取值函数)；取值函数 (row, by_model, grades) -> 字符串
 MAIN_BOARD_COLUMNS = [
     "rank", "model", "trim", "price", "sales", "total", "tier",
-    "evidence", "period", "kwh_per_wan", "cell_brand",
+    "evidence", "period", "kwh_per_wan", "cell_brand", "verdict",
 ]
 
 
@@ -240,10 +240,72 @@ def lifecycle_status_cn(status: str) -> str:
     return LIFECYCLE_STATUS_CN.get(str(status or ""), str(status) if status else "—")
 
 
+def car_verdict(row: dict, cand: dict, meta: dict | None = None) -> dict:
+    """机械生成单车的评价（优点/短板/适合人群/购买建议）——纯规则、无模型调用、可复现。
+
+    只用已有结构化字段：scores / tier / evidence_status / lifecycle / note / 事实列。
+    阈值固定写死，输入相同必得相同输出。不编造主观体验。
+    """
+    sc = row.get("scores") or {}
+    fr = row.get("fact_ref") or {}
+    tier = row.get("tier") or ""
+    ev = row.get("evidence_status") or cand.get("evidence_status") or ""
+    lc = (row.get("lifecycle") or {}).get("status", "")
+    pros, cons = [], []
+    # 优点：各维 ≥8.5 给优点标签
+    labels = {"powertrain": "三电强", "safety": "安全高", "adas": "智驾好",
+              "space": "空间大", "value": "性价比高", "control": "操控好",
+              "cabin": "车机流畅", "quality": "品控稳"}
+    for k, lab in labels.items():
+        v = sc.get(k)
+        if isinstance(v, (int, float)) and v >= 8.5:
+            pros.append(lab)
+        elif isinstance(v, (int, float)) and v < 7.0:
+            cons.append(lab.replace("强", "弱").replace("高", "低").replace("好", "弱")
+                        .replace("大", "小").replace("流畅", "一般").replace("稳", "弱"))
+    if ev == "A":
+        pros.append("有官方碰撞成绩")
+    kpw = fr.get("kWh/万元")
+    if isinstance(kpw, (int, float)) and kpw >= 5:
+        pros.append("电量/价格比高")
+    # 短板：月销上界、缺关键数据
+    if str(fr.get("趋势月销", "")).startswith("≤"):
+        cons.append("月销仅为车系上界")
+    if fr.get("CLTC") in (None, "—", ""):
+        cons.append("CLTC未采集")
+    if lc == "facelift_pending":
+        cons.append("改款在即")
+    if lc == "new_launch":
+        cons.append("新车爬坡期")
+    if not pros:
+        pros.append("配置均衡")
+    if not cons:
+        cons.append("无明显结构化短板")
+    # 适合人群：按最突出的维度机械映射
+    top = max((k for k in labels if isinstance(sc.get(k), (int, float))),
+              key=lambda k: sc[k], default="")
+    audience = {"powertrain": "看重续航快充", "safety": "家庭安全优先", "adas": "常用智驾",
+                "space": "大空间家用", "value": "预算敏感", "control": "爱驾驶",
+                "cabin": "重车机体验", "quality": "求省心耐用"}.get(top, "综合家用")
+    # 建议：三档 + 证据 + 生命周期
+    if not tier:
+        advice = "落榜/待核（无档位）"
+    elif tier == "第一档":
+        advice = "建议购买（第一档）"
+    elif tier == "第三档":
+        advice = "暂缓（第三档，等证据）"
+    elif ev == "C":
+        advice = "谨慎（证据C）"
+    else:
+        advice = "按偏好选（第二档）"
+    return {"pros": pros[:4], "cons": cons[:4], "audience": audience, "advice": advice}
+
+
 MAIN_COL_LABELS = {
     "rank": "#", "model": "车型", "trim": "评分配置", "price": "指导价(万)",
     "sales": "趋势月销", "total": "加权分", "tier": "档位", "evidence": "证据",
     "period": "周期", "kwh_per_wan": "kWh/万元", "cell_brand": "电池来源",
+    "verdict": "评价（优缺点/适合人群/建议）",
 }
 
 
@@ -278,7 +340,14 @@ def main_cell(key: str, row: dict, cand: dict, grade: str = "") -> str:
     if key == "kwh_per_wan":
         v = fr.get("kWh/万元")
         mark = " ▲" if grade == "优" else (" ▼" if grade == "弱" else "")
-        return f"{v}{mark}" if v not in (None, "—", "") else "—"
+        if v not in (None, "—", ""):
+            return f"{v}{mark}"
+        reason = fr.get("kWh/万元_缺失原因")
+        return f"—（{reason}）" if reason else "—"
+    if key == "verdict":
+        v = car_verdict(row, cand)
+        return (f"优：{'、'.join(v['pros'])}｜短：{'、'.join(v['cons'])}｜"
+                f"适合：{v['audience']}｜{v['advice']}")
     if key == "cell_brand":
         # v9.6.1：电压并入电池来源；按评分配置判定电压，不按车系
         bp = row.get("battery_detail") or {}
@@ -444,6 +513,14 @@ def selftest() -> int:
         bad.append(f"电池来源未含电压: {bsrc}")
     if main_cell("tier", rtest, rtest) != "第一档":
         bad.append("档位未显示")
+    # v9.6.2：缺失原因 + 评价列机械生成
+    rmiss = {"model": "B", "fact_ref": {"kWh/万元": "—", "kWh/万元_缺失原因": "缺配置价"}}
+    if main_cell("kwh_per_wan", rmiss, rmiss) != "—（缺配置价）":
+        bad.append("kWh万元缺失原因未显示")
+    vtest = car_verdict({"model": "C", "scores": {"safety": 9.0, "quality": 5.7},
+                         "tier": "第二档", "evidence_status": "A"}, {})
+    if not (vtest["pros"] and vtest["cons"] and vtest["advice"]):
+        bad.append("评价列生成不完整")
     if bad:
         print("[selftest FAIL]", bad)
         return 1
