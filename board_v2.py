@@ -411,6 +411,19 @@ def build(cands: list[dict], cfg: dict, policy: dict,
         r["tier"] = (tiers or {}).get(r["model"]) or r.get("tier") or ""
         _bp = battery_platform.get(r["model"], {})
         r["battery_detail"] = _bp   # {voltage, cell, pack, trim, src}
+    # v9.7.8：给每个配置预生成评价文本（此时 tier/fact_ref 已注入），供下拉切换联动
+    if trim_data:
+        import copy as _copy
+        import board_view as _BV
+        row_by_model = {r["model"]: r for r in rows}
+        for mdl, td in trim_data.items():
+            base = row_by_model.get(mdl, {})
+            for t in td.get("trims", []):
+                vrow = _copy.deepcopy(base)
+                vrow["best_trim_detail"] = t
+                v = _BV.car_verdict(vrow, vrow)
+                t["verdict"] = (f"优：{'、'.join(v['pros'])}｜短：{'、'.join(v['cons'])}｜"
+                                f"适合：{v['audience']}｜{v['advice']}")
     bands = band_subboards(rows, cands, policy)
     analyses = analysis_blocks(cands, cfg, weights)
     return {

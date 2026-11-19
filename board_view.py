@@ -249,8 +249,16 @@ def car_verdict(row: dict, cand: dict, meta: dict | None = None) -> dict:
     只用已有结构化字段：scores / tier / evidence_status / lifecycle / note / 事实列。
     阈值固定写死，输入相同必得相同输出。不编造主观体验。
     """
-    sc = row.get("scores") or {}
-    fr = row.get("fact_ref") or {}
+    # v9.7.8：评价基于当前配置的分（best_trim_detail），不是车系基础分
+    bd = row.get("best_trim_detail") or {}
+    sc = bd.get("scores") or row.get("scores") or {}
+    fr = dict(row.get("fact_ref") or {})
+    # 配置级事实覆盖（电压/快充/电芯/电量），让不同配置评价不同
+    if bd:
+        if bd.get("price") and bd.get("battery_kwh"):
+            fr["kWh/万元"] = round(bd["battery_kwh"] / bd["price"], 2)
+        if bd.get("cltc_km"):
+            fr["CLTC"] = bd["cltc_km"]
     tier = row.get("tier") or ""
     ev = row.get("evidence_status") or cand.get("evidence_status") or ""
     lc = (row.get("lifecycle") or {}).get("status", "")
@@ -268,6 +276,24 @@ def car_verdict(row: dict, cand: dict, meta: dict | None = None) -> dict:
                         .replace("大", "小").replace("流畅", "一般").replace("稳", "弱"))
     if ev == "A":
         pros.append("有官方碰撞成绩")
+    # 配置级差异标签（v9.7.8）：从 deltas/charge 提取，不同配置评价不同
+    cfg_tags = []
+    charge = str(bd.get("charge") or "")
+    if "800V" in charge or "900V" in charge:
+        cfg_tags.append("高压快充")
+    if "5C" in charge or "4C" in charge:
+        cfg_tags.append("超充")
+    for d in (bd.get("deltas") or []):
+        why = str(d.get("why") or "")
+        if "激光雷达" in why and d.get("delta", 0) > 0:
+            cfg_tags.append("激光雷达")
+        if "CLTC" in why and d.get("delta", 0) > 0.4:
+            cfg_tags.append("长续航")
+        if "电量" in why and d.get("delta", 0) > 0.4:
+            cfg_tags.append("大电池")
+    # 配置标签优先（让不同配置的评价一眼可辨），维度标签补充，合计不超过4
+    dim_pros = [x for x in pros if x not in cfg_tags]
+    pros = (cfg_tags[:2] + dim_pros)[:4]
     kpw = fr.get("kWh/万元")
     if isinstance(kpw, (int, float)) and kpw >= 5:
         pros.append("电量/价格比高")

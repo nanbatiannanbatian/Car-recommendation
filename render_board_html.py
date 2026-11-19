@@ -285,7 +285,7 @@ function trimCellVals(model,idx){
   var t=TRIMDATA[model].trims[idx],sc=t.scores||{},charge=String(t.charge||''),
       cell=String(t.cell_supplier||'—'),kwh=t.battery_kwh,price=t.price;
   var mv=charge.match(/(900|800|400)\s*V/);
-  return {name:t.name,price:price,total:t.total,power:t.power_score,scores:sc,
+  return {name:t.name,price:price,total:t.total,power:t.power_score,scores:sc,verdict:t.verdict||'',
     cell:cell+(mv?' · '+mv[1]+'V':''),
     kwh:(kwh&&price)?(kwh/price).toFixed(2):'—'};
 }
@@ -299,6 +299,7 @@ function applyTrim(model,idx){
     if(c('c-price'))c('c-price').textContent=v.price;
     if(c('c-cell'))c('c-cell').textContent=v.cell;
     if(c('c-kwh'))c('c-kwh').textContent=v.kwh;
+    if(c('c-verdict')&&v.verdict)c('c-verdict').innerHTML=v.verdict.replace(/优：/,'<b style="color:#1a7f37">优</b> ').replace(/｜短：/,'<br><b style="color:#b42318">短</b> ').replace(/｜适合：/,'<br>适合：').replace(/｜(建议|暂缓|谨慎|落榜)/,'<br><b>$1</b>');
     row.querySelectorAll('.dimcell').forEach(function(d){
       var k=d.getAttribute('data-dim');
       if(v.scores[k]!=null)d.textContent=Number(v.scores[k]).toFixed(1);});
