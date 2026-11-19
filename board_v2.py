@@ -30,6 +30,15 @@ v2 把它们收敛成一套：
 各列前 10 再汇总——这样每个价位段的前 10 都看得到，段内选车逻辑各自成立。
 与价位段子榜的区别：子榜是全量分组视图；分段汇总总榜是各段前几名拼成的 Top N 总榜。
 
+纯产品力总榜（v8.3.3，并列辅助榜）
+------------------------------------
+`product_power_board()`：剔除性价比维度（value），其余 7 维按原权重归一化×10，
+全池混排、不分价位段（目的正是跨价位直接比产品力）。回答「不看价格谁的产品力更强」。
+纪律：这是【辅助榜】，与主榜并列展示，主榜（8维含性价比）仍是唯一权威排序，
+本榜绝不改动主榜任何名次；两榜各自的分数、名次、口径都分开标注，避免混淆。
+rank_delta = 主榜名次 - 产品力名次；正数=剔除性价比后名次上升（性价比拖累了它），
+负数=剔除性价比后名次下降（它靠性价比抬升了主榜名次）。
+
 CLI
 ---
   python3 board_v2.py --candidates <带scores的候选池.json> \
@@ -201,6 +210,57 @@ def segmented_summary(rows: list[dict], cands: list[dict], policy: dict,
     return {"per_band": per_band, "bands": bands_meta, "items": summary}
 
 
+# ---------------------------------------------------------------- 纯产品力总榜（并列辅助榜）
+def product_power_board(rows: list[dict], cands: list[dict], cfg: dict,
+                        policy: dict | None = None) -> dict:
+    """纯产品力总榜：剔除性价比(value)，其余7维按原权重归一化×10，全池混排。
+
+    - 与主榜并列的【辅助榜】，回答「不看价格谁的产品力更强」。
+    - 纪律：主榜（8维含性价比）仍是唯一权威排序；本榜不改主榜任何名次、分数、权重。
+    - 全池混排、不分价位段——因为目的正是跨价位直接比产品力。
+    - rank_delta = 主榜名次 - 产品力名次；正=剔除性价比后名次上升，负=靠性价比抬升。
+    """
+    W = {d["key"]: d["weight"] for d in cfg["dimensions"]}
+    pb_cfg = (policy or {}).get("product_board", {})
+    value_key = pb_cfg.get("excluded_dimension", "value")
+    keys = [k for k in W if k != value_key]
+    tw = sum(W[k] for k in keys)
+    if tw <= 0:
+        raise RuntimeError("产品力维度权重合计为0，无法归一化")
+    by_model = {c["model"]: c for c in cands}
+    main_rank = {r["model"]: r["rank"] for r in rows}
+    main_score = {r["model"]: r["total"] for r in rows}
+    band_of = {}
+    if policy:
+        for label, models in assign_bands(cands, policy).items():
+            for m in models:
+                band_of[m] = label
+    items = []
+    for mdl, c in by_model.items():
+        sc = c.get("scores") or {}
+        if any(k not in sc for k in keys):
+            continue  # 维度不全的车不进产品力榜
+        pp = sum(sc[k] * W[k] for k in keys) / tw * 10
+        items.append({
+            "model": mdl,
+            "power_score": round(pp, 2),
+            "main_score": main_score.get(mdl),
+            "main_rank": main_rank.get(mdl),
+            "price": price_of(c),
+            "band": band_of.get(mdl, ""),
+        })
+    items.sort(key=lambda x: -x["power_score"])
+    for i, it in enumerate(items, 1):
+        it["power_rank"] = i
+        it["rank_delta"] = (it["main_rank"] - i) if it["main_rank"] is not None else None
+    return {
+        "excluded_dimension": value_key,
+        "note": "辅助榜：剔除性价比/7维归一化×10/全池混排；主榜8维全方面仍是唯一权威排序",
+        "n": len(items),
+        "items": items,
+    }
+
+
 # ---------------------------------------------------------------- 组装
 def build(cands: list[dict], cfg: dict, policy: dict,
           facts: dict[str, dict] | None = None,
@@ -225,6 +285,7 @@ def build(cands: list[dict], cfg: dict, policy: dict,
         "main_board": rows,
         "band_subboards": bands,
         "segmented_summary": segmented_summary(rows, cands, policy, per_band),
+        "product_power_board": product_power_board(rows, cands, cfg, policy),
     }
 
 
@@ -350,7 +411,20 @@ def run_selftest():
     assert ss_scores == sorted(ss_scores, reverse=True), "分段汇总总榜未按分数降序"
     assert all(it["score"] == all_scores[it["model"]] for it in ss["items"]), "汇总分数与主榜不一致"
     assert len({it["band"] for it in ss["items"]}) == len(ss["bands"]), "有价位段没有代表进总榜"
-    print("[selftest OK] 主榜降序 / 事实列不计分 / 参考列计算 / 子榜复用分数 / 贵车不被硬排除 / 分段汇总总榜")
+    # 7) 纯产品力总榜：降序 / 覆盖全池 / main_score 与主榜一致 / 只改 value 不改产品力分
+    pp = data["product_power_board"]
+    assert pp["excluded_dimension"] == "value"
+    pp_scores = [it["power_score"] for it in pp["items"]]
+    assert pp_scores == sorted(pp_scores, reverse=True), "产品力榜未按产品力分降序"
+    assert pp["n"] == len(cands)
+    assert all(it["main_score"] == all_scores[it["model"]] for it in pp["items"]), \
+        "产品力榜携带的主榜分与主榜不一致"
+    mid = next(c for c in cands if c["model"] == "中价车")
+    mid2 = json.loads(json.dumps(mid)); mid2["model"] = "中价车低性价比"; mid2["scores"]["value"] = 2
+    pp2 = product_power_board(main_board([mid, mid2], cfg), [mid, mid2], cfg, pol)
+    d_by = {it["model"]: it["power_score"] for it in pp2["items"]}
+    assert d_by["中价车"] == d_by["中价车低性价比"], "改 value 却改变了产品力分（性价比未真正剔除）"
+    print("[selftest OK] 主榜降序 / 事实列不计分 / 参考列计算 / 子榜复用分数 / 贵车不被硬排除 / 分段汇总总榜 / 纯产品力榜(剔除性价比)")
 
 
 if __name__ == "__main__":
