@@ -158,11 +158,21 @@ def selftest() -> int:
         bad.append("无拆车车误报置信")
     if c2[0]["experience_adjust"]["dimensions"]["adas"]["before"] != 8.0:
         bad.append("审计 before 错误")
+    # 数据源注册表完整性
+    ds_path = os.path.join(HERE, "categories", "data_sources.json")
+    if os.path.exists(ds_path):
+        ds = json.load(open(ds_path, encoding="utf-8"))
+        statuses = {s["status"] for s in ds["sources"]}
+        if "integrated" not in statuses or "legal_risk" not in statuses:
+            bad.append("数据源注册表缺关键状态")
+        if not ds.get("not_integrated_summary"):
+            bad.append("数据源注册表缺未接入清单")
     if bad:
         print("[selftest FAIL]", bad)
         return 1
-    print(f"[selftest OK] 证据库 {len(lib['entries'])} 条 / {len({e['model'] for e in lib['entries']})} 款；"
-          "极氪7X 智驾下修操控上修；无证据不动；只改四维")
+    print(f"[selftest OK] 证据库 {len(lib['entries'])} 条 / {len({e['model'] for e in lib['entries']})} 款 / "
+          f"数据源注册表 {len(ds['sources']) if os.path.exists(ds_path) else 0} 渠道；"
+          "四维调整+无证据不动+拆车只作置信")
     return 0
 
 

@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 9.4.0
+version: 9.4.1
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v9.4.0）
+# Car recommendation —— 可信购车榜单引擎（v9.4.1）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -2100,3 +2100,24 @@ A/B 矩阵加第 26 项体验自检。
 21 款中型纯电 SUV 榜：极氪7X 四维 智驾8.5/操控9.0/车机8.3/三电8.3，总分 86.4→84.6 仍 #1；
 小鹏G6 #11→#8、问界M5 #13→#10（各↑3）；腾势N7/深蓝S07/乐道L60 因车机或能耗证据下修。
 A/B 矩阵 26 项、全部 selftest 通过。
+
+---
+
+## v9.4.1 · 数据源注册表（2026-11-19）
+
+### 为什么要改
+用户问 B站/知乎/抖音/小红书 能不能接、还有哪些数据源、已接入渠道有没有遗漏。
+调研结论：官方 API 四家 UGC 都拿不到第三方车型评测（B站无全站搜索、抖音能力改造中且禁品类词、
+小红书只有 basic_info 且有两起爬虫判例赔110万/490万）；**只有知乎数据开放平台可行**
+（实名后每日约5000次免费搜索，但只给摘要、单次≤10条，只能做声量层）。
+已接入渠道的未用数据：易车开放平台有实测API+中保研/中汽研安全榜（需企业商务）、
+懂车帝开放平台有懂车分+全网舆情（需商务）、汽车之家无官方API但有第三方结构化口碑接口（付费）。
+
+### 实现（用户指示"耗时就先做标识"）
+- 新增 `categories/data_sources.json`：13 个渠道逐条登记 status（integrated/partial/
+  available_needs_auth/ugc_needs_credentials/third_party_paid/legal_risk）、数据类型、接入条件、优先级。
+- 明确写出 `not_integrated_summary`：需商务/凭据的4项、合规风险不建议采集的3项、当前零覆盖的IVISTA。
+- selftest 加注册表完整性断言；不改分数、不改页面渲染。
+
+### 未接事项（需用户决策，不擅自做）
+知乎需用户提供 Access Secret；易车/懂车帝/汽车之家 API 需企业资质或付费；UGC 平台不采集。
