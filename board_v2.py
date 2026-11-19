@@ -183,10 +183,24 @@ def segmented_summary(rows: list[dict], cands: list[dict], policy: dict,
     - 价值：保证每个价位段都有车进总榜，避免高端车凭产品力垄断前列；
       这是全价位主榜（纯拼综合分）之外的「带分段配额的总榜」视角。
     - 纪律：分数全部来自主榜 rows，不重新打分、不改权重。
+    - v8.3.6 起：**非价位段提问（候选只落一个段）时跳过**。此时「各段取前几→汇总」
+      等于把主榜原样再列一遍，没有信息增量；用户已给价位段的场景应看主榜+纯产品力榜。
+      多段（全价位榜）时规则不变，照常分段取前几汇总。
     """
     by_model = {c["model"]: c for c in cands}
     score_by_model = {r["model"]: r["total"] for r in rows}
     grouped = assign_bands(cands, policy)
+    nonempty = [label for label, models in grouped.items() if models]
+    if len(nonempty) <= 1:
+        return {
+            "per_band": per_band,
+            "bands": [{"band": label, "n_total": len(grouped[label]), "n_taken": 0}
+                      for label in grouped],
+            "items": [],
+            "skipped": True,
+            "reason": ("候选只落入 1 个价位段（提问已给价位段），分段汇总等于重列主榜，"
+                       "无信息增量；已跳过。多段全价位榜仍按各段前 N 汇总。"),
+        }
     summary: list[dict] = []
     bands_meta: list[dict] = []
     for label, models in grouped.items():
@@ -207,7 +221,8 @@ def segmented_summary(rows: list[dict], cands: list[dict], policy: dict,
     summary.sort(key=lambda x: -(x["score"] if x["score"] is not None else -1e9))
     for i, item in enumerate(summary, 1):
         item["summary_rank"] = i
-    return {"per_band": per_band, "bands": bands_meta, "items": summary}
+    return {"per_band": per_band, "bands": bands_meta, "items": summary,
+            "skipped": False, "reason": ""}
 
 
 # ---------------------------------------------------------------- 纯产品力总榜（并列辅助榜）
@@ -365,7 +380,11 @@ def render_md(data: dict) -> str:
         ref = " · ".join(f"{k} {v}" for k, v in r["fact_ref"].items() if v != "—")
         L.append(f"| {r['rank']} | {r['model']} | {r['total']:.1f} | {r.get('tier','')} | {ref} |")
     ss = data.get("segmented_summary", {})
-    if ss:
+    if ss and ss.get("skipped"):
+        L += ["", "## 分段汇总总榜：已跳过", "",
+              f"> {ss.get('reason', '候选只落入单一价位段')}", "",
+              "> 本次提问已给价位段，直接看主榜 + 下方纯产品力辅助榜即可。"]
+    elif ss:
         L += ["", f"## 分段汇总总榜（各价位段前 {ss.get('per_band', 10)} 名 → 汇总成总榜）", "",
               "先按价位段各取前几名，再按主榜分数汇成一榜；分数全部来自主榜，不重新打分。", ""]
         L += ["| # | 车型 | 加权分 | 价位段 | 段内名次 |", "|---|---|---|---|---|"]
@@ -426,6 +445,15 @@ def run_selftest():
     assert ss_scores == sorted(ss_scores, reverse=True), "分段汇总总榜未按分数降序"
     assert all(it["score"] == all_scores[it["model"]] for it in ss["items"]), "汇总分数与主榜不一致"
     assert len({it["band"] for it in ss["items"]}) == len(ss["bands"]), "有价位段没有代表进总榜"
+    assert ss.get("skipped") is False, "多段榜不应跳过分段汇总"
+    # 6b) v8.3.6：单价位段（提问已给价位段）时跳过分段汇总，但纯产品力榜仍在
+    single = [dict(c, price_wan=15.0) for c in cands[:2]]
+    d1 = build(single, cfg, pol, facts)
+    ss1 = d1["segmented_summary"]
+    assert ss1.get("skipped") is True and ss1["items"] == [], "单段榜应跳过分段汇总"
+    assert d1["product_power_board"]["items"], "单段榜仍应保留纯产品力榜"
+    md1 = render_md(d1)
+    assert "分段汇总总榜：已跳过" in md1, "单段跳过未在 md 中说明"
     # 7) 纯产品力总榜：降序 / 覆盖全池 / main_score 与主榜一致 / 只改 value 不改产品力分
     pp = data["product_power_board"]
     assert pp["excluded_dimension"] == "value"

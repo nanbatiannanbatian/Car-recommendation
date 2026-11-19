@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 8.3.5
+version: 8.3.6
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v8.3.5）
+# Car recommendation —— 可信购车榜单引擎（v8.3.6）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -1847,3 +1847,26 @@ selftest 7 项全过（新增：产品力榜降序、覆盖全池、携带主榜
 `render_board_html.py --selftest` + `board_v2/master_pool/cross_verify/ranking/robust --selftest` 全过；
 用 2026-10 纯电中型轿车 12–18万榜（14 款）验证：主榜/三档/分段/产品力/参考列全部正确呈现，
 `--no-html` 时只出 Markdown。`build_release.py` 打包 10 项检查通过（文档引用的脚本均在包内）。
+
+---
+
+## v8.3.6 · 单价位段跳过分段汇总，保留纯产品力榜（2026-11-19）
+
+### 为什么要改
+v8.3 的「分段汇总总榜」是为**没给价位段**的提问设计的：先分段、各段取前几、再汇总，
+避免全价位混排被高端车垄断。但用户给出价位段（如「12–18万」）后，所有候选只落入一个段，
+分段汇总就退化成把主榜原样再列一遍——没有信息增量，还多占一屏。
+另一方面，**纯产品力榜**（剔除性价比、跨价位直接比产品力）在同一价位段内仍有意义：
+12–18万榜实测红旗天工05 主榜#8→产品力#4（↑4）、风云A9 #5→#10（↓5），
+揭示的是「靠价格抬升还是靠产品力」，与是否已给价位段无关。
+
+### 规则（已固化进 `board_v2.py:segmented_summary()`）
+- 统计非空价位段数：`≤1` → 跳过分段汇总（`segmented_summary.skipped=true` + reason），
+  Markdown/HTML 给一句说明而不是空表；`≥2` → 维持 v8.3 原规则不变（各段前 N → 汇总）。
+- 纯产品力榜**不受影响**，任何场景都保留。
+- 自检：`board_v2.py --selftest` 新增单段断言（跳过 + 产品力榜仍在 + md 有说明）。
+
+### 验收
+- 12–18万中型纯电轿车榜（14 款，单段）：分段汇总 skipped，产品力榜 n=14，主榜/三档不变。
+- 全价位中型纯电 SUV 榜（3 段）：分段汇总照常 20 条（入门10/主流9/高端1）。
+- 全部 selftest 与 A/B 24 项能力矩阵回归通过。

@@ -181,8 +181,12 @@ def render(data, summary, title, as_of):
                          f"<span style='color:#7b8590'>({e(it.get('price'))}万)</span></li>")
             H.append("</ol></div>")
 
-    # 分段汇总总榜
-    if seg.get("items"):
+    # 分段汇总总榜：单段提问已跳过，给一句说明而不是空表
+    if seg.get("skipped"):
+        H.append(f'<h2>分段汇总总榜 <span>已跳过 · 提问已给价位段</span></h2>'
+                 f'<div class="rule">{e(seg.get("reason", "候选只落入单一价位段"))}'
+                 f'本次看主榜 + 下方纯产品力辅助榜即可。</div>')
+    elif seg.get("items"):
         H.append(f"<h2>分段汇总总榜 <span>各段取前 {e(seg.get('per_band'))} → 按主榜分数汇总 · 不重新打分</span></h2>")
         H.append("<table><thead><tr><th>#</th><th>车型</th><th>分数</th><th>来自价位段</th><th>段内名次</th></tr></thead><tbody>")
         for i, it in enumerate(seg["items"], 1):
