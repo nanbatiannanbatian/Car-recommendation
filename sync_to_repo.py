@@ -43,6 +43,7 @@ NEW_FILES = [
     "cross_verify.py",                          # v8.2 多源交叉核验
     "categories/verified_overrides.json",       # v8.2 网查确认回填表
     "render_board_html.py",                     # v8.3.5 榜单 HTML 渲染器
+    "board_view.py",                            # v9.0.0 展示区块注册表（唯一事实源）
 ]
 
 

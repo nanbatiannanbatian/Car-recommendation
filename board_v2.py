@@ -312,6 +312,8 @@ def build(cands: list[dict], cfg: dict, policy: dict,
             "dimensions": [{"key": d["key"], "label": d["label"],
                             "weight": d["weight"]} for d in cfg["dimensions"]],
             "fact_reference_columns": list(policy.get("fact_reference_columns") or []),
+            # v9.0：生命周期事实随数据出（历史页面有、v8.x 漏渲染）
+            "lifecycle": {c["model"]: c["lifecycle"] for c in cands if c.get("lifecycle")},
         },
         "main_board": rows,
         "band_subboards": bands,
@@ -365,7 +367,8 @@ def cli(argv=None):
     policy = _load(a.policy)
     facts = _load(a.facts) if a.facts else {}
     data = build(cands, cfg, policy, facts, per_band=a.per_band)
-    md = render_md(data)
+    _sum = _load(a.summary) if a.summary and os.path.exists(a.summary) else None
+    md = render_md(data, _sum)
     if a.out:
         os.makedirs(a.out, exist_ok=True)
         json.dump(data, open(os.path.join(a.out, "board_v2_data.json"), "w", encoding="utf-8"),
@@ -387,71 +390,136 @@ def cli(argv=None):
         print(md)
 
 
-def render_md(data: dict) -> str:
-    L = [f"# {data['meta']['title']}", "",
-         "> 名次来源：**8维加权打分榜（唯一主榜）**。kWh/万元、电耗等为『参考·不计分』列。", ""]
-    # 事实列覆盖披露：哪些字段本榜有数据、哪些缺失（不猜不造，明确标出）
-    fact_cols = (data.get("meta", {}).get("fact_reference_columns") or [])
-    if fact_cols:
-        have = [c["label"] for c in fact_cols
-                if any((r.get("fact_ref") or {}).get(c["label"]) not in (None, "—", "")
-                       for r in data["main_board"])]
-        lack = [c["label"] for c in fact_cols if c["label"] not in have]
+def render_md(data: dict, summary: dict | None = None) -> str:
+    """Markdown 渲染：遍历 board_view.BLOCKS 注册表，缺数据的区块自动不渲染。
+
+    所有展示区块的唯一清单在 board_view.py —— 加区块/改顺序只改那边。
+    """
+    import board_view as BV
+    if summary is None:
+        summary = _load_summary_sidecar()
+    active = BV.active_blocks(data, summary)
+    ids = {b["id"] for b in active}
+    meta = data.get("meta") or {}
+    rows = data.get("main_board") or []
+    L = [f"# {meta.get('title', '统一榜单')}", ""]
+
+    if "lede" in ids:
+        L += ["> 名次来源：**8维加权打分榜（唯一主榜）**。kWh/万元、电耗等为『参考·不计分』列；"
+              "纯产品力榜为并列辅助视角，不改主榜名次。", ""]
+
+    if "fact_coverage" in ids:
+        have, lack = BV.fact_coverage(meta, rows)
         if lack:
             L += ["> **事实参考列覆盖**：本榜有数据的是 " + "、".join(have) + "；"
                   "「—」表示未采集到该字段（" + "、".join(lack) + "），不以估计值填充。", ""]
-    L += ["## 全价位打分主榜", "", "| # | 车型 | 加权分 | 档位 | 事实参考列（不计分） |",
-          "|---|---|---|---|---|"]
-    for r in data["main_board"]:
-        ref = " · ".join(f"{k} {v}" for k, v in r["fact_ref"].items() if v != "—")
-        L.append(f"| {r['rank']} | {r['model']} | {r['total']:.1f} | {r.get('tier','')} | {ref} |")
 
-    # v8.3.9：总分维度明细——每行 8 维原始分 + 加权贡献，让用户看穿总分怎么来的
-    dims = data["meta"].get("dimensions") or []
-    if dims:
-        L += ["", "## 总分构成（8 维明细）", "",
+    if "main_board" in ids:
+        L += ["## 打分主榜", "", "| # | 车型 | 加权分 | 档位 | 证据 | 事实参考列（不计分） |",
+              "|---|---|---|---|---|---|"]
+        for r in rows:
+            ref = " · ".join(f"{k} {v}" for k, v in (r.get("fact_ref") or {}).items() if v != "—")
+            L.append(f"| {r['rank']} | {r['model']} | {r['total']:.1f} | "
+                     f"{r.get('tier','')} | {r.get('evidence','')} | {ref} |")
+
+    if "score_breakdown" in ids:
+        dims = meta.get("dimensions") or []
+        L += ["", "## 总分构成（维度明细）", "",
               "> 表头括号是该维权重，格内是原始维分（0–10）；加权分 = Σ(维分×权重) × 10 + adjust。", ""]
-        head = "| # | 车型 | " + " | ".join(f"{d['label']}({d['weight']*100:.1f}%)" for d in dims) + " | 加权分 |"
-        sep = "|---|---|" + "---|" * (len(dims) + 1)
-        L += [head, sep]
-        for r in data["main_board"]:
+        L += ["| # | 车型 | " + " | ".join(BV.dimension_lines(meta)) + " | 加权分 |",
+              "|---|---|" + "---|" * (len(dims) + 1)]
+        for r in rows:
             sc = r.get("scores") or {}
-            cells = []
-            for d in dims:
-                v = sc.get(d["key"])
-                cells.append(f"{v:.1f}" if isinstance(v, (int, float)) else "—")
+            cells = [f"{sc[d['key']]:.1f}" if isinstance(sc.get(d['key']), (int, float)) else "—"
+                     for d in dims]
             L.append(f"| {r['rank']} | {r['model']} | " + " | ".join(cells) + f" | {r['total']:.1f} |")
-    ss = data.get("segmented_summary", {})
-    if ss and ss.get("skipped"):
-        pass  # v8.3.8：单段无数据，整块不渲染（连「已跳过」说明也不占版面）
-    elif ss:
-        L += ["", f"## 分段汇总总榜（各价位段前 {ss.get('per_band', 10)} 名 → 汇总成总榜）", "",
-              "先按价位段各取前几名，再按主榜分数汇成一榜；分数全部来自主榜，不重新打分。", ""]
-        L += ["| # | 车型 | 加权分 | 价位段 | 段内名次 |", "|---|---|---|---|---|"]
-        for it in ss["items"]:
-            L.append(f"| {it['summary_rank']} | {it['model']} | {it['score']:.1f} | {it['band']} | {it['rank_in_band']} |")
-    if data["meta"].get("band_subboards_skipped"):
-        pass  # v8.3.8：单段无数据，整块不渲染
-    else:
+
+    if "tiers" in ids:
+        t = (summary or {}).get("tiers") or {}
+        if t and all(k in t for k in ("T1", "T2", "T3")):
+            names = {"T1": "第一档 · 可直接买", "T2": "第二档 · 按偏好取舍", "T3": "第三档 · 证据不足/暂缓"}
+            L += ["", "## 三档分级", ""]
+            for k in ("T1", "T2", "T3"):
+                models = t.get(k) or []
+                L.append(f"- **{names[k]}（{len(models)} 款）**：{'、'.join(models) if models else '—'}")
+        else:
+            by = {"T1": [], "T2": [], "T3": []}
+            for r in rows:
+                k = str(r.get("tier") or "").upper()
+                if k in by: by[k].append(r["model"])
+            L += ["", "## 三档分级", ""]
+            for k in ("T1", "T2", "T3"):
+                L.append(f"- **{k}（{len(by[k])} 款）**：{'、'.join(by[k]) if by[k] else '—'}")
+
+    if "band_subboards" in ids:
         L += ["", "## 价位段子榜（复用主榜分数，不重新打分）", ""]
-        for b in data["band_subboards"]:
+        for b in data.get("band_subboards") or []:
             L += [f"### {b['band']}", ""]
-            for i, it in enumerate(b["items"], 1):
+            for i, it in enumerate(b.get("items") or [], 1):
                 L.append(f"{i}. {it['model']} — {it['score']:.1f} 分（{it['price']}万）")
             L.append("")
-    # 纯产品力总榜（辅助榜，v8.3.7 起 md 也渲染，此前只有 HTML 有）
-    pp = data.get("product_power_board") or {}
-    if pp.get("items"):
-        L += ["", f"## 纯产品力总榜（辅助榜 · 剔除{pp.get('excluded_dimension', 'value')} · 不改主榜名次）", "",
-              "> 回答「不看价格谁的产品力更强」；rank_delta 正＝性价比拖累，负＝靠性价比抬升。", "",
-              "| # | 车型 | 产品力分 | 主榜名次 | rank_delta | 价格 |",
-              "|---|---|---|---|---|---|"]
-        for it in pp["items"]:
+
+    if "segmented_summary" in ids:
+        ss = data.get("segmented_summary") or {}
+        L += ["", f"## 分段汇总总榜（各段前 {ss.get('per_band', 10)} 名 → 汇总）", "",
+              "分数全部来自主榜，不重新打分。", "",
+              "| # | 车型 | 加权分 | 价位段 | 段内名次 |", "|---|---|---|---|---|"]
+        for it in ss.get("items") or []:
+            L.append(f"| {it['summary_rank']} | {it['model']} | {it['score']:.1f} | "
+                     f"{it['band']} | {it['rank_in_band']} |")
+
+    if "product_power" in ids:
+        pp = data.get("product_power_board") or {}
+        L += ["", f"## 纯产品力总榜（辅助榜 · 剔除{pp.get('excluded_dimension','value')} · 不改主榜名次）", "",
+              "> rank_delta 正＝性价比拖累，负＝靠性价比抬升。", "",
+              "| # | 车型 | 产品力分 | 主榜名次 | rank_delta | 价格 |", "|---|---|---|---|---|---|"]
+        for it in pp.get("items") or []:
             d = it.get("rank_delta")
-            dt = f"{d:+d}" if isinstance(d, int) else "—"
             L.append(f"| {it['power_rank']} | {it['model']} | {it['power_score']:.2f} | "
-                     f"#{it['main_rank']} | {dt} | {it.get('price', '—')} |")
+                     f"#{it['main_rank']} | {f'{d:+d}' if isinstance(d,int) else '—'} | {it.get('price','—')} |")
+
+    if "evidence_notes" in ids:
+        L += ["", "## 逐车取证依据（点开可复核）", ""]
+        for r in rows:
+            note = r.get("note") or "—"
+            fr = r.get("fact_ref") or {}
+            extras = []
+            if fr.get("电芯"): extras.append(f"电芯 {fr['电芯']}")
+            if fr.get("趋势月销"): extras.append(f"趋势月销 {fr['趋势月销']}")
+            L.append(f"- **{r['model']}**（证据 {r.get('evidence','?')}）：{note}"
+                     + (f"｜{' · '.join(extras)}" if extras else ""))
+
+    if "lifecycle" in ids:
+        lc = (summary or {}).get("boards") or {}
+        # summary.boards 可能按分榜聚合；尝试找到生命周期条目
+        life = meta.get("lifecycle") or (summary or {}).get("lifecycle") or {}
+        if life:
+            L += ["", "## 生命周期提示（销量下滑 ≠ 车不行）", ""]
+            for model, info in (life.items() if isinstance(life, dict) else []):
+                L.append("- " + BV.lifecycle_line(model, info))
+
+    if "dropped" in ids:
+        L += ["", "## 落榜与待核名单（落榜 ≠ 车不好）", ""]
+        for lab, b in ((summary or {}).get("boards") or {}).items():
+            if isinstance(b, dict) and b.get("dropped"):
+                L.append(f"- {lab}：过闸 {b.get('passed')} / 落榜 {b.get('dropped')}（见 report.md 逐条原因）")
+        if (summary or {}).get("dropped"):
+            L.append(f"- 合计落榜 {summary['dropped']} 款")
+
+    if "method_boundary" in ids:
+        L += ["", "## 方法与边界", ""] + [f"- {t}" for t in BV.method_boundary_text()]
+
+    if "reproduce" in ids:
+        L += ["", "## 复现说明", ""] + [f"- {t}" for t in BV.reproduce_text(meta)]
+
     return "\n".join(L)
+
+
+def _load_summary_sidecar() -> dict | None:
+    """render_md 在没有显式 summary 时，尝试读同目录 summary.json（pipeline 产物）。"""
+    # 这里不自动读文件——避免 render_md 变成有副作用的函数；
+    # board_v2 CLI 会把 summary 显式传进来。保留钩子供调用方覆盖。
+    return None
 
 
 def run_selftest():

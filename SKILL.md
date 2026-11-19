@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 8.3.9
+version: 9.0.0
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v8.3.9）
+# Car recommendation —— 可信购车榜单引擎（v9.0.0）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -1930,3 +1930,38 @@ v8.3.7 让价位段子榜和分段汇总在单价位段时「跳过」，但仍�
 12–18万榜：维度明细 8 列全出（三电18%/安全16.2%/智驾13.5%/空间12.6%/性价比11.7%/操控9%/车机9%/品控10%），
 覆盖披露写明「有数据=指导价/电芯/趋势月销；缺=电池/kWh·万元/电耗/CLTC/800V」。
 selftest 加断言（meta 8 维、md 含维度表与权重、覆盖披露）。全部 selftest + A/B 24 项通过。
+
+---
+
+## v9.0.0 · 页面展示逻辑单点收敛 + 历史必要区块补回（2026-11-19）
+
+### 为什么要改（架构问题）
+历史漂亮页面（各 run 目录的 `build_*.py`）里有丰富区块：8维拆解、逐车取证依据、事实参考区、
+生命周期、落榜名单、方法与边界、复现说明。v8.3.5 把 HTML 固化进发布包后，连续几轮「改一处漏一处」：
+事实列空了、HTML 有产品力榜 md 没有、跳过时连说明占版面、三档/生命周期在 md 里消失……
+根因是展示逻辑散在两处（board_v2.render_md 与 render_board_html.render），各改各的。
+
+### 方案（已实现）
+- 新增 **`board_view.py`** —— 页面展示的唯一事实源：
+  - `BLOCKS` 注册表列出全部 13 个区块（id / 标题 / 适用条件 / 数据来源）
+  - `REQUIRED_BLOCK_IDS` 是契约：8 个历史必要区块任何版本不得少
+  - `active_blocks(data, summary)` 判定当前数据该渲染哪些块
+  - 公共辅助：`fact_coverage()` / `dimension_lines()` / `lifecycle_line()` /
+    `method_boundary_text()` / `reproduce_text()` —— 文案与格式只写一份
+  - `board_view.py --selftest` 守契约（A/B 矩阵已加为第 25 项）
+- `board_v2.py.render_md()` 与 `render_board_html.py.render()` 改为**遍历同一注册表**，
+  每块只负责自己的标记语言；新增区块改注册表 + 两处各一个分支，不再到处找漏。
+- 数据侧：board_v2 的 `meta` 随数据带出 `dimensions` / `fact_reference_columns` / `lifecycle`，
+  渲染器只读，不再依赖外部 summary 才能出三档/生命周期。
+
+### 补回的历史必要区块（此前 v8.x 缺失）
+逐车取证依据（note/证据等级/销量口径）、生命周期提示（换代/清库/爬坡）、
+落榜与待核名单、方法与边界（公式/稳健性读法/闸门/排除理由）、复现说明。
+非必要且按 v7 决定已废除的：独立事实榜（已降级为参考列）、
+选车对比逻辑（只对多段全价位榜有意义，单段不适用）。
+
+### 验收
+- 12–18万榜 HTML/MD 区块集合**完全一致**：打分主榜 / 总分构成 / 三档 / 产品力榜 /
+  逐车取证 / 生命周期 / 落榜 / 方法与边界 / 复现（9 块；两段榜再加子榜与分段汇总 = 11 块）。
+- 三个 selftest 全绿（注册表契约 13 项、必要 8 项、HTML 11 块）；
+  A/B 矩阵加入 board_view 契约测试（提交后重导出即可跑通）。
