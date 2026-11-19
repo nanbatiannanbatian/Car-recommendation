@@ -512,6 +512,23 @@ def render_md(data: dict, summary: dict | None = None) -> str:
             L.append(f"| {it['power_rank']} | {it['model']} | {it['power_score']:.2f} | "
                      f"#{it['main_rank']} | {f'{d:+d}' if isinstance(d,int) else '—'} | {it.get('price','—')} |")
 
+    if "experience_adjust" in ids:
+        ea = meta.get("experience_adjust") or {}
+        L += ["", "## 体验证据修正（智驾/操控 · 不碰其它维）", "",
+              "> 有证据才调整（来源分级加权、每维封顶 ±1.5），无证据维持硬件口径不插补。", "",
+              "| 车型 | 维度 | 前→后 | 调整 | 依据 |", "|---|---|---|---|---|"]
+        for model, info in ea.items():
+            for dim, det in (info.get("dimensions") or {}).items():
+                delta = det.get("delta", 0)
+                if not delta:
+                    continue
+                dlabel = "智驾" if dim == "adas" else ("操控" if dim == "control" else dim)
+                srcs = det.get("evidence") or []
+                ref = "; ".join(
+                    f"{s.get('source_type')} {s.get('date')} {s.get('url')}" for s in srcs)
+                L.append(f"| {model} | {dlabel} | {det.get('before')}→{det.get('after')} | "
+                         f"{delta:+.2f} | {ref} |")
+
     if "evidence_notes" in ids:
         L += ["", "## 逐车取证依据（点开可复核）", "",
               "> 承接主榜参考列之外的完整事实（指导价/电量/CLTC/月销/800V）。", ""]

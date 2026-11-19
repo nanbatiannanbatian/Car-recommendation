@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 9.3.0
+version: 9.3.1
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v9.3.0）
+# Car recommendation —— 可信购车榜单引擎（v9.3.1）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -2063,3 +2063,11 @@ kWh/万元 作为既有参考项正常显示（如 MG 07 5.28、风云A9 5.40，
 特斯拉Model Y 智驾 7.0→6.0（84.7%垫底）但操控 8.2→9.2（麋鹿80.9第一），净名次不变。
 共 9 款车被调，其余 12 款标"仅硬件口径"不插补。
 A/B 矩阵加第 26 项体验自检。
+
+---
+
+## v9.3.1 · 页面展示体验证据修正（2026-11-19，用户确认后实施）
+
+用户确认"增加页面渲染"：board_view 注册表加 `experience_adjust` 区块（14项），
+有审计数据时在 HTML/Markdown 展示"车型/维度/前→后/调整量/依据来源（可点开的URL）"，
+无证据的车不出现该区块。selftest 加区块激活断言；Q1 榜实测 9 款车的调整全部带来源链接呈现。

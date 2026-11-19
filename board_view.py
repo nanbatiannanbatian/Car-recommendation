@@ -41,6 +41,8 @@ BLOCKS = [
      "desc": "多段全价位榜才有；各段前N按主榜分数汇总"},
     {"id": "product_power", "title": "纯产品力总榜", "when": "has_product_power",
      "desc": "辅助榜，剔除性价比、全池混排，不改主榜名次"},
+    {"id": "experience_adjust", "title": "体验证据修正", "when": "has_experience",
+     "desc": "智驾/操控按可核验体验证据调整，列明来源与调整量；无证据车仅硬件口径"},
     {"id": "evidence_notes", "title": "逐车取证依据", "when": "has_notes",
      "desc": "每款车的取证要点/证据等级/销量口径，点开可复核"},
     {"id": "lifecycle", "title": "生命周期提示", "when": "has_lifecycle",
@@ -94,6 +96,7 @@ def active_blocks(data: dict, summary: dict | None = None) -> list[dict]:
         "has_tiers": has_tiers,
         "multi_band": multi_band,
         "has_product_power": bool((data.get("product_power_board") or {}).get("items")),
+        "has_experience": bool((meta.get("experience_adjust") or {})),
         "has_notes": _has_evidence_notes(data, summary),
         "has_lifecycle": _has_lifecycle(data, summary),
         "has_dropped": _has_dropped(summary),
@@ -297,6 +300,13 @@ def selftest() -> int:
             bad.append(f"最小数据下缺区块 {rid}")
     if "band_subboards" in act:
         bad.append("单段榜不应出价位段子榜")
+    # 体验修正区块：有审计数据时必须渲染
+    data_exp = dict(data)
+    data_exp["meta"] = dict(data["meta"])
+    data_exp["meta"]["experience_adjust"] = {"A车": {"dimensions": {"adas": {"delta": -0.5}}}}
+    act_exp = {b["id"] for b in active_blocks(data_exp, None)}
+    if "experience_adjust" not in act_exp:
+        bad.append("体验审计数据存在但区块未激活")
     # v9.0.1：事实库自动加载必须有数据（防「漏喂」回归）
     lib = load_fact_library()
     if len(lib) < 50 or not any(v.get("kwh") for v in lib.values()):

@@ -257,6 +257,36 @@ def render(data, summary, title, as_of):
                      f"{f'{d:+d}' if isinstance(d,int) else '—'}</td><td>{e(it.get('price'))}</td></tr>")
         H.append("</tbody></table>")
 
+    # ---- 体验证据修正（v9.3.1，用户确认展示）
+    if "experience_adjust" in ids:
+        ea = meta.get("experience_adjust") or {}
+        H.append("<h2>体验证据修正 <span>智驾/操控从硬件口径按可核验体验证据调整 · 不碰其它维</span></h2>")
+        H.append('<div class="rule">有证据的车才调整（来源分级加权、每维封顶 ±1.5）；'
+                 '无证据的车维持硬件口径、不插补。点来源链接可逐条复核。</div>')
+        H.append("<table><thead><tr><th style='text-align:left'>车型</th><th>维度</th>"
+                 "<th>前 → 后</th><th>调整</th><th style='text-align:left'>依据来源（可点开）</th>"
+                 "</tr></thead><tbody>")
+        for model, info in ea.items():
+            for dim, det in (info.get("dimensions") or {}).items():
+                delta = det.get("delta", 0)
+                if not delta:
+                    continue
+                dcls = "delta-up" if isinstance(delta, (int, float)) and delta > 0 else "delta-down"
+                dtxt = f"{delta:+.2f}" if isinstance(delta, (int, float)) else "—"
+                srcs = det.get("evidence") or []
+                links = " · ".join(
+                    f'<a href="{e(s.get("url"))}" target="_blank" rel="noopener">'
+                    f'{e(s.get("source_type"))} {e(s.get("date"))}</a>' if s.get("url")
+                    else f'{e(s.get("source_type"))} {e(s.get("date"))}'
+                    for s in srcs)
+                claim = " ".join(str(s.get("claim") or "")[:90] for s in srcs[:1])
+                dlabel = "智驾" if dim == "adas" else ("操控" if dim == "control" else e(dim))
+                H.append(f"<tr><td class='name'>{e(model)}</td><td>{dlabel}</td>"
+                         f"<td>{num(det.get('before'))} → {num(det.get('after'))}</td>"
+                         f"<td class='{dcls}'>{dtxt}</td>"
+                         f"<td class='ref'>{links}<br><span style='color:#7b8590'>{e(claim)}</span></td></tr>")
+        H.append("</tbody></table>")
+
     # ---- 逐车取证依据（历史有、v8.x 漏掉，v9.0 补回）
     if "evidence_notes" in ids:
         H.append("<h2>逐车取证依据 <span>取证要点 / 证据等级 / 销量口径 · 可逐条质疑</span></h2>")
