@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 9.2.0
+version: 9.3.0
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v9.2.0）
+# Car recommendation —— 可信购车榜单引擎（v9.3.0）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -2030,3 +2030,36 @@ kWh/万元 作为既有参考项正常显示（如 MG 07 5.28、风云A9 5.40，
 ### 验收
 主榜参考列实测 31–41 字符（例：kWh/万元 4.32 · 电耗 11.5 · 电芯 宁德时代），
 取证表补全指导价/电量/CLTC/月销；三版 selftest 与 A/B 25 项矩阵全过。
+
+---
+
+## v9.3.0 · 智驾/操控从"纯硬件"改为"硬件+体验证据"（2026-11-19，用户授权网查后实施）
+
+### 为什么要改
+用户质疑：极氪7X 抖音博主说"轻量化差、电耗差、智驾差不推荐"，而我给智驾 9.0、榜首。
+查证：原方法论智驾公式只有硬件触发项（激光雷达/算力/城区NOA），操控只有悬架/驱动/零百——
+**看配置单就能算出来**，用户指出这不合理的批评成立。
+但官方 IVISTA/C-ICAP 对当前 21 款中型纯电 SUV **零覆盖**（只测新旗舰），
+所以经用户授权网查，建立体验证据库。
+
+### 数据来源（全部公开可核验，R1-R4 继承 thirdparty_tests.json）
+- 懂车帝/P3中国/汽车之家 36 车辅助驾驶实测（城市NOA通过率：华为98.2%/小鹏95.6%/理想93.1%/特斯拉84.7%）
+- 懂车帝五款25万级纯电SUV麋鹿对比（Model Y 80.9 / 极氪7X 75.2 km/h 等）
+- 多源车主口碑（极氪7X 城区保守、蔚来ES6 城区保守但平顺、零跑C11 急刹率5%等）
+- 已有候选池证据字段（宋L EV 悬挂偏硬、海狮06 暗光激活率低）
+
+### 实现
+- 新增 `categories/experience_facts.json`：12 条证据 / 10 款车（adas 9、control 3），
+  每条含 platform/url/date/claim/direction/weight/source_type，来源分级独立实测>UP主>车主口碑>厂商。
+- 新增 `experience_score.py`：按来源权重加总、每维封顶 ±1.5，只调 adas/control，
+  写入 `candidate.experience_adjust` 审计字段（前后分+逐条依据），无证据不插补。
+- `board_v2.build()` 默认应用（深拷贝，不改总池），`--no-experience` 可关（A/B 对照用）。
+- `meta.experience_adjust` 带出审计，页面展示待用户确认（本次未改渲染区块）。
+- selftest 断言：只改两维、无证据不动分、极氪7X 智驾下修操控上修。
+
+### 效果（21 款中型纯电 SUV 榜）
+极氪7X 智驾 9.0→8.5（口碑下修）、操控 8.5→9.0（麋鹿75.2上修），总分 86.4→86.1，仍第 1；
+小鹏G6 智驾 7.6→8.5（XNGP 95.6%实测），#11→#8（↑3）；阿维塔07 #3→#2；
+特斯拉Model Y 智驾 7.0→6.0（84.7%垫底）但操控 8.2→9.2（麋鹿80.9第一），净名次不变。
+共 9 款车被调，其余 12 款标"仅硬件口径"不插补。
+A/B 矩阵加第 26 项体验自检。

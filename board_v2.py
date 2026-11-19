@@ -291,8 +291,14 @@ def product_power_board(rows: list[dict], cands: list[dict], cfg: dict,
 def build(cands: list[dict], cfg: dict, policy: dict,
           facts: dict[str, dict] | None = None,
           weights: list[float] | None = None,
-          per_band: int = 10) -> dict:
+          per_band: int = 10,
+          no_experience: bool = False) -> dict:
     facts = facts or {}
+    # v9.3.0：建池时自动应用体验证据（只调 adas/control）；
+    # --no-experience 或 no_experience=True 可关闭（A/B 对照用）
+    import copy
+    import experience_score as ES
+    cands = ES.apply_experience(copy.deepcopy(cands), enabled=not no_experience)
     rows = main_board(cands, cfg, weights)
     by_model = {c["model"]: c for c in cands}
     for r in rows:
@@ -315,6 +321,12 @@ def build(cands: list[dict], cfg: dict, policy: dict,
             "dimensions": [{"key": d["key"], "label": d["label"],
                             "weight": d["weight"]} for d in cfg["dimensions"]],
             "fact_reference_columns": list(policy.get("fact_reference_columns") or []),
+            # v9.3.0：体验修正审计（哪些车被调、依据来源）
+            "experience_adjust": {
+                c["model"]: c["experience_adjust"] for c in cands
+                if c.get("experience_adjust", {}).get("n_evidence", 0) > 0
+            },
+            "experience_enabled": not no_experience,
             # v9.0：生命周期事实随数据出（历史页面有、v8.x 漏渲染）
             "lifecycle": {c["model"]: c["lifecycle"] for c in cands if c.get("lifecycle")},
         },
@@ -354,6 +366,8 @@ def cli(argv=None):
     ap.add_argument("--per-band", type=int, default=10, help="分段汇总总榜每段取前几名（默认10）")
     ap.add_argument("--out", help="输出目录，写 board_v2_data.json / board_v2.md / 榜单.html")
     ap.add_argument("--no-html", action="store_true", help="不自动生成 HTML 页面（默认生成）")
+    ap.add_argument("--no-experience", action="store_true",
+                    help="不应用体验证据修正（只看硬件口径，A/B 对照用）")
     ap.add_argument("--html-title", help="HTML 页面标题（缺省用 data.meta.title）")
     ap.add_argument("--as-of", default="—", help="HTML 页面数据月标注，如 202610")
     ap.add_argument("--summary", help="pipeline.py 的 summary.json，给 HTML 提供三档分级")
@@ -371,7 +385,8 @@ def cli(argv=None):
     # v9.0.1：默认加载随包事实库，不再漏喂 kWh/电耗/CLTC；--facts 可覆盖
     import board_view as BV
     facts = BV.load_fact_library(a.facts)
-    data = build(cands, cfg, policy, facts, per_band=a.per_band)
+    data = build(cands, cfg, policy, facts, per_band=a.per_band,
+                 no_experience=a.no_experience)
     _sum = _load(a.summary) if a.summary and os.path.exists(a.summary) else None
     md = render_md(data, _sum)
     if a.out:
