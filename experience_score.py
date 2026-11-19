@@ -85,6 +85,31 @@ def teardown_confidence(model: str) -> dict:
     }
 
 
+def load_residual_values() -> dict:
+    """加载三年保值率库（中国汽车流通协会×精真估，可核验来源）。"""
+    path = os.path.join(HERE, "categories", "residual_values.json")
+    if not os.path.exists(path):
+        return {"values": {}, "pool_median": 48.0, "max_adjust": 1.0, "source_urls": []}
+    return json.load(open(path, encoding="utf-8"))
+
+
+def residual_adjust(model: str, rv: dict | None = None) -> tuple[float, dict | None]:
+    """保值率 → value 维调整（相对池内中位，封顶 ±max_adjust）。无数据返回 (0,None)。"""
+    rv = rv if rv is not None else load_residual_values()
+    rate = (rv.get("values") or {}).get(model)
+    if rate is None:
+        return 0.0, None
+    median = float(rv.get("pool_median", 48.0))
+    cap = float(rv.get("max_adjust", 1.0))
+    delta = max(-cap, min(cap, (float(rate) - median) / 8.0))
+    return round(delta, 2), {
+        "kind": "residual_value_3y", "source_type": "association_report",
+        "date": "2026-06", "url": (rv.get("source_urls") or [""])[0],
+        "claim": f"三年保值率 {rate}%（中国汽车流通协会×精真估，纯电三年中位约{median}%）",
+        "delta": round(delta, 2), "rate": rate,
+    }
+
+
 def apply_experience(cands: list[dict], lib: dict | None = None,
                      enabled: bool = True) -> list[dict]:
     """把体验证据应用到候选（原地改 scores），并写审计字段。"""
@@ -105,11 +130,21 @@ def apply_experience(cands: list[dict], lib: dict | None = None,
                 "evidence": evs,
                 "basis": "硬件+体验证据" if evs else "仅硬件口径（无体验证据）",
             }
+        # 保值率 → value 维（复用同一审计字段，页面区块自动显示，无需改渲染）
+        rdelta, rev = residual_adjust(model) if enabled else (0.0, None)
+        v_old = scores.get("value")
+        if isinstance(v_old, (int, float)) and rev and abs(rdelta) > 1e-9:
+            scores["value"] = round(max(0.0, min(10.0, float(v_old) + rdelta)), 2)
+        if rev:
+            detail["value"] = {
+                "before": v_old, "after": scores.get("value"), "delta": rdelta,
+                "evidence": [rev], "basis": "性价比+持有成本(保值率)",
+            }
         c["experience_adjust"] = {
             "enabled": enabled,
             "before": before,
             "dimensions": detail,
-            "n_evidence": sum(len(adj[d][1]) for d in DIMS),
+            "n_evidence": sum(len(adj[d][1]) for d in DIMS) + (1 if rev else 0),
             "teardown_confidence": teardown_confidence(model),
         }
     return cands
@@ -158,6 +193,18 @@ def selftest() -> int:
         bad.append("无拆车车误报置信")
     if c2[0]["experience_adjust"]["dimensions"]["adas"]["before"] != 8.0:
         bad.append("审计 before 错误")
+    # 保值率 → value：Model Y 54.2% 应上调，无数据车不动
+    rd, rev = residual_adjust("特斯拉 Model Y")
+    if not (rd > 0 and rev and rev.get("rate") == 54.2):
+        bad.append(f"保值率调整错误: {rd}")
+    if residual_adjust("不存在的车")[0] != 0:
+        bad.append("无保值率数据车被调分")
+    c3 = [{"model":"特斯拉 Model Y","scores":{"value":6.5,"adas":8.0},"total":80}]
+    apply_experience(c3, lib)
+    if c3[0]["scores"]["value"] <= 6.5:
+        bad.append("保值率未作用到 value 维")
+    if c3[0]["experience_adjust"]["dimensions"]["value"]["basis"] != "性价比+持有成本(保值率)":
+        bad.append("保值率审计 basis 错误")
     # 数据源注册表完整性
     ds_path = os.path.join(HERE, "categories", "data_sources.json")
     if os.path.exists(ds_path):

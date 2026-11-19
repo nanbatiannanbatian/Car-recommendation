@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 9.4.1
+version: 9.5.0
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v9.4.1）
+# Car recommendation —— 可信购车榜单引擎（v9.5.0）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -2121,3 +2121,26 @@ A/B 矩阵 26 项、全部 selftest 通过。
 
 ### 未接事项（需用户决策，不擅自做）
 知乎需用户提供 Access Secret；易车/懂车帝/汽车之家 API 需企业资质或付费；UGC 平台不采集。
+
+---
+
+## v9.5.0 · 保值率进 value 维（2026-11-19，用户确认"做1"）
+
+### 为什么要改
+用户指出特斯拉排名第17但销量/保值率/品牌/供应商强，问是否该影响打分。
+逐条判断：品牌（结果非产品属性，不加）、销量（方法论已定只作门槛不排序）、
+售后（数据覆盖差、地域差异大，只披露不加）、供应商/集成化（已在三电确定性/安全中间接体现）、
+**保值率（真实的持有成本，确实漏了）** —— 用户确认只做保值率这一条。
+
+### 实现
+- 新增 `categories/residual_values.json`：中国汽车流通协会×精真估《2026年6月报告》三年保值率，
+  带来源URL。覆盖3款（Model Y 54.2% / 蔚来ES6 47.2% / 零跑C11 47%），其余无数据不插补。
+- 口径：delta = clamp((保值率 - 池内中位48%) / 8, ±1.0)，只调 value 维，
+  不改其它7维、不改总分公式、不改产品力排序逻辑（保值率是市场结果不是产品力）。
+- `experience_score.residual_adjust()` 复用现有 experience_adjust 审计字段，
+  页面"体验证据修正"区块自动显示（性价比(保值率) 6.5→7.3 +0.78），**未改任何渲染代码**。
+- selftest 断言：有数据上调、无数据不动、只作用 value、审计 basis 正确。
+
+### 效果
+Model Y value 6.5→7.28、总分 76.8→77.7、#17→#15；蔚来ES6 -0.10、零跑C11 -0.13（低保值率轻扣）。
+核心短板（智驾6.0、容量最小非800V）未变，保值率补不回大差距。A/B 26项、全部 selftest 通过。

@@ -47,6 +47,7 @@ NEW_FILES = [
     "categories/fact_library.json",             # v9.0.1 事实参考库（KWh/电耗/CLTC，随包）
     "experience_score.py",                      # v9.3.0 体验证据评分修正（adas/control）
     "categories/experience_facts.json",         # v9.3.0 体验证据库（网查可核验来源）
+    "categories/residual_values.json",          # v9.5.0 保值率库（中汽流通协会×精真估）
 ]
 
 

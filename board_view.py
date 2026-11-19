@@ -207,6 +207,7 @@ def fact_grades(rows: list[dict]) -> dict[str, dict[str, str]]:
 
 EXPERIENCE_DIM_LABELS = {
     "adas": "智驾", "control": "操控", "cabin": "车机", "powertrain": "三电/能耗",
+    "value": "性价比(保值率)",
 }
 
 
