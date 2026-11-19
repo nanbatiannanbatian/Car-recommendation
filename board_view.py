@@ -31,6 +31,8 @@ BLOCKS = [
      "desc": "哪些事实字段有数据、哪些「—」未采集，不以估计值填充"},
     {"id": "main_board", "title": "打分主榜", "when": "always",
      "desc": "8维加权总分唯一排序；行内事实参考列不计分"},
+    {"id": "trim_compare", "title": "逐配置对比（下拉）", "when": "has_trim_board",
+     "desc": "每车展开看各配置单独算分；标注插补维度，只作同车配置相对对比"},
     {"id": "score_breakdown", "title": "总分构成（维度明细）", "when": "has_dimensions",
      "desc": "每车8维原始分+权重，让用户看穿总分怎么来的"},
     {"id": "tiers", "title": "三档分级", "when": "has_tiers",
@@ -112,6 +114,7 @@ def active_blocks(data: dict, summary: dict | None = None) -> list[dict]:
         "multi_band": multi_band,
         "has_product_power": bool((data.get("product_power_board") or {}).get("items")),
         "has_experience": bool((meta.get("experience_adjust") or {})),
+        "has_trim_board": bool(meta.get("trim_board")),
         "has_three_board": bool((meta.get("three_board") or {}).get("rows")),
         "has_robustness": bool((meta.get("robustness") or {}).get("kendall_mean")),
         "has_audit": bool((meta.get("audit_boundary") or {}).get("verdict")),
@@ -513,6 +516,11 @@ def selftest() -> int:
         bad.append(f"电池来源未含电压: {bsrc}")
     if main_cell("tier", rtest, rtest) != "第一档":
         bad.append("档位未显示")
+    # v9.7.0：逐配置对比区块
+    data4 = dict(data); data4["meta"] = dict(data["meta"])
+    data4["meta"]["trim_board"] = {"A车": {"trims": [{"name": "x"}]}}
+    if "trim_compare" not in {b["id"] for b in active_blocks(data4, None)}:
+        bad.append("逐配置对比区块未激活")
     # v9.6.2：缺失原因 + 评价列机械生成
     rmiss = {"model": "B", "fact_ref": {"kWh/万元": "—", "kWh/万元_缺失原因": "缺配置价"}}
     if main_cell("kwh_per_wan", rmiss, rmiss) != "—（缺配置价）":

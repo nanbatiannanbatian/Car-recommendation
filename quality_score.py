@@ -34,11 +34,11 @@ def _complaint_penalty(v: dict) -> tuple[float, str]:
     if per is None:
         return 0.0, f"车质网 {count} 条，销量缺，密度不可算，不扣分"
     per = float(per)
-    density = min(2.6, 2.2 * math.log1p(per) / math.log1p(50.0))
+    density = min(2.2, 2.0 * math.log1p(per) / math.log1p(50.0))  # v9.7.0 密度封顶2.6→2.2
     top_tags = [str(t) for t, _ in (v.get("top_tags") or [])]
     hi = sum(1 for t in top_tags if t in HIGH_TAGS)
     mid = sum(1 for t in top_tags if t in MID_TAGS)
-    severe = min(1.2, hi * 0.4 + mid * 0.15)
+    severe = min(0.8, hi * 0.3 + mid * 0.1)  # v9.7.0 收紧：1.2→0.8
     total = density + severe
     tag_txt = "、".join(top_tags) or "无高频标签"
     return total, (f"车质网 90 天 {count} 条 / {per:g}/万台；"
@@ -49,7 +49,7 @@ def _pph_adjust(c: dict) -> tuple[float, str]:
     if not c.get("ah_pph_usable"):
         return 0.0, "PPH 样本不足，中性处理"
     pph = float(c.get("ah_pph") or 0)
-    adj = _clamp((100.0 - pph) / 100.0, -1.5, 0.6)
+    adj = _clamp((100.0 - pph) / 100.0, -1.5, 1.0)  # v9.7.0 正向空间0.6→1.0
     n = int(c.get("ah_review_users") or 0)
     return adj, f"汽车之家 PPH {pph:g}（口碑样本 {n}），调整 {adj:+.2f}"
 
@@ -140,7 +140,7 @@ def report(cands: list[dict]) -> str:
         "不是「卖得多扣分多」；② 但分母是**单月趋势销量**、投诉是 **90 天累计**，口径不完全对齐，"
         "密度会被高估（保守方向），不作精确质量排序；③ 投诉有自选择偏差（沉默的大多数不投诉），"
         "「无投诉」只代表**没证据**（低置信），不等于质量好——见置信列；"
-        "④ 有投诉也不必然差，已用 PPH 口碑正向对冲、并对高投诉密度做封顶。",
+        "④ v9.7.0 温和平衡：投诉密度封顶 2.6→2.2、性质扣分上限 1.2→0.8；PPH 正向空间 0.6→1.0，让口碑有实质对冲但不反转（刷口碑仍难盖过高投诉）。",
         "",
         f"> 覆盖：{cov['total']} 款；车质网投诉≥5 条 {cov['complaint_ge5']} 款；"
         f"PPH 可用 {cov['pph_usable']} 款；召回事件 {cov['recall']} 款；"

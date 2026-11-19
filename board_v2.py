@@ -376,6 +376,12 @@ def build(cands: list[dict], cfg: dict, policy: dict,
         r["battery_detail"] = _bp   # {voltage, cell, pack, trim, src}
     bands = band_subboards(rows, cands, policy)
     analyses = analysis_blocks(cands, cfg, weights)
+    # v9.7.0：逐配置评分（下拉对比用，不改主榜名次）
+    try:
+        import trim_board as TB
+        trim_data = TB.build_trim_board(cands, cfg, rows)
+    except Exception:
+        trim_data = {}
     return {
         "meta": {
             "title": policy.get("title", "统一榜单"),
@@ -402,6 +408,7 @@ def build(cands: list[dict], cfg: dict, policy: dict,
             "three_board": analyses.get("three_board", {}),
             "robustness": analyses.get("robustness", {}),
             "audit_boundary": analyses.get("audit_boundary", {}),
+            "trim_board": trim_data,
         },
         "main_board": rows,
         "band_subboards": bands,

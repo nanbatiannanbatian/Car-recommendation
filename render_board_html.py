@@ -182,6 +182,39 @@ def render(data, summary, title, as_of):
                     H.append(f"<td>{e(val)}</td>")
             H.append("</tr>")
         H.append("</tbody></table>")
+    # ---- 逐配置下拉对比（v9.7.0）
+    if "trim_compare" in ids:
+        tb = meta.get("trim_board") or {}
+        if tb:
+            H.append('<h2>逐配置对比 <span>点车型展开 · 同车不同配置的相对差别</span></h2>')
+            H.append('<div class="rule">每个配置按 spec_score 规则单独算 8 维分，'
+                     '★ 为该车最高分配置。注意：配置表缺悬架/算力等参数，逐配置分有插补维度，'
+                     '<b>只用于同车不同配置的相对对比，不作跨车绝对排名，也不改主榜名次</b>。</div>')
+            for r in rows:
+                td = tb.get(r["model"])
+                if not td or not td.get("trims"):
+                    continue
+                best = td.get("best_trim")
+                H.append(f'<details style="margin:4px 0;border:1px solid var(--line);border-radius:8px;padding:8px 12px">'
+                         f'<summary style="cursor:pointer"><b>{e(r["model"])}</b> '
+                         f'（{e(best)} · {td["n_trims"]} 配置，最高 {e(td.get("best_total"))}）</summary>')
+                H.append('<table style="margin-top:8px"><thead><tr><th>配置</th><th>指导价(万)</th>'
+                         '<th>电量kWh</th><th>电芯</th><th>电压/快充</th><th>三电</th><th>智驾</th>'
+                         '<th>性价比</th><th>配置总分</th><th>插补</th></tr></thead><tbody>')
+                for t in td["trims"]:
+                    sc = t.get("scores") or {}
+                    flag = " ★" if t.get("name") == best else ""
+                    H.append(f"<tr><td class='name'>{e(t.get('name'))}{flag}</td>"
+                             f"<td>{e(t.get('price'))}</td><td>{e(t.get('battery_kwh'))}</td>"
+                             f"<td class='ref'>{e(t.get('cell_supplier'))}</td>"
+                             f"<td class='ref'>{e(t.get('charge'))}</td>"
+                             f"<td>{num(sc.get('powertrain'))}</td><td>{num(sc.get('adas'))}</td>"
+                             f"<td>{num(sc.get('value'))}</td>"
+                             f"<td><span class='score'>{e(t.get('total'))}</span></td>"
+                             f"<td style='color:#b8860b'>{e(t.get('n_imputed'))}维</td></tr>")
+                H.append('</tbody></table>')
+                H.append(f'<div style="font-size:11px;color:#7b8590">来源：{e(td.get("source"))} '
+                         f'· 核验 {e(td.get("date"))}</div></details>')
 
     # ---- 总分构成
     if "score_breakdown" in ids:
@@ -191,18 +224,47 @@ def render(data, summary, title, as_of):
         for d in dims:
             H.append(f"<th>{e(d.get('label'))}<br><small>{float(d.get('weight',0))*100:.1f}%</small></th>")
         H.append("<th>加权分</th></tr></thead><tbody>")
+        tb = meta.get("trim_board") or {}
         for r in rows:
             sc = r.get("scores") or {}
-            H.append(f"<tr><td>{rank_badge(r.get('rank'))}</td><td class='name'>{e(r.get('model'))}</td>"
+            td = tb.get(r["model"]) or {}
+            # 配置下拉：切换时把该配置的维度分/总分写进单元格
+            sel = ""
+            if td.get("trims"):
+                opts = "".join(
+                    f'<option value="{i}">{e(t.get("name"))}'
+                    f'（¥{e(t.get("price"))}）</option>'
+                    for i, t in enumerate(td["trims"]))
+                sel = (f'<br><select onchange="swTrim(this)" style="font-size:11px;max-width:150px" '
+                       f'data-model="{e(r["model"])}"><option value="-1">车系评分（主榜口径）</option>'
+                       f'{opts}</select>')
+            H.append(f"<tr><td>{rank_badge(r.get('rank'))}</td>"
+                     f"<td class='name'>{e(r.get('model'))}{sel}</td>"
                      f"<td class='ref'>{e(BV.main_cell('trim', r, r))}</td>"
                      f"<td>{e(BV.main_cell('price', r, r))}</td>")
             for d in dims:
                 v = sc.get(d["key"])
                 cls = "delta-up" if isinstance(v, (int, float)) and v >= 9 else (
                     "delta-down" if isinstance(v, (int, float)) and v < 8 else "")
-                H.append(f"<td class='{cls}'>{num(v) if isinstance(v,(int,float)) else '—'}</td>")
-            H.append(f"<td><span class='score'>{num(r.get('total'))}</span></td></tr>")
+                H.append(f"<td class='{cls} dimcell' data-dim='{d['key']}'>"
+                         f"{num(v) if isinstance(v,(int,float)) else '—'}</td>")
+            H.append(f"<td class='totalcell'><span class='score'>{num(r.get('total'))}</span></td></tr>")
         H.append("</tbody></table>")
+        # 逐配置下拉切换脚本（只改显示，不动主榜排序）
+        if tb:
+            H.append(
+                '<script>'
+                'var TRIMDATA=' + json.dumps(tb, ensure_ascii=False) + ';'
+                'function swTrim(sel){'
+                'var v=sel.value,model=sel.getAttribute("data-model"),row=sel.closest("tr");'
+                'if(v=="-1"){location.reload();return;}'
+                'var t=TRIMDATA[model].trims[parseInt(v)],sc=t.scores||{};'
+                'row.querySelectorAll(".dimcell").forEach(function(c){c.textContent='
+                '(sc[c.getAttribute("data-dim")]!=null?Number(sc[c.getAttribute("data-dim")]).toFixed(1):"—");});'
+                'row.querySelector(".totalcell").textContent=t.total==null?"—":t.total;'
+                'row.children[2].textContent=t.name+" ¥"+t.price;'
+                '}'
+                '</script>')
 
     # ---- 三档
     if "tiers" in ids:
