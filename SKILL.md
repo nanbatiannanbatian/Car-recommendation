@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 8.3.6
+version: 8.3.7
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v8.3.6）
+# Car recommendation —— 可信购车榜单引擎（v8.3.7）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -1870,3 +1870,24 @@ v8.3 的「分段汇总总榜」是为**没给价位段**的提问设计的：�
 - 12–18万中型纯电轿车榜（14 款，单段）：分段汇总 skipped，产品力榜 n=14，主榜/三档不变。
 - 全价位中型纯电 SUV 榜（3 段）：分段汇总照常 20 条（入门10/主流9/高端1）。
 - 全部 selftest 与 A/B 24 项能力矩阵回归通过。
+
+---
+
+## v8.3.7 · 给价位段时价位段子榜也跳过，Markdown 补产品力榜（2026-11-19）
+
+### 为什么要改
+v8.3.6 已让「分段汇总总榜」在单价位段时跳过，但**价位段子榜**仍在显示：
+给定 12–18万 后它输出 3 个段（2 个空段 + 1 个把主榜原样重列的段），
+且价格缺失的 3 款车在子榜里被丢掉——零信息增量还制造误导。
+用户给价位段时，该价位段本身就是`主榜`，子榜与汇总榜都不必再展示。
+
+### 规则
+- `band_subboards()` 在非空价位段 `≤1` 时返回空列表；`meta.band_subboards_skipped=true` + reason，
+  Markdown/HTML 给一句说明。`≥2` 段的全价位榜不受影响。
+- 与 v8.3.6 的分段汇总跳过共用同一判据（非空段数），两处行为一致。
+- **纯产品力榜任何场景保留**；v8.3.7 起 Markdown 也渲染它（此前只有 HTML 有），两种格式一致。
+- selftest 加双断言：多段保留子榜、单段跳过子榜且产品力榜仍在。
+
+### 验收
+12–18万榜：子榜 0、分段汇总 skipped、产品力榜 14 款，md/html 都有跳过说明与产品力榜；
+全价位 SUV 榜：3 段子榜与分段汇总照常；全部 selftest + A/B 24 项能力矩阵通过。

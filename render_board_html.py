@@ -170,8 +170,11 @@ def render(data, summary, title, as_of):
                      f'<ul>{"".join(f"<li>{e(m)}</li>" for m in models) if models else "<li>—</li>"}</ul></div>')
         H.append("</div>")
 
-    # 价位段子榜
-    if bands:
+    # 价位段子榜：单段提问已跳过
+    if meta.get("band_subboards_skipped"):
+        H.append('<h2>价位段子榜 <span>已跳过 · 提问已给价位段</span></h2>'
+                 f'<div class="rule">{e(meta.get("band_subboards_skip_reason", "候选只落入单一价位段"))}</div>')
+    elif bands:
         H.append("<h2>价位段子榜 <span>同一份分数按预算分组 · 复用主榜 · 不重新打分</span></h2>")
         for b in bands:
             items = b.get("items") or []

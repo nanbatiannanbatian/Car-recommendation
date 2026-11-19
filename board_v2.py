@@ -159,10 +159,18 @@ def assign_bands(cands: list[dict], policy: dict) -> dict[str, list[str]]:
 
 
 def band_subboards(rows: list[dict], cands: list[dict], policy: dict) -> list[dict]:
-    """价位段子榜：按主榜分数排序的分组视图，分数来自主榜（不重算）。"""
+    """价位段子榜：按主榜分数排序的分组视图，分数来自主榜（不重算）。
+
+    v8.3.7：提问已给价位段（候选只落一个非空段）时返回空列表——
+    此时子榜＝主榜按唯一段原样重列，且价格缺失的车会被丢掉，零信息增量。
+    多段全价位榜不受影响，仍按段给分组视图。
+    """
+    grouped = assign_bands(cands, policy)
+    nonempty = [label for label, models in grouped.items() if models]
+    if len(nonempty) <= 1:
+        return []
     by_model = {c["model"]: c for c in cands}
     score_by_model = {r["model"]: r["total"] for r in rows}
-    grouped = assign_bands(cands, policy)
     out = []
     for label, models in grouped.items():
         ranked = sorted(models, key=lambda m: -score_by_model.get(m, -1e9))
@@ -296,6 +304,10 @@ def build(cands: list[dict], cfg: dict, policy: dict,
             "fact_cols_scored": False,
             "band_reuses_score": True,
             "n": len(rows),
+            "band_subboards_skipped": not bands,
+            "band_subboards_skip_reason": (
+                "提问已给价位段，候选只落一个段；子榜＝主榜原样重列且会丢价格缺失车，已跳过。"
+                if not bands else ""),
         },
         "main_board": rows,
         "band_subboards": bands,
@@ -390,12 +402,28 @@ def render_md(data: dict) -> str:
         L += ["| # | 车型 | 加权分 | 价位段 | 段内名次 |", "|---|---|---|---|---|"]
         for it in ss["items"]:
             L.append(f"| {it['summary_rank']} | {it['model']} | {it['score']:.1f} | {it['band']} | {it['rank_in_band']} |")
-    L += ["", "## 价位段子榜（复用主榜分数，不重新打分）", ""]
-    for b in data["band_subboards"]:
-        L += [f"### {b['band']}", ""]
-        for i, it in enumerate(b["items"], 1):
-            L.append(f"{i}. {it['model']} — {it['score']:.1f} 分（{it['price']}万）")
-        L.append("")
+    if data["meta"].get("band_subboards_skipped"):
+        L += ["", "## 价位段子榜：已跳过", "",
+              f"> {data['meta'].get('band_subboards_skip_reason', '提问已给价位段')}", ""]
+    else:
+        L += ["", "## 价位段子榜（复用主榜分数，不重新打分）", ""]
+        for b in data["band_subboards"]:
+            L += [f"### {b['band']}", ""]
+            for i, it in enumerate(b["items"], 1):
+                L.append(f"{i}. {it['model']} — {it['score']:.1f} 分（{it['price']}万）")
+            L.append("")
+    # 纯产品力总榜（辅助榜，v8.3.7 起 md 也渲染，此前只有 HTML 有）
+    pp = data.get("product_power_board") or {}
+    if pp.get("items"):
+        L += ["", f"## 纯产品力总榜（辅助榜 · 剔除{pp.get('excluded_dimension', 'value')} · 不改主榜名次）", "",
+              "> 回答「不看价格谁的产品力更强」；rank_delta 正＝性价比拖累，负＝靠性价比抬升。", "",
+              "| # | 车型 | 产品力分 | 主榜名次 | rank_delta | 价格 |",
+              "|---|---|---|---|---|---|"]
+        for it in pp["items"]:
+            d = it.get("rank_delta")
+            dt = f"{d:+d}" if isinstance(d, int) else "—"
+            L.append(f"| {it['power_rank']} | {it['model']} | {it['power_score']:.2f} | "
+                     f"#{it['main_rank']} | {dt} | {it.get('price', '—')} |")
     return "\n".join(L)
 
 
@@ -430,8 +458,10 @@ def run_selftest():
     cheap_ref = data["main_board"][-1]["fact_ref"]  # 廉价车分最低(性价比高但产品力弱)
     cheap_row = [r for r in data["main_board"] if r["model"] == "廉价车"][0]
     assert cheap_row["fact_ref"]["kWh/万元"] == 5.33, cheap_row["fact_ref"]
-    # 4) 价位段子榜复用同一份分数
+    # 4) 多段榜：价位段子榜复用同一份分数
     all_scores = {r["model"]: r["total"] for r in data["main_board"]}
+    assert data["band_subboards"], "多段榜应保留价位段子榜"
+    assert data["meta"]["band_subboards_skipped"] is False
     for b in data["band_subboards"]:
         for it in b["items"]:
             assert it["score"] == all_scores[it["model"]], "子榜分数与主榜不一致"
@@ -451,9 +481,13 @@ def run_selftest():
     d1 = build(single, cfg, pol, facts)
     ss1 = d1["segmented_summary"]
     assert ss1.get("skipped") is True and ss1["items"] == [], "单段榜应跳过分段汇总"
+    # 6c) v8.3.7：单段榜价位段子榜也跳过，纯产品力榜仍在
+    assert d1["band_subboards"] == [], "单段榜应跳过价位段子榜"
+    assert d1["meta"]["band_subboards_skipped"] is True
     assert d1["product_power_board"]["items"], "单段榜仍应保留纯产品力榜"
     md1 = render_md(d1)
-    assert "分段汇总总榜：已跳过" in md1, "单段跳过未在 md 中说明"
+    assert "分段汇总总榜：已跳过" in md1, "单段跳过分段未在 md 中说明"
+    assert "价位段子榜：已跳过" in md1, "单段跳过子榜未在 md 中说明"
     # 7) 纯产品力总榜：降序 / 覆盖全池 / main_score 与主榜一致 / 只改 value 不改产品力分
     pp = data["product_power_board"]
     assert pp["excluded_dimension"] == "value"
