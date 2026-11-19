@@ -13,7 +13,7 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 8.2.0
+version: 8.3.0
 author: "nanbatiannanbatian"
 ---
 
@@ -1692,3 +1692,46 @@ cross_verify selftest 6 项 + master_pool selftest 10 项全过。
 总池 67 款核验：19 个冲突全部为已解释口径差（16 price + 3 trend_sales），
 电芯真冲突经网查确认清零；185 个单源项（多为 C-NCAP 官方成绩与逐配置 kWh，标注来源）。
 写回实测 scores 改动 0 款。报告：`runs/car_midsuv_ev_202610/cross_verify/cross_verify.md/.json`。
+
+---
+
+## v8.3 · 分段汇总总榜：无价位段的排行榜默认分段→各段取前几→汇总成总榜（2026-11-19）
+
+### 为什么要改（用户明确要求）
+用户规则：**「以后排行榜如果没有价位段，就分几个价位段，每个价位段按前几排名，
+最后把这几个榜单汇总成总榜」**。此前 v7 的统一榜虽有价位段子榜，但那是「全价位混排主榜 +
+各段全量分组视图」，缺少「各段各取前几 → 拼成一张带分段配额的总榜」这个默认展示模板。
+
+### 事实榜融合状态核查（用户要求检查）
+- 现行口径：**没有独立事实榜**。kWh/万元、电耗等已作为「参考·不计分」列并入打分主榜。
+- 最新两份榜单（`全价位合并榜_中型纯电SUV_21款_202610.html`、`统一榜单v7_中型纯电SUV_202610.html`）
+  经核查均无独立事实榜章节，只有「全价位打分主榜 + 事实参考列 + 价位段子榜」。
+- 目录里 `中型纯电SUV全价位事实榜_202610.html`（11:48）是融合前的历史中间产物，非现行口径。
+
+### 三段规则（已固化进 `board_v2.py` + `categories/rank_v2_policy.json`）
+1. **先分段**：按 `price_bands`（默认 18/28 万切入门/主流/高端三段，或价格分位自动切）。
+2. **各段取前 N**：每段按主榜分数取前 `per_band` 名（默认 5，CLI `--per-band` 可调）。
+3. **汇总成总榜**：把各段前 N 汇总后按主榜分数降序排成一张总榜。
+- **纪律**：汇总榜分数全部来自主榜 `score_rows`，**不重新打分、不改权重**。
+- **价值**：保证每个价位段都有车进总榜，避免高端车凭产品力垄断前列；
+  它与「全价位纯分主榜」并存——前者是带分段配额的推荐视角，后者是综合产品力视角。
+
+### 与既有视图的区别
+| 视图 | 口径 | 回答什么 |
+|---|---|---|
+| 全价位打分主榜 | 全部车按综合分混排 | 综合产品力谁最强 |
+| 价位段子榜 | 各段全量分组 | 我这个预算买哪款最好 |
+| **分段汇总总榜(v8.3)** | 各段取前 N → 汇总 | 排行榜没分段时，各价位代表凑成总榜 |
+
+### 用法
+```bash
+python3 board_v2.py --selftest
+python3 board_v2.py --candidates <带scores候选池.json> --facts <事实参数.json> \
+    --per-band 5 --out <目录>
+# → board_v2_data.json 增加 segmented_summary 字段（per_band/bands/items）
+# → board_v2.md 增加「分段汇总总榜」章节
+```
+
+### 验收（2026-11-19）
+selftest 6 项全过（新增：各段不超过 per_band、汇总按分数降序、分数来自主榜、各段都有代表）。
+21 款中型纯电 SUV 样例：三段各取前 5 汇总成总榜，合计 15 款，高低价位段均有代表入榜。
