@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 8.3.4
+version: 8.3.5
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v8.3.4）
+# Car recommendation —— 可信购车榜单引擎（v8.3.5）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -518,8 +518,24 @@ python3 pipeline.py --category car_ev --candidates cands.json --out runs/x
 python3 pipeline.py --category car_ev --candidates cands.json --sliders "省心=90"
 ```
 
-链路：**取数 → 闸门 → 打分 → 稳健性 → 三档 → 审查 → 合成报告**，产出 `report.md` + `summary.json`。
+链路：**取数 → 闸门 → 打分 → 稳健性 → 三档 → 审查 → 合成报告**，产出 `report.md` + `summary.json` + **`榜单.html`**（可视化页，默认自动生成，`--no-html` 可关；`--as-of 202610` 标注数据月）。
 全程无模型调用，同一输入必得同一输出。
+
+### 榜单 HTML 可视化（v8.3.5 起内置）
+此前只有 `ice_board.py` / `ev_battery_board.py` 自带 HTML，主榜链路只出 Markdown；
+那些漂亮的分段榜页面是各 run 目录的一次性 `build_*.py` 产物、没进发布包。
+v8.3.5 起 `render_board_html.py` 把渲染能力固化进包，`pipeline.py` 与 `board_v2.py` 出榜时自动生成 `榜单.html`：
+主榜（事实参考列不计分）+ 三档分级 + 价位段子榜 + 分段汇总总榜 + 纯产品力辅助榜（`rank_delta`），一张页看全。
+
+```bash
+# 出榜后单独重渲染（换个标题/补上数据月）
+python3 render_board_html.py --data runs/x/board_v2_data.json --summary runs/x/summary.json \
+    --out runs/x/榜单.html --title "中型纯电轿车 12-18万" --as-of 202610
+python3 render_board_html.py --selftest   # 结构自检
+```
+
+渲染纪律与榜单一致：事实列只展示不排序、分段/产品力榜复用主榜分数、无模型调用。
+`board_v2.py --no-html` / `pipeline.py --no-html` 可关闭自动生成。
 
 辩论引擎已于 2026-11 整体移除（orchestrator/pairwise/baseline/mcp_server/run.* 均删除）。非数据型争议（如维度取舍）改用 notes_tool 的检索沉淀 + 人工决策。
 
@@ -1808,3 +1824,26 @@ selftest 7 项全过（新增：产品力榜降序、覆盖全池、携带主榜
 ### 发布
 两处退化修复 + 全能力回归通过后，同步到 GitHub `test-v8.3.1` 分支提交
 （`a9369ba`）；以该分支作为发布候选，版本号 v8.3.4。
+
+---
+
+## v8.3.5 · 榜单 HTML 可视化内置（2026-11-19）
+
+### 为什么要改
+主榜链路（`pipeline.py` / `board_v2.py`）此前只出 Markdown；燃油榜和电池榜虽自带 HTML，
+但用户要看可视化页面时，只能靠各 run 目录里写死车型/文案的一次性 `build_*.py`——
+这些脚本没进发布包，安装用户拿不到 HTML，是真实能力缺口。
+
+### 实现
+- 新增 `render_board_html.py`：消费 `board_v2_data.json`（+ 可选 pipeline `summary.json`），
+  产出单文件、自包含样式的 `榜单.html`；五块内容一页看全：打分主榜（事实参考列不计分）、
+  三档分级、价位段子榜、分段汇总总榜、纯产品力辅助榜（`rank_delta` 标出性价比拖累/抬升）。
+  三档优先取 summary；没有时从主榜每行的 `tier` 字段聚合。
+- `board_v2.py` / `pipeline.py` 出榜后**默认自动生成 `榜单.html`**，`--no-html` 可关；
+  `pipeline.py` 复用同一份候选 + 同一配置重建 board_v2 数据，与单独跑 `board_v2.py` 完全一致。
+- 渲染器自带 `--selftest`（结构断言），不依赖真实数据、无第三方包、无模型调用、同输入同输出。
+
+### 验收
+`render_board_html.py --selftest` + `board_v2/master_pool/cross_verify/ranking/robust --selftest` 全过；
+用 2026-10 纯电中型轿车 12–18万榜（14 款）验证：主榜/三档/分段/产品力/参考列全部正确呈现，
+`--no-html` 时只出 Markdown。`build_release.py` 打包 10 项检查通过（文档引用的脚本均在包内）。

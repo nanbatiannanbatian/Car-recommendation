@@ -108,6 +108,10 @@ def main():
                     help="跳过官网配置事实节（该节本身不改分，仅作回测对照）")
     ap.add_argument("--no-trims", action="store_true",
                     help="跳过具体配置阶梯与带内配置推荐（默认启用，回测对照用）")
+    ap.add_argument("--no-html", action="store_true",
+                    help="不随报告生成 HTML 榜单页（默认生成，需 board_v2 链路）")
+    ap.add_argument("--as-of", default="—", help="HTML 页面数据月标注，如 202610")
+    ap.add_argument("--html-title", help="HTML 页面标题")
     a = ap.parse_args()
 
     cfg = L.load_category(a.category)
@@ -299,6 +303,26 @@ def main():
     print(f"[ok] {sp}")
     for k, v in summary["review"].items():
         print(f"  {k}: {v}")
+
+    # v8.5: 自动出可视化 HTML。用同一份候选 + 同一配置重建 board_v2 数据，
+    # 事实列不计分、分段/产品力复用主榜分数——与 board_v2 单独跑完全一致。
+    if not a.no_html:
+        try:
+            import board_v2 as BV
+            import render_board_html as RH
+            _here = os.path.dirname(os.path.abspath(__file__))
+            bv_cfg_path = os.path.join(_here, "categories", "car_ev_1218_quality.json")
+            policy_path = os.path.join(_here, "categories", "rank_v2_policy.json")
+            if os.path.exists(bv_cfg_path) and os.path.exists(policy_path):
+                cfg_v2 = json.load(open(bv_cfg_path, encoding="utf-8"))
+                pol = json.load(open(policy_path, encoding="utf-8"))
+                data_v2 = BV.build(cands, cfg_v2, pol)
+                doc = RH.render(data_v2, summary, a.html_title, a.as_of)
+                hp = os.path.join(a.out, "榜单.html")
+                open(hp, "w", encoding="utf-8").write(doc)
+                print(f"[ok] {hp}")
+        except Exception as ex:
+            print(f"[warn] HTML 渲染跳过（不影响榜单）：{type(ex).__name__}: {ex}", file=sys.stderr)
 
 
 if __name__ == "__main__":

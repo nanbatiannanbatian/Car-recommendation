@@ -316,7 +316,11 @@ def cli(argv=None):
     ap.add_argument("--policy", default=os.path.join(HERE, "categories", "rank_v2_policy.json"))
     ap.add_argument("--facts", help="事实参数 json（按 model 索引），用于参考列")
     ap.add_argument("--per-band", type=int, default=10, help="分段汇总总榜每段取前几名（默认10）")
-    ap.add_argument("--out", help="输出目录，写 board_v2_data.json / board_v2.md")
+    ap.add_argument("--out", help="输出目录，写 board_v2_data.json / board_v2.md / 榜单.html")
+    ap.add_argument("--no-html", action="store_true", help="不自动生成 HTML 页面（默认生成）")
+    ap.add_argument("--html-title", help="HTML 页面标题（缺省用 data.meta.title）")
+    ap.add_argument("--as-of", default="—", help="HTML 页面数据月标注，如 202610")
+    ap.add_argument("--summary", help="pipeline.py 的 summary.json，给 HTML 提供三档分级")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args(argv)
 
@@ -337,6 +341,17 @@ def cli(argv=None):
                   ensure_ascii=False, indent=1)
         open(os.path.join(a.out, "board_v2.md"), "w", encoding="utf-8").write(md)
         print("[ok] board_v2_data.json / board_v2.md ->", a.out)
+        # v8.5: 自动出可视化 HTML（无模型、同输入同输出；--no-html 可关）
+        if not a.no_html:
+            try:
+                import render_board_html as RH
+                summary = _load(a.summary) if a.summary and os.path.exists(a.summary) else None
+                doc = RH.render(data, summary, a.html_title, a.as_of)
+                hp = os.path.join(a.out, "榜单.html")
+                open(hp, "w", encoding="utf-8").write(doc)
+                print("[ok] 榜单.html ->", hp)
+            except Exception as ex:
+                print(f"[warn] HTML 渲染跳过（不影响榜单）：{type(ex).__name__}: {ex}", file=sys.stderr)
     else:
         print(md)
 

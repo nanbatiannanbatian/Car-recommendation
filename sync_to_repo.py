@@ -42,6 +42,7 @@ NEW_FILES = [
     "categories/master_pool.json",              # v8.0 总池数据（67款，随代码同步）
     "cross_verify.py",                          # v8.2 多源交叉核验
     "categories/verified_overrides.json",       # v8.2 网查确认回填表
+    "render_board_html.py",                     # v8.3.5 榜单 HTML 渲染器
 ]
 
 
