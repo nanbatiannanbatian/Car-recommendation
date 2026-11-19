@@ -53,6 +53,7 @@ NEW_FILES = [
     "trim_board.py",                            # v9.7.0 逐配置评分（下拉对比用）
     "trim_annotate.py",                         # v9.7.3 统一人工口径逐配置排名
     "categories/trim_verified.json",            # v9.7.3 六配置榜人工标注（参考）
+    "categories/car_midsedan_allprice.json",    # 2026-10纯电中型轿车全价位榜配置
 ]
 
 
