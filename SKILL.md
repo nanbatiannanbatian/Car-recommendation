@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 9.7.2
+version: 9.7.3
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v9.7.2）
+# Car recommendation —— 可信购车榜单引擎（v9.7.3）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -2298,3 +2298,25 @@ selftest 加配置/车系口径标记断言；全 selftest + A/B 26 项通过。
 
 ### 验收
 全 selftest + A/B 26 项通过。MG07 #1 的配置、价格、电池、分数完全同源。
+
+---
+
+## v9.7.3 · 统一人工口径逐配置排名（修复两套分打架，2026-11-19）
+
+用户指出「845版加权分算出来是8.4」——追查发现 8.4 是六配置榜 MG07 845版的 base 加权分（十分制），
+而 v9.7.2 主榜显示 88.5（spec_score 规则分锚定）。暴露出**两套逐配置打分互相矛盾**：
+- 六配置榜：人工标注 base_scores + trim_deltas（845版三电9.2 high置信、总分86.0）
+- trim_board：spec_score 规则从零算（845版三电9.9、6维插补、总分71.5→锚定88.5）
+
+用户选择"全部车都做人工标注"，统一量纲。
+
+### 实现
+- 新增 `trim_annotate.py`：13 款统一人工口径——`base_scores` 取候选池人工车系 8 维分，
+  `trim_deltas` 按配置客观差异（800V/续航/电量/激光雷达/kWh万元）加减，delta 带 high/medium 置信。
+  全部百分制同量纲，**直接排名不再锚定**。
+- 弃用 spec_score 从零算分作排名依据（6维插补、系统性偏低、与人工分不同量纲）。
+  `trim_verified.json`（六配置榜人工标注）保留作参考，但只有 1 款覆盖，不作主排名源。
+- 效果：MG07 845版 **87.4**（800V +0.8/845km +0.6/电量+4.8/激光雷达 → 三电9.86）#2；
+  深蓝L06 88.5 #1；红旗天工05 因顶配900V/98kWh 升 #3（评分配置原本是550青春版400V）。
+- 分数标签改中文「（配置）」；`meta.total_basis=annotated_trim`。
+- selftest 断言 845版人工口径分 > 610版；全 selftest + A/B 26 项通过。

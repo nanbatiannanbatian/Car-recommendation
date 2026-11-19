@@ -51,6 +51,8 @@ NEW_FILES = [
     "PHEV_SCENE_GUIDE.md",                      # v9.5.1 插混按场景选车指南（方法论附注，不进评分）
     "categories/battery_platform.json",         # v9.6.1 按评分配置的电压/电池封装事实库
     "trim_board.py",                            # v9.7.0 逐配置评分（下拉对比用）
+    "trim_annotate.py",                         # v9.7.3 统一人工口径逐配置排名
+    "categories/trim_verified.json",            # v9.7.3 六配置榜人工标注（参考）
 ]
 
 

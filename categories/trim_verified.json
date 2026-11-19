@@ -1,0 +1,222 @@
+{
+  "note": "逐配置人工标注分（来自历次 compare_data.json，去重取最新版）。带 base_scores + trim_deltas + 置信度，优先于 spec_score 规则分；仅覆盖被人工标注过的配置，其余车仍用规则分。",
+  "updated": "2026-11-19",
+  "scoring_priority": "verified_first",
+  "entries": [
+    {
+      "model": "MG 07 纯电 845激光雷达版",
+      "series": "MG 07 纯电",
+      "trim": "2026款 纯电845激光雷达版（次顶配，91kWh）",
+      "price": 14.99,
+      "base_scores": {
+        "powertrain": 8.0,
+        "safety": 8.2,
+        "adas": 8.6,
+        "space": 8.0,
+        "value": 9.4,
+        "control": 8.8,
+        "cabin": 8.6,
+        "quality": 8.0
+      },
+      "trim_deltas": [
+        {
+          "dim": "powertrain",
+          "to": 9.2,
+          "conf": "high",
+          "reason": "相对车系评分配置610激光雷达版换整条三电路线：67kWh清陶半固态400V/3C/610km/176kW → 91kWh宁德三元锂800V/5C/845km/235kW。电池+24kWh、续航+235km、快充20→12min、电芯升一线。官网配置页+汽车之家+易车三源一致，高置信。"
+        },
+        {
+          "dim": "value",
+          "to": 9.2,
+          "conf": "medium",
+          "reason": "指导价14.99万比评分配置12.69万贵2.3万，但kWh/万元 6.07 高于评分配置 5.28（每万元度数反而更多）；绝对支出更高、每万元更划算，两面并存，略降0.2。medium。"
+        }
+      ],
+      "final_total": 86.0,
+      "confidence": "high",
+      "source": "car_compare_6config_202611_v4"
+    },
+    {
+      "model": "大众ID.AURA T6 660 Max激光雷达版",
+      "series": "大众ID.AURA T6",
+      "trim": "660 Max激光雷达版（次顶配）",
+      "price": 14.99,
+      "base_scores": {
+        "powertrain": 8.3,
+        "safety": 8.8,
+        "adas": 8.8,
+        "space": 8.8,
+        "value": 9.0,
+        "control": 8.2,
+        "cabin": 9.0,
+        "quality": 6.09
+      },
+      "trim_deltas": [],
+      "final_total": 84.3,
+      "confidence": "low",
+      "source": "car_compare_6config_202611_v4"
+    },
+    {
+      "model": "极狐阿尔法S5 2027款 750MAX激光神行",
+      "series": "极狐阿尔法S5",
+      "trim": "2027款 750MAX激光神行（顶配）",
+      "price": 14.48,
+      "base_scores": {
+        "powertrain": 8.3,
+        "safety": 7.8,
+        "adas": 7.6,
+        "space": 8.4,
+        "value": 8.2,
+        "control": 8.6,
+        "cabin": 8.0,
+        "quality": 5.9
+      },
+      "trim_deltas": [
+        {
+          "dim": "powertrain",
+          "to": 8.8,
+          "conf": "medium",
+          "reason": "相对评分配置2026款630境智行：电池64.8→74.4kWh、续航630→750km、电机185→227kW，宁德神行。参数来自汽车之家参数页（同名款型结构化字段）；但补能速度、电耗均未取得，不能按800V快充加分，medium。"
+        },
+        {
+          "dim": "adas",
+          "to": 8.4,
+          "conf": "medium",
+          "reason": "配置名含「激光」（650PLUS激光/650MAX激光/750MAX激光神行），相对评分配置630境智行（元境方案）新增激光雷达。参照T6激光雷达版给+0.8；芯片方案/城区NOA交付状态未知，medium。"
+        },
+        {
+          "dim": "value",
+          "to": 8.4,
+          "conf": "low",
+          "reason": "指导价14.48万 vs 评分配置12.88万（贵1.6万）；kWh/万元 5.14 略高于 5.03。官网另有「限时补贴价13.88万」，按纪律只用指导价口径未计入。电池容量两源冲突、电耗缺失，low。"
+        }
+      ],
+      "final_total": 78.1,
+      "confidence": "medium",
+      "source": "car_compare_6config_202611_v4"
+    },
+    {
+      "model": "极狐阿尔法T5 2027款 纯电705激光雷达版",
+      "series": "极狐阿尔法T5",
+      "trim": "2027款 纯电705 激光雷达版（顶配，2026-10-23上市）",
+      "price": 15.88,
+      "base_scores": {
+        "powertrain": 8.8,
+        "safety": 9.5,
+        "adas": 7.8,
+        "space": 8.6,
+        "value": 8.4,
+        "control": 8.2,
+        "cabin": 7.8,
+        "quality": 8.0
+      },
+      "trim_deltas": [
+        {
+          "dim": "powertrain",
+          "to": 9.2,
+          "conf": "medium",
+          "reason": "相对现款705顶配：新增全域800V+宁德5C超充（10-80%大幅缩短），驱动改后驱227kW。补能速度是三电第一权重项。参数多来源一致但具体充电时间未取得，中等置信。"
+        },
+        {
+          "dim": "adas",
+          "to": 8.8,
+          "conf": "low",
+          "reason": "新增192线激光雷达+城区NOA（多来源一致），参照T6激光雷达版8.8。但芯片方案8775舱驾一体 vs 地平线J6M两说冲突、城区NOA交付初期或需OTA，低置信。"
+        },
+        {
+          "dim": "space",
+          "to": 8.7,
+          "conf": "low",
+          "reason": "车长4690→4760（+70mm）、新增185L前备箱；轴距仍2845不变，空间提升有限，低置信。"
+        },
+        {
+          "dim": "value",
+          "to": 8.9,
+          "conf": "low",
+          "reason": "指导价15.88万与现款705顶配同价，但多出激光雷达+800V 5C+后驱。另有'限时10.98万起'说法（是否含顶配不明），保守按指导价未计入，故仍低置信。"
+        },
+        {
+          "dim": "control",
+          "to": 8.6,
+          "conf": "low",
+          "reason": "后驱替代前驱、新增FSD可变阻尼减振器，理论操控提升；无实测支撑，低置信。"
+        },
+        {
+          "dim": "cabin",
+          "to": 8.4,
+          "conf": "low",
+          "reason": "新UI+8775舱驾一体（若属实）提升算力；芯片方案冲突，低置信。"
+        }
+      ],
+      "final_total": 88.5,
+      "confidence": "medium",
+      "source": "car_compare_6config_202611_v4"
+    },
+    {
+      "model": "极狐阿尔法T5 705元境智行版",
+      "series": "极狐阿尔法T5",
+      "trim": "2026款 纯电 705 元境智行版（顶配）",
+      "price": 15.88,
+      "base_scores": {
+        "powertrain": 8.6,
+        "safety": 9.5,
+        "adas": 7.8,
+        "space": 8.6,
+        "value": 9.0,
+        "control": 8.2,
+        "cabin": 7.8,
+        "quality": 4.99
+      },
+      "trim_deltas": [
+        {
+          "dim": "powertrain",
+          "to": 8.8,
+          "conf": "medium",
+          "reason": "705顶配79.2kWh/705km，高于车系评分配置660版（74.4kWh/660km），三电略升。"
+        },
+        {
+          "dim": "value",
+          "to": 8.7,
+          "conf": "medium",
+          "reason": "v2按用户提供的终端优惠1.1万：落地14.78万，比车系评分配置660版13.5万仅高1.28万（原指导价口径高2.38万、给8.4）。价差缩窄约46%，性价比同比例回补0.3分到8.7。终端优惠有时效，置信降为medium；指导价口径仍是8.4。"
+        }
+      ],
+      "final_total": 80.2,
+      "confidence": "medium",
+      "source": "car_compare_6config_202611_v4"
+    },
+    {
+      "model": "极狐阿尔法T7 715 MAX（84.8度）",
+      "series": "极狐阿尔法T7",
+      "trim": "纯电 715 MAX（非乾崑，84.8kWh 中最低配）",
+      "price": 15.38,
+      "base_scores": {
+        "powertrain": 8.4,
+        "safety": 7.4,
+        "adas": 8.4,
+        "space": 9.0,
+        "value": 8.6,
+        "control": 7.8,
+        "cabin": 8.2,
+        "quality": 6.55
+      },
+      "trim_deltas": [
+        {
+          "dim": "adas",
+          "to": 7.0,
+          "conf": "low",
+          "reason": "车系8.4分是16.88万ULTRA乾崑版（华为ADS 5 Pro+激光雷达）；715 MAX为非乾崑版，换北汽元境方案。降1.4为保守估计，标低置信。"
+        },
+        {
+          "dim": "value",
+          "to": 8.9,
+          "conf": "high",
+          "reason": "同为84.8kWh/715km，价格从车系评分配置16.88万降到15.38万（-1.5万），性价比提升。"
+        }
+      ],
+      "final_total": 79.3,
+      "confidence": "high",
+      "source": "car_compare_6config_202611_v4"
+    }
+  ]
+}

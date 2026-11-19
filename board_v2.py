@@ -360,39 +360,28 @@ def build(cands: list[dict], cfg: dict, policy: dict,
     import experience_score as ES
     cands = ES.apply_experience(copy.deepcopy(cands), enabled=not no_experience)
     rows = main_board(cands, cfg, weights)
-    # v9.7.1：主榜按「每车最高配置分」评价（用户要求：买车买具体配置）
-    # 逐配置分经标准差锚定到车系分量纲；无配置数据的车沿用原车系分。
-    trim_data = {}
-    try:
-        import trim_board as TB
-        trim_data = TB.build_trim_board(cands, cfg, rows)
-    except Exception:
-        pass
+    # v9.7.3：主榜按「每车最高配置分」评价——统一人工口径（车系base+客观delta）
+    # 所有配置分同量纲百分制，直接排名不再锚定；无配置数据的车沿用原车系分。
+    import trim_annotate as TA
+    trim_data = TA.annotate_all(cands, cfg)
     if trim_data:
-        import statistics as _st
-        bests = {m: d["best_total"] for m, d in trim_data.items() if d.get("best_total") is not None}
-        if len(bests) >= 3:
-            bmu, bsd = _st.mean(bests.values()), _st.pstdev(bests.values())
-            smu, ssd = _st.mean([r["total"] for r in rows]), _st.pstdev([r["total"] for r in rows])
-            if bsd > 1e-6 and ssd > 1e-6:
-                for r in rows:
-                    bv = bests.get(r["model"])
-                    if bv is not None:
-                        r["config_anchored_total"] = round(
-                            max(0, min(100, smu + (bv - bmu) / bsd * ssd)), 1)
-                        r["best_trim"] = trim_data[r["model"]].get("best_trim")
-                        r["best_trim_raw"] = bv
-                        # v9.7.2：主榜显示的配置/价格/电压/电芯都切到最高配置
-                        best_detail = next(
-                            (t for t in trim_data[r["model"]].get("trims", [])
-                             if t.get("name") == r["best_trim"]), None)
-                        r["best_trim_detail"] = best_detail
-                        # 主榜分与名次都由锚定配置分决定
-                        r["series_total"] = r["total"]   # 保留车系分作对照
-                        r["total"] = r["config_anchored_total"]
-                rows.sort(key=lambda r: (-r["total"], r["model"]))
-                for i, r in enumerate(rows, 1):
-                    r["rank"] = i
+        for r in rows:
+            td = trim_data.get(r["model"])
+            if td and td.get("best_total") is not None:
+                r["series_total"] = r["total"]
+                r["total"] = round(float(td["best_total"]), 1)
+                r["config_anchored_total"] = r["total"]
+                r["best_trim"] = td.get("best_trim")
+                r["best_trim_raw"] = td["best_total"]
+                r["best_total_basis"] = td.get("best_source")
+                r["best_confidence"] = td.get("best_confidence")
+                r["score_basis"] = "annotated_trim"
+                best_detail = next((t for t in td.get("trims", [])
+                                    if t.get("name") == r["best_trim"]), None)
+                r["best_trim_detail"] = best_detail
+        rows.sort(key=lambda r: (-r["total"], r["model"]))
+        for i, r in enumerate(rows, 1):
+            r["rank"] = i
     by_model = {c["model"]: c for c in cands}
     for r in rows:
         r["fact_ref"] = fact_columns(by_model[r["model"]], facts, policy)
@@ -448,11 +437,11 @@ def build(cands: list[dict], cfg: dict, policy: dict,
             "robustness": analyses.get("robustness", {}),
             "audit_boundary": analyses.get("audit_boundary", {}),
             "trim_board": trim_data,
-            # v9.7.1：主榜分数口径（config_anchored=按最高配置分，series=车系分）
-            "total_basis": "config_anchored" if any(
-                r.get("config_anchored_total") is not None for r in rows) else "series",
-            "total_basis_note": "主榜分＝该车型最高配置分经标准差锚定到车系分量纲；"
-                                "series_total 保留车系分对照；无配置数据的车沿用车系分",
+            # v9.7.3：主榜分数口径（统一人工口径逐配置分）
+            "total_basis": "annotated_trim" if trim_data else "series",
+            "total_basis_note": "主榜分＝该车型最高配置分（车系人工base+客观配置delta，"
+                                "同量纲百分制）；series_total 保留车系分对照；"
+                                "无配置数据的车沿用车系分；delta带置信度",
         },
         "main_board": rows,
         "band_subboards": bands,

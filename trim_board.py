@@ -95,9 +95,29 @@ def score_trim(trim: dict, base_spec: dict | None, cfg: dict,
     }
 
 
+def load_verified(path: str | None = None) -> dict[str, dict]:
+    """加载人工标注的逐配置分（带置信度），优先于 spec_score 规则分。"""
+    p = path or os.path.join(HERE, "categories", "trim_verified.json")
+    if not os.path.exists(p):
+        return {}
+    d = json.load(open(p, encoding="utf-8"))
+    out = {}
+    for e in d.get("entries", []):
+        series = str(e.get("series") or "")
+        # 用 series 关联车系（如 "MG 07 纯电"）
+        if series:
+            out[series] = e
+    return out
+
+
 def build_trim_board(cands: list[dict], cfg: dict, main_rows: list[dict] | None = None) -> dict:
-    """给每个车的所有配置打分，标出该车型的最高分配置。不改主榜分数。"""
+    """给每个车的所有配置打分，标出该车型的最高分配置。不改主榜分数。
+
+    v9.7.3：人工标注配置分（trim_verified.json，带置信度）优先；
+    其余配置仍用 spec_score 规则分并标 n_imputed。两套分带 score_source 字段区分。
+    """
     tdb = load_trims()
+    verified = load_verified()
     peer_prices = [float(c.get("trim", {}).get("price") or c.get("price_wan") or 0)
                    for c in cands if isinstance(c.get("trim"), dict)]
     peer_prices = [p for p in peer_prices if p > 0] or [15.0]
@@ -107,8 +127,29 @@ def build_trim_board(cands: list[dict], cfg: dict, main_rows: list[dict] | None 
         entry = tdb.get(model)
         if not entry or not entry.get("trims"):
             continue
-        # 车系级公共参数（激光雷达/芯片等从候选池 note 无法可靠提取，留空插补）
         scored = [score_trim(t, None, cfg, peer_prices) for t in entry["trims"]]
+        # 人工标注：把该配置的分替换为标注分（同量纲百分制）
+        vf = verified.get(model)
+        vf_note = ""
+        if vf and vf.get("final_total") is not None:
+            vname = str(vf.get("trim") or "")
+            for s in scored:
+                # 配置名模糊匹配（标注名含年份/电池描述，取关键数字串）
+                import re
+                nums = set(re.findall(r"\d{3,4}", vname))
+                s_nums = set(re.findall(r"\d{3,4}", str(s.get("name") or "")))
+                if nums & s_nums or (vf.get("price") is not None and s.get("price") == vf["price"]):
+                    s["total"] = vf["final_total"]
+                    s["scores"] = dict(vf.get("base_scores") or s["scores"])
+                    # 应用 trim_deltas 到对应维度
+                    for d in vf.get("trim_deltas", []):
+                        if d.get("dim") in s["scores"]:
+                            s["scores"][d["dim"]] = d["to"]
+                    s["score_source"] = "verified"
+                    s["confidence"] = vf.get("confidence")
+                    s["n_imputed"] = 0
+                    s["verified_note"] = vf.get("source", "")
+            vf_note = f"含人工标注配置（{vf.get('confidence')}置信）"
         valid = [s for s in scored if s.get("total") is not None]
         best = max(valid, key=lambda s: s["total"]) if valid else None
         out[model] = {
@@ -118,8 +159,10 @@ def build_trim_board(cands: list[dict], cfg: dict, main_rows: list[dict] | None 
             "trims": scored,
             "best_trim": best["name"] if best else None,
             "best_total": best["total"] if best else None,
+            "best_source": best.get("score_source", "spec_score") if best else None,
             "source": entry.get("url", ""),
             "date": entry.get("date", ""),
+            "verified_note": vf_note,
         }
     return out
 

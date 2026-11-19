@@ -341,8 +341,10 @@ def main_cell(key: str, row: dict, cand: dict, grade: str = "") -> str:
     if key == "total":
         if row.get("total") is None:
             return "—"
-        base = "配置" if row.get("config_anchored_total") is not None else "车系"
-        return f"{float(row['total']):.1f}（{base}）"
+        basis = row.get("score_basis") or ("配置" if row.get("config_anchored_total") is not None else "车系")
+        label = {"annotated_trim": "配置", "verified_trim": "标注配置",
+                 "spec_score_anchored": "规则配置"}.get(basis, basis)
+        return f"{float(row['total']):.1f}（{label}）"
     if key == "tier":
         return str(row.get("tier") or "")
     if key == "evidence":
