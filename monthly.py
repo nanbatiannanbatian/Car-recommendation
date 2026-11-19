@@ -42,12 +42,10 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
-# 默认输出根目录：环境变量 > 本机历史归档（存在才沿用，保证老归档连续性）
-# > skill 内 runs 目录。开源环境下前两者都不命中，自动落到第三档。
-_LEGACY_ROOT = r"C:/Users/海南岛南霸天/WorkBuddy/2026-11-13-15-03-08/runs/car-ev-monthly"
+# 默认输出根目录：环境变量 > skill 内 runs 目录。
+# 如需沿用本机历史归档，可设置环境变量 CAR_EV_MONTHLY_ROOT 指向该目录。
 ROOT_DEFAULT = (os.environ.get("CAR_EV_MONTHLY_ROOT")
-                or (_LEGACY_ROOT if os.path.isdir(_LEGACY_ROOT)
-                    else os.path.join(HERE, "runs", "car-ev-monthly")))
+                or os.path.join(HERE, "runs", "car-ev-monthly"))
 BASELINE_DEFAULT = os.path.join(HERE, "categories", "baseline_car_ev.json")
 PY = sys.executable
 

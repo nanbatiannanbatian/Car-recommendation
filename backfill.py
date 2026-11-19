@@ -276,9 +276,8 @@ import collections  # noqa: E402  （放在底部避免顶部依赖噪音）
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--db", default=os.path.join(
-        "C:/Users/海南岛南霸天/WorkBuddy/2026-11-13-15-03-08/runs/car-ev-4boards",
-        "car_ev.db"))
+    ap.add_argument("--db", default=os.environ.get(
+        "CAR_EV_DB", os.path.join(HERE, "runs", "car_ev.db")))
     ap.add_argument("--sales", action="store_true")
     ap.add_argument("--filings", action="store_true")
     ap.add_argument("--brand-stats", action="store_true")

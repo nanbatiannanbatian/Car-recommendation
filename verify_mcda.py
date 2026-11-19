@@ -52,8 +52,8 @@ def real_matrix(cands_path=None):
         for root, dirs, files in os.walk(here_runs):
             if "candidates_trend.json" in files:
                 cands_pool.append(os.path.join(root, "candidates_trend.json"))
-        legacy = r"C:/Users/海南岛南霸天/WorkBuddy/2026-11-13-15-03-08/runs/car-ev-4boards/candidates_trend.json"
-        if os.path.exists(legacy):
+        legacy = os.environ.get("CAR_EV_LEGACY_CANDS")
+        if legacy and os.path.exists(legacy):
             cands_pool.append(legacy)
         if not cands_pool:
             raise SystemExit("找不到 candidates_trend.json，用 --candidates 指定")

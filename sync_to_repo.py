@@ -35,7 +35,9 @@ NEW_FILES = [
     "quality_score.py",
     "sync_cell_brand.py",
     "sync_to_repo.py",  # 本脚本自身也入库
+    "board_v2.py",                              # v7.0 统一榜单引擎
     "categories/car_ev_1218_quality.json",
+    "categories/rank_v2_policy.json",           # v7.0 榜单策略配置
 ]
 
 

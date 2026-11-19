@@ -13,7 +13,7 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 5.6.1
+version: 7.0.0
 author: "nanbatiannanbatian"
 ---
 
@@ -789,6 +789,28 @@ python3 sync_cell_brand.py --check cands.json --json audit.json
 其余三个榜仍落在 8.7（sd 0.00–0.07）——**这几个榜的 safety 权重实际失效，报告里会自动标出来。**
 这不是打分规则的问题，是这些车确实没有第三方验证。
 
+### `sync_to_repo.py` — skill 代码同步到 GitHub 仓库（强制流程，2026-11-19）
+
+**双轨风险**：skill 实际运行目录 `~/.workbuddy/skills/omni-debate` 与 GitHub 发布副本
+（`WorkBuddy/<session>/omni-debate-github`，origin=`Car-recommendation.git`）是两套目录。
+改了 skill 代码却没同步，改动只活在 skill 本地，永远上不了 GitHub。
+**用户明确要求：每次修改 skill 代码后，必须同步到 omni-debate 仓库并提交。**
+
+```bash
+python3 sync_to_repo.py --check              # 先体检：列出将同步哪些文件（只读）
+python3 sync_to_repo.py --apply              # 执行同步：白名单复制 + baseline 仓库端回填
+# 然后进仓库 git add -A && git commit && git push
+```
+
+**同步规则**：白名单 = 仓库已有 `*.py`/`categories/*.json`/根 `*.md`（以 skill 为准）
++ 新增代码（quality_score/sync_cell_brand/sync_to_repo/car_ev_1218_quality.json）。
+内容相同（仅行尾符差异）跳过；**仓库有、skill 无的文件不动**（防丢仓库独有内容，如 README）。
+`baseline_car_ev.json` 不整文件覆盖，调 sync_cell_brand 在仓库端回填（保持 indent=2，避免 2400 行重排）。
+`runs/` 和 `cache/` 由 .gitignore 排除，绝不入库。
+
+**踩过的坑**：GitHub 推送常遇间歇性断连（Connection reset / 21s 超时）；环境变量里有
+`HTTPS_PROXY=127.0.0.1:60770`，时通时断。推送失败时重试即可，不是代码问题。
+
 ## 工信部备案预测与第三方视频证据（v5.5）
 
 ### `filings.py` — 工信部备案（每月自动，提前 4-10 周看到要上市的车）
@@ -1467,3 +1489,43 @@ python3 swoiow_probe.py --selftest
 - **samrdprc.org.cn 召回公告**：静态 HTML，召回编号/车型/数量/缺陷结构化；召回≠质量差，先定「只披露不评分」呈现规则再接。
 
 完整方案见 `车辆榜单引擎_架构与运维手册.md` §3.2–3.3。
+
+---
+
+## v7.0 · 统一榜单：打分榜唯一主榜，事实榜降级参考列，价位段子榜（2026-11-19）
+
+### 为什么要改
+旧链路并行产出「事实榜」（只按 kWh/万元、电耗排序）和「打分榜」，用户混淆「哪个是排行」。
+用户明确决定：**以后所有排行、比较都以打分榜为准**。事实指标不再单独成榜。
+
+### 三条硬规则（已固化进 `board_v2.py` + `categories/rank_v2_policy.json`）
+1. **打分榜是唯一权威名次来源**。主榜 = 8 维加权（含品控 10%），直接复用 `leaderboard.score_rows`，
+   不重写打分逻辑。所有「排行 / 前十 / 同级对比 / 比较榜」都从这里取名次。
+2. **事实指标降级为「参考·不计分」列**。kWh、kWh/万元、电耗、CLTC 续航、电芯、800V、月销
+   贴在主榜每行，只帮助理解，**绝不参与加权**。自检已验证：改某车的 kWh 不改变任何名次。
+3. **价位差异不设硬排除**。同级别（官方二级分类）已控制级别混淆变量；价格对竞争力的影响
+   由「性价比」维度（11.7%）吸收——贵车性价比低但产品力维度占优，便宜车反之，混排本身
+   就是有意义的综合比较。「价格相差太多就不排名」会丢掉「多花钱值不值」的信息，且价位
+   边界会造成临界车跳榜的假精确，故不采用。
+
+### 价位段子榜：回答「我这个预算买哪款最好」
+`board_v2.py` 把**同一份主榜分数**按预算分组（默认 18/28 万切三段，或用价格分位自动切），
+生成价位段子榜。关键纪律：**子榜复用主榜分数，不重新打分、不改权重**——它只是展示层的分组视图。
+- 「综合谁最强 / 给前十」→ 看全价位主榜
+- 「我这个预算买哪个」→ 看价位段子榜
+- 「某车电池/电耗到底怎样」→ 看主榜的参考列（不计分）
+
+### 用法
+```bash
+python3 board_v2.py --selftest
+python3 board_v2.py --candidates <带scores候选池.json> --facts <事实参数.json> \
+    --out <目录>
+# → board_v2_data.json（主榜+子榜+参考列） + board_v2.md
+```
+策略与字段映射在 `categories/rank_v2_policy.json`（价位段边界、哪些是参考列、三榜问答指南），
+改口径改配置即可，不动代码。`--facts` 可选：不传则用候选池自带的事实字段。
+
+### 验收（2026-11-19，中型纯电 SUV 全价位 12 款）
+主榜：极氪7X 86.4 / 阿维塔07 83.3 / 腾势N7 80.3 … Model Y 76.8（第8）。
+Kendall τ=0.913（10 算法×6 权重情景）。事实榜的零跑C11 kWh/万元第1、Model Y 电耗第1，
+在 v2 里都只是参考列——综合名次分别是第9、第8，印证「参考不计分」。
