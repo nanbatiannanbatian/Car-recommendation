@@ -112,13 +112,13 @@ def render(data, summary, title, as_of):
 <div class="kicker">CAR-RECOMMENDATION · 统一榜单引擎 · 数据月 {e(as_of)}</div>
 <h1>{e(title)} <em>可信排行榜</em></h1>
 <p class="lede">打分主榜是唯一权威名次来源（8 维加权）；事实指标降级为<b>参考列 · 不计分</b>；
-价位段子榜与分段汇总复用同一份主榜分数，不重新打分、不改权重。</p>
+纯产品力榜为并列辅助视角，不改主榜名次。</p>
 <div class="meta"><span>候选 <b>{len(rows)}</b> 款</span>
 <span>主榜口径 <b>{e(meta.get('primary', '8维加权打分榜'))}</b></span>
 <span>生成 <b>{datetime.now().strftime('%Y-%m-%d %H:%M')}</b></span></div>
 <div class="rule"><b>三条规则：</b>① 主榜＝打分榜，唯一权威名次；
 ② kWh、电耗、电芯、月销等＝参考列，<b>只看不计分</b>（改这些数不动名次）；
-③ 预算明确看价位段子榜，综合谁最强看主榜，「不看价格比产品力」看下方纯产品力辅助榜。</div>"""]
+③ 多段全价位榜额外给价位段子榜与分段汇总（复用主榜分数）；「不看价格比产品力」看下方纯产品力辅助榜。</div>"""]
 
     # 主榜
     H.append("<h2>打分主榜 <span>8 维加权总分排序 · 参考列不参与排序</span></h2>")
@@ -170,11 +170,8 @@ def render(data, summary, title, as_of):
                      f'<ul>{"".join(f"<li>{e(m)}</li>" for m in models) if models else "<li>—</li>"}</ul></div>')
         H.append("</div>")
 
-    # 价位段子榜：单段提问已跳过
-    if meta.get("band_subboards_skipped"):
-        H.append('<h2>价位段子榜 <span>已跳过 · 提问已给价位段</span></h2>'
-                 f'<div class="rule">{e(meta.get("band_subboards_skip_reason", "候选只落入单一价位段"))}</div>')
-    elif bands:
+    # 价位段子榜：单段无数据（v8.3.8）整块不渲染
+    if not meta.get("band_subboards_skipped") and bands:
         H.append("<h2>价位段子榜 <span>同一份分数按预算分组 · 复用主榜 · 不重新打分</span></h2>")
         for b in bands:
             items = b.get("items") or []
@@ -184,12 +181,8 @@ def render(data, summary, title, as_of):
                          f"<span style='color:#7b8590'>({e(it.get('price'))}万)</span></li>")
             H.append("</ol></div>")
 
-    # 分段汇总总榜：单段提问已跳过，给一句说明而不是空表
-    if seg.get("skipped"):
-        H.append(f'<h2>分段汇总总榜 <span>已跳过 · 提问已给价位段</span></h2>'
-                 f'<div class="rule">{e(seg.get("reason", "候选只落入单一价位段"))}'
-                 f'本次看主榜 + 下方纯产品力辅助榜即可。</div>')
-    elif seg.get("items"):
+    # 分段汇总总榜：单段无数据（v8.3.8）整块不渲染
+    if not seg.get("skipped") and seg.get("items"):
         H.append(f"<h2>分段汇总总榜 <span>各段取前 {e(seg.get('per_band'))} → 按主榜分数汇总 · 不重新打分</span></h2>")
         H.append("<table><thead><tr><th>#</th><th>车型</th><th>分数</th><th>来自价位段</th><th>段内名次</th></tr></thead><tbody>")
         for i, it in enumerate(seg["items"], 1):

@@ -393,9 +393,7 @@ def render_md(data: dict) -> str:
         L.append(f"| {r['rank']} | {r['model']} | {r['total']:.1f} | {r.get('tier','')} | {ref} |")
     ss = data.get("segmented_summary", {})
     if ss and ss.get("skipped"):
-        L += ["", "## 分段汇总总榜：已跳过", "",
-              f"> {ss.get('reason', '候选只落入单一价位段')}", "",
-              "> 本次提问已给价位段，直接看主榜 + 下方纯产品力辅助榜即可。"]
+        pass  # v8.3.8：单段无数据，整块不渲染（连「已跳过」说明也不占版面）
     elif ss:
         L += ["", f"## 分段汇总总榜（各价位段前 {ss.get('per_band', 10)} 名 → 汇总成总榜）", "",
               "先按价位段各取前几名，再按主榜分数汇成一榜；分数全部来自主榜，不重新打分。", ""]
@@ -403,8 +401,7 @@ def render_md(data: dict) -> str:
         for it in ss["items"]:
             L.append(f"| {it['summary_rank']} | {it['model']} | {it['score']:.1f} | {it['band']} | {it['rank_in_band']} |")
     if data["meta"].get("band_subboards_skipped"):
-        L += ["", "## 价位段子榜：已跳过", "",
-              f"> {data['meta'].get('band_subboards_skip_reason', '提问已给价位段')}", ""]
+        pass  # v8.3.8：单段无数据，整块不渲染
     else:
         L += ["", "## 价位段子榜（复用主榜分数，不重新打分）", ""]
         for b in data["band_subboards"]:
@@ -486,8 +483,10 @@ def run_selftest():
     assert d1["meta"]["band_subboards_skipped"] is True
     assert d1["product_power_board"]["items"], "单段榜仍应保留纯产品力榜"
     md1 = render_md(d1)
-    assert "分段汇总总榜：已跳过" in md1, "单段跳过分段未在 md 中说明"
-    assert "价位段子榜：已跳过" in md1, "单段跳过子榜未在 md 中说明"
+    assert "## 分段汇总总榜" not in md1, "单段无数据，分段汇总整块不应渲染"
+    assert "## 价位段子榜" not in md1, "单段无数据，价位段子榜整块不应渲染"
+    assert "已跳过" not in md1, "单段不应留「已跳过」说明占版面"
+    assert "纯产品力总榜" in md1, "单段榜产品力榜应在"
     # 7) 纯产品力总榜：降序 / 覆盖全池 / main_score 与主榜一致 / 只改 value 不改产品力分
     pp = data["product_power_board"]
     assert pp["excluded_dimension"] == "value"

@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 8.3.7
+version: 8.3.8
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v8.3.7）
+# Car recommendation —— 可信购车榜单引擎（v8.3.8）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -1891,3 +1891,21 @@ v8.3.6 已让「分段汇总总榜」在单价位段时跳过，但**价位段�
 ### 验收
 12–18万榜：子榜 0、分段汇总 skipped、产品力榜 14 款，md/html 都有跳过说明与产品力榜；
 全价位 SUV 榜：3 段子榜与分段汇总照常；全部 selftest + A/B 24 项能力矩阵通过。
+
+---
+
+## v8.3.8 · 单段无数据时两块榜直接不渲染（2026-11-19）
+
+### 为什么要改
+v8.3.7 让价位段子榜和分段汇总在单价位段时「跳过」，但仍在页面留了两段「已跳过」说明——
+用户指出：没有数据就直接不显示，说明文字本身也是噪音。
+
+### 规则
+- 单段（非空价位段 ≤1）时：Markdown / HTML **整块不渲染**这两节，连「已跳过」字样都不出现。
+- 机读字段保留（`segmented_summary.skipped`、`meta.band_subboards_skipped` + reason），供审计用。
+- 页面顶部导语与规则说明同步清理，不再指向不存在的章节。
+- 纯产品力榜任何场景保留；多段全价位榜两节照常显示。
+- selftest 改为断言 `## 价位段子榜` / `## 分段汇总总榜` 章节不存在、`已跳过` 不出现、产品力榜仍在。
+
+### 验收
+12–18万榜页面只剩：打分主榜 → 三档分级 → 纯产品力总榜；全部 selftest + A/B 24 项矩阵通过。
