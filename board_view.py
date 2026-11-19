@@ -155,6 +155,28 @@ def method_boundary_text() -> list[str]:
     ]
 
 
+def load_fact_library(explicit_path: str | None = None) -> dict:
+    """加载事实参考库：显式 --facts 优先，否则自动用随包事实库。
+
+    v9.0.1 修复「漏喂事实库」bug：此前出榜只从 master_pool 导候选，
+    候选里只有 cell_brand/trend_sales，kWh/电耗/CLTC 全空，页面误报「未采集」。
+    事实数据其实在 car_all_202610/all_data.json（带易车来源），已提炼为
+    categories/fact_library.json 随包发布。本函数让两版出榜链路默认就能拿到。
+    """
+    import os
+    import json as _json
+    path = explicit_path
+    if not path or not os.path.exists(path):
+        here = os.path.dirname(os.path.abspath(__file__))
+        path = os.path.join(here, "categories", "fact_library.json")
+    if not os.path.exists(path):
+        return {}
+    try:
+        return _json.load(open(path, encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
 def lifecycle_line(model: str, info) -> str:
     """生命周期条目 → 一句可读中文（两版共用，避免露原始 JSON）。"""
     if isinstance(info, str):
@@ -203,6 +225,10 @@ def selftest() -> int:
             bad.append(f"最小数据下缺区块 {rid}")
     if "band_subboards" in act:
         bad.append("单段榜不应出价位段子榜")
+    # v9.0.1：事实库自动加载必须有数据（防「漏喂」回归）
+    lib = load_fact_library()
+    if len(lib) < 50 or not any(v.get("kwh") for v in lib.values()):
+        bad.append(f"事实库自动加载异常（{len(lib)} 款）")
     if bad:
         print("[selftest FAIL]", bad)
         return 1

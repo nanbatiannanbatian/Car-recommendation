@@ -310,13 +310,15 @@ def main():
         try:
             import board_v2 as BV
             import render_board_html as RH
+            import board_view as BView
             _here = os.path.dirname(os.path.abspath(__file__))
             bv_cfg_path = os.path.join(_here, "categories", "car_ev_1218_quality.json")
             policy_path = os.path.join(_here, "categories", "rank_v2_policy.json")
             if os.path.exists(bv_cfg_path) and os.path.exists(policy_path):
                 cfg_v2 = json.load(open(bv_cfg_path, encoding="utf-8"))
                 pol = json.load(open(policy_path, encoding="utf-8"))
-                data_v2 = BV.build(cands, cfg_v2, pol)
+                facts_v2 = BView.load_fact_library()   # v9.0.1 默认带事实库
+                data_v2 = BV.build(cands, cfg_v2, pol, facts_v2)
                 doc = RH.render(data_v2, summary, a.html_title, a.as_of)
                 hp = os.path.join(a.out, "榜单.html")
                 open(hp, "w", encoding="utf-8").write(doc)

@@ -1,0 +1,402 @@
+{
+ "深蓝L06": {
+  "kwh": 56.12,
+  "consumption": 11.5,
+  "cell_brand": "宁德时代",
+  "cltc": 560
+ },
+ "马自达EZ-6": {
+  "kwh": 56.1,
+  "consumption": 13.4,
+  "cell_brand": "宁德时代(时代长安)",
+  "cltc": 600
+ },
+ "风云A9": {
+  "kwh": 70.11,
+  "consumption": 12.3,
+  "cell_brand": "得壹能源(奇瑞犀牛自研)",
+  "cltc": 655
+ },
+ "秦MAX EV": {
+  "kwh": 64.315,
+  "consumption": 11.4,
+  "cell_brand": "弗迪(第二代刀片)",
+  "cltc": 630
+ },
+ "海豹06EV": {
+  "kwh": 56.64,
+  "consumption": 11.4,
+  "cell_brand": "弗迪(刀片)",
+  "cltc": 630
+ },
+ "MG 07 纯电": {
+  "kwh": 67.0,
+  "consumption": 12.3,
+  "cell_brand": "上汽清陶(半固态)",
+  "cltc": 610
+ },
+ "银河A7 EV": {
+  "kwh": 58.05,
+  "consumption": 11.4,
+  "cell_brand": "神盾金砖(吉利自研/耀宁)",
+  "cltc": 550
+ },
+ "深蓝L07": {
+  "kwh": 56.12,
+  "consumption": 12,
+  "cell_brand": "宁德时代(时代长安)"
+ },
+ "极狐阿尔法S5": {
+  "kwh": 64.8,
+  "consumption": 13.6,
+  "cell_brand": "宁德时代",
+  "cltc": 560
+ },
+ "红旗天工05": {
+  "kwh": 62.0,
+  "consumption": 12.1,
+  "cell_brand": "宁德时代(时代一汽)"
+ },
+ "丰田bZ3": {
+  "kwh": 65.3,
+  "consumption": 11,
+  "cell_brand": "弗迪(刀片)"
+ },
+ "极狐贝塔S3": {
+  "kwh": 54.0,
+  "cell_brand": "宁德时代(巧克力换电)"
+ },
+ "大众与众07": {
+  "kwh": 59.9,
+  "consumption": 12.1,
+  "cell_brand": "国轩高科"
+ },
+ "海狮06EV": {
+  "kwh": 69.07,
+  "consumption": 13.3,
+  "cell_brand": "弗迪(第二代刀片)",
+  "cltc": 710
+ },
+ "极狐阿尔法T5": {
+  "kwh": 64.8,
+  "consumption": 13.1,
+  "cell_brand": "宁德时代",
+  "cltc": 705
+ },
+ "小鹏MONA L05": {
+  "kwh": 71.1,
+  "consumption": 11.7,
+  "cell_brand": "中创新航"
+ },
+ "零跑C10": {
+  "kwh": 81.9,
+  "consumption": 13.8,
+  "cell_brand": "国轩高科/亿纬动力/中创新航",
+  "cltc": 660
+ },
+ "零跑C11": {
+  "kwh": 81.9,
+  "consumption": 14.4,
+  "cell_brand": "蜂巢能源/国轩高科",
+  "cltc": 640
+ },
+ "深蓝S07": {
+  "kwh": 66.02,
+  "consumption": 12.6,
+  "cell_brand": "宁德时代/中创新航"
+ },
+ "马自达EZ-60": {
+  "kwh": 77.94,
+  "cell_brand": "中创新航"
+ },
+ "长安启源Q06": {
+  "kwh": 66.02,
+  "consumption": 12.8,
+  "cell_brand": "中创新航"
+ },
+ "丰田bZ5": {
+  "kwh": 65.28,
+  "consumption": 13.5,
+  "cell_brand": "弗迪(刀片)",
+  "cltc": 550
+ },
+ "大众ID.AURA T6": {
+  "kwh": 77.5,
+  "consumption": 13.1,
+  "cell_brand": "宁德时代(时代一汽)",
+  "cltc": 660
+ },
+ "日产N7": {
+  "kwh": 73.0,
+  "consumption": 13,
+  "cell_brand": "欣旺达/宁德时代"
+ },
+ "银河TT": {
+  "kwh": 63.8,
+  "consumption": 11,
+  "cell_brand": "神盾短刀(吉利自研)",
+  "cltc": 640
+ },
+ "长安启源A06": {
+  "kwh": 61.73,
+  "consumption": 11,
+  "cell_brand": "宁德时代"
+ },
+ "长安启源A07": {
+  "kwh": 77.94,
+  "consumption": 12.5,
+  "cell_brand": "宁德时代"
+ },
+ "丰田铂智7": {
+  "kwh": 71.35,
+  "consumption": 12.7,
+  "cell_brand": "弗迪/宁德时代"
+ },
+ "大众与众09": {
+  "kwh": 91.963,
+  "consumption": 13.7,
+  "cell_brand": "宁德时代"
+ },
+ "埃安Ray7": {
+  "kwh": 62.98,
+  "consumption": 9.8,
+  "cell_brand": "中创新航/因湃",
+  "cltc": 702
+ },
+ "极狐阿尔法T7": {
+  "kwh": 84.8,
+  "consumption": 12.7,
+  "cell_brand": "宁德时代",
+  "cltc": 715
+ },
+ "日产NX8": {
+  "kwh": 73.0,
+  "consumption": 14.4,
+  "cell_brand": "欣旺达/宁德时代"
+ },
+ "别克E5": {
+  "kwh": 65.0,
+  "consumption": 13.4,
+  "cell_brand": "上汽时代(宁德合资)",
+  "cltc": 620
+ },
+ "零跑C16": {
+  "kwh": 81.9,
+  "consumption": 14.6,
+  "cell_brand": "中创新航/国轩高科"
+ },
+ "东风奕派M8": {
+  "kwh": 77.38,
+  "consumption": 14.6,
+  "cell_brand": "中创新航"
+ },
+ "东风风行星海V6": {
+  "kwh": 60.5,
+  "consumption": 13.5,
+  "cell_brand": "欣旺达",
+  "cltc": 510
+ },
+ "MG4": {
+  "kwh": 53.9,
+  "consumption": 11.9,
+  "cell_brand": "宁德时代"
+ },
+ "小鹏MONA M03": {
+  "kwh": 61.6,
+  "consumption": 10.8,
+  "cell_brand": "亿纬动力",
+  "cltc": 540
+ },
+ "AION RT": {
+  "kwh": 70.1,
+  "consumption": 10.5,
+  "cell_brand": "宁德时代",
+  "cltc": 710
+ },
+ "零跑B01": {
+  "kwh": 69.7,
+  "consumption": 11.5,
+  "cell_brand": "宁德时代/国轩高科",
+  "cltc": 670
+ },
+ "零跑Lafa5": {
+  "kwh": 67.1,
+  "consumption": 12.4,
+  "cell_brand": "国轩高科/中创新航/福鼎时代",
+  "cltc": 605
+ },
+ "秦PLUS EV": {
+  "kwh": 57.6,
+  "consumption": 11.9,
+  "cell_brand": "弗迪",
+  "cltc": 510
+ },
+ "荣威D6": {
+  "kwh": 53.95,
+  "consumption": 11.7,
+  "cell_brand": "宁德时代",
+  "cltc": 520
+ },
+ "AION UT": {
+  "consumption": 11.7,
+  "cell_brand": "宁德时代"
+ },
+ "长安启源Q05": {
+  "kwh": 51.9,
+  "consumption": 11.3,
+  "cell_brand": "宁德时代(时代长安)",
+  "cltc": 405
+ },
+ "小鹏MONA L03": {
+  "kwh": 69.0,
+  "consumption": 11.5,
+  "cell_brand": "中创新航",
+  "cltc": 550
+ },
+ "AION i60": {
+  "kwh": 77.65,
+  "consumption": 12.3,
+  "cell_brand": "因湃电池",
+  "cltc": 520
+ },
+ "元PLUS": {
+  "kwh": 57.545,
+  "consumption": 11.8,
+  "cell_brand": "弗迪",
+  "cltc": 540
+ },
+ "深蓝S05": {
+  "kwh": 56.12,
+  "consumption": 12.3,
+  "cell_brand": "宁德时代",
+  "cltc": 520
+ },
+ "铂智3X": {
+  "kwh": 58.37,
+  "consumption": 12.6,
+  "cell_brand": "江苏正力/中创新航",
+  "cltc": 430
+ },
+ "海狮05EV": {
+  "kwh": 57.545,
+  "consumption": 11.8,
+  "cell_brand": "弗迪",
+  "cltc": 540
+ },
+ "零跑B10": {
+  "kwh": 69.7,
+  "consumption": 12.6,
+  "cell_brand": "欣旺达/国轩高科",
+  "cltc": 610
+ },
+ "银河E5": {
+  "kwh": 61.52,
+  "consumption": 12.1,
+  "cell_brand": "蜂巢能源/国轩高科",
+  "cltc": 530
+ },
+ "五菱宏光MINIEV": {
+  "kwh": 25.1,
+  "consumption": 9.2,
+  "cell_brand": "国轩/瑞浦"
+ },
+ "长安Lumin": {
+  "kwh": 28.08,
+  "consumption": 10.0,
+  "cell_brand": "宁德时代"
+ },
+ "吉利熊猫mini": {
+  "kwh": 17.03,
+  "consumption": 9.1,
+  "cell_brand": "国轩高科"
+ },
+ "比亚迪海鸥": {
+  "kwh": 39.2,
+  "consumption": 9.9,
+  "cell_brand": "弗迪"
+ },
+ "比亚迪海豚": {
+  "kwh": 44.93,
+  "consumption": 11.2,
+  "cell_brand": "弗迪"
+ },
+ "吉利星愿": {
+  "kwh": 47.14,
+  "consumption": 10.9,
+  "cell_brand": "宁德时代"
+ },
+ "五菱缤果": {
+  "kwh": 31.9,
+  "consumption": 10.6,
+  "cell_brand": "欣旺达/瑞浦赛克"
+ },
+ "欧拉好猫": {
+  "kwh": 45.99,
+  "consumption": 13.3,
+  "cell_brand": "蜂巢能源"
+ },
+ "东风纳米01": {
+  "kwh": 31.45,
+  "consumption": 10.6,
+  "cell_brand": "欣旺达"
+ },
+ "奇瑞小蚂蚁": {
+  "kwh": 25.05,
+  "consumption": 10.0,
+  "cell_brand": "国轩高科"
+ },
+ "比亚迪元UP": {
+  "kwh": 45.12,
+  "consumption": 12.2,
+  "cell_brand": "弗迪"
+ },
+ "AION Y Plus": {
+  "kwh": 58.9,
+  "consumption": 12.9,
+  "cell_brand": "宁德时代(时代广汽)/因湃电池",
+  "cltc": 510
+ },
+ "宝骏悦也Plus": {
+  "kwh": 42,
+  "consumption": 12.6,
+  "cell_brand": "国轩高科"
+ },
+ "东风纳米06": {
+  "kwh": 51.87,
+  "consumption": 12.6,
+  "cell_brand": "东昱欣晟",
+  "cltc": 471
+ },
+ "蔚来ET7": {
+  "kwh": 100,
+  "consumption": 16,
+  "cell_brand": "江苏时代"
+ },
+ "蔚来ES8": {
+  "kwh": 102,
+  "consumption": 16.3,
+  "cell_brand": "宁德时代"
+ },
+ "问界M9纯电版": {
+  "kwh": 100,
+  "consumption": 17.4,
+  "cell_brand": "宁德时代",
+  "cltc": 630
+ },
+ "奔驰EQS": {
+  "kwh": 111.8,
+  "consumption": 14.6,
+  "cell_brand": "宁德时代",
+  "cltc": 813
+ },
+ "宝马i7": {
+  "kwh": 105.7,
+  "consumption": 17.9,
+  "cltc": 650
+ },
+ "乐道L90": {
+  "kwh": 85,
+  "consumption": 14.6,
+  "cell_brand": "中创新航"
+ }
+}

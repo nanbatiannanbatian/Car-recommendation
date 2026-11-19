@@ -365,7 +365,9 @@ def cli(argv=None):
     cands = raw.get("candidates", raw)
     cfg = _load(a.config)
     policy = _load(a.policy)
-    facts = _load(a.facts) if a.facts else {}
+    # v9.0.1：默认加载随包事实库，不再漏喂 kWh/电耗/CLTC；--facts 可覆盖
+    import board_view as BV
+    facts = BV.load_fact_library(a.facts)
     data = build(cands, cfg, policy, facts, per_band=a.per_band)
     _sum = _load(a.summary) if a.summary and os.path.exists(a.summary) else None
     md = render_md(data, _sum)

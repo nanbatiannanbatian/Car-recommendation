@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 9.0.0
+version: 9.0.1
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v9.0.0）
+# Car recommendation —— 可信购车榜单引擎（v9.0.1）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -1965,3 +1965,26 @@ selftest 加断言（meta 8 维、md 含维度表与权重、覆盖披露）。�
   逐车取证 / 生命周期 / 落榜 / 方法与边界 / 复现（9 块；两段榜再加子榜与分段汇总 = 11 块）。
 - 三个 selftest 全绿（注册表契约 13 项、必要 8 项、HTML 11 块）；
   A/B 矩阵加入 board_view 契约测试（提交后重导出即可跑通）。
+
+---
+
+## v9.0.1 · 修复「漏喂事实库」bug（2026-11-19）
+
+### 问题
+用户指出榜单页写「电池/kWh/万元/电耗/CLTC 未采集」，但懂车帝等平台明明有这些数据。
+排查：数据确实存在——`car_all_202610/all_data.json`（73 款，带易车来源 URL 与原文引文）
+里有 kWh/consumption，CLTC 续航藏在引文里。根因是出榜只从 master_pool 导候选，
+候选里只有 cell_brand/trend_sales，**没把事实库作为 `--facts` 喂给 board_v2**，
+页面那句「未采集」掩盖的是输入遗漏。
+
+### 修复（数据链路，非渲染）
+- 事实库提炼为 `categories/fact_library.json`（73 款：72 有 kWh、71 有电耗、39 有 CLTC），随包发布。
+- `board_view.load_fact_library()` 统一加载：显式 `--facts` 优先，否则自动用随包库。
+- `board_v2.py` CLI 与 `pipeline.py` 自动 HTML 链路都改为默认加载，不再漏喂。
+- selftest 加断言：事实库必须加载到 ≥50 款且有 kWh。
+
+### 效果
+同为 12–18万中型纯电轿车榜，事实列覆盖从 0/14 提升到：
+电池 13/14、kWh/万元 10/14、电耗 12/14、CLTC 8/14、电芯 14/14。
+kWh/万元 作为既有参考项正常显示（如 MG 07 5.28、风云A9 5.40，越高越"量大价优"），
+是否按优劣着色属渲染改动，需用户单独确认后才做。
