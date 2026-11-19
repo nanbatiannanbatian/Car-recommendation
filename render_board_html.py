@@ -149,35 +149,52 @@ def render(data, summary, title, as_of):
                  '电池来源为事实列不计分。kWh·万元 <b style="color:#1a7f37">▲优</b>（本池前25%）/'
                  '<b style="color:#b42318">▼弱</b>（后25%）；月销 <i>≤</i> 为车系合计上界。'
                  '证据 A=官方碰撞成绩 / B=口碑样本够 / C=新上市或样本不足。</div>')
-        H.append("<table><thead><tr>" + "".join(f"<th>{e(BV.MAIN_COL_LABELS[k])}</th>"
+        H.append('<div class="rule">配置下拉为<b>交互预览</b>：切换后主榜名次与分数实时重排，'
+                 '但<b>档位、三榜并列、稳健性、审查边界按最高配置口径固定不变</b>（权威结论不随预览改变）。</div>')
+        tb_main = meta.get("trim_board") or {}
+        H.append('<table id="mainBoard"><thead><tr>' + "".join(f"<th>{e(BV.MAIN_COL_LABELS[k])}</th>"
                  for k in BV.MAIN_BOARD_COLUMNS) + "</tr></thead><tbody>")
         for r in rows:
             cand = r
             gmap = grades.get(r["model"], {})
-            H.append("<tr>")
-            for k in BV.MAIN_BOARD_COLUMNS:
+            td = tb_main.get(r["model"]) or {}
+            H.append(f"<tr data-model='{e(r['model'])}' data-base-total='{r.get('total')}'>")
+            for ci, k in enumerate(BV.MAIN_BOARD_COLUMNS):
                 val = BV.main_cell(k, r, cand, gmap.get("kWh/万元", ""))
                 if k == "rank":
-                    H.append(f"<td>{rank_badge(r.get('rank'))}</td>")
+                    H.append(f"<td class='c-rank'>{rank_badge(r.get('rank'))}</td>")
                 elif k == "model":
-                    H.append(f"<td class='name'>{e(val)}</td>")
+                    sel = ""
+                    if td.get("trims"):
+                        opts = "".join(
+                            f'<option value="{i}"'
+                            f'{" selected" if t.get("name")==r.get("best_trim") else ""}>'
+                            f'{e(t.get("name"))}（¥{e(t.get("price"))}）</option>'
+                            for i, t in enumerate(td["trims"]))
+                        sel = (f'<br><select class="trimsel" data-model="{e(r["model"])}" '
+                               f'style="font-size:11px;max-width:160px">{opts}</select>')
+                    H.append(f"<td class='name'>{e(val)}{sel}</td>")
                 elif k == "total":
-                    H.append(f"<td><span class='score'>{e(val)}</span></td>")
+                    H.append(f"<td class='c-total'><span class='score'>{e(val)}</span></td>")
                 elif k == "tier":
-                    H.append(f"<td>{tier_badge(r.get('tier'))}</td>")
+                    H.append(f"<td>{tier_badge(r.get('tier'))}</td>")   # 档位固定，不参与联动
                 elif k == "evidence":
                     cls = {"A": "delta-up", "C": "delta-down"}.get(val, "")
                     H.append(f"<td class='{cls}'>{e(val)}</td>")
                 elif k == "kwh_per_wan":
                     g = gmap.get("kWh/万元", "")
-                    H.append(f'<td style="color:{BV.grade_color(g) if g else "inherit"}">{e(val)}</td>')
+                    H.append(f'<td class="c-kwh" style="color:{BV.grade_color(g) if g else "inherit"}">{e(val)}</td>')
                 elif k == "trim":
-                    H.append(f"<td class='ref'>{e(val)}</td>")
+                    H.append(f"<td class='ref c-trim'>{e(val)}</td>")
+                elif k == "price":
+                    H.append(f"<td class='c-price'>{e(val)}</td>")
                 elif k == "cell_brand":
-                    H.append(f"<td class='ref'>{e(val)}</td>")
+                    H.append(f"<td class='ref c-cell'>{e(val)}</td>")
+                elif k == "sales":
+                    H.append(f"<td>{e(val)}</td>")   # 月销不随配置变
                 elif k == "verdict":
                     v = BV.car_verdict(r, r)
-                    H.append(f"<td class='ref' style='font-size:12px;line-height:1.5'>"
+                    H.append(f"<td class='ref c-verdict' style='font-size:12px;line-height:1.5'>"
                              f"<b style='color:#1a7f37'>优</b> {'、'.join(e(x) for x in v['pros'])}<br>"
                              f"<b style='color:#b42318'>短</b> {'、'.join(e(x) for x in v['cons'])}<br>"
                              f"适合：{e(v['audience'])}｜<b>{e(v['advice'])}</b></td>")
@@ -229,7 +246,7 @@ def render(data, summary, title, as_of):
     if "score_breakdown" in ids:
         dims = meta.get("dimensions") or []
         H.append("<h2>总分构成 <span>8 维原始分 · 加权分＝Σ(维分×权重)×10 + adjust</span></h2>")
-        H.append('<table><thead><tr><th>#</th><th>车型</th><th>评分配置</th><th>指导价(万)</th>')
+        H.append('<table id="scoreBoard"><thead><tr><th>#</th><th>车型</th><th>评分配置</th><th>指导价(万)</th>')
         for d in dims:
             H.append(f"<th>{e(d.get('label'))}<br><small>{float(d.get('weight',0))*100:.1f}%</small></th>")
         H.append("<th>加权分</th></tr></thead><tbody>")
@@ -237,17 +254,17 @@ def render(data, summary, title, as_of):
         for r in rows:
             sc = r.get("scores") or {}
             td = tb.get(r["model"]) or {}
-            # 配置下拉：切换时把该配置的维度分/总分写进单元格
+            # 配置下拉：与主榜联动（class=trimsel 共用同一处理函数）
             sel = ""
             if td.get("trims"):
                 opts = "".join(
-                    f'<option value="{i}">{e(t.get("name"))}'
-                    f'（¥{e(t.get("price"))}）</option>'
+                    f'<option value="{i}"'
+                    f'{" selected" if t.get("name")==r.get("best_trim") else ""}>'
+                    f'{e(t.get("name"))}（¥{e(t.get("price"))}）</option>'
                     for i, t in enumerate(td["trims"]))
-                sel = (f'<br><select onchange="swTrim(this)" style="font-size:11px;max-width:150px" '
-                       f'data-model="{e(r["model"])}"><option value="-1">车系评分（主榜口径）</option>'
-                       f'{opts}</select>')
-            H.append(f"<tr><td>{rank_badge(r.get('rank'))}</td>"
+                sel = (f'<br><select class="trimsel" data-model="{e(r["model"])}" '
+                       f'style="font-size:11px;max-width:150px">{opts}</select>')
+            H.append(f"<tr data-model='{e(r['model'])}'><td>{rank_badge(r.get('rank'))}</td>"
                      f"<td class='name'>{e(r.get('model'))}{sel}</td>"
                      f"<td class='ref'>{e(BV.main_cell('trim', r, r))}</td>"
                      f"<td>{e(BV.main_cell('price', r, r))}</td>")
@@ -259,21 +276,57 @@ def render(data, summary, title, as_of):
                          f"{num(v) if isinstance(v,(int,float)) else '—'}</td>")
             H.append(f"<td class='totalcell'><span class='score'>{num(r.get('total'))}</span></td></tr>")
         H.append("</tbody></table>")
-        # 逐配置下拉切换脚本（只改显示，不动主榜排序）
+        # 配置切换联动脚本：更新两表该行 + 重排主榜（档位/三榜不动）
         if tb:
-            H.append(
-                '<script>'
-                'var TRIMDATA=' + json.dumps(tb, ensure_ascii=False) + ';'
-                'function swTrim(sel){'
-                'var v=sel.value,model=sel.getAttribute("data-model"),row=sel.closest("tr");'
-                'if(v=="-1"){location.reload();return;}'
-                'var t=TRIMDATA[model].trims[parseInt(v)],sc=t.scores||{};'
-                'row.querySelectorAll(".dimcell").forEach(function(c){c.textContent='
-                '(sc[c.getAttribute("data-dim")]!=null?Number(sc[c.getAttribute("data-dim")]).toFixed(1):"—");});'
-                'row.querySelector(".totalcell").textContent=t.total==null?"—":t.total;'
-                'row.children[2].textContent=t.name+" ¥"+t.price;'
-                '}'
-                '</script>')
+            s2 = json.dumps(tb, ensure_ascii=False)
+            js = r"""<script>
+var TRIMDATA=__DATA__;
+function trimCellVals(model,idx){
+  var t=TRIMDATA[model].trims[idx],sc=t.scores||{},charge=String(t.charge||''),
+      cell=String(t.cell_supplier||'—'),kwh=t.battery_kwh,price=t.price;
+  var mv=charge.match(/(900|800|400)\s*V/);
+  return {name:t.name,price:price,total:t.total,scores:sc,
+    cell:cell+(mv?' · '+mv[1]+'V':''),
+    kwh:(kwh&&price)?(kwh/price).toFixed(2):'—'};
+}
+function applyTrim(model,idx){
+  var v=trimCellVals(model,idx);
+  var q='[data-model="'+model+'"]';
+  document.querySelectorAll('#mainBoard tr'+q+',#scoreBoard tr'+q).forEach(function(row){
+    var c=function(k){return row.querySelector('.'+k);};
+    if(c('c-total'))c('c-total').innerHTML='<span class="score">'+v.total+'（配置）</span>';
+    if(c('c-trim'))c('c-trim').textContent=v.name;
+    if(c('c-price'))c('c-price').textContent=v.price;
+    if(c('c-cell'))c('c-cell').textContent=v.cell;
+    if(c('c-kwh'))c('c-kwh').textContent=v.kwh;
+    row.querySelectorAll('.dimcell').forEach(function(d){
+      var k=d.getAttribute('data-dim');
+      if(v.scores[k]!=null)d.textContent=Number(v.scores[k]).toFixed(1);});
+    if(c('totalcell'))c('totalcell').innerHTML='<span class="score">'+v.total+'</span>';
+  });
+  var sb=document.getElementById('scoreBoard');
+  if(sb){var sr=sb.querySelector('tr'+q);if(sr)sr.children[2].textContent=v.name+' ¥'+v.price;}
+  sortMain();
+}
+function sortMain(){
+  var tb=document.querySelector('#mainBoard tbody');if(!tb)return;
+  var rs=Array.prototype.slice.call(tb.querySelectorAll('tr'));
+  rs.sort(function(a,b){
+    var ae=a.querySelector('.c-total'),be=b.querySelector('.c-total');
+    var av=ae?parseFloat(ae.textContent)||0:0,bv=be?parseFloat(be.textContent)||0:0;
+    return bv-av;});
+  rs.forEach(function(r,i){tb.appendChild(r);
+    var rc=r.querySelector('.c-rank');if(rc)rc.innerHTML='<span class="rank">'+(i+1)+'</span>';});
+}
+document.querySelectorAll('.trimsel').forEach(function(sel){
+  sel.addEventListener('change',function(){
+    var m=this.getAttribute('data-model'),idx=parseInt(this.value);
+    applyTrim(m,idx);
+    document.querySelectorAll('.trimsel[data-model="'+m+'"]').forEach(function(o){o.value=idx;});
+  });
+});
+</script>""".replace('__DATA__',s2)
+            H.append(js)
 
     # ---- 三档
     if "tiers" in ids:

@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 9.7.4
+version: 9.7.5
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v9.7.4）
+# Car recommendation —— 可信购车榜单引擎（v9.7.5）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -2345,3 +2345,22 @@ base 车系8维 + delta(三电续航+0.33/电量+0.25、性价比+0.28)，权重
 ### 效果
 MG07 845版 87.9 #1、深蓝L06 87.8 #2（分差0.1，在算法噪声内）。
 全 selftest + A/B 26 项通过。
+
+---
+
+## v9.7.5 · 配置下拉双表联动主榜排名（2026-11-19，用户确认后实施）
+
+用户确认：下拉框两个表都放（B），档位固定不动、三榜/稳健性/审查边界不联动。
+
+### 实现
+- 主榜表加 `id=mainBoard`、行 `data-model`，车型单元格放配置下拉；总分构成表加 `id=scoreBoard`、
+  下拉统一 `class=trimsel`。两表下拉共用 JS 处理函数。
+- JS `applyTrim()`：切换配置后同步更新主榜+总分构成两表的总分/配置名/指导价/电池来源/kWh万元/维度分；
+  `sortMain()` 按新总分重排主榜行并重编名次 badge；档位列不参与联动。
+  两表下拉选中状态互相同步。页面标注"交互预览，不改权威名次与三档"。
+- **踩坑**：Python 普通字符串里 `\"` 输出裸 `"`，导致 JS 选择器 `data-model=""+model+""` 语法错误
+  （node --check 报 missing ) after argument list），整段脚本不执行。改用 raw 三引号字符串 + JS 内部单引号修复。
+- 浏览器实测：MG07 切 650舒享版 → 分 87.9→84.2、名次 #1→#2、配置/价格/电池/kWh 全联动，档位保持第一档。
+
+### 验收
+全 selftest + A/B 26 项通过；node --check JS 语法通过。
