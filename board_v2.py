@@ -92,6 +92,9 @@ def fact_columns(c: dict, facts: dict[str, dict], policy: dict) -> dict:
             v = f.get("is_800v", c.get("is_800v"))
         elif k == "trend_sales":
             v = c.get("trend_sales")
+            # v9.1.0：车系合计是纯电销量的上界，加 ≤ 前缀供三分法区分，不参与分位比较
+            if v is not None and c.get("sales_scope") == "series_total":
+                v = f"≤{v}"
         else:
             v = f.get(k)
         if isinstance(v, bool):
@@ -417,12 +420,25 @@ def render_md(data: dict, summary: dict | None = None) -> str:
                   "「—」表示未采集到该字段（" + "、".join(lack) + "），不以估计值填充。", ""]
 
     if "main_board" in ids:
-        L += ["## 打分主榜", "", "| # | 车型 | 加权分 | 档位 | 证据 | 事实参考列（不计分） |",
+        grades = BV.fact_grades(rows)
+        L += ["## 打分主榜", "",
+              "> 事实列标记：▲=本池前25%（电耗越低越好/kWh·万元越高越好）、▼=本池后25%、"
+              "（上界）=车系合计非纯电值。着色/标记不参与打分、非跨榜可比。", "",
+              "| # | 车型 | 加权分 | 档位 | 证据 | 事实参考列（不计分） |",
               "|---|---|---|---|---|---|"]
         for r in rows:
-            ref = " · ".join(f"{k} {v}" for k, v in (r.get("fact_ref") or {}).items() if v != "—")
+            fr = r.get("fact_ref") or {}
+            gmap = grades.get(r["model"], {})
+            parts = []
+            for k, v in fr.items():
+                if v in (None, "—", ""):
+                    continue
+                g = gmap.get(k, "")
+                suffix = " ▲" if g == "优" else (" ▼" if g == "弱" else
+                          ("（上界）" if g == "上界" else ""))
+                parts.append(f"{k} {v}{suffix}")
             L.append(f"| {r['rank']} | {r['model']} | {r['total']:.1f} | "
-                     f"{r.get('tier','')} | {r.get('evidence','')} | {ref} |")
+                     f"{r.get('tier','')} | {r.get('evidence','')} | {' · '.join(parts) if parts else '—'} |")
 
     if "score_breakdown" in ids:
         dims = meta.get("dimensions") or []

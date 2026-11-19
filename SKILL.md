@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 9.0.1
+version: 9.1.0
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v9.0.1）
+# Car recommendation —— 可信购车榜单引擎（v9.1.0）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -1988,3 +1988,26 @@ selftest 加断言（meta 8 维、md 含维度表与权重、覆盖披露）。�
 电池 13/14、kWh/万元 10/14、电耗 12/14、CLTC 8/14、电芯 14/14。
 kWh/万元 作为既有参考项正常显示（如 MG 07 5.28、风云A9 5.40，越高越"量大价优"），
 是否按优劣着色属渲染改动，需用户单独确认后才做。
+
+---
+
+## v9.1.0 · 事实列三分法着色（2026-11-19，用户确认后实施）
+
+### 方案（用户确认的三分法）
+- **第一类 · 按本池分位着色**：`电耗`（越低越好）、`kWh/万元`（越高越好）。
+  前 25% 标「优（绿 ▲）」、后 25% 标「弱（红 ▼）」、中间灰；样本 <4 不分档避免假精确。
+  仅本池可比、非跨榜可比；HTML 带图例，Markdown 用 ▲/▼ 文字标记。
+- **第二类 · 事实标签不着色**：`电芯`/`CLTC`/`电池kWh`/`800V`/`指导价` 只展示真实值，
+  缺失标「未采集」浅灰——电池大不等于好、电芯品牌无优劣序。
+- **第三类 · 月销上界**：`sales_scope=series_total` 的销量加 `≤` 前缀并标「上界」灰色斜体，
+  表示车系合计是纯电销量上界，不和纯电单独值同色比较。
+
+### 实现
+- `board_view.fact_grades()` 统一判定（纯数据，不碰分数）；`grade_color()` 统一色值。
+- `fact_columns()` 把销量口径随参考值带出（`≤` 前缀），`fact_coverage()` 沿用。
+- 两版渲染器只在主榜参考列套标记/颜色；着色不参与打分、不改名次。
+- selftest 断言：电耗低=优、kWh/万元高=优、上界识别、着色前后 total 不变。
+
+### 验收
+12–18万榜实测：MG 07 kWh/万元 5.28 ▲、电耗 12.3 ▼；深蓝L06 电耗 11.5 ▲、
+月销 `≤5758（上界）`。三版 selftest 与 A/B 25 项矩阵全过。

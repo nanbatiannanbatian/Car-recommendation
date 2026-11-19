@@ -136,6 +136,71 @@ def fact_coverage(meta: dict, rows: list[dict]) -> tuple[list[str], list[str]]:
     return have, lack
 
 
+# ---- 事实列三分法着色（v9.1.0，用户确认后实施）-------------------------
+# 第一类：有明确优劣 + 口径一致 → 按本池分位着色（优绿/中灰/劣红 + 文字标记）
+# 第二类：事实标签、无优劣序 → 不着色，只把「未采集/未核验」标灰
+# 第三类：趋势月销 → ≤上界的车系合计值标灰斜体，不参与分位比较；指导价不着色
+RANKED_FACT_FIELDS = {"电耗": "low", "kWh/万元": "high"}   # label -> 方向
+PLAIN_FACT_FIELDS = {"电芯", "CLTC", "电池", "800V", "指导价"}
+
+
+def fact_grades(rows: list[dict]) -> dict[str, dict[str, str]]:
+    """返回 {model: {字段label: '优|中|弱|未采集|上界|—'}}。纯数据，不改任何分数。
+
+    - 可比较字段（电耗/kWh·万元）：按本池有值样本的分位数分档，
+      前 25% 优、后 25% 弱、中间 中；样本 <4 款时不分档，全标「中」避免假精确。
+    - 电量/kWh 本身不按优劣着色（大电量不等于好，车重和效率不同）。
+    """
+    out: dict[str, dict[str, str]] = {r["model"]: {} for r in rows}
+    for label, direction in RANKED_FACT_FIELDS.items():
+        vals = []
+        for r in rows:
+            v = (r.get("fact_ref") or {}).get(label)
+            if isinstance(v, (int, float)):
+                vals.append(float(v))
+        if len(vals) < 4:
+            for r in rows:
+                v = (r.get("fact_ref") or {}).get(label)
+                out[r["model"]][label] = "中" if isinstance(v, (int, float)) else "未采集"
+            continue
+        s = sorted(vals)
+        n = len(s)
+        # 分位阈值：25% / 75%
+        q1 = s[int(0.25 * (n - 1))]
+        q3 = s[int(0.75 * (n - 1))]
+        for r in rows:
+            v = (r.get("fact_ref") or {}).get(label)
+            if not isinstance(v, (int, float)):
+                out[r["model"]][label] = "未采集"
+                continue
+            v = float(v)
+            if direction == "low":     # 电耗越低越好
+                g = "优" if v <= q1 else ("弱" if v >= q3 else "中")
+            else:                       # kWh/万元 越高越好
+                g = "优" if v >= q3 else ("弱" if v <= q1 else "中")
+            out[r["model"]][label] = g
+    # 第二类 + 第三类：只标「未采集」，不做优劣
+    for r in rows:
+        fr = r.get("fact_ref") or {}
+        for label in PLAIN_FACT_FIELDS | {"趋势月销"}:
+            if label in out[r["model"]]:
+                continue
+            v = fr.get(label)
+            if v in (None, "—", ""):
+                out[r["model"]][label] = "未采集"
+            elif label == "趋势月销" and isinstance(v, str) and v.strip().startswith(("<=", "≤")):
+                out[r["model"]][label] = "上界"   # 车系合计，非纯电值
+            else:
+                out[r["model"]][label] = "—"      # 有值，不着色
+    return out
+
+
+def grade_color(g: str) -> str:
+    """优绿 / 中灰 / 弱红 / 未采集与上界浅灰 —— 与股市红涨绿跌区分，这里绿=好。"""
+    return {"优": "#1a7f37", "弱": "#b42318", "中": "#7b8590",
+            "未采集": "#aab0b6", "上界": "#aab0b6"}.get(g, "")
+
+
 def dimension_lines(meta: dict) -> list[str]:
     """维度表头，如 ['三电(18.0%)', ...]。"""
     return [f"{d['label']}({float(d['weight']) * 100:.1f}%)"
@@ -229,6 +294,22 @@ def selftest() -> int:
     lib = load_fact_library()
     if len(lib) < 50 or not any(v.get("kwh") for v in lib.values()):
         bad.append(f"事实库自动加载异常（{len(lib)} 款）")
+    # v9.1.0：三分法着色——优/弱分档正确，且着色不改变任何分数
+    grows = [
+        {"model": f"M{i}", "total": 90 - i, "fact_ref": {
+            "电耗": v, "kWh/万元": (20 - v) / 2, "电芯": "宁德时代",
+            "趋势月销": "≤3000（车系合计）" if i == 0 else 5000}}
+        for i, v in enumerate([10.0, 11.0, 12.0, 13.0, 14.0])
+    ]
+    g = fact_grades(grows)
+    if not (g["M0"]["电耗"] == "优" and g["M4"]["电耗"] == "弱"):
+        bad.append(f"电耗分档错误（低=优应成立）: {g['M0']['电耗']}/{g['M4']['电耗']}")
+    if not (g["M0"]["kWh/万元"] == "优" and g["M4"]["kWh/万元"] == "弱"):
+        bad.append("kWh/万元分档错误（高=优应成立）")
+    if g["M0"].get("趋势月销") != "上界":
+        bad.append("月销上界未识别")
+    if [r["total"] for r in grows] != [90, 89, 88, 87, 86]:
+        bad.append("着色改了分数")
     if bad:
         print("[selftest FAIL]", bad)
         return 1

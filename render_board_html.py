@@ -138,18 +138,39 @@ def render(data, summary, title, as_of):
             H.append(f'<div class="rule">事实参考列覆盖：本榜有数据的是 <b>{e("、".join(have))}</b>；'
                      f'「—」表示未采集（{e("、".join(lack))}），不以估计值填充。</div>')
 
-    # ---- 打分主榜
+    # ---- 打分主榜（v9.1.0：事实列按三分法着色，只展示不改分）
     if "main_board" in ids:
+        grades = BV.fact_grades(rows)
         H.append("<h2>打分主榜 <span>8 维加权总分排序 · 参考列不参与排序</span></h2>")
+        H.append('<div class="rule">事实列着色图例：<b style="color:#1a7f37">优（本池前25%）</b> · '
+                 '<span style="color:#7b8590">中</span> · '
+                 '<b style="color:#b42318">弱（本池后25%）</b> · '
+                 '<span style="color:#aab0b6">未采集/上界（车系合计）</span>。'
+                 '仅「电耗」「kWh/万元」按本池分位着色；电芯/CLTC/电量是事实标签不分优劣，'
+                 '着色不影响名次、非跨榜可比。</div>')
         H.append("<table><thead><tr><th>#</th><th>车型</th><th>加权分</th><th>档位</th>"
                  "<th>证据</th><th style='text-align:left'>事实参考列 · 不计分</th></tr></thead><tbody>")
         for r in rows:
-            ref = " · ".join(f"{k} {v}" for k, v in (r.get("fact_ref") or {}).items()
-                             if v not in (None, "—", ""))
+            fr = r.get("fact_ref") or {}
+            gmap = grades.get(r["model"], {})
+            parts = []
+            for k, v in fr.items():
+                if v in (None, "—", ""):
+                    continue
+                g = gmap.get(k, "")
+                txt = str(v)
+                if g == "优":
+                    parts.append(f'<b style="color:{BV.grade_color(g)}">{e(k)} {e(txt)} ▲</b>')
+                elif g == "弱":
+                    parts.append(f'<b style="color:{BV.grade_color(g)}">{e(k)} {e(txt)} ▼</b>')
+                elif g == "上界":
+                    parts.append(f'<span style="color:{BV.grade_color(g)};font-style:italic">{e(k)} {e(txt)}（上界）</span>')
+                else:
+                    parts.append(f"{e(k)} {e(txt)}")
             H.append(f"<tr><td>{rank_badge(r.get('rank'))}</td><td class='name'>{e(r.get('model'))}</td>"
                      f"<td><span class='score'>{num(r.get('total'))}</span></td>"
                      f"<td>{tier_badge(r.get('tier'))}</td><td>{e(r.get('evidence'))}</td>"
-                     f"<td class='ref'>{e(ref) if ref else '—'}</td></tr>")
+                     f"<td class='ref'>{' · '.join(parts) if parts else '—'}</td></tr>")
         H.append("</tbody></table>")
 
     # ---- 总分构成
