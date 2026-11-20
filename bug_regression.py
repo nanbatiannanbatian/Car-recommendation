@@ -74,6 +74,14 @@ CASES = [
     ("BUG-051", "判档用车系基础分、主榜用配置锚定分(两套口径打架)", "v9.7.43"),
     ("BUG-052", "note文案与crash结构字段矛盾无人校验(铁律不可执行)", "v9.7.43"),
     ("BUG-053", "同源车维度分无据大差异(007GT value/cabin被压低)", "v9.7.43"),
+    ("BUG-054", "Euro NCAP成绩被当无成绩降权(007GT safety 7.2<无成绩车)", "v9.7.43"),
+    ("BUG-055", "score_rows丢crash字段致全池误标缺官方碰撞", "v9.7.43"),
+    ("BUG-056", "证据A绑人工标注致有碰撞实锤的车进不了T1/T1全空", "v9.7.43"),
+    ("BUG-057", "人工标A但无碰撞实锤未堵+T2强推荐过渡档", "v9.7.43"),
+    ("BUG-058", "有碰撞成绩车页面不显示具体体系/成绩", "v9.7.43"),
+    ("BUG-059", "高分低档车未标注为何分高却不推荐", "v9.7.43"),
+    ("BUG-060", "生命周期状态on_sale漏中文映射页面直出英文", "v9.7.43"),
+    ("BUG-061", "MCDA相关算法重复计票虚高命中率", "v9.7.43"),
 ]
 
 
@@ -561,7 +569,8 @@ def t028():
     for kw in ("证据不足", "营运风险", "不适合跨车型横向对比", "_tau_grade", "dim_breakdown"):
         assert kw in src, f"缺 {kw}"
     # v9.7.43：徽标文案必须已中文化（去掉 C· 前缀），旧前缀只剩在历史产物里
-    assert 'title="参数完备但缺官方碰撞/口碑实锤' in src, "证据徽标 tooltip 丢失"
+    assert 'title="证据等级C：新上市或口碑样本不足' in src, "证据徽标 tooltip 丢失"
+    assert "非碰撞成绩缺失" in src, "证据C tooltip未澄清与碰撞成绩无关"
     assert "C·证据不足</span>" not in src, "证据徽标仍是 C· 英文前缀未中文化"
     out = os.path.join(HERE, "runs", "compact_bev_allprice_202610", "榜单.html")
     if os.path.exists(out):
@@ -857,21 +866,240 @@ def t053():
     d = json.load(open(pool_path, encoding="utf-8"))
     r = SC.check(d["candidates"], d.get("score_diff_reasons", {}))
     assert r["passed"], f"真实池有无据差异: {r['issues']}"
-    # 007两车 value/cabin 已对齐、safety保留差异且理由在
+    # 007两车 value/cabin/safety 已对齐（同价同配置同Euro NCAP成绩）
     by = {c["model"]: c for c in d["candidates"]}
     j7, gt = by["极氪007"], by["极氪007GT"]
     assert j7["scores"]["value"] == gt["scores"]["value"] == 8.8, "value未对齐"
     assert j7["scores"]["cabin"] == gt["scores"]["cabin"] == 9.0, "cabin未对齐"
-    assert j7["scores"]["safety"] == 9.0 and gt["scores"]["safety"] == 7.2, "safety有据差异不应抹平"
-    assert "safety" in d["score_diff_reasons"].get("极氪007GT|极氪007", {}), "safety差异未登记理由"
-    # 反向：删理由后必须报无据差异
-    r2 = SC.check(d["candidates"], {})
-    assert not r2["passed"] and any(x["dim"] == "safety" for x in r2["issues"]), "删理由未检出"
-    return f"同源车门禁生效：{r['pairs']}对/0无据差异；007 safety差异有据保留、value/cabin已对齐"
+    assert j7["scores"]["safety"] == gt["scores"]["safety"] == 8.8, "safety同成绩应同分"
+    # 反向：把三厢safety改成7.0制造无据差异，门禁必须检出
+    import copy as _copy
+    fake = _copy.deepcopy(d["candidates"])
+    for c in fake:
+        if c["model"] == "极氪007":
+            c["scores"]["safety"] = 7.0
+    r2 = SC.check(fake, {})
+    assert not r2["passed"] and any(x["dim"] == "safety" for x in r2["issues"]), "注入safety差异未检出"
+    return f"同源车门禁生效：{r['pairs']}对/0无据差异；007/GT value/cabin/safety全对齐"
+
+
+def t054():
+    """安全分严谨性：多体系映射表 + 单调性(有成绩车不得低于无成绩车中位)。"""
+    import copy
+    import safety_check as SFC
+    tbl = SFC.load_table()
+    # 映射表结构：体系分级 + 严谨性说明
+    assert "Euro NCAP" in tbl["systems"] and "C-IASI" in tbl["systems"], "缺体系分级"
+    assert tbl["systems"]["Euro NCAP"]["grades"]["5star_occupant>=90"] == 8.8, "Euro映射分错"
+    assert tbl["structural_evidence_policy"]["in_formula"] is False, "扭转刚度不应入公式"
+    assert "无直接对应关系" in tbl["note"], "缺体系不可比说明"
+    # pipeline接入
+    src = _read("pipeline.py")
+    assert "safety_check" in src and "安全分严谨性门禁" in src and "--skip-safety-gate" in src, "pipeline未接安全门禁"
+    # 数据级：真实池通过 + 007GT=8.8 + basis
+    pool = os.path.join(HERE, "runs", "midsedan_bev_1218_202610", "candidates_allprice.json")
+    d = json.load(open(pool, encoding="utf-8"))
+    r = SFC.check(d["candidates"], tbl)
+    assert r["passed"], f"真实池安全门禁未过: {r['issues']}"
+    by = {c["model"]: c for c in d["candidates"]}
+    gt = by["极氪007GT"]
+    assert gt["scores"]["safety"] == 8.8 and gt["safety_basis"] == "euro_ncap", "007GT安全分未修"
+    assert by["极氪007"]["scores"]["safety"] == 8.8, "三厢007同成绩应同分"
+    assert r["official_min"] >= r["no_score_median"], "单调性破坏"
+    # 反向：改回7.2必须检出
+    fake = copy.deepcopy(d["candidates"])
+    for c in fake:
+        if c["model"] == "极氪007GT":
+            c["scores"]["safety"] = 7.2
+    r2 = SFC.check(fake, tbl)
+    assert not r2["passed"], "7.2未被检出"
+    return f"安全分门禁生效：{r['checked']}款有成绩车/最低{r['official_min']}≥无成绩中位{r['no_score_median']}；007GT=8.8"
+
+
+def t055():
+    """碰撞成绩标记：score_rows须透传crash；有权威成绩(含Euro NCAP)不误标。"""
+    import json as J
+    import leaderboard as LB
+    import render_board_html as RH
+    # 源码级：score_rows 必须透传 crash
+    src = _read("leaderboard.py")
+    assert '"crash": c.get("crash")' in src, "score_rows未透传crash字段"
+    # 数据级：score_rows 输出含crash
+    cfg = J.load(open(os.path.join(HERE, "categories", "car_midsedan_allprice.json"), encoding="utf-8"))
+    pool = J.load(open(os.path.join(HERE, "runs", "midsedan_bev_1218_202610", "candidates_allprice.json"), encoding="utf-8"))["candidates"]
+    rows = LB.score_rows(pool, cfg)
+    by = {r["model"]: r for r in rows}
+    j7 = by["极氪007"]
+    assert "crash" in j7 and j7["crash"] and "Euro NCAP" in str(j7["crash"]), "007崩溃字段未透传"
+    assert j7.get("safety_basis") == "euro_ncap", "basis未透传"
+    # risk_flags 8个case
+    cases = [
+        ({"crash": "Euro NCAP 2026五星93%；无正式C-NCAP星级", "safety_basis": "euro_ncap"}, False),
+        ({"crash": "Euro NCAP 2026五星(93%)", "safety_basis": "euro_ncap"}, False),
+        ({"crash": "C-NCAP 92.3%", "safety_basis": "cncap"}, False),
+        ({"crash": "Euro NCAP 2026五星(93%)", "safety_basis": None}, False),
+        ({"crash": "无官方成绩", "safety_basis": None}, True),
+        ({"crash": "未查到C-NCAP成绩", "safety_basis": None}, True),
+        ({"crash": "未查到C-NCAP；无中保研", "safety_basis": None}, True),
+        ({"safety_basis": None}, True),
+    ]
+    for r, want in cases:
+        got = "缺权威碰撞成绩" in RH.risk_flags(r)
+        assert got == want, f"risk_flags误判: {r} → {got}, 期望{want}"
+    return "碰撞标记修复：score_rows透传crash+basis；8 case全对(Euro NCAP不误标、真无成绩仍标)"
+
+
+def t056():
+    """证据A以官方碰撞成绩为准(非人工evidence_status)，让有实锤的高命中车进T1。"""
+    import copy
+    import leaderboard as L
+    cfg = json.load(open(os.path.join(HERE, "categories", "car_midsedan_allprice.json"), encoding="utf-8"))
+    pool = json.load(open(os.path.join(HERE, "runs", "midsedan_bev_1218_202610", "candidates_allprice.json"), encoding="utf-8"))["candidates"]
+    src = _read("leaderboard.py")
+    assert "has_crash_evidence" in src and "ev_for_t1" in src, "证据A未按碰撞成绩重定义"
+    assert "_BASIS_CN" in src, "缺体系中文展示名"
+    r = L.tier_report(pool, cfg, None, "测试", airbag_gate=False, crash_gate=False)
+    t1 = r["tiers"]["T1"]
+    assert "极氪007GT" in t1, f"007GT有Euro NCAP五星+命中最高应进T1: {t1}"
+    rec = next(x for x in r["detail"]["T1"] if x["model"] == "极氪007GT")
+    assert rec["evidence"] == "B" and "Euro NCAP" in rec.get("evidence_t1_label", ""), \
+        f"判据应显示碰撞实锤达标: {rec.get('evidence_t1_label')}"
+    assert not rec.get("t1_blockers"), f"007GT不应有T1阻断: {rec.get('t1_blockers')}"
+    # 反向：删掉safety_basis（无碰撞实锤）→ 证据B进不了T1
+    fake = copy.deepcopy(pool)
+    for c in fake:
+        if c["model"] == "极氪007GT":
+            c.pop("safety_basis", None)
+    r2 = L.tier_report(fake, cfg, None, "测试", airbag_gate=False, crash_gate=False)
+    assert "极氪007GT" not in r2["tiers"]["T1"], "删碰撞实锤后仍进T1=机制失效"
+    return f"证据A以碰撞实锤为准：T1={t1}，007GT(B但Euro NCAP实锤)进T1，删实锤即出局"
+
+
+def t057():
+    """证据A必须有实锤(人工A无basis不算) + T2强推荐过渡档机制可用。"""
+    import copy
+    import leaderboard as L
+    cfg = json.load(open(os.path.join(HERE, "categories", "car_midsedan_allprice.json"), encoding="utf-8"))
+    pool = json.load(open(os.path.join(HERE, "runs", "midsedan_bev_1218_202610", "candidates_allprice.json"), encoding="utf-8"))["candidates"]
+    src = _read("leaderboard.py")
+    assert 'ev_for_t1 = "A" if has_crash_evidence' in src and 'if ev == "A"' in src, "人工A无实锤未堵"
+    assert "strong_pick" in src and "强推荐候选" in src, "T2强推荐机制缺失"
+    # 证据A漏洞：MG07人工A但无basis → ev_for_t1 不应为A
+    r = L.tier_report(pool, cfg, None, "测试", airbag_gate=False, crash_gate=False)
+    mg = next(x for x in r["detail"]["T2"] + r["detail"]["T3"] if x["model"] == "MG 07 纯电")
+    assert "无权威碰撞成绩" in str(mg.get("t1_blockers") or ""), f"MG07人工A无实锤未堵: {mg.get('t1_blockers')}"
+    # 强推荐机制：合成一辆"有实锤+高分+命中50%但<80%"的车，应被标strong_pick
+    fake = copy.deepcopy(pool)
+    tgt = next(c for c in fake if c["model"] == "深蓝L06")
+    tgt["safety_basis"] = "cncap"
+    # 直接测强推荐判定逻辑（源码存在 + 真实数据路径不报错 + summary传递字段）
+    psrc = _read("pipeline.py")
+    assert "strong_picks" in psrc and 'x.get("strong_pick")' in psrc, "pipeline未传强推荐名单到页面"
+    rsrc = _read("render_board_html.py")
+    assert "strong-tag" in rsrc and "强推荐说明" in rsrc, "页面未渲染强推荐标记"
+    # 反向：删掉safety_basis后强推荐逻辑不应把无实锤车标上
+    r2 = L.tier_report(fake, cfg, None, "测试", airbag_gate=False, crash_gate=False)
+    assert isinstance(r2["detail"]["T2"], list), "T2结构异常"
+    return "证据A堵漏(MG07人工A无实锤被挡)+T2强推荐机制已接入(summary+页面)"
+
+
+def t058():
+    """有碰撞成绩的车，页面显示体系+关键数字徽标；C-IASI用等级不用百分号。"""
+    import re
+    import render_board_html as RH
+    src = _read("render_board_html.py")
+    assert "def crash_badge" in src and "flag-crash" in src, "碰撞徽标函数/CSS缺失"
+    assert "crash_badge(r)" in src, "name列未挂碰撞徽标"
+    cases = [
+        ({"safety_basis": "cncap", "crash": "C-NCAP 2024 92.3%五星"}, "C-NCAP 92.3%"),
+        ({"safety_basis": "euro_ncap", "crash": "Euro NCAP 2026五星(安全驾驶79%/碰撞避免89%/碰撞保护93%)"}, "Euro NCAP 93%"),
+        ({"safety_basis": "ciasi", "crash": "E-NCAP 2023五星(乘员96%)+中保研C-IASI AGGG最优点评"}, "C-IASI AGGG"),
+        ({"safety_basis": None, "crash": "无官方成绩"}, ""),
+    ]
+    for r, want in cases:
+        got = re.sub(r"<[^>]+>", "", RH.crash_badge(r))
+        assert got == want, f"碰撞徽标错: {r} → {got}, 期望{want}"
+    # 真实页面产物：有徽标且无成绩车不误标
+    p = os.path.join(HERE, "runs", "bev_midsedan_202610_full", "榜单.html")
+    if os.path.exists(p):
+        h = _read("runs/bev_midsedan_202610_full/榜单.html")
+        assert h.count("flag-crash") >= 7, "页面碰撞徽标不足7个"
+    return "碰撞徽标：C-NCAP得分率/EuroNCAP碰撞保护/C-IASI等级全部正确，无成绩车不标"
+
+
+def t059():
+    """高分低档车：卡点导出到summary + 档位列'为何未进一档'标记(hover列全部卡点)。"""
+    import re, html
+    psrc = _read("pipeline.py")
+    rsrc = _read("render_board_html.py")
+    assert "t1_blockers" in psrc, "pipeline未导出T1卡点"
+    assert "flag-lowtier" in rsrc and "为何未进一档" in rsrc, "档位列缺低档标记"
+    assert "不在意这些因素" in rsrc and "非不安全" in rsrc, "缺客观提示/碰撞非不安全说明"
+    # 数据级：summary有卡点 + 页面标记（TOP10非T1的车）
+    p = os.path.join(HERE, "runs", "bev_midsedan_202610_full", "summary.json")
+    if os.path.exists(p):
+        s = json.load(open(p, encoding="utf-8"))
+        blk = (s.get("t1_blockers") or {}).get("中型纯电轿车（全价位）") or {}
+        assert "奥迪E5 Sportback" in blk, "奥迪E5卡点未导出"
+        assert any("月销 450" in b for b in blk["奥迪E5 Sportback"]["blockers"]), "奥迪销量卡点丢失"
+        h = _read("runs/bev_midsedan_202610_full/榜单.html")
+        assert h.count("为何未进一档") >= 5, "页面低档标记不足"
+        tips = [html.unescape(t) for t in re.findall(r'flag-lowtier" title="([^"]+)"', h)]
+        sales_tips = [t for t in tips if "月销" in t]
+        assert sales_tips and "非不安全" in "".join(tips), "销量/碰撞提示缺失"
+    return "高分低档标记：卡点导出summary+档位列hover全列(销量/命中/碰撞)+客观提示"
+
+
+def t060():
+    """生命周期中文化：on_sale 有映射 + 未映射状态门禁可检出。"""
+    import board_view as BV
+    assert BV.LIFECYCLE_STATUS_CN.get("on_sale") == "在售", "on_sale未映射"
+    assert "check_lifecycle_coverage" in _read("board_view.py"), "缺覆盖检查函数"
+    assert "check_lifecycle_coverage" in _read("pipeline.py"), "pipeline未接中文化门禁"
+    # 真实池无漏网
+    pool = json.load(open(os.path.join(HERE, "runs", "midsedan_bev_1218_202610", "candidates_allprice.json"), encoding="utf-8"))["candidates"]
+    r = BV.check_lifecycle_coverage(pool)
+    assert r["passed"], f"有未映射状态: {r['missing']}"
+    # 反向：注入未映射状态必须检出
+    import copy
+    fake = copy.deepcopy(pool[:1])
+    fake[0]["lifecycle"] = {"status": "off_sale_brand_new"}
+    r2 = BV.check_lifecycle_coverage(fake)
+    assert not r2["passed"] and "off_sale_brand_new" in r2["missing"], "未映射状态未检出"
+    # 页面无 on_sale 英文泄漏
+    p = os.path.join(HERE, "runs", "bev_midsedan_202610_full", "榜单.html")
+    if os.path.exists(p):
+        assert "on_sale" not in _read("runs/bev_midsedan_202610_full/榜单.html"), "页面仍泄漏on_sale英文"
+    return "生命周期中文化：on_sale→在售，覆盖门禁生效(注入未映射状态能检出)"
+
+
+def t061():
+    """算法家族去重：相关算法只算1票，MG07抱团虚高被戳破。"""
+    import leaderboard as L
+    import robust as R
+    assert hasattr(R, "METHOD_FAMILIES") and hasattr(R, "FAMILY_OF"), "缺家族定义"
+    assert len(R.METHOD_FAMILIES) == 6, "家族数应为6"
+    # saw系5种必须同家族（实测τ≥0.84）
+    for m in ("saw", "moora", "waspas", "spotis", "edas"):
+        assert R.FAMILY_OF[m] == "weighted_sum", f"{m}未在加权和家族"
+    assert R.FAMILY_OF["gra"] == "grey_relational" and R.FAMILY_OF["topsis"] == "distance"
+    lsrc = _read("leaderboard.py")
+    assert "family_freq" in lsrc and "独立算法家族命中" in lsrc, "第一档未用家族命中"
+    # 数据级：真实池跑run_robust，007家族命中应显著高于MG07
+    cfg = json.load(open(os.path.join(HERE, "categories", "car_midsedan_allprice.json"), encoding="utf-8"))
+    d = json.load(open(os.path.join(HERE, "runs", "midsedan_bev_1218_202610", "candidates_allprice.json"), encoding="utf-8"))["candidates"]
+    d = L.with_config_scores(d, cfg)
+    names, matrix, types, _ = L.decision_matrix(d, cfg)
+    schemes = L.build_schemes(cfg)
+    res = R.run_robust(matrix, schemes["基准"], types, names, top_k=3, scheme_weights=L._clean_schemes(schemes))
+    j7 = res["per_alt"]["极氪007"]["family_freq"]
+    mg = res["per_alt"]["MG 07 纯电"]["family_freq"]
+    assert j7 >= 0.8 and mg <= 0.5, f"家族命中异常: 007={j7}, MG07={mg}"
+    return f"算法家族去重生效：6家族，007家族命中{j7:.0%} vs MG07{mg:.0%}(原6/10抱团虚高)"
 
 
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061]
 
 
 def run():

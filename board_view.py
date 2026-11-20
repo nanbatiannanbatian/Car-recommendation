@@ -240,11 +240,27 @@ LIFECYCLE_STATUS_CN = {
     "steady": "在售（稳定）", "active": "在售",
     "ramp_up": "爬坡期", "mature": "成熟期", "declining": "销量回落",
     "new": "新车上市", "pending": "待确认", "unknown": "状态未知",
+    # v9.7.43：补 on_sale（特斯拉Model 3/比亚迪e7 用此值，此前原文直出英文）
+    "on_sale": "在售",
 }
 
 
 def lifecycle_status_cn(status: str) -> str:
     return LIFECYCLE_STATUS_CN.get(str(status or ""), str(status) if status else "—")
+
+
+def check_lifecycle_coverage(cands: list[dict]) -> dict:
+    """v9.7.43：检查所有候选的生命周期状态是否都有中文映射。
+    防止再出现 on_sale 这种漏映射、页面直出英文。返回未映射状态→车型列表。
+    """
+    missing = {}
+    for c in cands:
+        lc = c.get("lifecycle")
+        s = (lc.get("status") if isinstance(lc, dict) else lc) or ""
+        s = str(s).strip()
+        if s and s not in LIFECYCLE_STATUS_CN:
+            missing.setdefault(s, []).append(c.get("model"))
+    return {"missing": missing, "passed": not missing}
 
 
 def car_verdict(row: dict, cand: dict, meta: dict | None = None) -> dict:

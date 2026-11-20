@@ -281,6 +281,22 @@ RUNNERS = {"spotis": m_spotis, "saw": m_saw, "waspas": m_waspas, "topsis": m_top
            "mabac": m_mabac, "moora": m_moora, "edas": m_edas,
            "promethee": m_promethee, "gra": m_gra}
 
+# v9.7.43：算法家族（按实测 Kendall τ≥0.8 聚类，2026-11-20 在纯电中型车池验证）。
+# 为什么不按10种算法直接计票：saw/moora/waspas/spotis/edas 之间 τ=0.94~1.00，
+# 是同一类算法被数了5次；MG07 曾"6/10命中"但6票全来自抱团组，虚高。
+# 家族去重后每家族算1票，命中率=进前top_k的家族数/总家族数，更真实反映独立支持。
+# 分组依据：加权和/比值系(saw系)、向量距离(topsis)、折衷(vikor)、边界(mabac)、
+#           偏好流(promethee)、灰色关联(gra)——覆盖不同数学原理。
+METHOD_FAMILIES = {
+    "weighted_sum": ["saw", "moora", "waspas", "spotis", "edas"],
+    "distance": ["topsis"],
+    "compromise": ["vikor"],
+    "boundary": ["mabac"],
+    "preference_flow": ["promethee"],
+    "grey_relational": ["gra"],
+}
+FAMILY_OF = {m: f for f, ms in METHOD_FAMILIES.items() for m in ms}
+
 METHOD_LABEL = {"saw": "SAW 加权和", "waspas": "WASPAS 和+积", "topsis": "TOPSIS 理想解",
                 "vikor": "VIKOR 折衷", "mabac": "MABAC 边界距离",
                 "moora": "MOORA 比值", "edas": "EDAS 平均解",
@@ -708,6 +724,19 @@ def run_robust(matrix, weights, types, names, top_k=3,
 
     joint_freq, joint_hist = _freq(ok)
 
+    # v9.7.43：家族去重命中率——同家族算法只算1票（防相关算法重复计数虚高）。
+    _fam_hits = {nm: set() for nm in names}
+    for r in base_runs:
+        if "ranks" not in r:
+            continue
+        fam = FAMILY_OF.get(r.get("method"))
+        if not fam:
+            continue
+        for i, nm in enumerate(names):
+            if r["ranks"][i] <= top_k:
+                _fam_hits[nm].add(fam)
+    n_fam = len(METHOD_FAMILIES)
+
     def _verdict(freq, n, strict=1.0, good=0.85, mid=0.5):
         r = freq / n if n else 0
         if r >= strict:
@@ -726,6 +755,11 @@ def run_robust(matrix, weights, types, names, top_k=3,
             "method_hits": meth_freq[nm],
             "method_n": n_meth,
             "method_verdict": _verdict(meth_freq[nm], n_meth),
+            # v9.7.43：家族去重命中（每家族1票，防抱团算法虚高）
+            "family_freq": len(_fam_hits[nm]) / n_fam if n_fam else 0,
+            "family_hits": len(_fam_hits[nm]),
+            "family_n": n_fam,
+            "family_names": sorted(_fam_hits[nm]),
             "method_range": (mh[0], mh[-1]) if mh else (0, 0),
             "method_median": mh[len(mh) // 2] if mh else 0,
             "topk_freq": joint_freq[nm] / total,

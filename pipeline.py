@@ -117,6 +117,7 @@ def main():
     ap.add_argument("--skip-universe-gate", action="store_true", help="跳过完整性门禁(须在报告说明为何同级漏收车无需处理)")
     ap.add_argument("--skip-consistency-gate", action="store_true", help="跳过条目内一致性门禁(须在报告说明为何note与结构字段矛盾不是错误)")
     ap.add_argument("--skip-sibling-gate", action="store_true", help="跳过同源车评分一致性门禁(须在报告说明为何无据差异合理)")
+    ap.add_argument("--skip-safety-gate", action="store_true", help="跳过安全分严谨性门禁(须在报告说明为何成绩映射分可偏离)")
     ap.add_argument("--html-title", help="HTML 页面标题")
     ap.add_argument("--force-stale", action="store_true",
                     help="强制使用旧指纹候选池出榜（仅调试/回测用，报告会标注数据过期）")
@@ -180,6 +181,27 @@ def main():
                  "\n→ 对齐分数，或在候选池 score_diff_reasons[车A|车B][维度] 写明事实差异原因。"
                  "\n→ 确认差异合理用 --skip-sibling-gate（须在报告说明）。")
     print(f"[同源车一致性门禁] {_sr['pairs']} 对同源车 / 无据差异 {len(_sr['issues'])}")
+
+    # v9.7.43：安全分严谨性门禁——有官方碰撞成绩的车必须按体系映射表给分，
+    # 且不得低于无成绩车中位（防"有强证据反分更低"，007GT 曾 7.2 < 无成绩8.0）。
+    # 各体系不可跨体系套同一得分率公式，映射表见 official_safety_scores.json。
+    import safety_check as SFC
+    _sc = SFC.check(cands)
+    if not _sc["passed"] and not a.skip_safety_gate:
+        lines = [f"  - [{x['type']}] {x['model']}: {x['actual']} → 应 {x['expected']}" for x in _sc["issues"]]
+        sys.exit("安全分严谨性门禁：\n" + "\n".join(lines) +
+                 "\n→ 按 official_safety_scores.json 映射表统一有成绩车的安全分与 basis。"
+                 "\n→ 确认合理用 --skip-safety-gate（须在报告说明）。")
+    print(f"[安全分门禁] 有成绩车 {_sc['checked']} 款 / 最低 {_sc['official_min']} / 无成绩中位 {_sc['no_score_median']} / 问题 0")
+
+    # v9.7.43：生命周期中文化门禁——所有状态值必须有中文映射，
+    # 防止 on_sale 这类漏映射导致页面直出英文（特斯拉曾中招）。
+    import board_view as BView
+    _lc = BView.check_lifecycle_coverage(cands)
+    if not _lc["passed"]:
+        lines = [f"  - {s}：{', '.join(ms)}" for s, ms in _lc["missing"].items()]
+        sys.exit("生命周期中文化门禁：以下状态值无中文映射，页面会直出英文：\n" + "\n".join(lines) +
+                 "\n→ 在 board_view.LIFECYCLE_STATUS_CN 补映射。")
 
     # 第三方实测/拆车证据 → adjust（带封顶）。放在闸门之前：adjust 不影响准入，
     # 只影响名次；审计行进报告，方便逐条质疑。
@@ -328,7 +350,20 @@ def main():
         if fdata:
             fitems = (fdata.get("boards") or {}).get(label) or []
             parts += FC.render_board(label, fitems, len(passed))
-        summary["tiers"][label] = L.tier_report(passed, cfg, wv, label, airbag_gate=a.airbag_gate, crash_gate=a.crash_gate)["tiers"]
+        _tr = L.tier_report(passed, cfg, wv, label, airbag_gate=a.airbag_gate, crash_gate=a.crash_gate)
+        summary["tiers"][label] = _tr["tiers"]
+        # v9.7.43：第二档"强推荐"名单（有碰撞实锤+高分+无硬风险，但换算法不够稳压）
+        summary.setdefault("strong_picks", {})[label] = [
+            x["model"] for x in (_tr.get("detail") or {}).get("T2", []) if x.get("strong_pick")]
+        # v9.7.43：高分低档车的T1卡点导出给页面（如实展示为何分高却没推荐）
+        _blockers = {}
+        for _tk in ("T1", "T2", "T3"):
+            for _x in (_tr.get("detail") or {}).get(_tk, []):
+                if _x.get("t1_blockers"):
+                    _blockers[_x["model"]] = {"tier": _tk, "score": _x.get("score"),
+                                              "blockers": _x["t1_blockers"],
+                                              "sales": _x.get("sales")}
+        summary.setdefault("t1_blockers", {})[label] = _blockers
         summary["review"][label] = L.review_report(passed, cfg, wv)["verdict"]
 
     # 1b 被动安全配置事实列（全局一节，逐条带来源；不计入加权）

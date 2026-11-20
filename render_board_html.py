@@ -73,6 +73,8 @@ tr.tier-T1 td{background:#eef8f0}tr.tier-T2 td{background:#fffdf5}tr.tier-T3 td{
 .flag-warn{background:#fdf0ee;color:#b42318;border:1px solid #f3c9c3}
 .flag-est{background:#fbf3e9;color:#8a5a1f;border:1px solid #edd9bc}
 .flag-fleet{background:#fdf0ee;color:#b42318;border:1px solid #d85a30;font-weight:500}
+.flag-crash{background:#eaf6ee;color:#17663a;border:1px solid #b7dfc6;font-weight:500}
+.flag-lowtier{background:#f2f4f7;color:#475467;border:1px solid #d0d5dd;font-weight:400;cursor:help}
 .stability-tip{background:#fff8e6;border-left:3px solid #BA7517;padding:10px 14px;
 border-radius:0 8px 8px 0;font-size:13px;color:#5c4518;margin:14px 0}
 .rk{display:inline-flex;width:25px;height:25px;align-items:center;justify-content:center;
@@ -94,6 +96,7 @@ border-radius:10px;padding:14px 18px}
 .tier-card.T1{border-left-color:var(--t1)}.tier-card.T3{border-left-color:var(--t3)}
 .tier-card h3{margin:0 0 8px;font-size:15px}
 .tier-card ul{margin:0;padding-left:20px;font-size:13.5px}
+.strong-tag{display:inline-block;margin-left:6px;padding:0 5px;border-radius:3px;background:var(--t1);color:#fff;font-size:11px;font-weight:500;vertical-align:1px}
 .foot{margin-top:34px;font-size:12px;color:var(--ink3);border-top:1px solid var(--line);padding-top:16px}
 @media(max-width:720px){.wrap{padding:22px 12px 50px}h1{font-size:23px}table{font-size:11.5px}th,td{padding:7px 4px}}
 """
@@ -172,10 +175,62 @@ def risk_flags(r: dict) -> str:
     # v9.7.43：销量口径异常标注（季度初出口集中/促销透支/清库等导致的单月异常低值，非产品力问题）
     if any(k in note for k in ("销量口径异常", "出口集中", "季度初出口", "促销透支")):
         out.append('<span class="flag flag-est" title="该车型当月销量为口径性异常低值（如季度初出口集中、促销透支、清库），非产品力问题，不改档位；见生命周期提示与逐车取证依据">⚠销量口径异常</span>')
+    # v9.7.43 修复：此前用 `any(k in crash for k in ("无","未查到","未披露"))`，
+    # "无"字过宽（"无正式C-NCAP星级"会被误判），且 score_rows 没透传 crash 导致全池误标。
+    # 改为结构化判断：有官方成绩体系 basis 即视为有实锤；否则看 crash 是否明确有成绩。
+    basis = str(r.get("safety_basis") or "").lower()
+    has_official_basis = basis in ("cncap", "ciasi", "c-ncap", "ciasi_checked",
+                                   "euro_ncap", "ancap", "iihs")
     crash = str(r.get("crash") or "")
-    if not crash or any(k in crash for k in ("无", "未查到", "未披露")):
-        out.append('<span class="flag flag-warn" title="无中保研/中汽研/C-NCAP可查询的官方碰撞报告；安全无官方实锤，证据已降权但不判劣">缺官方碰撞</span>')
+    # 明确无成绩的措辞：句首 无/未查到/未披露 + 碰撞/NCAP/成绩 等。
+    # 注意优先于 has_result——"未查到C-NCAP成绩"含 NCAP 字样但不是成绩。
+    no_result = bool(re.match(r"^\s*(无官方|无\s*(官方)?碰撞|无\s*c-?ncap|无\s*中保研|未查到|未披露|暂无)", crash))
+    # 成绩标志（仅当没被判 no_result 时才认）：NCAP/C-IASI/IIHS 星级或等级
+    has_result = bool(re.search(r"(?i)(ncap|cias[i]?|iihs|五星|5星|四星|4星|[Gg]\+)", crash)) and not no_result
+    if not has_official_basis and (not crash or no_result or not has_result):
+        out.append('<span class="flag flag-warn" title="无中保研(C-IASI)/中汽研(C-NCAP)/Euro NCAP/IIHS 可查的权威碰撞成绩；安全分基于配置与口碑，非实测实锤；不等于不安全，但证据等级较低">缺权威碰撞成绩</span>')
     return "".join(out)
+
+
+def crash_badge(r: dict) -> str:
+    """v9.7.43：有官方碰撞成绩的车，车名后显示体系+关键数字徽标（绿色）。
+    数据来自 score_rows 透传的 safety_basis/crash，不额外读文件。
+    文案=体系+关键数字（得分率/星级/C-IASI等级），完整描述放 hover title。
+    """
+    basis = str(r.get("safety_basis") or "").lower()
+    sys_cn = {"cncap": "C-NCAP", "c-ncap": "C-NCAP", "ciasi": "C-IASI",
+              "ciasi_checked": "C-IASI", "euro_ncap": "Euro NCAP",
+              "ancap": "ANCAP", "iihs": "IIHS"}.get(basis)
+    if not sys_cn:
+        return ""
+    crash = str(r.get("crash") or "")
+    # 关键数字：优先得分率(92.3%)，其次星级，再C-IASI等级串
+    key = ""
+    # C-IASI 是等级制(G/A/M/P)，不取百分号（如 ET5 的 96% 其实是 E-NCAP 分项非 C-IASI）
+    grade = (re.search(r"C-IASI\s+([GAPM][GAPM+]{1,5})", crash) or
+             re.search(r"(?:^|\s)([GAPM]{4,6})(?=\D|$)", crash)) if sys_cn == "C-IASI" else None
+    if grade:
+        key = grade.group(1)
+    else:
+        m = re.search(r"(\d{2}(?:\.\d)?)\s*%", crash)
+        if m:
+            # 取第一个百分号数字；Euro NCAP 常有多个分项，取碰撞保护那个更有意义
+            pcts = re.findall(r"(\d{2}(?:\.\d)?)\s*%", crash)
+            if sys_cn == "Euro NCAP" and len(pcts) >= 3:
+                key = pcts[2] + "%"  # 顺序：安全驾驶/碰撞避免/碰撞保护 → 取碰撞保护
+            else:
+                key = pcts[0] + "%"
+    if not key:
+        star = re.search(r"(五星|四星|5星|4星|TSP\+|TSP)", crash, re.I)
+        if star:
+            key = star.group(1)
+    if not key:
+        grade2 = re.search(r"\b([GAPM]\+?[GAPM]{0,3})\b", crash)
+        if grade2:
+            key = grade2.group(1)
+    label = f"{sys_cn} {key}".strip() if key else sys_cn
+    return (f'<span class="flag flag-crash" title="{e(crash or sys_cn + " 官方碰撞成绩")}">'
+            f'{e(label)}</span>')
 
 
 def num(v, digits=1):
@@ -328,6 +383,12 @@ def render(data, summary, title, as_of):
                      '分数仅作同车配置相对参考，跨车型横向对比请谨慎。</div>')
         H.append('<table id="mainBoard"><thead><tr>' + "".join(f"<th>{e(BV.MAIN_COL_LABELS[k])}</th>"
                  for k in BV.MAIN_BOARD_COLUMNS) + "</tr></thead><tbody>")
+        # v9.7.43：高分低档车的卡点（pipeline 导出），用于档位列"为何未进一档"标记
+        _t1blk = {}
+        if summary:
+            for _v in (summary.get("t1_blockers") or {}).values():
+                if isinstance(_v, dict):
+                    _t1blk.update(_v)
         for r in rows:
             cand = r
             gmap = grades.get(r["model"], {})
@@ -349,11 +410,22 @@ def render(data, summary, title, as_of):
                             for i, t in enumerate(td["trims"]))
                         sel = (f'<br><select class="trimsel" data-model="{e(r["model"])}" '
                                f'style="font-size:11px;max-width:160px">{opts}</select>')
-                    H.append(f"<td class='name'>{e(val)}{risk_flags(r)}{sel}</td>")
+                    H.append(f"<td class='name'>{e(val)}{risk_flags(r)}{crash_badge(r)}{sel}</td>")
                 elif k == "total":
                     H.append(f"<td class='c-total'><span class='score'>{e(val)}</span></td>")
                 elif k == "tier":
-                    H.append(f"<td>{tier_badge(r.get('tier'))}</td>")   # 档位固定，不参与联动
+                    _tier_cell = tier_badge(r.get("tier"))
+                    # v9.7.43：高分(TOP10)却未进一档的车，档位列加"为何未进一档"标记
+                    _bi = _t1blk.get(r["model"])
+                    if _bi and (r.get("rank") or 99) <= 10:
+                        _bl = list(_bi.get("blockers") or [])
+                        # 碰撞缺失注明"非不安全"，避免误导
+                        _bl = [("无权威碰撞成绩（非不安全，仅证据等级较低）" if "无权威碰撞成绩" in b else b)
+                               for b in _bl]
+                        _tip = "；".join(_bl) + "。——不在意这些因素的用户可将其纳入购买考虑，非产品力差。"
+                        _tier_cell += (f'<span class="flag flag-lowtier" title="{e(_tip)}">'
+                                       f'为何未进一档</span>')
+                    H.append(f"<td>{_tier_cell}</td>")   # 档位固定，不参与联动
                 elif k == "evidence":
                     cls = {"A": "delta-up", "B": "", "C": "delta-down"}.get(val, "")
                     if val == "C":
@@ -364,7 +436,7 @@ def render(data, summary, title, as_of):
                                    'title="营运/交付硬风险，第三档暂缓">营运风险</span>')
                         else:
                             lab = ('<span class="flag flag-warn" '
-                                   'title="参数完备但缺官方碰撞/口碑实锤，留第二档；安全置信度勿对标 A 级证据">证据不足</span>')
+                                   'title="证据等级C：新上市或口碑样本不足（非碰撞成绩缺失）；排序稳定但一手实锤有限，不宜对标A类证据">证据不足</span>')
                         H.append(f"<td class='{cls}'>{lab}</td>")
                     else:
                         H.append(f"<td class='{cls}'>{e(val)}</td>")
@@ -597,16 +669,27 @@ document.addEventListener('change',function(ev){
         if review: H.append(f'<div class="warn">{e(review)}</div>')
         H.append('<div class="tier-grid">')
         names = {"T1": "第一档 · 可直接买", "T2": "第二档 · 按偏好取舍", "T3": "第三档 · 证据不足/暂缓"}
+        # v9.7.43：第二档内"强推荐"标记——有碰撞实锤+高分+无硬风险，只是换算法不够稳压
+        _strong = set()
+        if summary:
+            _sp = (summary.get("strong_picks") or {})
+            for _v in _sp.values():
+                _strong.update(_v if isinstance(_v, list) else [])
         for k in ("T1", "T2", "T3"):
             models = tiers.get(k) or []
-            H.append(f'<div class="tier-card {k}"><h3>{names[k]}（{len(models)} 款）</h3>'
-                     f'<ul>{"".join(f"<li>{e(m)}</li>" for m in models) if models else "<li>—</li>"}</ul></div>')
+            lis = "".join(
+                f"<li>{e(m)}{'<b class=\"strong-tag\" title=\"有权威碰撞实锤+高分+无硬风险；仅因换算法名次不够稳压未进第一档\">强推荐</b>' if (k=='T2' and m in _strong) else ''}</li>"
+                for m in models) if models else "<li>—</li>"
+            H.append(f'<div class="tier-card {k}"><h3>{names[k]}（{len(models)} 款）</h3><ul>{lis}</ul></div>')
         H.append("</div>")
+        if _strong:
+            H.append('<div class="rule"><b>强推荐说明：</b>第二档中带「强推荐」标的车，有权威碰撞实锤、总分高、无硬风险，'
+                     '仅因换算法/换权重时名次不够稳压而未进第一档——车本身没有明显短板，按你的偏好取舍即可。</div>')
         _es = (summary or {}).get("evidence_soft") or []
         if _es:
             _lines = "；".join(f"{e(x.get('model'))}（{e(x.get('tier'))}）" for x in _es)
             H.append(f'<div class="rule"><b>证据分级提示（v9.7.18）：</b>{_lines} '
-                     '一手证据不足（多为缺官方碰撞成绩）——已降低第一档资格，'
+                     '一手证据不足（新上市/样本少/缺权威碰撞成绩）——已降低第一档资格，'
                      '<b>但不因此判劣或打入「暂缓」</b>；真正的硬风险（停产/无交付/营运为主）才进第三档。</div>')
 
     # ---- 价位段子榜 / 分段汇总（多段才有）

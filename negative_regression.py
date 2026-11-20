@@ -54,6 +54,14 @@ NEG_TARGETS = {
     "t051": ["with_config_scores"],
     "t052": ["check_internal_consistency"],
     "t053": ["同源车一致性门禁"],
+    "t054": ["安全分严谨性门禁"],
+    "t055": ['"crash": c.get("crash")'],
+    "t056": ["has_crash_evidence"],
+    "t057": ["strong_pick"],
+    "t058": ["def crash_badge"],
+    "t059": ["为何未进一档"],
+    "t060": ["_lc = BView.check_lifecycle_coverage(cands)"],
+    "t061": ["独立算法家族命中"],
 }
 
 # 数据断言型：测试名 -> (文件路径, 车型/键, 篡改模式)

@@ -216,6 +216,12 @@ def score_rows(cands: list[dict], cfg: dict, weights: list[float] | None = None)
             "evidence": c.get("evidence_status") or c.get("grade") or "?",
             "note": c.get("note") or c.get("weak") or "",
             "scores": sc,
+            # v9.7.43：事实字段透传给页面渲染（risk_flags 等）。此前 score_rows 只出
+            # model/price/total/evidence/note/scores，导致 render 读不到 crash →
+            # 全池误标"缺官方碰撞"（连有 Euro NCAP 五星的 007 都被误标）。
+            "crash": c.get("crash"),
+            "safety_basis": c.get("safety_basis"),
+            "safety_confidence": c.get("safety_confidence"),
         })
     rows.sort(key=lambda r: -r["total"])
     return rows
@@ -892,6 +898,11 @@ def tier_rules(cfg: dict) -> dict:
     return {
         "top_k": int(t.get("top_k") or 3),
         "t1_min_method_freq": float(t.get("t1_min_method_freq", 0.8)),
+        # v9.7.43：家族命中用「票数」而非比例，消除6家族无法整除80%的语义漂移。
+        # 6家族中至少5票认可（=83.3%，与原10票制80%≈8票的严格度相当）。
+        # 显式 None 才回退比例(兼容旧榜)；缺省给5票。
+        "t1_min_family_hits": (None if t.get("t1_min_family_hits") == "ratio"
+                               else int(t.get("t1_min_family_hits", 5))),
         "t1_min_joint_freq": float(t.get("t1_min_joint_freq", 0.4)),
         "t1_evidence": t.get("t1_evidence") or ["A"],
         "t1_min_sales": float(t.get("t1_min_sales", 2000)),
@@ -904,6 +915,10 @@ def tier_rules(cfg: dict) -> dict:
         "t1_max_norm_swing": int(t.get("t1_max_norm_swing", 2)),
         "norm_audit_enabled": bool(t.get("norm_audit_enabled", True)),
     }
+
+
+_BASIS_CN = {"cncap": "C-NCAP", "c-ncap": "C-NCAP", "ciasi": "C-IASI", "ciasi_checked": "C-IASI",
+             "euro_ncap": "Euro NCAP", "ancap": "ANCAP", "iihs": "IIHS"}
 
 
 def tier_report(cands: list[dict], cfg: dict, weights: list[float] | None = None,
@@ -979,6 +994,20 @@ def tier_report(cands: list[dict], cfg: dict, weights: list[float] | None = None
         c = by.get(nm, {})
         a = per[nm]
         ev = str(c.get("evidence_status") or c.get("grade") or "?").upper()
+        # v9.7.43：证据A重定义——「有权威碰撞成绩」即满足第一档证据要求。
+        # 此前 evidence_status 是人工散落字段，没跟碰撞成绩挂钩：007GT有 Euro NCAP
+        # 五星(碰撞保护93%同期第一)却因人工标B被挡在T1，导致T1全空、失去推荐意义。
+        # 现以 safety_basis（官方体系，含 Euro NCAP/IIHS）为准；非国内体系只提示不阻断。
+        OFFICIAL_BASIS = ("cncap", "ciasi", "c-ncap", "ciasi_checked",
+                          "euro_ncap", "ancap", "iihs")
+        has_crash_evidence = str(c.get("safety_basis") or "").lower() in OFFICIAL_BASIS
+        # 无碰撞实锤时一律不认"人工标A"（MG07 曾人工A但crash=无官方成绩）；
+        # 证据A = 有权威碰撞成绩，证据等级只降不升。
+        ev_for_t1 = "A" if has_crash_evidence else ("B" if ev == "A" else ev)
+        crash_basis_note = ""
+        if has_crash_evidence and ev not in rules["t1_evidence"]:
+            crash_basis_note = (f"碰撞实锤来自 {c.get('safety_basis')}（人工证据等级 {ev}），"
+                                f"按官方碰撞成绩认定证据达标")
         sales = c.get("trend_sales")
         lc = lifecycle_of(c)
         quiet = lifecycle_quiet(c)
@@ -1011,12 +1040,21 @@ def tier_report(cands: list[dict], cfg: dict, weights: list[float] | None = None
         rec = {"model": nm, "evidence": ev, "sales": sales,
                "method_hits": a["method_hits"], "method_n": a["method_n"],
                "method_freq": a["method_freq"],
+               # v9.7.43：家族去重命中率（第一档判据用这个，防相关算法重复计数）
+               "family_freq": a.get("family_freq"),
+               "family_hits": a.get("family_hits"),
+               "family_n": a.get("family_n"),
+               "family_names": a.get("family_names") or [],
                "joint_hits": a["topk_count"], "joint_freq": a["topk_freq"],
                "scenarios": scen_hit[nm], "risks": risks, "best": best_dim(nm),
                "score": total_score.get(nm), "note": c.get("note") or "",
                "sales_scope": c.get("sales_scope"), "sales_note": c.get("sales_note"),
                "lifecycle": lc,
                "evidence_soft": ev_soft,
+               # v9.7.43：判据展示用——有碰撞实锤时显示"达标(体系)"而非原始人工等级，
+               # 避免第一档表写"证据B"让人以为规则失效。
+               "evidence_t1_label": (f"证据达标（{_BASIS_CN.get(str(c.get('safety_basis') or '').lower(), c.get('safety_basis'))}碰撞实锤）"
+                                     if has_crash_evidence else f"证据 {ev}"),
                "norm_swing": norm_swing.get(nm),
                "norm_detail": norm_detail.get(nm),
                "price": c.get("price") or "",
@@ -1025,12 +1063,27 @@ def tier_report(cands: list[dict], cfg: dict, weights: list[float] | None = None
                "trim": (c.get("scored_trim_used") or (c.get("trim") or {}).get("name"))}
 
         blockers = []
-        if a["method_freq"] < rules["t1_min_method_freq"]:
-            blockers.append(f"算法命中 {a['method_freq']:.0%}<{rules['t1_min_method_freq']:.0%}")
+        # v9.7.43：第一档用家族去重命中率（同家族算法算1票，防MG07那种6票全抱团虚高）
+        _ff = a.get("family_freq")
+        _ff_hits = a.get("family_hits")
+        _ff_n = a.get("family_n") or 6
+        _is_family = _ff is not None
+        if not _is_family:
+            # 兼容旧数据：无家族字段时回退原算法命中
+            _ff, _ff_hits, _ff_n = a["method_freq"], a["method_hits"], a["method_n"]
+        # 优先按「票数」判（6家族至少5票），语义明确；无票数配置时回退比例
+        _min_hits = rules["t1_min_family_hits"] if _is_family else None
+        if _min_hits is not None:
+            _pass_hit = _ff_hits >= _min_hits
+        else:
+            _pass_hit = _ff >= rules["t1_min_method_freq"]
+        if not _pass_hit:
+            _need = f"{_min_hits}/{_ff_n}票" if _min_hits is not None else f"{rules['t1_min_method_freq']:.0%}"
+            blockers.append(f"独立算法家族命中 {_ff_hits}/{_ff_n}={_ff:.0%}<{_need}")
         if a["topk_freq"] < rules["t1_min_joint_freq"]:
             blockers.append(f"全情景命中 {a['topk_freq']:.0%}<{rules['t1_min_joint_freq']:.0%}")
-        if ev not in rules["t1_evidence"]:
-            blockers.append(f"证据 {ev} 未达 {'/'.join(rules['t1_evidence'])}")
+        if ev_for_t1 not in rules["t1_evidence"]:
+            blockers.append(f"证据 {ev} 未达 {'/'.join(rules['t1_evidence'])}（无权威碰撞成绩）")
         if airbag_gate:
             # 第1档气囊准入闸——三态，**只拦「明确缺失」，不拦「未核验」**。
             # 为什么不再用 null 拦：null 表示「我们没取到证据」，是数据缺口，
@@ -1082,14 +1135,28 @@ def tier_report(cands: list[dict], cfg: dict, weights: list[float] | None = None
         elif not blockers:
             if ev_soft:
                 rec.setdefault("t1_notes", []).extend(ev_soft)
+            # v9.7.43：非国内体系碰撞成绩的含金量提示（不阻断T1，只是披露）
+            if crash_basis_note:
+                rec.setdefault("t1_notes", []).append(crash_basis_note)
             tiers["T1"].append(rec)
         else:
             if ev_soft:
                 rec.setdefault("t2_notes", []).extend(ev_soft)
+            # v9.7.43：第二档内"强推荐"标记——有权威碰撞实锤 + 高分 + 无硬风险，
+            # 但换算法不够稳（命中未达T1）。回答"车好，只是分数挤团不够稳压"。
+            # 不是新档位，只是T2内的可视化提示，不改三档结构。
+            _sc = total_score.get(nm) or 0
+            rec["strong_pick"] = bool(
+                has_crash_evidence and _sc >= 80 and not risks
+                and (rec.get("family_freq") or 0) >= 0.5)
+            if rec["strong_pick"]:
+                rec.setdefault("t2_notes", []).append(
+                    f"强推荐候选：总分{_sc:.1f}+{c.get('safety_basis')}碰撞实锤，"
+                    f"独立算法家族命中 {rec.get('family_hits')}/{rec.get('family_n')}={rec.get('family_freq', 0):.0%}<80%故未进第一档；车本身无明显短板")
             tiers["T2"].append(rec)
 
     for k in tiers:
-        tiers[k].sort(key=lambda r: (-r["joint_freq"], -r["method_freq"], -(r["score"] or 0)))
+        tiers[k].sort(key=lambda r: (-(r.get("family_freq") or 0), -r["joint_freq"], -(r["score"] or 0)))
 
     L = [f"## 三档分级：{label or cfg.get('label')}", ""]
     L.append(f"> **不出 1–10 名。** 本榜 {res['n_methods']} 种算法两两 Kendall τ 均值 "
@@ -1114,7 +1181,10 @@ def tier_report(cands: list[dict], cfg: dict, weights: list[float] | None = None
     norm_cond = ""
     if do_norm and norm_swing:
         norm_cond = f"、跨归一化名次波动 ≤{rules['t1_max_norm_swing']} 位"
-    L.append(f"| **第一档** | 基准算法命中 ≥{rules['t1_min_method_freq']:.0%}、"
+    _hit_cond = (f"独立算法家族命中 ≥{rules['t1_min_family_hits']}/{len(robust.METHOD_FAMILIES)}票"
+                 if rules.get("t1_min_family_hits") is not None
+                 else f"独立算法家族命中 ≥{rules['t1_min_method_freq']:.0%}")
+    L.append(f"| **第一档** | {_hit_cond}（10算法按原理去重成6家族、同家族只算1票）、"
              f"全情景命中 ≥{rules['t1_min_joint_freq']:.0%}、证据 ∈ {rules['t1_evidence']}、"
              f"趋势月销 ≥{int(rules['t1_min_sales']):,}{ab_cond}{norm_cond} | 换算法换权重都在前列，不用取舍 |")
     L.append("| **第二档** | 不触发第三档风险，但未达第一档 | 强弱项分明，取舍交给滑杆 |")
@@ -1131,8 +1201,10 @@ def tier_report(cands: list[dict], cfg: dict, weights: list[float] | None = None
             stxt = f"月销 {r['sales']:,}"
         else:
             stxt = "月销 —"
-        bits = [f"证据 {r['evidence']}", stxt,
-                f"{r['joint_hits']}/{res['n_runs']} 次进前{top_k}（{r['joint_freq']:.0%}）"]
+        bits = [r.get("evidence_t1_label") or f"证据 {r['evidence']}", stxt]
+        if r.get("family_hits") is not None:
+            bits.append(f"独立家族命中 {r['family_hits']}/{r['family_n']}（{r.get('family_freq', 0):.0%}）")
+        bits.append(f"{r['joint_hits']}/{res['n_runs']} 次进前{top_k}（{r['joint_freq']:.0%}）")
         lcs = (r.get("lifecycle") or {}).get("status")
         if lcs and lcs != "active":
             bits.append(LC_LABEL.get(lcs, lcs))
@@ -1169,8 +1241,8 @@ def tier_report(cands: list[dict], cfg: dict, weights: list[float] | None = None
         L.append("| 车型 | 评分配置 | 判据 | 为什么在这一档 |")
         L.append("|---|---|---|---|")
         for r in tiers["T1"]:
-            why = (f"{r['method_n']} 种算法中 {r['method_hits']} 种进前{top_k}，"
-                   f"{res['n_schemes']} 套权重情景下 {len(r['scenarios'])} 套进前{top_k}")
+            why = (f"{r.get('family_n', 6)} 个独立算法家族中 {r.get('family_hits', 0)} 个进前{top_k}"
+                   f"（10算法按原理去重），{res['n_schemes']} 套权重情景下 {len(r['scenarios'])} 套进前{top_k}")
             L.append(f"| **{r['model']}** | {r['trim'] or '—'} | {_line(r)} | {why} |")
     else:
         near = sorted([r for t in ("T2", "T3") for r in tiers[t]],
