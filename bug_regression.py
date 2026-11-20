@@ -63,6 +63,7 @@ CASES = [
     ("BUG-040", "快充能力无配置级delta且口径混用会虚高", "v9.7.31"),
     ("BUG-041", "紧凑SUV榜候选池/配置未固化", "v9.7.32"),
     ("BUG-042", "校验不覆盖电芯字段致11/20主榜空白", "v9.7.33"),
+    ("BUG-043", "占位scored_trim致全榜低置信刷屏", "v9.7.34"),
 ]
 
 
@@ -223,6 +224,25 @@ def t015():
     assert "BV.main_cell" in src, "渲染绕过了 board_view 单点"
     return "渲染复用 board_view 单点"
 
+
+def t043():
+    """低置信要只在有区分度时显示；占位scored_trim必须回填。"""
+    td = json.load(open(os.path.join(HERE, "categories", "trims.json"), encoding="utf-8"))
+    placeholders = [e["model"] for e in td["entries"]
+                    if "待配置" in str(e.get("scored_trim") or "")]
+    assert not placeholders, f"仍有占位scored_trim: {placeholders}"
+    src = _read("render_board_html.py")
+    assert "_mixed_conf" in src, "低置信区分度显示逻辑缺失"
+    for out in ("compact_suv_bev_202610", "compact_bev_extended_202610"):
+        p2 = os.path.join(HERE, "runs", out, "榜单.html")
+        if os.path.exists(p2):
+            t = _read(os.path.join("runs", out, "榜单.html"))
+            m = re.search(r"<h2[^>]*>打分主榜.*?<tbody>(.*?)</tbody>", t, re.S)
+            seg = m.group(1) if m else ""
+            rows = len(re.findall(r"<tr data-model=", seg))
+            low_count = seg.count("低置信")
+            assert low_count == 0 or low_count < rows, f"{out} 低置信刷屏: {low_count}/{rows}"
+    return "占位基准已回填，低置信不刷屏"
 
 def t042():
     """校验必须覆盖展示字段——电芯缺失要被拦截，不能'校验全绿但主榜空白'。"""
@@ -572,7 +592,7 @@ def t016():
 
 
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043]
 
 
 def run():

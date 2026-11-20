@@ -303,6 +303,16 @@ def render(data, summary, title, as_of):
                  '结合档位、评价与逐配置对比做决定。' + _tau_txt + '。'
                  '「唯一名次」只在本榜 8 维规则内成立，不是购车唯一结论。</div>')
         tb_main = meta.get("trim_board") or {}
+        # v9.7.34：低置信标记只在"有区分度"时显示——全high或全low时逐车标没有意义，
+        # 全low是系统性数据问题，应在顶部提示修数据而非标每一款。
+        _confs = {(tdm.get("best_confidence") or "") for tdm in tb_main.values()}
+        _mixed_conf = ("low" in _confs or "低" in _confs) and any(
+            c in ("high", "medium", "高", "中") for c in _confs)
+        if "low" in _confs and not _mixed_conf and len(tb_main) > 1:
+            H.append('<div class="rule" style="background:#fbf3e9">'
+                     '<b>置信度提示：</b>本榜全部车型配置基准均为低置信（基准配置名与配置表对不上，'
+                     '已用近似配置做基准）。逐车标「低置信」无区分意义，此处统一说明：'
+                     '分数仅作同车配置相对参考，跨车型横向对比请谨慎。</div>')
         H.append('<table id="mainBoard"><thead><tr>' + "".join(f"<th>{e(BV.MAIN_COL_LABELS[k])}</th>"
                  for k in BV.MAIN_BOARD_COLUMNS) + "</tr></thead><tbody>")
         for r in rows:
@@ -351,7 +361,7 @@ def render(data, summary, title, as_of):
                 elif k == "trim":
                     cf = (td.get("best_confidence") or "")
                     cf_flag = ('<span class="flag flag-est" title="低置信=配置匹配或一手证据不足；分数仅用于同车配置对比，不适合跨车型横向对比">低置信</span>'
-                               if cf in ("low", "低") else "")
+                               if _mixed_conf and cf in ("low", "低") else "")
                     H.append(f"<td class='ref c-trim'>{e(val)}{cf_flag}</td>")
                 elif k == "price":
                     H.append(f"<td class='c-price'>{e(val)}</td>")
