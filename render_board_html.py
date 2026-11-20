@@ -23,6 +23,7 @@
 """
 import argparse
 import html
+import re
 import json
 import os
 import sys
@@ -37,6 +38,18 @@ font:15px/1.7 "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif;-webkit-
 .wrap{max-width:1200px;margin:0 auto;padding:38px 26px 70px}
 .kicker{font-size:12.5px;letter-spacing:.18em;color:var(--ink3);text-transform:uppercase}
 h1{font-size:30px;line-height:1.3;margin:12px 0 10px}h1 em{font-style:normal;color:var(--accent)}
+/* v9.7.14 本榜导航：目录卡片 + 锚点跳转 */
+.navbox{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin:20px 0 8px}
+.navbox h3{margin:0 0 12px;font-size:15px;color:var(--ink)}
+.navgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:9px}
+.navgrid a{display:block;text-decoration:none;color:inherit;border:1px solid var(--line);
+border-radius:8px;padding:9px 11px;transition:border-color .15s,background .15s}
+.navgrid a:hover{border-color:var(--accent2);background:#f3f8fa}
+.navgrid a b{display:block;font-size:13.5px;color:var(--accent2)}
+.navgrid a span{display:block;font-size:12px;color:var(--ink3);line-height:1.5;margin-top:2px}
+.topbar{text-align:right;font-size:12px;margin-top:8px}
+.topbar a{color:var(--ink3);text-decoration:none}
+h2{scroll-margin-top:18px}
 h2{font-size:20px;margin:38px 0 6px;padding-bottom:9px;border-bottom:2px solid var(--line)}
 h2 span{font-size:13px;color:var(--ink3);font-weight:400;margin-left:9px}
 .lede{color:var(--ink2);max-width:960px;margin:0}
@@ -122,6 +135,29 @@ def render(data, summary, title, as_of):
 <span>主榜口径 <b>{e(meta.get('primary', '8维加权打分榜'))}</b></span>
 <span>生成 <b>{datetime.now().strftime('%Y-%m-%d %H:%M')}</b></span></div>"""
     H = [head]
+
+    # ---- v9.7.14 本榜导航：从 BLOCKS 单一来源生成，只列本次实际渲染的区块
+    NAV_BY_TITLE = {
+        "打分主榜": "main_board", "逐配置对比": "trim_compare", "总分构成": "score_breakdown",
+        "三档分级": "tiers", "价位段子榜": "band_subboards", "分段汇总总榜": "segmented_summary",
+        "纯产品力总榜": "product_power", "体验证据修正": "experience_adjust",
+        "逐车取证依据": "evidence_notes", "生命周期提示": "lifecycle",
+        "落榜与待核名单": "dropped", "方法与边界": "method_boundary", "复现说明": "reproduce",
+        "三榜并列": "three_board", "稳健性": "robustness", "审查边界": "audit_boundary",
+    }
+    nav_items = []
+    for b in active:
+        bid = b["id"]
+        if bid in ("lede", "fact_coverage"):
+            continue
+        title_b = b["title"].replace("（下拉）", "").replace("（维度明细）", "")
+        anchor = NAV_BY_TITLE.get(title_b, bid)
+        desc = re.sub(r"多段全价位榜才有；|（下拉）|（维度明细）", "", b.get("desc") or "").strip()
+        nav_items.append(f'<a href="#sec-{anchor}"><b>{e(title_b)}</b><span>{e(desc)}</span></a>')
+    if nav_items:
+        H.append('<div class="navbox" id="top"><h3>本榜导航 · 点击直达各部分</h3>'
+                 '<div class="navgrid">' + "".join(nav_items) + '</div>'
+                 '<div class="topbar"><a href="#top">↑ 回到顶部</a></div></div>')
 
     # ---- lede（注册区块，文案统一在 board_view）
     if "lede" in ids:
@@ -603,6 +639,13 @@ document.addEventListener('change',function(ev){
     H.append(f"""<div class="foot">可信购车榜单引擎 · 展示区块注册表 board_view.py（{len(active)} 项已渲染）<br>
 主榜调用 leaderboard.score_rows，事实列不计分、子榜复用分数均由 selftest 验证。</div>
 </div></body></html>""")
+    # v9.7.14：给每个 h2 加锚点 id（按标题文字匹配 BLOCKS，不依赖渲染顺序）
+    def _add_anchor(m):
+        inner = m.group(1)
+        first = re.sub(r"<[^>]+>", "", inner).strip().split()[0] if inner.strip() else ""
+        bid = NAV_BY_TITLE.get(first, "")
+        return f'<h2 id="sec-{bid}">' + inner + '</h2>' if bid else m.group(0)
+    H = [re.sub(r"<h2>(.*?)</h2>", _add_anchor, blk) if isinstance(blk, str) else blk for blk in H]
     return "\n".join(H)
 
 

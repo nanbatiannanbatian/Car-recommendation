@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 9.7.13
+version: 9.7.14
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v9.7.13）
+# Car recommendation —— 可信购车榜单引擎（v9.7.14）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -2486,3 +2486,16 @@ MG07 845版 87.9 #1、深蓝L06 87.8 #2（分差0.1，在算法噪声内）。
 - `LIFECYCLE_STATUS_CN` 补 `steady`→在售（稳定）、`active`→在售，及 ramp_up/mature/declining/new/pending/unknown。
 - `lifecycle_line()` 字符串分支（如 info="steady"）也过 `lifecycle_status_cn()`，不再原文直出。
 - 两榜重出后页面无英文状态残留；BUG-019 进回归（19/19），A/B 27/27 通过。
+
+---
+
+## v9.7.14 · 顶部导航目录 + 区块跳转锚点（2026-11-20，用户确认后实施）
+
+用户：最上面把榜单有几个部分、每部分功能显示出来，加跳转一键到具体位置。确认后实施。
+
+- `render_board_html.py` 在 h1/meta 后加「本榜导航」卡片：从 `BV.BLOCKS` + `active_blocks()` 单一来源生成，
+  只列本次实际渲染的区块，每项显示标题 + 一句话作用（desc 轻量精简条件说明），点击锚点直达。
+- 页面末尾后处理给每个 h2 加 `id="sec-<blockid>"`（按标题文字映射 NAV_BY_TITLE，不依赖渲染顺序），
+  目录项 `<a href="#sec-...">`；另加「↑ 回到顶部」。CSS 加 navbox/navgrid 样式 + h2 scroll-margin。
+- 不改分数/排名/档位/区块内容，只加导航层。
+- 验证：紧凑榜 9 项、中型榜 15 项，目录与 h2 锚点一一对应；BUG-020 进回归（20/20），A/B 27/27。

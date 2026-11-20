@@ -40,6 +40,7 @@ CASES = [
     ("BUG-017", "自动补录车scored_trim匹配失败致配置分全相同", "v9.7.11"),
     ("BUG-018", "营运/网约车未在主榜评价标识,误导私人购车者", "v9.7.12"),
     ("BUG-019", "生命周期状态英文(steady/active)直出页面", "v9.7.13"),
+    ("BUG-020", "榜单缺少顶部导航目录与区块跳转锚点", "v9.7.14"),
 ]
 
 
@@ -201,6 +202,20 @@ def t015():
     return "渲染复用 board_view 单点"
 
 
+def t020():
+    """顶部导航：目录项与 h2 锚点必须一一对应，来自 BLOCKS 单一来源。"""
+    import re as _re
+    src = _read("render_board_html.py")
+    assert "本榜导航" in src and "NAV_BY_TITLE" in src, "导航未实现"
+    out = os.path.join(HERE, "runs", "compact_bev_allprice_202610", "榜单.html")
+    if os.path.exists(out):
+        t = _read("runs/compact_bev_allprice_202610/榜单.html")
+        hrefs = set(_re.findall(r'href="#(sec-[^"]+)"', t))
+        ids = set(_re.findall(r'<h2 id="(sec-[^"]+)"', t))
+        assert hrefs and hrefs == ids, f"导航锚点不对应: {hrefs ^ ids}"
+        return f"目录与锚点一一对应（{len(ids)}项）"
+    return "无榜单产物，跳过"
+
 def t019():
     """生命周期状态必须中文化：映射表覆盖 + 字符串分支转换。"""
     import board_view as BV
@@ -247,7 +262,7 @@ def t016():
 
 
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020]
 
 
 def run():
