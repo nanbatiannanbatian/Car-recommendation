@@ -5623,11 +5623,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 437.0,
-     "charge": null,
+     "charge": "400V 快充20-21min（2C）",
      "motor_kw": 120.0,
      "key_configs": [],
      "group": "2026款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "MG4 2026款 437 随心",
@@ -5638,11 +5639,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 437.0,
-     "charge": null,
+     "charge": "400V 快充20-21min（2C）",
      "motor_kw": 120.0,
      "key_configs": [],
      "group": "2026款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "MG4 2026款 改款 437 从容",
@@ -5653,11 +5655,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 437.0,
-     "charge": null,
+     "charge": "400V 快充20-21min（2C）",
      "motor_kw": 120.0,
      "key_configs": [],
      "group": "2026款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "MG4 2026款 437 从容",
@@ -5668,11 +5671,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 437.0,
-     "charge": null,
+     "charge": "400V 快充20-21min（2C）",
      "motor_kw": 120.0,
      "key_configs": [],
      "group": "2026款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "MG4 2026款 改款 437 自由",
@@ -5683,11 +5687,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 437.0,
-     "charge": null,
+     "charge": "400V 快充20-21min（2C）",
      "motor_kw": 120.0,
      "key_configs": [],
      "group": "2026款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "MG4 2026款 437 自由",
@@ -5698,11 +5703,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 437.0,
-     "charge": null,
+     "charge": "400V 快充20-21min（2C）",
      "motor_kw": 120.0,
      "key_configs": [],
      "group": "2026款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "MG4 2026款 530周年限量",
@@ -5713,11 +5719,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 530.0,
-     "charge": null,
+     "charge": "400V 快充20-21min（2C）",
      "motor_kw": 120.0,
      "key_configs": [],
      "group": "2026款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "MG4 2026款 改款 437 智趣",
@@ -5728,11 +5735,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 437.0,
-     "charge": null,
+     "charge": "400V 快充20-21min（2C）",
      "motor_kw": 120.0,
      "key_configs": [],
      "group": "2026款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "MG4 2026款 改款 530 智趣",
@@ -5743,11 +5751,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 530.0,
-     "charge": null,
+     "charge": "400V 快充20-21min（2C）",
      "motor_kw": 120.0,
      "key_configs": [],
      "group": "2026款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "MG4 2026款 530 智趣",
@@ -5758,11 +5767,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 530.0,
-     "charge": null,
+     "charge": "400V 快充20-21min（2C）",
      "motor_kw": 120.0,
      "key_configs": [],
      "group": "2026款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "MG4 2026款 改款 半固态安芯",
@@ -5773,11 +5783,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 530.0,
-     "charge": null,
+     "charge": "400V 快充20-21min（2C）",
      "motor_kw": 120.0,
      "key_configs": [],
      "group": "2026款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "MG4 2026款 半固态安芯",
@@ -5788,11 +5799,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 530.0,
-     "charge": null,
+     "charge": "400V 快充20-21min（2C）",
      "motor_kw": 120.0,
      "key_configs": [],
      "group": "2026款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     }
    ],
    "price_band_max": 16.0,
@@ -5833,11 +5845,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 550.0,
-     "charge": null,
+     "charge": "400V碳化硅·3C 快充18min",
      "motor_kw": 150.0,
      "key_configs": [],
      "group": "2027款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "AION RT 2026款 520智享",
@@ -5848,11 +5861,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 520.0,
-     "charge": null,
+     "charge": "400V碳化硅·3C 快充18min",
      "motor_kw": 150.0,
      "key_configs": [],
      "group": "2026款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "AION RT 2027款 605智享",
@@ -5863,11 +5877,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 605.0,
-     "charge": null,
+     "charge": "400V碳化硅·3C 快充18min",
      "motor_kw": 165.0,
      "key_configs": [],
      "group": "2027款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "AION RT 2027款 605智",
@@ -5878,11 +5893,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 605.0,
-     "charge": null,
+     "charge": "400V碳化硅·3C 快充18min",
      "motor_kw": 165.0,
      "key_configs": [],
      "group": "2027款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "AION RT 2026款 520智",
@@ -5893,11 +5909,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 520.0,
-     "charge": null,
+     "charge": "400V碳化硅·3C 快充18min",
      "motor_kw": 150.0,
      "key_configs": [],
      "group": "2026款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "AION RT 2027款 710智",
@@ -5908,11 +5925,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 710.0,
-     "charge": null,
+     "charge": "400V碳化硅·3C 快充18min",
      "motor_kw": 165.0,
      "key_configs": [],
      "group": "2027款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "AION RT 2026款 650智",
@@ -5923,11 +5941,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 650.0,
-     "charge": null,
+     "charge": "400V碳化硅·3C 快充18min",
      "motor_kw": 165.0,
      "key_configs": [],
      "group": "2026款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "AION RT 2027款 710智尊",
@@ -5938,11 +5957,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 710.0,
-     "charge": null,
+     "charge": "400V碳化硅·3C 快充18min",
      "motor_kw": 165.0,
      "key_configs": [],
      "group": "2027款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "AION RT 2026款 650智尊",
@@ -5953,11 +5973,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 650.0,
-     "charge": null,
+     "charge": "400V碳化硅·3C 快充18min",
      "motor_kw": 165.0,
      "key_configs": [],
      "group": "2026款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "AION RT 2027款 RT super",
@@ -5968,11 +5989,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 505.0,
-     "charge": null,
+     "charge": "400V碳化硅·3C 快充18min",
      "motor_kw": 150.0,
      "key_configs": [],
      "group": "2027款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "AION RT 2026款 RT super",
@@ -5983,11 +6005,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 505.0,
-     "charge": null,
+     "charge": "400V碳化硅·3C 快充18min",
      "motor_kw": 150.0,
      "key_configs": [],
      "group": "2026款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     }
    ],
    "price_band_max": 16.0,
@@ -6028,11 +6051,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 590.0,
-     "charge": null,
+     "charge": "400V 快充21min",
      "motor_kw": 132.0,
      "key_configs": [],
      "group": "2027款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "零跑B01 2027款 590悦享",
@@ -6043,11 +6067,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 590.0,
-     "charge": null,
+     "charge": "400V 快充21min",
      "motor_kw": 180.0,
      "key_configs": [],
      "group": "2027款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "零跑B01 2027款 670悦享",
@@ -6058,11 +6083,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 670.0,
-     "charge": null,
+     "charge": "800V·3C 快充16min",
      "motor_kw": 185.0,
      "key_configs": [],
      "group": "2027款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "零跑B01 2027款 590激光雷达",
@@ -6073,11 +6099,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 590.0,
-     "charge": null,
+     "charge": "400V 快充21min",
      "motor_kw": 180.0,
      "key_configs": [],
      "group": "2027款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "零跑B01 2027款 670激光雷达",
@@ -6088,11 +6115,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 670.0,
-     "charge": null,
+     "charge": "800V·3C 快充16min",
      "motor_kw": 185.0,
      "key_configs": [],
      "group": "2027款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "零跑B01 2027款 590行政",
@@ -6103,11 +6131,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 590.0,
-     "charge": null,
+     "charge": "400V 快充21min",
      "motor_kw": 132.0,
      "key_configs": [],
      "group": "2027款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     }
    ],
    "price_band_max": 16.0,
@@ -6148,11 +6177,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 515.0,
-     "charge": null,
+     "charge": "400V 快充（新款800V·3C 16min）",
      "motor_kw": 132.0,
      "key_configs": [],
      "group": "2026款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "零跑Lafa5 2026款 515 Pro",
@@ -6163,11 +6193,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 515.0,
-     "charge": null,
+     "charge": "400V 快充（新款800V·3C 16min）",
      "motor_kw": 160.0,
      "key_configs": [],
      "group": "2026款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "零跑Lafa5 2026款 605 Pro",
@@ -6178,11 +6209,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 605.0,
-     "charge": null,
+     "charge": "400V 快充（新款800V·3C 16min）",
      "motor_kw": 160.0,
      "key_configs": [],
      "group": "2026款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "零跑Lafa5 2026款 515 Max",
@@ -6193,11 +6225,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 515.0,
-     "charge": null,
+     "charge": "400V 快充（新款800V·3C 16min）",
      "motor_kw": 160.0,
      "key_configs": [],
      "group": "2026款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "零跑Lafa5 2026款 605 Max",
@@ -6208,11 +6241,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 605.0,
-     "charge": null,
+     "charge": "400V 快充（新款800V·3C 16min）",
      "motor_kw": 160.0,
      "key_configs": [],
      "group": "2026款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "零跑Lafa5 2026款 500 Ultra",
@@ -6223,11 +6257,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 500.0,
-     "charge": null,
+     "charge": "400V 快充（新款800V·3C 16min）",
      "motor_kw": 180.0,
      "key_configs": [],
      "group": "2026款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "零跑Lafa5 2026款 600 Ultra",
@@ -6238,11 +6273,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 600.0,
-     "charge": null,
+     "charge": "400V 快充（新款800V·3C 16min）",
      "motor_kw": 180.0,
      "key_configs": [],
      "group": "2026款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     }
    ],
    "price_band_max": 16.0,
@@ -6283,11 +6319,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 420.0,
-     "charge": null,
+     "charge": "400V 快充约30min",
      "motor_kw": 100.0,
      "key_configs": [],
      "group": "2025款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "PLUS 2025款 EV 智驾 510KM进取型",
@@ -6298,11 +6335,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 510.0,
-     "charge": null,
+     "charge": "400V 快充约30min",
      "motor_kw": 100.0,
      "key_configs": [],
      "group": "2025款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "PLUS 2025款 EV 智驾 420KM领先型",
@@ -6313,11 +6351,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 420.0,
-     "charge": null,
+     "charge": "400V 快充约30min",
      "motor_kw": 100.0,
      "key_configs": [],
      "group": "2025款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "PLUS 2025款 EV 智驾 510KM领先型",
@@ -6328,11 +6367,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 510.0,
-     "charge": null,
+     "charge": "400V 快充约30min",
      "motor_kw": 100.0,
      "key_configs": [],
      "group": "2025款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "PLUS 2025款 EV 智驾 510KM超越型",
@@ -6343,11 +6383,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 510.0,
-     "charge": null,
+     "charge": "400V 快充约30min",
      "motor_kw": 100.0,
      "key_configs": [],
      "group": "2025款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "PLUS 2025款 EV 智驾 510KM领航",
@@ -6358,11 +6399,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 510.0,
-     "charge": null,
+     "charge": "400V 快充约30min",
      "motor_kw": 100.0,
      "key_configs": [],
      "group": "2025款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "PLUS 2025款 EV 510KM 标准",
@@ -6373,11 +6415,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 510.0,
-     "charge": null,
+     "charge": "400V 快充约30min",
      "motor_kw": 100.0,
      "key_configs": [],
      "group": "2025款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "PLUS 2021款 EV 420KM 出行",
@@ -6388,11 +6431,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 420.0,
-     "charge": null,
+     "charge": "400V 快充约30min",
      "motor_kw": 100.0,
      "key_configs": [],
      "group": "2021款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "PLUS 2023款 EV 510KM 出行",
@@ -6403,11 +6447,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 510.0,
-     "charge": null,
+     "charge": "400V 快充约30min",
      "motor_kw": 100.0,
      "key_configs": [],
      "group": "2023款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "PLUS 2021款 EV 510KM 出行",
@@ -6418,11 +6463,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 510.0,
-     "charge": null,
+     "charge": "400V 快充约30min",
      "motor_kw": 100.0,
      "key_configs": [],
      "group": "2021款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "PLUS 2025款 EV 510KM 畅行",
@@ -6433,11 +6479,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 510.0,
-     "charge": null,
+     "charge": "400V 快充约30min",
      "motor_kw": 100.0,
      "key_configs": [],
      "group": "2025款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     }
    ],
    "price_band_max": 16.0,
@@ -6478,11 +6525,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 450.0,
-     "charge": null,
+     "charge": "400V级 快充20-21min",
      "motor_kw": 120.0,
      "key_configs": [],
      "group": "2026款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "D6 2025款 450km 优享",
@@ -6493,11 +6541,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 450.0,
-     "charge": null,
+     "charge": "400V级 快充20-21min",
      "motor_kw": 95.0,
      "key_configs": [],
      "group": "2025款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "D6 2026款 450km 尊享",
@@ -6508,11 +6557,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 450.0,
-     "charge": null,
+     "charge": "400V级 快充20-21min",
      "motor_kw": 120.0,
      "key_configs": [],
      "group": "2026款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "D6 2025款 450km 尊享",
@@ -6523,11 +6573,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 450.0,
-     "charge": null,
+     "charge": "400V级 快充20-21min",
      "motor_kw": 95.0,
      "key_configs": [],
      "group": "2025款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "D6 2026款 520km 享",
@@ -6538,11 +6589,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 520.0,
-     "charge": null,
+     "charge": "400V级 快充20-21min",
      "motor_kw": 120.0,
      "key_configs": [],
      "group": "2026款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "D6 2025款 520km 享",
@@ -6553,11 +6605,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 520.0,
-     "charge": null,
+     "charge": "400V级 快充20-21min",
      "motor_kw": 105.0,
      "key_configs": [],
      "group": "2025款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "D6 2026款 520km 尊享",
@@ -6568,11 +6621,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 520.0,
-     "charge": null,
+     "charge": "400V级 快充20-21min",
      "motor_kw": 120.0,
      "key_configs": [],
      "group": "2026款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "D6 2025款 520km 尊享",
@@ -6583,11 +6637,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 520.0,
-     "charge": null,
+     "charge": "400V级 快充20-21min",
      "motor_kw": 105.0,
      "key_configs": [],
      "group": "2025款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "D6 2025款 520km 智享",
@@ -6598,11 +6653,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 520.0,
-     "charge": null,
+     "charge": "400V级 快充20-21min",
      "motor_kw": 105.0,
      "key_configs": [],
      "group": "2025款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "D6 2025款 520km 智慧",
@@ -6613,11 +6669,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 520.0,
-     "charge": null,
+     "charge": "400V级 快充20-21min",
      "motor_kw": 105.0,
      "key_configs": [],
      "group": "2025款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     }
    ],
    "price_band_max": 16.0,
@@ -6658,11 +6715,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 330.0,
-     "charge": null,
+     "charge": "400V 快充24min（super版75kW约26min）",
      "motor_kw": 100.0,
      "key_configs": [],
      "group": "2025款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "AION UT 2026款 320 星辉",
@@ -6673,11 +6731,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 320.0,
-     "charge": null,
+     "charge": "400V 快充24min（super版75kW约26min）",
      "motor_kw": 100.0,
      "key_configs": [],
      "group": "2026款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "AION UT 2025款 330星辉",
@@ -6688,11 +6747,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 330.0,
-     "charge": null,
+     "charge": "400V 快充24min（super版75kW约26min）",
      "motor_kw": 100.0,
      "key_configs": [],
      "group": "2025款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "AION UT 2025款 420智享",
@@ -6703,11 +6763,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 420.0,
-     "charge": null,
+     "charge": "400V 快充24min（super版75kW约26min）",
      "motor_kw": 100.0,
      "key_configs": [],
      "group": "2025款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "AION UT 2026款 420永冲锋",
@@ -6718,11 +6779,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 420.0,
-     "charge": null,
+     "charge": "400V 快充24min（super版75kW约26min）",
      "motor_kw": 100.0,
      "key_configs": [],
      "group": "2026款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "AION UT 2027款 530 宁德",
@@ -6733,11 +6795,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 530.0,
-     "charge": null,
+     "charge": "400V 快充24min（super版75kW约26min）",
      "motor_kw": 100.0,
      "key_configs": [],
      "group": "2027款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "AION UT 2025款 420智",
@@ -6748,11 +6811,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 420.0,
-     "charge": null,
+     "charge": "400V 快充24min（super版75kW约26min）",
      "motor_kw": 100.0,
      "key_configs": [],
      "group": "2025款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "AION UT 2025款 420智尊",
@@ -6763,11 +6827,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 420.0,
-     "charge": null,
+     "charge": "400V 快充24min（super版75kW约26min）",
      "motor_kw": 100.0,
      "key_configs": [],
      "group": "2025款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     }
    ],
    "price_band_max": 16.0,
@@ -6808,11 +6873,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 450.0,
-     "charge": null,
+     "charge": "400V 快充（约30min）",
      "motor_kw": 100.0,
      "key_configs": [],
      "group": "2026款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "领汇e5 2026款 530 享",
@@ -6823,11 +6889,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 530.0,
-     "charge": null,
+     "charge": "400V 快充（约30min）",
      "motor_kw": 100.0,
      "key_configs": [],
      "group": "2026款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "领汇e5 2026款 450 出租",
@@ -6838,11 +6905,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 450.0,
-     "charge": null,
+     "charge": "400V 快充（约30min）",
      "motor_kw": 100.0,
      "key_configs": [],
      "group": "2026款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "领汇e5 2026款 530 出租",
@@ -6853,11 +6921,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 530.0,
-     "charge": null,
+     "charge": "400V 快充（约30min）",
      "motor_kw": 100.0,
      "key_configs": [],
      "group": "2026款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "领汇e5 2026款 530 享出行",
@@ -6868,11 +6937,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 530.0,
-     "charge": null,
+     "charge": "400V 快充（约30min）",
      "motor_kw": 100.0,
      "key_configs": [],
      "group": "2026款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     }
    ],
    "price_band_max": 16.0,
@@ -6913,11 +6983,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 503.0,
-     "charge": null,
+     "charge": "400V 快充",
      "motor_kw": 100.0,
      "key_configs": [],
      "group": "2026款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "AION S 2026款 炫530",
@@ -6928,11 +6999,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 430.0,
-     "charge": null,
+     "charge": "400V 快充",
      "motor_kw": 100.0,
      "key_configs": [],
      "group": "2026款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "AION S 2026款 炫 580",
@@ -6943,11 +7015,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 505.0,
-     "charge": null,
+     "charge": "400V 快充",
      "motor_kw": 100.0,
      "key_configs": [],
      "group": "2026款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "AION S 2026款 炫 畅行电池订阅",
@@ -6958,11 +7031,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 503.0,
-     "charge": null,
+     "charge": "400V 快充",
      "motor_kw": 100.0,
      "key_configs": [],
      "group": "2026款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     }
    ],
    "price_band_max": 16.0,
@@ -7071,11 +7145,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 300.0,
-     "charge": null,
+     "charge": "400V 快充30-80% 0.5h",
      "motor_kw": 60.0,
      "key_configs": [],
      "group": "2024款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "e 2024款 锂 手动挡 300km",
@@ -7086,11 +7161,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 300.0,
-     "charge": null,
+     "charge": "400V 快充30-80% 0.5h",
      "motor_kw": 60.0,
      "key_configs": [],
      "group": "2024款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "e 2026款 锂 自动挡智教 300km",
@@ -7101,11 +7177,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 300.0,
-     "charge": null,
+     "charge": "400V 快充30-80% 0.5h",
      "motor_kw": 60.0,
      "key_configs": [],
      "group": "2026款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "e 2026款 锂 手动挡智教 300km",
@@ -7116,11 +7193,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 300.0,
-     "charge": null,
+     "charge": "400V 快充30-80% 0.5h",
      "motor_kw": 60.0,
      "key_configs": [],
      "group": "2026款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     }
    ],
    "price_band_max": 16.0,
@@ -7161,11 +7239,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 450.0,
-     "charge": null,
+     "charge": "400V 快充",
      "motor_kw": 100.0,
      "key_configs": [],
      "group": "2025款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "新能源 2025款 出行450",
@@ -7176,11 +7255,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 450.0,
-     "charge": null,
+     "charge": "400V 快充",
      "motor_kw": 100.0,
      "key_configs": [],
      "group": "2025款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     }
    ],
    "price_band_max": 16.0,
@@ -7281,11 +7361,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 600.0,
-     "charge": null,
+     "charge": "800V 快充20-22min（320kW）",
      "motor_kw": 165.0,
      "key_configs": [],
      "group": "2027款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "CLA新能源 2026款 260L",
@@ -7296,11 +7377,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 600.0,
-     "charge": null,
+     "charge": "800V 快充20-22min（320kW）",
      "motor_kw": 165.0,
      "key_configs": [],
      "group": "2026款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "CLA新能源 2027款 300 L 晖银",
@@ -7311,11 +7393,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 866.0,
-     "charge": null,
+     "charge": "800V 快充20-22min（320kW）",
      "motor_kw": 200.0,
      "key_configs": [],
      "group": "2027款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "CLA新能源 2027款 300 L 晖银首发",
@@ -7326,11 +7409,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 866.0,
-     "charge": null,
+     "charge": "800V 快充20-22min（320kW）",
      "motor_kw": 200.0,
      "key_configs": [],
      "group": "2027款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "CLA新能源 2025款 300L 超长续航",
@@ -7341,11 +7425,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 866.0,
-     "charge": null,
+     "charge": "800V 快充20-22min（320kW）",
      "motor_kw": 200.0,
      "key_configs": [],
      "group": "2025款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "CLA新能源 2027款 300 L 鎏金",
@@ -7356,11 +7441,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 866.0,
-     "charge": null,
+     "charge": "800V 快充20-22min（320kW）",
      "motor_kw": 200.0,
      "key_configs": [],
      "group": "2027款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "CLA新能源 2027款 300 L 鎏金首发",
@@ -7371,11 +7457,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 866.0,
-     "charge": null,
+     "charge": "800V 快充20-22min（320kW）",
      "motor_kw": 200.0,
      "key_configs": [],
      "group": "2027款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "CLA新能源 2025款 300L 超长续航领智",
@@ -7386,11 +7473,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 866.0,
-     "charge": null,
+     "charge": "800V 快充20-22min（320kW）",
      "motor_kw": 200.0,
      "key_configs": [],
      "group": "2025款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "CLA新能源 2027款 300 L 冠军限量",
@@ -7401,11 +7489,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 866.0,
-     "charge": null,
+     "charge": "800V 快充20-22min（320kW）",
      "motor_kw": 200.0,
      "key_configs": [],
      "group": "2027款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     }
    ],
    "price_band_max": 16.0,
@@ -7446,11 +7535,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 550.0,
-     "charge": null,
+     "charge": "400V 快充",
      "motor_kw": 165.0,
      "key_configs": [],
      "group": "2026款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "羿驰05 2025款 550km 乐享",
@@ -7461,11 +7551,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 550.0,
-     "charge": null,
+     "charge": "400V 快充",
      "motor_kw": 165.0,
      "key_configs": [],
      "group": "2025款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "羿驰05 2026款 530km 巧克力",
@@ -7476,11 +7567,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 530.0,
-     "charge": null,
+     "charge": "400V 快充",
      "motor_kw": 165.0,
      "key_configs": [],
      "group": "2026款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "羿驰05 2026款 550km 智享",
@@ -7491,11 +7583,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 550.0,
-     "charge": null,
+     "charge": "400V 快充",
      "motor_kw": 165.0,
      "key_configs": [],
      "group": "2026款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "羿驰05 2025款 550km 智享",
@@ -7506,11 +7599,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 550.0,
-     "charge": null,
+     "charge": "400V 快充",
      "motor_kw": 165.0,
      "key_configs": [],
      "group": "2025款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "羿驰05 2025款 550km 精英",
@@ -7521,11 +7615,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 550.0,
-     "charge": null,
+     "charge": "400V 快充",
      "motor_kw": 165.0,
      "key_configs": [],
      "group": "2025款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "羿驰05 2026款 705km MAX神行乐享",
@@ -7536,11 +7631,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 705.0,
-     "charge": null,
+     "charge": "400V 快充",
      "motor_kw": 165.0,
      "key_configs": [],
      "group": "2026款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "羿驰05 2025款 470km 尊享",
@@ -7551,11 +7647,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 470.0,
-     "charge": null,
+     "charge": "400V 快充",
      "motor_kw": 170.0,
      "key_configs": [],
      "group": "2025款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "羿驰05 2026款 705km MAX神行智享",
@@ -7566,11 +7663,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 705.0,
-     "charge": null,
+     "charge": "400V 快充",
      "motor_kw": 165.0,
      "key_configs": [],
      "group": "2026款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     },
     {
      "name": "羿驰05 2026款 550km 尊耀",
@@ -7581,11 +7679,12 @@
      "cell_supplier": null,
      "supplier_class": "undisclosed",
      "cltc_km": 550.0,
-     "charge": null,
+     "charge": "400V 快充",
      "motor_kw": 165.0,
      "key_configs": [],
      "group": "2026款",
-     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null"
+     "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+     "charge_source": "domain_search_20261120_voltage"
     }
    ],
    "price_band_max": 16.0,
