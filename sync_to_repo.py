@@ -88,6 +88,7 @@ NEW_FILES = [
     "build_midsuv_full.py",                     # B类完整榜生成器（注入比较器引擎+区块）
     "midsuv_full_regress.py",                   # 完整榜回归（38项含node实跑环境分+动态区块）
     "dynamic_blocks_test.js",                   # 动态区块DOM stub实跑验证（随环境分重绘）
+    "env_options_test.js",                      # 全环境项测试（12项×每选项生效+结果正确）
     # v9.7.47 安全分严谨化 + 碰撞成绩体系（2026-11-20 深夜多轮用户强制）
     "official_safety_scores.json",              # 官方碰撞成绩多体系统一映射表
     "safety_check.py",                          # 安全分严谨性门禁（体系映射+单调性）

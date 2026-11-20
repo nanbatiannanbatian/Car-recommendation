@@ -71,6 +71,11 @@ def run():
                         capture_output=True, text=True, timeout=60)
     check("动态区块实跑(node)全过", nt.returncode == 0 and "5/5 通过" in nt.stdout,
           (nt.stdout or nt.stderr)[-300:])
+    # 4c. 全环境项测试：12项×每个选项都生效、结果无异常（用户要求"每个环境修改是否起效果"）
+    et = subprocess.run(["node", "env_options_test.js", OUT], cwd=HERE,
+                        capture_output=True, text=True, timeout=90)
+    check("全环境项测试(node)全过", et.returncode == 0 and "77/77 通过" in et.stdout,
+          (et.stdout or et.stderr)[-400:])
 
     # 5. 占位符已替换
     check("无占位符残留", "__EXTRA_" not in html and "__CARS_JSON__" not in html)

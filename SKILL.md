@@ -94,6 +94,7 @@ python3 energy_router.py "<用户原始提问>"    # 返回 board_type/powers/ne
   全额计入+降档+红标）。**禁止另写简化调节逻辑**；通过 `EC.build(cars_override=…, extra_head=…, extra_tail=…)` 注入榜单数据。
 - **全套区块 = `cross_energy_sections.py::BLOCKS`（对齐 board_view 18 项契约）+ 导航卡**。必要区块 `REQUIRED` 自检齐全。
 - **环境分对区块的作用域（必须分明，2026-11-20 用户追问后定稿）**：只有内容依赖综合分/档位/名次的区块随环境分实时更新——`DYNAMIC_BLOCKS={band_subboards, tiers, three_board, robustness}`，通过比较器 `render()` 末尾的 `window.onBoardRerender(rows,cond,scale)` 钩子 JS 重绘；`main_board` 主表本就动态。**固定不受影响**（且禁止误改）：逐配置对比/总分构成(8维权重)/逐车取证/生命周期/导语/方法边界/复现/审查边界(事实或说明)，以及 `product_power` 纯产品力榜——它是刻意基准，场景调节不得污染。区块标题带🔄(动态)/固定标识。回归 `dynamic_blocks_test.js` 用 DOM stub 实跑验证切换条件后4区块确实变化。
+- **全环境项回归（`env_options_test.js`，77项）**：遍历 12 项×每个选项，断言每项非中性选项至少对某车生效（软分/硬条件/续航之一变化）、无 NaN/越界、关键硬条件阈值正确（无桩纯电−15/极寒低价−12/限牌油车−8/营运油车−10/over8纯电+1.0）、极端组合结果合法。设计为中性的选项（hint 含"不调节/默认/平衡点"）登记在 `NEUTRAL_OPTIONS` 并要求其 hint 有据，禁止用白名单掩盖漏实现。**已抓出并修复**：`hold_years=over8` 选项 hint 承诺"纯电加分"但引擎漏实现（完全无效），已补软调节（纯电+1.0/插混增程+0.3/油车油混−0.3）。
 - 出 B 类固定榜命令：`python3 build_midsuv_full.py`（读候选池+补采分→构造 cars→注入区块→交互 HTML）。
 - 回归：`midsuv_full_regress.py`（30 项，含 node 实跑环境分 + 反向篡改）；`energy_compare_regress.py` 20 项守引擎。
 - 交付 B 类榜默认给**完整交互榜**（HTML），静态前十表可作为结论速览一并给。
