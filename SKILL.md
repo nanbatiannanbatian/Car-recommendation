@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 9.7.51
+version: 9.7.52
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v9.7.51）
+# Car recommendation —— 可信购车榜单引擎（v9.7.52）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -507,6 +507,8 @@ python3 leaderboard.py --tier car_ev --candidates cands.json --out tier.md
 **算法家族去重（v9.7.43）**：`robust.METHODS` 10 种 MCDA 算法按实测 Kendall τ≥0.8 聚类成 **6 个独立家族**（加权和系 saw/moora/waspas/spotis/edas、距离 topsis、折衷 vikor、边界 mabac、偏好流 promethee、灰色关联 gra）。第一档命中率按家族计票（每家族1票），不再按10种算法逐票——此前 saw~moora τ=1.0、saw系5种高度相关，MG07 曾"6/10命中"但6票全是同一家族虚高。家族去重后 MG07=33%、007GT=83%、007=100%，更真实反映独立算法支持。分组见 `robust.METHOD_FAMILIES`，回归 `t061` 锁死。
 
 **阈值用票数不用比例（v9.7.43）**：家族数=6 无法整除 80%（实际变成83.3%），故第一档阈值改为**明确票数** `tiering.t1_min_family_hits=5`（6家族至少5票认可），报告文案同步显示"≥5/6票"，消除"名义80%、实际83%"的语义漂移。配置写 `"ratio"` 可回退按比例（旧榜兼容）。
+
+**第二档强推荐 + 主榜金标（v9.7.50/52）**：第一档是"稳压群雄、不用取舍"的严选，不放宽（曾有人质疑 Model 3 稳稳第5为何不进一档——稳定第5≠稳压第1）。真正问题是别让用户误以为"只有T1那几款能买"：第二档加**强推荐**标记，条件=有权威碰撞实锤+总分≥80+无硬风险+(家族命中≥0.5 **或** 连续名次稳定：平均名次≤6且区间跨度≤5)，让"稳稳第5"的 Model 3 也被标出；`strong_pick_reasons` 导出 family/steady 供分情况说明。展示：三档卡片区绿标「强推荐」+ **打分主榜车名后金标「强推」**（`.strong-main`，hover显示原因），两处共同构成"可优先看清单"。回归 `t066`（判定+叙事）、`t067`（主榜金标、非强推不误标）锁死。
 
 **证据文本一致性门禁（v9.7.43）**：`evidence_consistency.py` 检查 `score_evidence.safety` 文本不得与 `safety_basis`/`scores` 矛盾——防"分数改了证据说明没同步"（007GT 曾分数8.8/basis=euro_ncap，文本却还写"无官方碰撞成绩"）。三条规则：文本说无成绩但有权威basis / 文本说有成绩但basis空 / 文本主体系与basis不符（佐证体系不算）。出榜拦截，回归 `t063` 锁死。
 

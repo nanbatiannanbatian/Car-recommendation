@@ -67,6 +67,7 @@ NEG_TARGETS = {
     "t064": ["crash_systems"],
     "t065": ["rank_mean_by_model"],
     "t066": ["稳定地排第5左右"],
+    "t067": [".strong-main"],
 }
 
 # 数据断言型：测试名 -> (文件路径, 车型/键, 篡改模式)

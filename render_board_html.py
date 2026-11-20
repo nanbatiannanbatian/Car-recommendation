@@ -97,6 +97,7 @@ border-radius:10px;padding:14px 18px}
 .tier-card h3{margin:0 0 8px;font-size:15px}
 .tier-card ul{margin:0;padding-left:20px;font-size:13.5px}
 .strong-tag{display:inline-block;margin-left:6px;padding:0 5px;border-radius:3px;background:var(--t1);color:#fff;font-size:11px;font-weight:500;vertical-align:1px}
+.strong-main{display:inline-block;margin-left:5px;padding:0 5px;border-radius:3px;background:#b8860b;color:#fff;font-size:10px;font-weight:500;vertical-align:1px;cursor:help}
 .foot{margin-top:34px;font-size:12px;color:var(--ink3);border-top:1px solid var(--line);padding-top:16px}
 @media(max-width:720px){.wrap{padding:22px 12px 50px}h1{font-size:23px}table{font-size:11.5px}th,td{padding:7px 4px}}
 """
@@ -402,6 +403,14 @@ def render(data, summary, title, as_of):
             for _v in (summary.get("t1_blockers") or {}).values():
                 if isinstance(_v, dict):
                     _t1blk.update(_v)
+        # v9.7.52：强推荐名单+原因，主榜车名后加金标（三档卡片区复用此变量）
+        _strong, _strong_reason = set(), {}
+        if summary:
+            for _k, _v in (summary.get("strong_picks") or {}).items():
+                _models = _v if isinstance(_v, list) else []
+                _strong.update(_models)
+                for _m in _models:
+                    _strong_reason[_m] = ((summary.get("strong_pick_reasons") or {}).get(_k) or {}).get(_m, "")
         for r in rows:
             cand = r
             gmap = grades.get(r["model"], {})
@@ -423,7 +432,14 @@ def render(data, summary, title, as_of):
                             for i, t in enumerate(td["trims"]))
                         sel = (f'<br><select class="trimsel" data-model="{e(r["model"])}" '
                                f'style="font-size:11px;max-width:160px">{opts}</select>')
-                    H.append(f"<td class='name'>{e(val)}{risk_flags(r)}{crash_badge(r)}{sel}</td>")
+                    # v9.7.52：强推荐金标（主榜可见），hover显示原因
+                    _sp_badge = ""
+                    if r["model"] in _strong:
+                        _why = ("家族命中不够稳压（换算法会换位）" if _strong_reason.get(r["model"]) == "family"
+                                else "连续名次稳定、只是排在第5左右")
+                        _sp_badge = (f'<b class="strong-main" title="强推荐：有权威碰撞实锤+高分+无硬风险；'
+                                     f'{e(_why)}。与第一档共同构成可优先看清单">强推</b>')
+                    H.append(f"<td class='name'>{e(val)}{risk_flags(r)}{crash_badge(r)}{_sp_badge}{sel}</td>")
                 elif k == "total":
                     H.append(f"<td class='c-total'><span class='score'>{e(val)}</span></td>")
                 elif k == "tier":
@@ -682,15 +698,7 @@ document.addEventListener('change',function(ev){
         if review: H.append(f'<div class="warn">{e(review)}</div>')
         H.append('<div class="tier-grid">')
         names = {"T1": "第一档 · 可直接买", "T2": "第二档 · 按偏好取舍", "T3": "第三档 · 证据不足/暂缓"}
-        # v9.7.43：第二档内"强推荐"标记——有碰撞实锤+高分+无硬风险，只是换算法不够稳压
-        _strong = set()
-        _strong_reason = {}
-        if summary:
-            for _k, _v in (summary.get("strong_picks") or {}).items():
-                _models = _v if isinstance(_v, list) else []
-                _strong.update(_models)
-                for _m in _models:
-                    _strong_reason[_m] = ((summary.get("strong_pick_reasons") or {}).get(_k) or {}).get(_m, "")
+        # v9.7.52：强推荐名单复用主表循环前已收集的 _strong/_strong_reason（不再重复读取）
         for k in ("T1", "T2", "T3"):
             models = tiers.get(k) or []
             lis = "".join(

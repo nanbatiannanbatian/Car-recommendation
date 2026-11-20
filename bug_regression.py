@@ -87,6 +87,7 @@ CASES = [
     ("BUG-064", "碰撞体系硬编码散落5处致新体系被漏", "v9.7.44"),
     ("BUG-065", "二值命中截断埋没稳稳第5的车(Model3)+产品力市场口径不清", "v9.7.48"),
     ("BUG-066", "第一档过严叙事局限+强推荐未标稳稳第5的车+并行纪律", "v9.7.50"),
+    ("BUG-067", "强推荐只在三档卡片显示、打分主榜看不到", "v9.7.52"),
 ]
 
 
@@ -1243,8 +1244,34 @@ def t066():
     return "强推荐OR路径：Model3走steady进强推荐、T1仍2款、MG07无实锤被挡；并行纪律已固化"
 
 
+def t067():
+    """强推荐在打分主榜车名后显示金标（不只是三档卡片），非强推车不误标。"""
+    p = os.path.join(HERE, "runs", "bev_midsedan_202610_full", "榜单.html")
+    if not os.path.exists(p):
+        return "强推主榜金标：产物缺失跳过"
+    import re
+    h = _read("runs/bev_midsedan_202610_full/榜单.html")
+    i, j = h.find('id="mainBoard"'), h.find("</table>", h.find('id="mainBoard"'))
+    assert i >= 0 and j > i, "主表缺失"
+    body = h[i:j]
+    assert ".strong-main" in _read("render_board_html.py"), "缺金标CSS"
+    assert body.count("strong-main") >= 2, "主榜无强推金标"
+    # 强推车行内有金标，非强推车(MG07)无
+    for m in ("特斯拉Model 3", "深蓝L06"):
+        k = body.find("data-model='" + m + "'")
+        row = body[k:body.find("</tr>", k)] if k >= 0 else ""
+        assert "strong-main" in row, f"{m}主榜行缺金标"
+    k = body.find("data-model='MG 07 纯电'")
+    mg_row = body[k:body.find("</tr>", k)] if k >= 0 else ""
+    assert "strong-main" not in mg_row, "MG07非强推却误标"
+    # hover含原因（steady/family二者之一）
+    tips = re.findall(r'strong-main" title="([^"]+)"', body)
+    assert tips and any("强推荐" in t and ("稳定" in t or "家族命中" in t) for t in tips), "金标hover缺原因"
+    return f"强推主榜金标：{body.count('strong-main')}处(hover含原因)，非强推车不误标"
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067]
 
 
 def run():
