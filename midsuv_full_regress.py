@@ -82,7 +82,7 @@ def run():
     # 4d. 默认过滤/分组/文案（用户报"默认无匹配车型"bug + 方盒子改名 + 条件分组）
     ft = subprocess.run(["node", "filter_default_test.js", OUT], cwd=HERE,
                         capture_output=True, text=True, timeout=60)
-    check("默认过滤/分组/文案(node)全过", ft.returncode == 0 and "10/10 通过" in ft.stdout,
+    check("默认过滤/折叠/文案(node)全过", ft.returncode == 0 and "15/15 通过" in ft.stdout,
           (ft.stdout or ft.stderr)[-400:])
 
     # 5. 占位符已替换

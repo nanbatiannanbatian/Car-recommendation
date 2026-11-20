@@ -27,6 +27,10 @@ header .sub{color:var(--sub);font-size:14px;max-width:980px}
 .panel h2{margin:0 0 4px;font-size:17px}
 .panel .hint{color:var(--sub);font-size:12px;margin:0 0 14px}
 .cond-panel{position:sticky;top:20px}
+.adv-conds{margin-top:14px;border:1px solid #e6e3dc;border-radius:8px;padding:8px 10px;background:#fcfbf8}
+.adv-conds summary{cursor:pointer;font-size:12px;color:#5b6470;font-weight:600;padding:2px 0}
+.adv-conds summary:hover{color:#1f6f8b}
+.adv-conds[open] summary{margin-bottom:6px;border-bottom:1px solid #e6e3dc;padding-bottom:6px}
 .grp-head{margin:14px 0 8px;padding:7px 10px;background:#faf9f6;border-left:3px solid #1f6f8b;border-radius:5px}
 .grp-head b{font-size:12.5px;color:#15181c}
 .grp-head span{display:block;font-size:10.5px;color:#5b6470;line-height:1.45;margin-top:3px}
@@ -202,21 +206,40 @@ const POOL_POWERS=[...new Set(CARS.map(c=>c.power))];
 
 function buildConds(){
   const box=document.getElementById('conds'); box.innerHTML='';
-  // 按 FACTOR_GROUPS 分组渲染；未在分组中的项放到"其他"避免遗漏
+  // v9.7.51：核心能源决策组默认平铺；其余组收进"高级选项"折叠区（默认收起）。
+  // 聚焦 8 项直接影响油电选择的条件；能耗微调/特殊场景是物理模型输入或小众场景，保留但不占主视野。
+  const groups=FACTOR_GROUPS||[];
   const grouped=new Set();
-  (FACTOR_GROUPS||[]).forEach(function(g){
+  function renderGroup(g,container){
     const hd=document.createElement('div'); hd.className='grp-head';
     hd.innerHTML='<b>'+g[0]+'</b><span>'+g[2]+'</span>';
-    box.appendChild(hd);
+    container.appendChild(hd);
     g[1].forEach(function(fid){
       const f=FACTORS[fid]; if(!f)return; grouped.add(fid);
-      box.appendChild(makeCond(fid,f));
+      container.appendChild(makeCond(fid,f));
     });
-  });
-  for(const [fid,f] of Object.entries(FACTORS)) if(!grouped.has(fid)) box.appendChild(makeCond(fid,f));
+  }
+  // 第一组=核心能源决策：默认展开
+  if(groups.length) renderGroup(groups[0],box);
+  // 其余组=高级选项：默认折叠
+  if(groups.length>1){
+    const adv=document.createElement('details'); adv.className='adv-conds'; adv.id='advConds';
+    const nRest=groups.slice(1).reduce(function(s,g){return s+g[1].length;},0);
+    adv.innerHTML='<summary>高级选项 · 能耗微调与特殊场景（'+nRest+' 项，一般用户可忽略）</summary>';
+    groups.slice(1).forEach(function(g){renderGroup(g,adv);});
+    box.appendChild(adv);
+  }
+  // 未在分组中的项放到"其他"避免遗漏（默认可见）
+  const rest=[];
+  for(const [fid,f] of Object.entries(FACTORS)) if(!grouped.has(fid)) rest.push(makeCond(fid,f));
+  if(rest.length){
+    const hd=document.createElement('div'); hd.className='grp-head';
+    hd.innerHTML='<b>其他</b><span>未归入上述分组的条件</span>';
+    box.appendChild(hd); rest.forEach(function(d){box.appendChild(d);});
+  }
 }
 function makeCond(fid,f){
-  const d=document.createElement('div'); d.className='fg';
+  const d=document.createElement('div'); d.className='fg'; d.dataset=Object.assign({},d.dataset,{fid:fid});
   const defOpt=f.options.find(o=>o.v===f.default);
   d.innerHTML='<label>'+f.label+'<span class="w"><span class="def-tag">默认</span></span></label>'+
     '<select id="c_'+fid+'">'+f.options.map(o=>'<option value="'+o.v+'"'+(o.v===f.default?' selected':'')+'>'+o.label+'</option>').join('')+'</select>'+

@@ -20,12 +20,16 @@ ok('分组JS存在', html.includes('FACTOR_GROUPS')&&html.includes('makeCond'));
 // 2) 动态：readCond 能读到每组默认值，默认过滤下有车（非空表）
 const scripts=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m=>m[1]).join('\n');
 const els={};
-function mkEl(id){return {id,innerHTML:'',value:'',textContent:'',style:{},children:[],
-  addEventListener(){},appendChild(c){this.children.push(c);},
-  classList:{add(){},remove(){}},querySelectorAll(){return [];},querySelector(sel){return this._sel||(this._sel=mkEl('sub'));},
+function mkEl(id){return {id,innerHTML:'',value:'',textContent:'',style:{},children:[],tag:'div',className:'',dataset:{},
+  addEventListener(){},appendChild(c){this.children.push(c);c.parent=this;},
+  classList:{add(){},remove(){}},querySelectorAll(){return [];},
+  querySelector(sel){
+    if(sel==='select'&&this.dataset&&this.dataset.fid) return els['c_'+this.dataset.fid]||mkEl('sub');
+    return this._sub||(this._sub=mkEl('sub'));
+  },
   getAttribute(){return null;},setAttribute(){}};}
 global.document={getElementById(id){return els[id]||(els[id]=mkEl(id));},
-  createElement(){return mkEl('new');},querySelectorAll(){return [];},querySelector(){return mkEl('q');}};
+  createElement(tag){const e=mkEl('new');e.tag=tag;return e;},querySelectorAll(){return [];},querySelector(){return mkEl('q');}};
 global.window=global;
 els.pLow=mkEl('pLow'); els.pLow.value=pLow;
 els.pHigh=mkEl('pHigh'); els.pHigh.value=pHigh;
@@ -36,16 +40,18 @@ const fm=html.match(/const FACTORS=(\{[\s\S]*?\});\s*const FACTOR_GROUPS/);
 if(!fm){console.error('FAIL  无法提取FACTORS');process.exit(1);}
 const FACTORS=JSON.parse(fm[1]);
 for(const [fid,f] of Object.entries(FACTORS)){const e=mkEl('c_'+fid);e.value=f.default;els['c_'+fid]=e;}
-// 让 makeCond 内 d.querySelector('select') 返回预注册元素：按 fid 顺序绑定
-let idx=0; const fids=Object.keys(FACTORS);
-const origCreate=global.document.createElement;
-global.document.createElement=function(tag){
-  const el=origCreate(tag);
-  const fid=fids[idx++];
-  if(fid){el._sel=els['c_'+fid];}
-  return el;
-};
 try{eval(scripts);}catch(e){console.error('EVAL ERROR',e.message);process.exit(2);}
+
+// 结构验证：conds 直属应是核心8项（.fg），details 容器应收纳其余4项
+const conds=els.conds;
+const directFg=conds?conds.children.filter(c=>c.className==='fg'):[];
+const details=conds?conds.children.filter(c=>c.tag==='details'):[];
+ok('核心8项默认平铺', directFg.length===8, '直属fg='+directFg.length);
+ok('高级选项details存在', details.length===1, 'details='+details.length);
+const advFg=details.length?details[0].children.filter(c=>c.className==='fg'):[];
+ok('4项收进折叠区', advFg.length===4, '折叠fg='+advFg.length);
+ok('折叠区默认收起', details.length&&!details[0].open);
+ok('12项合计无遗漏', directFg.length+advFg.length===12, (directFg.length+advFg.length)+'');
 
 const summary=els.summary?els.summary.innerHTML:'';
 const count=els.carCount?els.carCount.textContent:'';
