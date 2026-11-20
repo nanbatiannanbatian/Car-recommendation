@@ -84,6 +84,7 @@ CASES = [
     ("BUG-061", "MCDA相关算法重复计票虚高命中率", "v9.7.43"),
     ("BUG-062", "家族制80%阈值语义漂移(名义80%实际83%)", "v9.7.43"),
     ("BUG-063", "分数改了证据文本没同步(分数证据脱节)", "v9.7.43"),
+    ("BUG-064", "碰撞体系硬编码散落5处致新体系被漏", "v9.7.44"),
 ]
 
 
@@ -894,7 +895,7 @@ def t054():
     assert "Euro NCAP" in tbl["systems"] and "C-IASI" in tbl["systems"], "缺体系分级"
     assert tbl["systems"]["Euro NCAP"]["grades"]["5star_occupant>=90"] == 8.8, "Euro映射分错"
     assert tbl["structural_evidence_policy"]["in_formula"] is False, "扭转刚度不应入公式"
-    assert "无直接对应关系" in tbl["note"], "缺体系不可比说明"
+    assert ("无直接对应关系" in tbl["note"] or "不可按得分率横向" in tbl["note"]), "缺体系不可比说明"
     # pipeline接入
     src = _read("pipeline.py")
     assert "safety_check" in src and "安全分严谨性门禁" in src and "--skip-safety-gate" in src, "pipeline未接安全门禁"
@@ -959,7 +960,7 @@ def t056():
     pool = json.load(open(os.path.join(HERE, "runs", "midsedan_bev_1218_202610", "candidates_allprice.json"), encoding="utf-8"))["candidates"]
     src = _read("leaderboard.py")
     assert "has_crash_evidence" in src and "ev_for_t1" in src, "证据A未按碰撞成绩重定义"
-    assert "_BASIS_CN" in src, "缺体系中文展示名"
+    assert "cn_name" in src or "_BASIS_CN" in src, "缺体系中文展示名"
     r = L.tier_report(pool, cfg, None, "测试", airbag_gate=False, crash_gate=False)
     t1 = r["tiers"]["T1"]
     assert "极氪007GT" in t1, f"007GT有Euro NCAP五星+命中最高应进T1: {t1}"
@@ -1146,8 +1147,37 @@ def t063():
     return f"证据文本一致性：全场{r['checked']}款0矛盾；007/GT已同步Euro NCAP；注入矛盾能检出"
 
 
+def t064():
+    """碰撞体系单一真相源：crash_systems 覆盖全部权威体系，全链路引用不再硬编码。"""
+    import re
+    import crash_systems as CS
+    import render_board_html as RH
+    assert CS.selftest() == 0, "crash_systems selftest失败"
+    # 覆盖12体系 + 关键新体系
+    for code in ("cncap", "ciasi", "euro_ncap", "ancap", "iihs", "nhtsa",
+                 "jncap", "kncap", "asean_ncap", "latin_ncap", "bharat_ncap", "global_ncap"):
+        assert code in CS.SYSTEMS, f"缺体系 {code}"
+    # 别名归一（防 E-NCAP/NHTSA-NCAP 等不同写法漏判）
+    for raw, want in [("E-NCAP", "euro_ncap"), ("c-ncap", "cncap"), ("C-IASI", "ciasi"),
+                      ("NHTSA-NCAP", "nhtsa"), ("Bharat NCAP", "bharat_ncap"), ("iihs_tsp", "iihs")]:
+        assert CS.normalize(raw) == want, f"别名归一错: {raw}→{CS.normalize(raw)} 应{want}"
+    # 全链路引用 crash_systems（不再各自硬编码白名单）
+    for f in ("leaderboard.py", "evidence_consistency.py", "render_board_html.py"):
+        assert "crash_systems" in _read(f), f"{f} 未引用单一真相源"
+    # 12体系徽标都能显示
+    badge_cases = [("nhtsa", "NHTSA 5星"), ("jncap", "JNCAP五星(乘员95%)"),
+                   ("iihs", "IIHS Top Safety Pick+"), ("bharat_ncap", "Bharat NCAP五星")]
+    for b, cr in badge_cases:
+        out = re.sub(r"<[^>]+>", "", RH.crash_badge({"safety_basis": b, "crash": cr}))
+        assert out and CS.cn_name(b) in out, f"新体系徽标缺失: {b}→{out}"
+    # 映射表覆盖12体系
+    tbl = json.load(open(os.path.join(HERE, "official_safety_scores.json"), encoding="utf-8"))
+    assert len(tbl["systems"]) >= 12, "映射表未覆盖全部体系"
+    return "碰撞体系单一真相源：12体系+别名归一+全链路引用+徽标全显示"
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064]
 
 
 def run():

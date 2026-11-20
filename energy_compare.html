@@ -408,6 +408,10 @@ function render(){
     return carSort.dir*(a-b);
   });
   rows.forEach((r,i)=>r.rank=i+1);
+  // 可选扩展钩子：外部注入的正式榜区块可订阅重排结果，随条件实时重绘。默认无订阅，行为不变。
+  if(typeof window!=='undefined' && typeof window.onBoardRerender==='function'){
+    try{ window.onBoardRerender(rows, cond, scale); }catch(e){ console.error('onBoardRerender',e); }
+  }
 
   // 摘要
   if(rows.length){

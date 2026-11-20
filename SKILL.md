@@ -13,7 +13,7 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 9.7.45
+version: 9.7.46
 author: "nanbatiannanbatian"
 ---
 
@@ -93,6 +93,7 @@ python3 energy_router.py "<用户原始提问>"    # 返回 board_type/powers/ne
   + `ev_range_model.py` 物理续航 + 6 条硬条件惩罚（无桩纯电−15/极寒低价−12/短持有−8/长途续航不足−10/限牌油车−8/营运油车−10，
   全额计入+降档+红标）。**禁止另写简化调节逻辑**；通过 `EC.build(cars_override=…, extra_head=…, extra_tail=…)` 注入榜单数据。
 - **全套区块 = `cross_energy_sections.py::BLOCKS`（对齐 board_view 18 项契约）+ 导航卡**。必要区块 `REQUIRED` 自检齐全。
+- **环境分对区块的作用域（必须分明，2026-11-20 用户追问后定稿）**：只有内容依赖综合分/档位/名次的区块随环境分实时更新——`DYNAMIC_BLOCKS={band_subboards, tiers, three_board, robustness}`，通过比较器 `render()` 末尾的 `window.onBoardRerender(rows,cond,scale)` 钩子 JS 重绘；`main_board` 主表本就动态。**固定不受影响**（且禁止误改）：逐配置对比/总分构成(8维权重)/逐车取证/生命周期/导语/方法边界/复现/审查边界(事实或说明)，以及 `product_power` 纯产品力榜——它是刻意基准，场景调节不得污染。区块标题带🔄(动态)/固定标识。回归 `dynamic_blocks_test.js` 用 DOM stub 实跑验证切换条件后4区块确实变化。
 - 出 B 类固定榜命令：`python3 build_midsuv_full.py`（读候选池+补采分→构造 cars→注入区块→交互 HTML）。
 - 回归：`midsuv_full_regress.py`（30 项，含 node 实跑环境分 + 反向篡改）；`energy_compare_regress.py` 20 项守引擎。
 - 交付 B 类榜默认给**完整交互榜**（HTML），静态前十表可作为结论速览一并给。
@@ -505,6 +506,8 @@ python3 leaderboard.py --tier car_ev --candidates cands.json --out tier.md
 **阈值用票数不用比例（v9.7.43）**：家族数=6 无法整除 80%（实际变成83.3%），故第一档阈值改为**明确票数** `tiering.t1_min_family_hits=5`（6家族至少5票认可），报告文案同步显示"≥5/6票"，消除"名义80%、实际83%"的语义漂移。配置写 `"ratio"` 可回退按比例（旧榜兼容）。
 
 **证据文本一致性门禁（v9.7.43）**：`evidence_consistency.py` 检查 `score_evidence.safety` 文本不得与 `safety_basis`/`scores` 矛盾——防"分数改了证据说明没同步"（007GT 曾分数8.8/basis=euro_ncap，文本却还写"无官方碰撞成绩"）。三条规则：文本说无成绩但有权威basis / 文本说有成绩但basis空 / 文本主体系与basis不符（佐证体系不算）。出榜拦截，回归 `t063` 锁死。
+
+**碰撞体系单一真相源（v9.7.44）**：`crash_systems.py` 定义全球 **12 个权威碰撞体系**（C-NCAP/C-IASI/Euro NCAP/ANCAP/IIHS/NHTSA-NCAP/JNCAP/KNCAP/ASEAN NCAP/Latin NCAP/Bharat NCAP/Global NCAP）的 code/中文名/别名/家族/权威性。此前这些定义散落5处（映射表/徽标/证据门禁/安全门禁/leaderboard），每加一个体系改5处→漏掉 Model3 的 Euro NCAP。现全链路 import 它，加新体系只改这一个文件。`normalize()` 做别名归一（E-NCAP/Euro NCAP/euro_ncap→同一 code），防不同写法漏判。`official_safety_scores.json` 只管"各体系如何映射到0-10分"（NCAP家族星级共用一套、C-IASI等级制/IIHS奖项制各自映射）。回归 `t064` 锁死12体系+别名+全链路引用。
 | 第二档 | 无第三档风险，但未达第一档 | 要不要按偏好取舍 |
 | 第三档 | 证据 C / 无交付 / 月销 <500 / 人工标注硬伤 | 现在该不该看它 |
 

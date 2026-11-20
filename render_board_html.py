@@ -209,23 +209,24 @@ def crash_badge(r: dict) -> str:
     key = ""
     # C-IASI 是等级制(G/A/M/P)，不取百分号（如 ET5 的 96% 其实是 E-NCAP 分项非 C-IASI）
     grade = (re.search(r"C-IASI\s+([GAPM][GAPM+]{1,5})", crash) or
-             re.search(r"(?:^|\s)([GAPM]{4,6})(?=\D|$)", crash)) if sys_cn == "C-IASI" else None
+             re.search(r"(?:^|\s)([GAPM]{4,6})(?=\D|$)", crash)) if _family == "ciasi" else None
     if grade:
         key = grade.group(1)
     else:
         m = re.search(r"(\d{2}(?:\.\d)?)\s*%", crash)
         if m:
-            if sys_cn == "Euro NCAP":
-                # Euro NCAP 分项多且顺序不固定，按关键词取"乘员/碰撞保护"，
+            if _family == "ncap":
+                # NCAP 星级制分项多且顺序不固定，按关键词取"乘员/碰撞保护"，
                 # 不能按位置（Model3=成人96/儿童86/行人74/安全94，007=安全79/避免89/保护93）
                 occ = re.search(r"(?:成人乘员|乘员|碰撞保护)[^\d]{0,6}(\d{2}(?:\.\d)?)\s*%", crash)
                 key = (occ.group(1) if occ else m.group(1)) + "%"
             else:
                 key = m.group(1) + "%"
     if not key:
-        star = re.search(r"(五星|四星|5星|4星|TSP\+|TSP)", crash, re.I)
+        star = re.search(r"(Top Safety Pick\+?|TSP\+|五星|四星|5星|4星)", crash, re.I)
         if star:
-            key = star.group(1)
+            k = star.group(1)
+            key = ("TSP+" if "+" in k else "TSP") if "safety pick" in k.lower() or "tsp" in k.lower() else k
     if not key:
         grade2 = re.search(r"\b([GAPM]\+?[GAPM]{0,3})\b", crash)
         if grade2:

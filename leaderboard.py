@@ -27,6 +27,7 @@ import os
 import re
 import sys
 import lifecycle_confirm as LC  # noqa: E402  生命周期确证层（工信部公告/官方/媒体溯源）
+import crash_systems as CS  # 全球权威碰撞体系唯一真相源
 
 try:
     import ranking
@@ -917,8 +918,8 @@ def tier_rules(cfg: dict) -> dict:
     }
 
 
-_BASIS_CN = {"cncap": "C-NCAP", "c-ncap": "C-NCAP", "ciasi": "C-IASI", "ciasi_checked": "C-IASI",
-             "euro_ncap": "Euro NCAP", "ancap": "ANCAP", "iihs": "IIHS"}
+def cn_name(b):  # v9.7.44：统一走 crash_systems，加体系只改那一处
+    return CS.cn_name(b)
 
 
 def tier_report(cands: list[dict], cfg: dict, weights: list[float] | None = None,
@@ -998,15 +999,14 @@ def tier_report(cands: list[dict], cfg: dict, weights: list[float] | None = None
         # 此前 evidence_status 是人工散落字段，没跟碰撞成绩挂钩：007GT有 Euro NCAP
         # 五星(碰撞保护93%同期第一)却因人工标B被挡在T1，导致T1全空、失去推荐意义。
         # 现以 safety_basis（官方体系，含 Euro NCAP/IIHS）为准；非国内体系只提示不阻断。
-        OFFICIAL_BASIS = ("cncap", "ciasi", "c-ncap", "ciasi_checked",
-                          "euro_ncap", "ancap", "iihs")
-        has_crash_evidence = str(c.get("safety_basis") or "").lower() in OFFICIAL_BASIS
+        # 权威体系清单统一从 crash_systems 读（12体系，加体系只改那一处）
+        has_crash_evidence = CS.is_official(c.get("safety_basis"))
         # 无碰撞实锤时一律不认"人工标A"（MG07 曾人工A但crash=无官方成绩）；
         # 证据A = 有权威碰撞成绩，证据等级只降不升。
         ev_for_t1 = "A" if has_crash_evidence else ("B" if ev == "A" else ev)
         crash_basis_note = ""
         if has_crash_evidence and ev not in rules["t1_evidence"]:
-            crash_basis_note = (f"碰撞实锤来自 {c.get('safety_basis')}（人工证据等级 {ev}），"
+            crash_basis_note = (f"碰撞实锤来自 {cn_name(c.get('safety_basis'))}（人工证据等级 {ev}），"
                                 f"按官方碰撞成绩认定证据达标")
         sales = c.get("trend_sales")
         lc = lifecycle_of(c)
@@ -1053,7 +1053,7 @@ def tier_report(cands: list[dict], cfg: dict, weights: list[float] | None = None
                "evidence_soft": ev_soft,
                # v9.7.43：判据展示用——有碰撞实锤时显示"达标(体系)"而非原始人工等级，
                # 避免第一档表写"证据B"让人以为规则失效。
-               "evidence_t1_label": (f"证据达标（{_BASIS_CN.get(str(c.get('safety_basis') or '').lower(), c.get('safety_basis'))}碰撞实锤）"
+               "evidence_t1_label": (f"证据达标（{cn_name(c.get('safety_basis'))}碰撞实锤）"
                                      if has_crash_evidence else f"证据 {ev}"),
                "norm_swing": norm_swing.get(nm),
                "norm_detail": norm_detail.get(nm),
@@ -1109,9 +1109,8 @@ def tier_report(cands: list[dict], cfg: dict, weights: list[float] | None = None
             # 是唯一权威源，不采信人工填的 evidence_status（两者曾出现过不一致）。
             # Euro NCAP / ANCAP 同为官方政府背书的独立碰撞测评，中国品牌出口车常只有它。
             # 早前白名单漏了 euro_ncap，导致 MG4 明明有 Euro NCAP 五星却被判「无官方成绩」。
-            basis = str(c.get("safety_basis") or "")
-            if basis not in ("cncap", "ciasi", "c-ncap", "ciasi_checked",
-                             "euro_ncap", "ancap"):
+            # 权威清单统一走 crash_systems（12体系），杜绝"漏一个体系就误判无成绩"
+            if not CS.is_official(c.get("safety_basis")):
                 blockers.append("无官方碰撞成绩（安全分为插补值）")
         if (sales or 0) < rules["t1_min_sales"] and not quiet:
             blockers.append(f"月销 {(sales or 0):,}<{int(rules['t1_min_sales']):,}")

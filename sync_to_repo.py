@@ -86,7 +86,8 @@ NEW_FILES = [
     # v9.7.45 B类正式榜完整版（真环境分 + 18区块导航）
     "cross_energy_sections.py",                 # 跨能源榜18区块契约+导航卡
     "build_midsuv_full.py",                     # B类完整榜生成器（注入比较器引擎+区块）
-    "midsuv_full_regress.py",                   # 完整榜回归（30项含node实跑环境分）
+    "midsuv_full_regress.py",                   # 完整榜回归（38项含node实跑环境分+动态区块）
+    "dynamic_blocks_test.js",                   # 动态区块DOM stub实跑验证（随环境分重绘）
 ]
 
 

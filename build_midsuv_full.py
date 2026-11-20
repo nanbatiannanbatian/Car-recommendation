@@ -118,7 +118,7 @@ def main():
         cars_override=cars,
         out=OUT,
         extra_head=nav,
-        extra_tail=secs,
+        extra_tail=secs + "\n" + CES.dynamic_script(),  # 注入区块 + 随环境分实时重绘的JS
         title="2026年10月 12-18万 中型SUV 跨能源正式榜（产品力+环境分）",
     )
     # 校验
