@@ -144,6 +144,7 @@ def main():
     custom = parse_sliders(a.sliders)
     wv = L.build_schemes(cfg, custom).get("用户自定义") if custom else None
 
+    _pool_data = json.load(open(a.candidates, encoding="utf-8"))
     parts = [f"# {cfg.get('label')} · 出榜报告", ""]
     parts.append(f"> 来源：`{os.path.basename(a.candidates)}`；"
                  f"链路 取数→闸门→打分→稳健性→三档→审查。**全程无辩论。**")
@@ -192,6 +193,8 @@ def main():
         "category": a.category, "source": os.path.basename(a.candidates),
         "in": len(cands), "passed": 0, "dropped": 0, "sliders": custom,
         "boards": {}, "tiers": {}, "review": {},
+        # v9.7.23：未入池车型及原因（用户要求"能比就比，不能比说明原因"）
+        "pool_excluded": (_pool_data.get("pool_excluded") if isinstance(_pool_data, dict) else []),
         # v9.7.20：候选池披露同步给页面（评审反复指出报告有、页面看不到）
         "pool_disclosure": {
             "total": len(_all), "sourced": _src_named, "crash": _crash_named,

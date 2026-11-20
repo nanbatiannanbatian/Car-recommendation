@@ -52,6 +52,7 @@ CASES = [
     ("BUG-029", "候选池披露只在report不在页面/估算电池伪精确", "v9.7.20"),
     ("BUG-030", "候选池披露指向不存在的report清单(空指向)", "v9.7.21"),
     ("BUG-031", "全价位标签名不副实(实际10款候选)", "v9.7.22"),
+    ("BUG-032", "入池限于销量前10且未入池原因未显示", "v9.7.23"),
 ]
 
 
@@ -212,6 +213,18 @@ def t015():
     assert "BV.main_cell" in src, "渲染绕过了 board_view 单点"
     return "渲染复用 board_view 单点"
 
+
+def t032():
+    """入池应尽量覆盖可比较车型；不能入池的要显示原因。"""
+    p = os.path.join(HERE, "runs", "compact_bev_extended_202610", "榜单.html")
+    if os.path.exists(p):
+        t = _read("runs/compact_bev_extended_202610/榜单.html")
+        assert "未入池车型及原因" in t, "未入池原因未显示"
+        assert "北汽新能源EU" in t, "未列具体未入池车型"
+        rows = re.findall(r'<tr data-model=[\'"]([^\'"]+)[\'"]', t)
+        assert len(rows) >= 16, f"入池车型过少: {len(rows)}"
+        return f"扩展榜 {len(rows)} 款 + 未入池原因可见"
+    return "无扩展榜产物，跳过"
 
 def t031():
     """榜单定位不得暗示全市场覆盖；审计榜定位要显式。"""
@@ -393,7 +406,7 @@ def t016():
 
 
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032]
 
 
 def run():

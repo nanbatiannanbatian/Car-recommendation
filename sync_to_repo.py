@@ -55,6 +55,7 @@ NEW_FILES = [
     "trim_coverage.py",                         # v9.7.9 出榜前逐配置覆盖校验（铁律守门）
     "bug_regression.py",                        # v9.7.11 历史bug回归断言（17项）
     "categories/car_compact_bev_allprice.json",  # 2026-10紧凑型纯电全价位榜配置
+    "categories/car_compact_bev_extended.json",  # 2026-10紧凑型纯电16款扩展榜配置
     "categories/trim_verified.json",            # v9.7.3 六配置榜人工标注（参考）
     "categories/car_midsedan_allprice.json",    # 2026-10纯电中型轿车全价位榜配置
 ]

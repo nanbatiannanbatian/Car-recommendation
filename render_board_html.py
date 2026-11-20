@@ -250,8 +250,14 @@ def render(data, summary, title, as_of):
                  '官方二级分类 + 纯电 + 指导价；来源多为网查多源交叉（非厂商直供），'
                  '未见来源/无碰撞成绩的车只作参数参考。'
                  '<b>没有官方碰撞成绩不记 0 分、只标缺失，降权≠安全。</b></div>')
+        _pex = (summary or {}).get("pool_excluded") or []
+        if _pex:
+            _pl = "；".join(f"{e(x.get('model'))}（月销{e(x.get('sales'))}）：{e(x.get('reason'))}"
+                           for x in _pex)
+            H.append(f'<div class="rule" style="background:#fbf3e9;border-left-color:#BA7517">'
+                     f'<b>未入池车型及原因（能比就比，不能比则说明）：</b>{_pl}。</div>')
         H.append('<div class="rule" style="background:#f7f6f3;border-left-color:#888780">'
-                 '<b>榜单定位：</b>这是这 10 款候选车的<b>可审计横向对比榜</b>，'
+                 f'<b>榜单定位：</b>这是本池 {len(rows)} 款候选车的<b>可审计横向对比榜</b>，'
                  '<b>不是全市场全价位紧凑型纯电轿车的覆盖榜</b>；未入池车型不代表更差，'
                  '只是不在本期取证样本内。展示的 1–10 名是分数排序，'
                  '名次可信度以报告「同档组」为准，能不能买以「三档」为准。</div>')

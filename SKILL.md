@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 9.7.22
+version: 9.7.23
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v9.7.22）
+# Car recommendation —— 可信购车榜单引擎（v9.7.23）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -2626,3 +2626,19 @@ DeepSeek 定性："这是10款候选紧凑型纯电轿车的审计榜，不是�
 - 阈值（第一档命中≥80%/全情景≥60%/月销≥3000）其实 report 已有，DeepSeek 看页面没看到——
   载体差问题，本版不重复搬（报告是完整口径来源）。
 - BUG-031 进回归（31/31），A/B 27/27 通过。定稿。
+
+---
+
+## v9.7.23 · 入池扩展：能比就比，不能比说明原因（2026-11-20，用户要求）
+
+用户："未入池不等于更差，不能把能参与比较的都入池吗？榜单要更严谨，尽量对比更多车型"。
+
+- 原 10 款榜限于销量前10，是人为框子。扩展候选池到 18 款（销量≥100 的紧凑型纯电）：
+  新增奔驰CLA(152)/羿驰05(130)/曹操60(126)/秦新能源(213)/e爱丽舍(400)/比亚迪e3(164)/北汽EU(680)/欧尚520(468)。
+- 按铁律先补逐配置：auto_trims 自动补6款 + 网查补 e3/曹操60 参数（domain_search），
+  北汽EU/欧尚520 参数页无有效逐配置→标注"配置待核"不入主榜，**原因写进页面**。
+- 最终 16 款入榜，16/16 配置齐全；前4名与原榜一致（头部稳定），新增长尾自然垫底。
+- `pipeline.py` 把候选池顶层 `pool_excluded` 写进 summary，页面候选池披露后显示"未入池车型及原因"。
+- 新增车 8 维分按网查客观配置规则推算、置信低，note 留依据；曹操60 标营运硬风险。
+- BUG-032 进回归（32/32），A/B 27/27 通过。新产物 `runs/compact_bev_extended_202610`。
+- **原则固化**：入池以"能取得逐配置数据"为标准，不以销量名次划界；销量极低(<500)只影响档位、不影响入池。
