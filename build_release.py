@@ -127,6 +127,11 @@ def collect_files():
                 for c in sorted(p.glob("*.json")):
                     if not is_excluded_name(c.name):
                         files.append(c)
+            elif p.name == "research":
+                # v9.7.37：内置证据采集增强（自 research-collector），随包发布无需另装 skill
+                for c in sorted(p.glob("*")):
+                    if c.is_file() and not is_excluded_name(c.name) and c.suffix in ROOT_INCLUDE_EXT:
+                        files.append(c)
             continue
         if not p.is_file():
             continue

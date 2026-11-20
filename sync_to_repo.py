@@ -55,6 +55,9 @@ NEW_FILES = [
     "trim_coverage.py",                         # v9.7.9 出榜前逐配置覆盖校验（铁律守门）
     "facts_sync.py",                            # v9.7.28 原始库→事实库全字段映射
     "score_fingerprint.py",                     # v9.7.36 打分逻辑指纹门禁
+    "research/researcher.py",                   # v9.7.37 内置证据采集工具
+    "research/config.json",
+    "research/README.md",
     "bug_regression.py",                        # v9.7.11 历史bug回归断言（17项）
     "categories/car_compact_bev_allprice.json",  # 2026-10紧凑型纯电全价位榜配置
     "categories/car_compact_bev_extended.json",  # 2026-10紧凑型纯电16款扩展榜配置

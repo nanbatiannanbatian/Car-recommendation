@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 9.7.36
+version: 9.7.37
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v9.7.36）
+# Car recommendation —— 可信购车榜单引擎（v9.7.37）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -45,6 +45,13 @@ author: "nanbatiannanbatian"
   确实查不到配置的车，明确标注"配置待核"并移出主榜（只进落榜/待核名单），不混进主榜充数。
 - **禁止为赶时间跳过配置采集**。宁可多花时间网查（汽车之家/易车/厂商官网配置表），
   也不许出一份缺配置的残缺榜单。新车型入池 = 8 维分 + 逐配置数据 + 证据来源，三者缺一不可。
+- **内置证据采集增强**（2026-11-20 用户要求自包含）：`research/` 目录随包发布
+  （researcher.py + config.json + README.md，源自 research-collector，无硬编码路径/无重依赖）。
+  别人只装本 skill 即可用 `python3 research/researcher.py --sites dongchedi,12365auto,cncap,ciasi`
+  采集懂车帝实测/车质网投诉/C-NCAP碰撞证据，**无需另装 research-collector**。
+  它是"站点画像+检索词+广告降权"工具，不是平台私有API爬虫；真正抓网页靠内置 domain_search/WebFetch。
+  pipeline 出榜不依赖它（缺它只降级证据质量，不阻断出榜）。视频/评论只作参考不进 8 维分。
+
 - **打分逻辑指纹门禁**（2026-11-20 用户要求"skill升级后老数据全部作废"）：
   候选池必须带 `_generated_by`（skill版本 + 指纹），由 `score_fingerprint.py --stamp` 打标。
   指纹覆盖**打分代码文件内容**（trim_annotate/spec_score/leaderboard/quality_score/experience_score）
@@ -2928,3 +2935,19 @@ DeepSeek 定性："这是10款候选紧凑型纯电轿车的审计榜，不是�
 - **权衡**：事实数据不作废（不随代码变、重采浪费），只拒绝老分数混新版本；
   改打分代码后需重算分数并重新 stamp（一次性成本）。
 - BUG-044 进回归（44/44），A/B 28/28 通过。
+
+---
+
+## v9.7.37 · 内置证据采集工具，发布包自包含（2026-11-20，用户问"只装榜单引擎能用research-collector吗"）
+
+用户问：research-collector 是我们自己的 skill，别人只装"可信购车榜单引擎"能否用？不能的话是否整合。
+
+- 核查：发布包 102 文件零 research 字样；榜单引擎 pipeline 不依赖它（只 leaderboard.py --research 可选输入）；
+  结论：**不整合则别人出榜能跑但证据质量下降**（质量全8.0/安全缺碰撞的短板补不上）。
+- 整合（方案A自包含）：`research/` 目录随包发布 researcher.py + config.json + README.md
+  （源自 research-collector，176KB，无硬编码路径、无重依赖）。build_release 放行该目录。
+- **重要边界写进 README**：它是"站点画像+检索词生成+广告降权+博主评分"工具，
+  不是懂车帝/抖音私有API爬虫；真正抓网页靠内置 domain_search/WebFetch。
+  视频/评论是主观舆情，只作参考不进 8 维分（延续事实列不计分纪律）。
+- 验证：解包后 `python3 research/researcher.py --list-sites` 独立运行成功，17 站点解析器齐全。
+- BUG-045 进回归（45/45），包 0.74MB/105 文件。A/B 不受影响。

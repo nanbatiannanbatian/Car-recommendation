@@ -65,6 +65,7 @@ CASES = [
     ("BUG-042", "校验不覆盖电芯字段致11/20主榜空白", "v9.7.33"),
     ("BUG-043", "占位scored_trim致全榜低置信刷屏", "v9.7.35"),
     ("BUG-044", "skill升级后老分数混入新榜(无指纹门禁)", "v9.7.36"),
+    ("BUG-045", "发布包缺内置证据采集工具(依赖外部skill)", "v9.7.37"),
 ]
 
 
@@ -225,6 +226,21 @@ def t015():
     assert "BV.main_cell" in src, "渲染绕过了 board_view 单点"
     return "渲染复用 board_view 单点"
 
+
+def t045():
+    """发布包自包含：证据采集工具必须在包内，不依赖外部 skill。"""
+    import zipfile
+    for f in ("research/researcher.py", "research/config.json", "research/README.md"):
+        assert os.path.exists(os.path.join(HERE, f)), f"缺内置采集工具: {f}"
+    bld = _read("build_release.py")
+    assert 'p.name == "research"' in bld, "打包未放行 research/"
+    # 发布包实测含这三个文件（若有包）
+    zpath = os.path.join(HERE, "dist", "car-recommendation-v9.7.36.zip")
+    if os.path.exists(zpath):
+        with zipfile.ZipFile(zpath) as z:
+            names = z.namelist()
+        assert "car-recommendation/research/researcher.py" in names, "发布包缺采集脚本"
+    return "内置采集工具随包发布，自包含"
 
 def t044():
     """指纹门禁：代码/版本变化后老候选池分数不得混进新榜。"""
@@ -643,7 +659,7 @@ def t016():
 
 
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045]
 
 
 def run():
