@@ -58,8 +58,16 @@ EXCLUDE_GLOBS = ["*.bak", "*.bak-*", "*.tmp", "*.pyc", "*.orig",
                  "*_regress.py",
                  # 一次性榜单生成脚本：仅产出某月某价位的一次性 run 页面，非通用能力
                  "build_midsedan_202609.py", "build_midsuv_202610.py",
-                 # 采集/验证脚本（0 import）：其产出的数据已固化在包内，仅历史演进段提及、无 SKILL.md 运行命令
-                 "ice_crash.py", "ice_funnel.py", "ice_sales.py", "ice_sensitivity.py", "verify_mcda.py",
+                 # v9.7.54：大 JSON 数据不随包发布，靠包内生成脚本联网重建（用户决定，已实测链路可通）。
+                 # 故生成脚本必须在包内——ice_crash.py 从排除清单移除，其余生成脚本本就在包内。
+                 # 采集/验证脚本（0 import，产出数据已不随包或为历史）：
+                 "ice_funnel.py", "ice_sales.py", "ice_sensitivity.py", "verify_mcda.py",
+                 # v9.7.54 用户决定：大 JSON（>=30KB，约1.1MB）不随包发布，联网重建。
+                 # 生成脚本均在包内：auto_trims/build_ice_pool/master_pool/auto_levels/facts_sync/
+                 # universe_build/airbags/ice_crash；实测 build_index 可无 key 联网生成 5375 条映射。
+                 "trims.json", "master_pool.json", "ice_crash.json", "baseline_car_ev.json",
+                 "fact_library.json", "universe_car_midsedan_allprice.json", "airbags.json",
+                 "vehicle_physics.json",
                  # 一次性数据采集脚本：作者维护数据时用，仅文档提及、无代码调用
                  "fetch_bili.py", "fetch_cncap.py",
                  # 注：lifecycle_fetch/sync_cncap/auto_levels/auto_trims 虽无 import，

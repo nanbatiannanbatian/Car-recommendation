@@ -32,14 +32,17 @@ def run():
     check("错误提示含清理指引", "请清理无引用的大文件" in src)
     # 2) 排除清单
     for f in ("trims_v61polluted.json", "trims_v60before.json", "*_regress.py",
-              "ice_crash.py", "build_midsuv_202610.py"):
+              "build_midsuv_202610.py"):
         check(f"排除清单含:{f}", f'"{f}"' in src)
-    # 运行必需的核心数据不得被误排（防"不是代码就删"式误伤）
-    for f in ("trims.json", "master_pool.json", "ice_crash.json", "fact_library.json", "airbags.json"):
-        check(f"核心数据未被排除:{f}", f'"{f}"' not in src.split("EXCLUDE_GLOBS")[1].split("]")[0])
-    # 注：核心 JSON 数据（trims/master_pool/ice_crash/fact_library 等）保留在包内。
-    # 它们虽有联网生成脚本（auto_trims/ice_crash 可 requests 抓取），但生成依赖外部输入/网络，
-    # 安装用户未必具备，故随包发布以保证离线可用——这是打包口径，不是"不可再生"的断言。
+    # v9.7.54 用户决定：大 JSON 不随包发布，联网重建。断言它们确实被排除。
+    big_json = ("trims.json", "master_pool.json", "ice_crash.json", "baseline_car_ev.json",
+                "fact_library.json", "universe_car_midsedan_allprice.json", "airbags.json",
+                "vehicle_physics.json")
+    excl_block = src.split("EXCLUDE_GLOBS")[1].split("]")[0]
+    for f in big_json:
+        check(f"大JSON已排除:{f}", f'"{f}"' in excl_block)
+    # 生成脚本必须在包内，否则数据删了无法重建（尤其 ice_crash.py 曾误排，已加回）
+    check("ice_crash.py未被排除(生成脚本)", '"ice_crash.py"' not in excl_block)
     # 3) 被排除的历史数据确实无代码引用（防止误排）
     pycode = ""
     for fn in os.listdir(HERE):
@@ -75,6 +78,13 @@ def run():
         check("产物无历史污染数据", not any("v61polluted" in n or "v60before" in n for n in names))
         check("产物无回归测试脚本", not any(n.endswith("_regress.py") for n in names))
         check("产物含核心模块", "car-recommendation/build_midsuv_full.py" in names and "car-recommendation/SKILL.md" in names)
+        # v9.7.54：大JSON已排除 + 生成脚本在包内
+        bigs = ("trims.json", "master_pool.json", "ice_crash.json", "baseline_car_ev.json",
+                "fact_library.json", "universe_car_midsedan_allprice.json", "airbags.json", "vehicle_physics.json")
+        check("产物无大JSON", not any(any(f in n for f in bigs) for n in names))
+        gens = ("auto_trims.py", "build_ice_pool.py", "master_pool.py", "ice_crash.py",
+                "auto_levels.py", "facts_sync.py", "universe_build.py", "airbags.py")
+        check("产物含全部生成脚本", all(f"car-recommendation/{g}" in names for g in gens))
     else:
         check("实际产物存在", False, "请先运行 python build_release.py")
 
