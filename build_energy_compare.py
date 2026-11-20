@@ -736,6 +736,9 @@ function adjust(car,cond){
   // 7) 年里程
   if(cond.annual_km==='over25') add('高里程', P==='BEV'?1.5 : P==='ICE'?-1:0);
   else if(cond.annual_km==='under10') add('低里程', P==='BEV'?-1 : ((P==='ICE'||P==='HEV')?1:0));
+  // 8) 持有年限（长期持有：电车能源节省累积、残值摊薄 → 纯电加分；与 under3 硬条件方向对称）
+  //    over8 的 hint 明确写"纯电加分"，此前引擎漏实现导致该选项完全无效（回归探测抓出）。
+  if(cond.hold_years==='over8') add('长期持有·电车收益累积', P==='BEV'?1.0 : (P==='PHEV'||P==='EREV')?0.3 : ((P==='ICE'||P==='HEV')?-0.3:0));
 
   return {items,total,hard};
 }

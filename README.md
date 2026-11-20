@@ -1,7 +1,7 @@
 # Car recommendation
 
 > 可信购车榜单引擎：口径闸门 / MCDA 稳健性检验 / 8 维打分统一榜 / 总候选池 / 多源交叉核验 / 证据分层 / 历史回测。
-> 无模型调用，同一输入必得同一输出。当前版本 **v9.7.46**。
+> 无模型调用，同一输入必得同一输出。当前版本 **v9.7.47**。
 
 ## 这是什么
 WorkBuddy 用户级 skill。核心是「车型排行榜全链路」：按需搜榜入池→取数→闸门→8 维打分→稳健性→三档→审查→报告，
@@ -936,3 +936,17 @@ MIT —— 随便用，出处保留即可。爬虫部分思路参考 [car_crawle
 - **实现（单一事实源，不重写引擎）**：比较器 `render()` 末尾加可选钩子 `window.onBoardRerender(rows,cond,scale)`（默认无订阅、行为不变）；`cross_energy_sections.dynamic_script()` 注入订阅 JS，用 rows 现成字段重绘 4 区块。稳健性改为真实计算：按当前 cond 在力度 0%/100%/150% 三档重算名次、输出每车名次跨度（≤1 稳健/≥3 敏感）。
 - **验证**：`dynamic_blocks_test.js` 用极简 DOM stub 跑页面完整 JS，模拟切换 默认→无家充+限牌+营运，4 区块 innerHTML 全部变化，T1 数量 17→7（硬条件降档生效）。接入 `midsuv_full_regress.py`（38/38）。
 - **回归**：完整榜 38/38、比较器 20/20、主链 64/64、判定 32/32、原榜 49/49 全绿。新增文件 `dynamic_blocks_test.js`。
+
+## v9.7.47 · 安全判定严谨化 + 碰撞成绩体系单一真相源（2026-11-20 深夜，用户连续多轮强制）
+
+用户一晚上连续抓出安全维度的系统性问题：007GT 有 Euro NCAP 五星却 safety 7.2（比无成绩车还低）、全池误标"缺官方碰撞"、T1 全空、高分低档无说明、特斯拉周期英文、算法抱团虚高命中率、分数改了证据文本没同步、Model3 的 Euro NCAP 被漏。核心结论同 v9.7.43：**写进文档不算数，必须代码化成单一事实源 + 出榜门禁 + 回归 + 失败回测**。
+
+- **安全分多体系映射**：联网核实各国 NCAP 无直接对应关系（C-IASI 自购低配25%小偏置最严 > Euro NCAP 匿名购车 > C-NCAP 中国场景；扭转刚度/高强度钢属纸面参数、非越大越好、不入公式只作佐证）。新增 `official_safety_scores.json` 按体系+等级映射到统一 0-10 分，Euro NCAP 五星+乘员≥90%→8.8。007GT 7.2→8.8、三厢007 9.0→8.8（同成绩同分）、蔚来ET5 8.1→8.3、Model3 按 Euro NCAP 五星96%→8.8。新增 `safety_check.py` 门禁（有成绩车分数必须等于映射表 + 单调性：有成绩车最低≥无成绩车中位，根治"有强证据反低分"）。
+- **碰撞标记与徽标修复**：`score_rows` 透传 crash/basis（修复全池误标"缺官方碰撞"，根因是字段没传导致 crash 恒空）；`risk_flags` 改结构化判断（Euro NCAP 也算权威、不用宽泛"无"字误伤）；车名后加绿色徽标显示体系+关键数字（C-NCAP 92.3%/Euro NCAP 93%/C-IASI AGGG），按关键词取乘员保护分项、不按位置（修 Model3 误显示行人74%）。
+- **证据A与档位**：证据A改为"有权威碰撞实锤即达标"（不再看人工散落 evidence_status，007GT 靠 Euro NCAP 进 T1，T1 从 0→2 款）；堵"人工标A但无实锤"漏洞。第二档新增"强推荐"标记（有实锤+高分+无硬风险只是换算法不稳）。高分低档车在档位列加"为何未进一档"hover（如实列销量/命中/碰撞卡点 + "不在意可考虑"，碰撞缺失注明"非不安全"）。
+- **生命周期中文化**：补 `on_sale`→在售（特斯拉曾直出英文），新增 `check_lifecycle_coverage()` 门禁扫全池未映射状态，防再漏。
+- **MCDA 算法家族去重**：实测10种算法两两 Kendall τ，发现 saw~moora=1.0、saw系5种 τ=0.84-1.0 抱团（MG07"6/10命中"6票全同类虚高）。按 τ≥0.8 聚类成6独立家族，`robust.METHOD_FAMILIES` 定义，第一档命中按家族计票（MG07 33%/007GT 83%/007 100%）。阈值改明确票数 `t1_min_family_hits=5`（消除6家族无法整除80%的语义漂移）。
+- **碰撞体系单一真相源**：新增 `crash_systems.py` 定义全球12权威体系（C-NCAP/C-IASI/Euro NCAP/ANCAP/IIHS/NHTSA-NCAP/JNCAP/KNCAP/ASEAN NCAP/Latin NCAP/Bharat NCAP/Global NCAP）的 code/中文名/别名/家族/权威性 + 别名归一。此前散落5处（映射表/徽标/证据门禁/安全门禁/leaderboard），每加体系改5处→漏 Model3。全链路改 import 它，加新体系只改一处。
+- **证据文本一致性门禁**：新增 `evidence_consistency.py` 检查 score_evidence 文本不得与 basis/scores 矛盾（分数改了文本没同步），3规则+误报防护（佐证体系/否定语境），接入出榜拦截。
+- **新增文件**：`official_safety_scores.json`、`safety_check.py`、`evidence_consistency.py`、`crash_systems.py`。
+- **回归**：主回归 64/64、失败回测 60/60 全检出、比较器 20/20、board_view/render/trims/物理/申报/母池/同源/安全/证据 selftest 全绿。新增回归 t054-t064，每个改动配对失败回测探针（注入错误必须挂）。

@@ -1,0 +1,184 @@
+{
+  "note": "官方碰撞成绩统一映射表（v9.7.44）。体系清单以 crash_systems.py 为唯一真相源（12权威体系：C-NCAP/C-IASI/Euro NCAP/ANCAP/IIHS/NHTSA/JNCAP/KNCAP/ASEAN NCAP/Latin NCAP/Bharat NCAP/Global NCAP）。各体系不可按得分率横向直接比较（年份/规程/选车方式不同），按体系+等级映射到统一0-10分。NCAP家族星级制共用一套映射；C-IASI等级制、IIHS奖项制各自映射。依据：中保研C-IASI官网/中汽研C-NCAP官网/Euro NCAP官网/中国质量万里行/tyremap NCAP guide/百度百科NCAP。",
+  "version": "2026-11-20-v9.7.44",
+  "systems": {
+    "C-IASI": {
+      "authority": "最高（自购低配车、对标IIHS、25%小偏置、保险机构出资、不收车企费）",
+      "grades": {
+        "G+": 9.3,
+        "G": 9.0,
+        "A": 8.3,
+        "M": 7.2,
+        "P": 6.0
+      },
+      "note": "车内乘员/车外行人/车辆辅助三指数取最低档；耐撞维修经济性仅参考不主导（与保费相关非人身安全）"
+    },
+    "C-NCAP": {
+      "authority": "高（官方机构、中国道路场景、2024版已加严）",
+      "formula": "7.0 + (pct-80)*0.155, 封顶9.3",
+      "note": "综合得分率直接映射；2021及更早版本成绩降0.2（规程较松）"
+    },
+    "Euro NCAP": {
+      "authority": "高（独立机构、匿名购车、主动安全权重高、全球公认）",
+      "grades": {
+        "5star_occupant>=90": 8.8,
+        "5star_occupant85-90": 8.5,
+        "5star_occupant<85": 8.3,
+        "4star": 7.8,
+        "3star": 7.0
+      },
+      "note": "不套C-NCAP得分率公式（两体系不可比）；以星级+乘员保护分项定档。五星且乘员保护≥90%取8.8，与C-NCAP五星90%+的8.5-8.9同档，略低于C-IASI G+的9.3（后者自购低配更严）"
+    },
+    "ANCAP": {
+      "authority": "高（澳洲，规程同Euro NCAP）",
+      "map_to": "Euro NCAP"
+    },
+    "IIHS": {
+      "authority": "最高（保险公司、25%小偏置+车顶强度4倍车重）",
+      "grades": {
+        "TSP+": 9.2,
+        "TSP": 8.8,
+        "G": 8.3,
+        "A": 7.5,
+        "M": 6.8,
+        "P": 6.0
+      }
+    },
+    "NHTSA-NCAP": {
+      "authority": "高/中（见 crash_systems.py）",
+      "grades": {
+        "5star_occupant>=90": 8.8,
+        "5star_occupant85-90": 8.5,
+        "5star_occupant<85": 8.3,
+        "4star": 7.8,
+        "3star": 7.0
+      },
+      "note": "NCAP星级制（与测试年份相关：2015五星≠2024五星，注明测试年份）；五星+乘员保护≥90%取8.8。"
+    },
+    "JNCAP": {
+      "authority": "高/中（见 crash_systems.py）",
+      "grades": {
+        "5star_occupant>=90": 8.8,
+        "5star_occupant85-90": 8.5,
+        "5star_occupant<85": 8.3,
+        "4star": 7.8,
+        "3star": 7.0
+      },
+      "note": "NCAP星级制（与测试年份相关：2015五星≠2024五星，注明测试年份）；五星+乘员保护≥90%取8.8。"
+    },
+    "KNCAP": {
+      "authority": "高/中（见 crash_systems.py）",
+      "grades": {
+        "5star_occupant>=90": 8.8,
+        "5star_occupant85-90": 8.5,
+        "5star_occupant<85": 8.3,
+        "4star": 7.8,
+        "3star": 7.0
+      },
+      "note": "NCAP星级制（与测试年份相关：2015五星≠2024五星，注明测试年份）；五星+乘员保护≥90%取8.8。"
+    },
+    "ASEAN NCAP": {
+      "authority": "高/中（见 crash_systems.py）",
+      "grades": {
+        "5star_occupant>=90": 8.8,
+        "5star_occupant85-90": 8.5,
+        "5star_occupant<85": 8.3,
+        "4star": 7.8,
+        "3star": 7.0
+      },
+      "note": "NCAP星级制（与测试年份相关：2015五星≠2024五星，注明测试年份）；五星+乘员保护≥90%取8.8。"
+    },
+    "Latin NCAP": {
+      "authority": "高/中（见 crash_systems.py）",
+      "grades": {
+        "5star_occupant>=90": 8.8,
+        "5star_occupant85-90": 8.5,
+        "5star_occupant<85": 8.3,
+        "4star": 7.8,
+        "3star": 7.0
+      },
+      "note": "NCAP星级制（与测试年份相关：2015五星≠2024五星，注明测试年份）；五星+乘员保护≥90%取8.8。"
+    },
+    "Bharat NCAP": {
+      "authority": "高/中（见 crash_systems.py）",
+      "grades": {
+        "5star_occupant>=90": 8.8,
+        "5star_occupant85-90": 8.5,
+        "5star_occupant<85": 8.3,
+        "4star": 7.8,
+        "3star": 7.0
+      },
+      "note": "NCAP星级制（与测试年份相关：2015五星≠2024五星，注明测试年份）；五星+乘员保护≥90%取8.8。"
+    },
+    "Global NCAP": {
+      "authority": "高/中（见 crash_systems.py）",
+      "grades": {
+        "5star_occupant>=90": 8.8,
+        "5star_occupant85-90": 8.5,
+        "5star_occupant<85": 8.3,
+        "4star": 7.8,
+        "3star": 7.0
+      },
+      "note": "NCAP星级制（与测试年份相关：2015五星≠2024五星，注明测试年份）；五星+乘员保护≥90%取8.8。"
+    }
+  },
+  "car_scores": {
+    "深蓝L06": {
+      "system": "C-NCAP",
+      "value": 92.3,
+      "score": 8.9,
+      "source": "C-NCAP 2024 92.3%五星"
+    },
+    "马自达EZ-6": {
+      "system": "C-NCAP",
+      "value": 90.8,
+      "score": 8.9,
+      "source": "C-NCAP 2025 90.8%"
+    },
+    "阿维塔06": {
+      "system": "C-NCAP",
+      "value": 90.6,
+      "score": 8.5,
+      "source": "C-NCAP 2024版 90.6%五星（乘员96.10%）"
+    },
+    "奥迪E5 Sportback": {
+      "system": "C-NCAP",
+      "value": 91.3,
+      "score": 9.1,
+      "source": "C-NCAP 2024版 91.3%五星"
+    },
+    "极氪007": {
+      "system": "Euro NCAP",
+      "grade": "5star_occupant>=90",
+      "score": 8.8,
+      "occupant_pct": 93,
+      "source": "Euro NCAP 2026五星，碰撞保护93%（同期第一）"
+    },
+    "极氪007GT": {
+      "system": "Euro NCAP",
+      "grade": "5star_occupant>=90",
+      "score": 8.8,
+      "occupant_pct": 93,
+      "source": "Euro NCAP 2026五星，碰撞保护93%（同期第一）；车身结构与三厢007同源"
+    },
+    "特斯拉Model 3": {
+      "system": "Euro NCAP",
+      "grade": "5star_occupant>=90",
+      "score": 8.8,
+      "occupant_pct": 96,
+      "source": "Euro NCAP五星，成人乘员保护96%/儿童86%/行人74%/安全辅助94%（2019测试，改款沿用）；全球事实"
+    },
+    "蔚来ET5": {
+      "system": "C-IASI",
+      "grade": "A",
+      "score": 8.3,
+      "source": "中保研C-IASI AGGG（车外行人A，其余G）；E-NCAP 2023五星乘员96%"
+    }
+  },
+  "structural_evidence_policy": {
+    "in_formula": false,
+    "reason": "车身扭转刚度/高强度钢占比/气囊数业内无强制公开标准，厂商多为白车身宣传口径不可靠；且扭转刚度非越大越好（吸能区需形变吸能，整体过刚反把冲击传乘员舱）。业内共识：纸面参数只能作弱佐证，最终以真实碰撞测试为准。",
+    "use_as": "仅在无官方成绩车作人工判断的弱佐证，写入rationale披露，不单独加分；有官方成绩时不叠加（避免既按成绩又按参数双重加分）"
+  },
+  "systems_repository": "crash_systems.py（体系code/中文名/别名/家族）；本表只管各体系如何映射到0-10分"
+}
