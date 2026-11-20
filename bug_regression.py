@@ -64,6 +64,7 @@ CASES = [
     ("BUG-041", "紧凑SUV榜候选池/配置未固化", "v9.7.32"),
     ("BUG-042", "校验不覆盖电芯字段致11/20主榜空白", "v9.7.33"),
     ("BUG-043", "占位scored_trim致全榜低置信刷屏", "v9.7.35"),
+    ("BUG-044", "skill升级后老分数混入新榜(无指纹门禁)", "v9.7.36"),
 ]
 
 
@@ -224,6 +225,36 @@ def t015():
     assert "BV.main_cell" in src, "渲染绕过了 board_view 单点"
     return "渲染复用 board_view 单点"
 
+
+def t044():
+    """指纹门禁：代码/版本变化后老候选池分数不得混进新榜。"""
+    import score_fingerprint as SF
+    import tempfile
+    # 1) 指纹模块存在且能算
+    fp = SF.compute_fingerprint()
+    assert len(fp) == 16 and SF.skill_version()
+    # 2) 三个候选池都已打标
+    for f in ("categories/candidates_compact_suv_bev.json",
+              "categories/candidates_compact_bev_extended.json",
+              "categories/candidates_compact_bev_audit.json"):
+        d = json.load(open(os.path.join(HERE, f), encoding="utf-8"))
+        assert d.get("_generated_by", {}).get("fingerprint"), f"{f} 未打指纹"
+    # 3) pipeline 有门禁
+    src = _read("pipeline.py")
+    assert "指纹门禁" in src and "force-stale" in src, "pipeline 无指纹门禁"
+    # 4) 篡改指纹能被测出（用临时副本）
+    import copy
+    d = json.load(open(os.path.join(HERE, "categories", "candidates_compact_suv_bev.json"), encoding="utf-8"))
+    fake = copy.deepcopy(d)
+    fake["_generated_by"]["fingerprint"] = "0000000000000000"
+    tmp = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8")
+    json.dump(fake, tmp); tmp.close()
+    try:
+        r = SF.check(tmp.name)
+        assert not r["ok"], "篡改指纹未被拦截"
+    finally:
+        os.unlink(tmp.name)
+    return "指纹门禁生效，三池已打标，篡改可检出"
 
 def t043():
     """低置信只在有区分度时显示；占位scored_trim由代码自动解析（防呆，非靠人工回填）。"""
@@ -612,7 +643,7 @@ def t016():
 
 
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044]
 
 
 def run():

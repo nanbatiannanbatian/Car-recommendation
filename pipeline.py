@@ -112,6 +112,8 @@ def main():
                     help="不随报告生成 HTML 榜单页（默认生成，需 board_v2 链路）")
     ap.add_argument("--as-of", default="—", help="HTML 页面数据月标注，如 202610")
     ap.add_argument("--html-title", help="HTML 页面标题")
+    ap.add_argument("--force-stale", action="store_true",
+                    help="强制使用旧指纹候选池出榜（仅调试/回测用，报告会标注数据过期）")
     a = ap.parse_args()
 
     cfg = L.load_category(a.category)
@@ -119,6 +121,17 @@ def main():
     if errs:
         sys.exit("配置未通过校验：" + "；".join(errs))
     os.makedirs(a.out, exist_ok=True)
+
+    # v9.7.36：指纹门禁——skill/打分代码升级后，老版本生成的候选池分数不许混进新榜。
+    # 事实数据不作废，只拒绝"用老分数出新榜"；重跑打分逻辑后才能出。
+    import score_fingerprint as SF
+    _here = os.path.dirname(os.path.abspath(__file__))
+    cfg_path = os.path.join(_here, "categories", f"{a.category}.json")
+    _fp = SF.check(a.candidates, cfg_path if os.path.exists(cfg_path) else None)
+    if not _fp["ok"] and not a.force_stale:
+        sys.exit("指纹门禁：" + _fp["reason"] +
+                 "\n→ 请重算候选池分数后用 score_fingerprint.py --stamp 打标；"
+                 "确需强制出榜加 --force-stale（报告会标注数据过期）。")
 
     data = json.load(open(a.candidates, encoding="utf-8"))
     cands = data.get("candidates", data)
@@ -148,6 +161,14 @@ def main():
     parts = [f"# {cfg.get('label')} · 出榜报告", ""]
     parts.append(f"> 来源：`{os.path.basename(a.candidates)}`；"
                  f"链路 取数→闸门→打分→稳健性→三档→审查。**全程无辩论。**")
+    # v9.7.36：数据版本可追溯——读者知道分数是哪个 skill 版本/指纹生成的
+    _gb = _pool_data.get("_generated_by") if isinstance(_pool_data, dict) else None
+    if _gb:
+        parts.append(f"> **数据版本**：候选池生成于 skill v{_gb.get('skill_version')}"
+                     f"（指纹 `{str(_gb.get('fingerprint'))[:8]}`），"
+                     f"当前出榜 skill v{SF.skill_version()}；"
+                     + ("版本一致。" if _fp["ok"] else "**数据已过期，本次为 --force-stale 强制出榜。**"))
+
     # v9.7.17：候选池与证据质量披露自动生成（不再手工写报告，重跑不丢）
     _all = cands
     _src_named = sum(1 for c in _all if c.get("source_ids"))

@@ -730,5 +730,11 @@
    "sales": 2585,
    "reason": "汽车之家配置表索引无该车系，标注配置待核不入主榜"
   }
- ]
+ ],
+ "_generated_by": {
+  "skill_version": "9.7.36",
+  "fingerprint": "487a5afa3370bc24",
+  "config": "car_compact_suv_bev.json",
+  "stamped_at": "2026-11-20 15:06:22"
+ }
 }

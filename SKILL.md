@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 9.7.35
+version: 9.7.36
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v9.7.35）
+# Car recommendation —— 可信购车榜单引擎（v9.7.36）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -45,6 +45,15 @@ author: "nanbatiannanbatian"
   确实查不到配置的车，明确标注"配置待核"并移出主榜（只进落榜/待核名单），不混进主榜充数。
 - **禁止为赶时间跳过配置采集**。宁可多花时间网查（汽车之家/易车/厂商官网配置表），
   也不许出一份缺配置的残缺榜单。新车型入池 = 8 维分 + 逐配置数据 + 证据来源，三者缺一不可。
+- **打分逻辑指纹门禁**（2026-11-20 用户要求"skill升级后老数据全部作废"）：
+  候选池必须带 `_generated_by`（skill版本 + 指纹），由 `score_fingerprint.py --stamp` 打标。
+  指纹覆盖**打分代码文件内容**（trim_annotate/spec_score/leaderboard/quality_score/experience_score）
+  + 配置权重；**skill版本号不进指纹**（纯版本号变化如改文案不该让分数过期），版本号单独记录在_generated_by供展示。
+  `pipeline.py` 出榜前 `SF.check()`：指纹不一致**直接拒绝出榜**（退出码1），
+  需重算分数后重新 --stamp；确需强制加 `--force-stale`（报告标注数据过期）。
+  事实数据（trims/电芯/销量）不作废，只拒绝"老分数混进新版本"。
+  报告头部自动显示"数据版本 vs 当前版本"，可追溯。
+
 - **bug 修复必须落到代码，不能只改榜单数据**（2026-11-20 用户明确要求）：用户问"低置信刷屏"时，
   仅回填 15 款 scored_trim（数据）不够——下次再写占位值仍会复发。必须在核心模块加防呆：
   `trim_annotate.resolve_ref()` 自动识别占位基准并选真实代表配置，`is_placeholder_ref()` 判定占位，
@@ -2900,3 +2909,22 @@ DeepSeek 定性："这是10款候选紧凑型纯电轿车的审计榜，不是�
   conf≠low、配置分有差异——测试的是"下次同类输入是否安全"而非"当前数据是否干净"。
 - 三榜重出：低置信标=0、电芯空=0，无回归。43/43、A/B 28/28 通过。
 - 原则固化：**每次修 bug 都要问——这是只改了本次数据，还是下次同类输入也安全？**
+
+---
+
+## v9.7.36 · 打分逻辑指纹门禁（2026-11-20，用户要求防老数据混入）
+
+用户："是否需要在车型池加skill版本号，skill升级后缓存全部作废，避免老版本数据造成新版本展示有误"。
+
+- 核查：SKILL.md 有 version，但 pipeline/board_v2/render 无任何版本校验；
+  候选池无生成版本字段；master_pool.config_fingerprint() 只覆盖权重、**不覆盖打分代码**——
+  v9.7.31 快充delta、v9.7.34 基准解析这些改代码活动指纹不变，老分数会被当有效。风险真实存在。
+- 新增 `score_fingerprint.py`：指纹 = 5个打分代码文件内容哈希 + 配置权重 + skill版本（16位）。
+  `--stamp` 给候选池打基线、`--check` 校验、`--show` 查看。
+- `pipeline.py` 加门禁：出榜前 `SF.check()`，不一致则 sys.exit(1) 拒绝，
+  `--force-stale` 可强制（报告标注过期）。报告头部自动显示数据版本 vs 当前版本。
+- 三候选池已打当前基线指纹（9.7.35/11375c19，其分数刚重算过）。
+- 验证：临时改 trim_annotate.py 模拟升级→出榜被拒（退出码1），恢复后全绿。
+- **权衡**：事实数据不作废（不随代码变、重采浪费），只拒绝老分数混新版本；
+  改打分代码后需重算分数并重新 stamp（一次性成本）。
+- BUG-044 进回归（44/44），A/B 28/28 通过。
