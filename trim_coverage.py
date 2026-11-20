@@ -63,6 +63,36 @@ def report(r: dict) -> str:
     return "\n".join(L)
 
 
+def check_universe(cands_path: str, universe_path: str | None, excluded: list | None = None) -> dict:
+    """候选池完整性盘点（v9.7.24）：对照权威车型清单，报出漏收的车型。
+    universe json 格式：{"models": ["车型A", ...]} 或纯 list。"""
+    if not universe_path or not os.path.exists(universe_path):
+        return {"available": False}
+    u = json.load(open(universe_path, encoding="utf-8"))
+    universe = set(u.get("models", []) if isinstance(u, dict) else u)
+    pool = json.load(open(cands_path, encoding="utf-8"))
+    cands = pool.get("candidates", []) if isinstance(pool, dict) else pool
+    inpool = {c.get("model") for c in cands}
+    excluded = {x.get("model") for x in (excluded or [])}
+    missing = sorted(universe - inpool - excluded)
+    return {"available": True, "universe": len(universe), "in_pool": len(inpool),
+            "excluded_with_reason": len(inpool & excluded) + len(excluded & universe),
+            "not_covered": missing}
+
+
+def report_universe(r: dict) -> str:
+    if not r.get("available"):
+        return "完整性盘点：未提供 --universe 清单，跳过"
+    L = [f"候选池完整性盘点：权威清单 {r['universe']} 款，入池 {r['in_pool']} 款，"
+         f"已列明原因未入池 {r['excluded_with_reason']} 款"]
+    if r["not_covered"]:
+        L.append(f"  ⛔ 未覆盖且未说明原因 {len(r['not_covered'])} 款：{', '.join(r['not_covered'])}")
+        L.append("  → 按铁律：能取配置的入池，不能取的写明原因进 pool_excluded[]，不许漏掉。")
+    else:
+        L.append("  ✅ 权威清单全部覆盖或已说明未入池原因")
+    return "\n".join(L)
+
+
 def selftest() -> int:
     r = check(os.path.join(HERE, "runs", "midsedan_bev_1218_202610", "candidates.json"))
     if not r["missing"] and not r["incomplete"]:
@@ -77,6 +107,7 @@ if __name__ == "__main__":
     ap.add_argument("--candidates", help="候选池 json")
     ap.add_argument("--trims", help="配置库 json（默认 categories/trims.json）")
     ap.add_argument("--strict", action="store_true", help="有缺失则 exit 1")
+    ap.add_argument("--universe", help="权威车型清单 json（完整性盘点，对照是否漏收）")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args()
     if a.selftest:
@@ -85,5 +116,10 @@ if __name__ == "__main__":
         ap.error("需要 --candidates")
     r = check(a.candidates, a.trims)
     print(report(r))
+    if a.universe:
+        pool = json.load(open(a.candidates, encoding="utf-8"))
+        ex = pool.get("pool_excluded", []) if isinstance(pool, dict) else []
+        ur = check_universe(a.candidates, a.universe, ex)
+        print(report_universe(ur))
     if a.strict and (r["missing"] or r["incomplete"]):
         raise SystemExit(1)
