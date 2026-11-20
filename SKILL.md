@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 9.7.34
+version: 9.7.35
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v9.7.34）
+# Car recommendation —— 可信购车榜单引擎（v9.7.35）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -45,6 +45,13 @@ author: "nanbatiannanbatian"
   确实查不到配置的车，明确标注"配置待核"并移出主榜（只进落榜/待核名单），不混进主榜充数。
 - **禁止为赶时间跳过配置采集**。宁可多花时间网查（汽车之家/易车/厂商官网配置表），
   也不许出一份缺配置的残缺榜单。新车型入池 = 8 维分 + 逐配置数据 + 证据来源，三者缺一不可。
+- **bug 修复必须落到代码，不能只改榜单数据**（2026-11-20 用户明确要求）：用户问"低置信刷屏"时，
+  仅回填 15 款 scored_trim（数据）不够——下次再写占位值仍会复发。必须在核心模块加防呆：
+  `trim_annotate.resolve_ref()` 自动识别占位基准并选真实代表配置，`is_placeholder_ref()` 判定占位，
+  `ref_basis` 写明解析依据；`ref=None` 才降置信，不再静默 fallback 全车 low。
+  BUG-043 回归用**故意注入占位值**的假数据测试自动解析（不是只检查当前数据没占位）。
+  每次修 bug 都要问：这是只改了本次数据，还是下次同类输入也安全？
+
 - **占位 scored_trim 必须回填**（2026-11-20 用户问"全都有低置信是不是没必要展示"）：
   auto_trims 新入池车的 `scored_trim` 若是"待配置核验"等占位值，`find_ref` 失败 →
   `ref_fallback` → 全车置信 low → 主榜逐车刷"低置信"，全中就失去区分度。
@@ -2874,3 +2881,22 @@ DeepSeek 定性："这是10款候选紧凑型纯电轿车的审计榜，不是�
   领克20升至第1、AION i60 从第2降至第5；已写进候选池 pool_meta.notes 自动披露。
 - BUG-043 进回归（43/43），A/B 28/28 通过。
 - 教训：标记类字段要有区分度才有意义；全中的标记要么修根因、要么改展示规则。
+
+---
+
+## v9.7.35 · bug 修复代码化（2026-11-20，用户明确要求）
+
+用户："这份问题不要只改榜单，要把修改放到代码里面，把这次的bug记录下来，确保以后不出一样的问题"。
+
+- 核查：v9.7.34 主要改的是**数据**（回填15款 scored_trim）+ 显示规则，
+  `annotate_all()` 仍会在占位/匹配失败时静默 fallback 给全车 low——下次复发。
+- **代码级根治**（trim_annotate.py）：
+  - `is_placeholder_ref()` 识别"待配置核验/待核/待定/—"等占位值；
+  - `resolve_ref()` 统一解析基准：真实名先精确/模糊匹配，占位则按指导价中位就近选代表配置，
+    返回 (ref, is_fallback, basis) 写明依据；
+  - 置信只在实际 ref=None 时降 low，占位自动解析不再全车 low；
+  - out 增加 `ref_basis` / `ref_fallback` 字段供审计。
+- **BUG-043 回归升级**：故意把 AION N60 scored_trim 注入为占位，验证自动解析出真实配置、
+  conf≠low、配置分有差异——测试的是"下次同类输入是否安全"而非"当前数据是否干净"。
+- 三榜重出：低置信标=0、电芯空=0，无回归。43/43、A/B 28/28 通过。
+- 原则固化：**每次修 bug 都要问——这是只改了本次数据，还是下次同类输入也安全？**

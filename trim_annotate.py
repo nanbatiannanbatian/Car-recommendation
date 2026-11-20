@@ -167,6 +167,48 @@ def find_ref(name: str, trims: list[dict]) -> dict | None:
     return best if score >= 2 else None
 
 
+def is_placeholder_ref(name: str) -> bool:
+    """占位基准名（非真实配置名）——v9.7.35：这类值必须自动解析，不许静默 fallback 全车 low。"""
+    s = str(name or "")
+    return (not s or s in ("—", "-", "null", "None", "unknown")
+            or any(k in s for k in ("待核", "待配置", "待核验", "主力配置", "待定")))
+
+
+def resolve_ref(name: str, trims: list[dict], cands_for_model: list[dict] | None = None) -> tuple[dict | None, bool, str]:
+    """解析评分配置基准 → (ref, is_fallback, basis)。
+
+    v9.7.35（BUG-043 代码级根治）：占位名/匹配失败时**主动选代表配置**并写明依据，
+    不再静默 fallback 给全车打 low（那会导致主榜低置信刷屏、失去区分度）。
+    优先级：① 真实名精确/模糊匹配 → ② 候选池 trim 价格最近 → ③ 车系价格中位数配置。
+    只有真的无法解析（trims 为空）才返回 None。
+    """
+    if not is_placeholder_ref(name):
+        ref = find_ref(name, trims)
+        if ref:
+            return ref, False, "精确/模糊匹配 scored_trim"
+    # 占位或匹配失败：选代表配置
+    if not trims:
+        return None, True, "无配置可选"
+    price_hint = None
+    for c in (cands_for_model or []):
+        pg = c.get("price_guide") or []
+        if isinstance(pg, list) and len(pg) == 2:
+            price_hint = (pg[0] + pg[1]) / 2
+            break
+        if c.get("price"):
+            price_hint = c["price"]
+            break
+    if price_hint:
+        ref = min(trims, key=lambda t: abs((t.get("price") or 0) - price_hint))
+        basis = f"占位基准，按指导价中位{price_hint:g}万就近选取"
+    else:
+        prices = sorted(t.get("price") or 0 for t in trims if t.get("price"))
+        med = prices[len(prices) // 2] if prices else 0
+        ref = min(trims, key=lambda t: abs((t.get("price") or 0) - med))
+        basis = f"占位基准，按车系配置价中位{med:g}万选取"
+    return ref, True, basis
+
+
 def annotate_all(cands: list[dict], cfg: dict) -> dict:
     """给每个车的所有配置生成人工口径分（base_scores + delta）。"""
     tdb = load_trims()
@@ -180,23 +222,15 @@ def annotate_all(cands: list[dict], cfg: dict) -> dict:
         if not base:
             continue
         ref_name = entry.get("scored_trim") or ""
-        ref = find_ref(ref_name, entry["trims"])
-        # BUG-017(auto_trims补录车)：scored_trim 与配置表对不上时 find_ref 失败，
-        # 导致所有配置 delta=[]（配置分全相同、下拉无意义）。fallback 到车系评分配置价
-        # 最接近的配置作基准，保证配置差异能被算出来（基准偏差记入 confidence）。
-        ref_fallback = False
-        if ref is None:
-            price_hint = None
-            for c in cands:
-                if c.get("model") == model and isinstance(c.get("trim"), dict):
-                    price_hint = c["trim"].get("price")
-                    break
-            if price_hint:
-                ref = min(entry["trims"],
-                          key=lambda t: abs((t.get("price") or 0) - price_hint))
-            else:
-                ref = entry["trims"][0]
-            ref_fallback = True
+        # v9.7.35（BUG-043 根治）：占位/匹配失败主动解析代表配置，写明依据；
+        # 不再静默 fallback 给全车打 low（曾致主榜20/20低置信刷屏）。
+        _same_model = [c for c in cands if c.get("model") == model]
+        ref, ref_fallback, ref_basis = resolve_ref(ref_name, entry["trims"], _same_model)
+        if ref_fallback:
+            # 把解析出的真实基准名写回（供 out 与页面展示），避免下游再读到占位值
+            ref_name_real = ref.get("name") if ref else None
+        else:
+            ref_name_real = ref_name
         trims = []
         for t in entry["trims"]:
             # v9.7.4：匹配不到参考配置时不下 delta（宁可不加分，不在错基准上加分）
@@ -205,8 +239,11 @@ def annotate_all(cands: list[dict], cfg: dict) -> dict:
             for d in ds:
                 sc[d["dim"]] = round(max(0, min(10, sc.get(d["dim"], 8) + d["delta"])), 2)
             conf = min((d["conf"] for d in ds), key=lambda x: CONF_ORDER[x]) if ds else "high"
-            if ref_fallback:
-                conf = "low"  # 基准是 fallback 的，整体降置信
+            # v9.7.35：占位基准已由 resolve_ref 主动解析成真实代表配置，不再全车降 low
+            # （旧逻辑把所有配置打 low→主榜低置信刷屏=BUG-043）。基准偏差只在 ref_basis 说明，
+            # 不污染每个配置的置信度。只有基准完全无法解析（ref=None）才降置信。
+            if ref is None:
+                conf = "low"
             # 产品力分：剔除 value 的 7 维按原权重归一化×10（与 product_power_board 同口径）
             pp_keys = [k for k in W if k != "value"]
             pp_tw = sum(W[k] for k in pp_keys)
@@ -222,7 +259,9 @@ def annotate_all(cands: list[dict], cfg: dict) -> dict:
         valid = [t for t in trims if t.get("total") is not None]
         best = max(valid, key=lambda t: t["total"]) if valid else None
         out[model] = {
-            "scored_trim": ref_name,
+            "scored_trim": ref_name_real,
+            "ref_basis": ref_basis,
+            "ref_fallback": ref_fallback,
             "n_trims": len(trims), "trims": trims,
             "best_trim": best["name"] if best else None,
             "best_total": best["total"] if best else None,

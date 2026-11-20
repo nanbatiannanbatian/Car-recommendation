@@ -63,7 +63,7 @@ CASES = [
     ("BUG-040", "快充能力无配置级delta且口径混用会虚高", "v9.7.31"),
     ("BUG-041", "紧凑SUV榜候选池/配置未固化", "v9.7.32"),
     ("BUG-042", "校验不覆盖电芯字段致11/20主榜空白", "v9.7.33"),
-    ("BUG-043", "占位scored_trim致全榜低置信刷屏", "v9.7.34"),
+    ("BUG-043", "占位scored_trim致全榜低置信刷屏", "v9.7.35"),
 ]
 
 
@@ -226,11 +226,31 @@ def t015():
 
 
 def t043():
-    """低置信要只在有区分度时显示；占位scored_trim必须回填。"""
-    td = json.load(open(os.path.join(HERE, "categories", "trims.json"), encoding="utf-8"))
-    placeholders = [e["model"] for e in td["entries"]
-                    if "待配置" in str(e.get("scored_trim") or "")]
-    assert not placeholders, f"仍有占位scored_trim: {placeholders}"
+    """低置信只在有区分度时显示；占位scored_trim由代码自动解析（防呆，非靠人工回填）。"""
+    import copy
+    import trim_annotate as TA
+    # 代码级防呆：故意把某车 scored_trim 改成占位，验证 annotate_all 能自动解析且不全车 low
+    src_ta = _read("trim_annotate.py")
+    assert "is_placeholder_ref" in src_ta and "resolve_ref" in src_ta, "无占位基准自动解析"
+    fake_path = os.path.join(HERE, "__bug043_fake_trims.json")
+    orig_trims = TA.TRIMS
+    try:
+        td = json.load(open(os.path.join(HERE, "categories", "trims.json"), encoding="utf-8"))
+        fake = copy.deepcopy(td)
+        target = next(e for e in fake["entries"] if e["model"] == "AION N60")
+        target["scored_trim"] = "待配置核验"
+        json.dump(fake, open(fake_path, "w", encoding="utf-8"), ensure_ascii=False)
+        TA.TRIMS = fake_path
+        c = json.load(open(os.path.join(HERE, "categories", "candidates_compact_suv_bev.json"), encoding="utf-8"))["candidates"]
+        cfg = json.load(open(os.path.join(HERE, "categories", "car_compact_suv_bev.json"), encoding="utf-8"))
+        r = TA.annotate_all(c, cfg)["AION N60"]
+        assert "待配置" not in str(r["scored_trim"]), "占位基准未被自动解析"
+        assert r["best_confidence"] != "low", f"占位基准仍致全车low: {r['best_confidence']}"
+        assert len(set(t["total"] for t in r["trims"])) > 1, "配置分无差异"
+    finally:
+        TA.TRIMS = orig_trims
+        if os.path.exists(fake_path):
+            os.remove(fake_path)
     src = _read("render_board_html.py")
     assert "_mixed_conf" in src, "低置信区分度显示逻辑缺失"
     for out in ("compact_suv_bev_202610", "compact_bev_extended_202610"):
