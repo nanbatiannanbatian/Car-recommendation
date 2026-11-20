@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 9.7.24
+version: 9.7.25
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v9.7.24）
+# Car recommendation —— 可信购车榜单引擎（v9.7.25）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -2673,3 +2673,19 @@ DeepSeek 定性："这是10款候选紧凑型纯电轿车的审计榜，不是�
   与既有逐配置覆盖校验合为出榜前双门禁。实测 18 款权威清单 vs 16 入池 + 2 有原因 = ✅全覆盖。
 - 用户级 MEMORY.md 同步写入（跨会话强制）。
 - BUG-033 进回归（33/33），A/B 27/27 通过。
+
+---
+
+## v9.7.25 · 电池来源列回退修复（2026-11-20，用户指出）
+
+用户："电池来源信息没有，不合理，电芯信息都有的"。核实属实：
+`main_cell('cell_brand')` 的 `best_trim_detail` 分支在 cell_supplier=null（auto_trims 记 null）时
+直接返回"—"，永远走不到事实库 `fact_ref['电芯']` 回退——明明 fact_library 有值却显示未采集。
+
+- 修复回退链：best_trim.cell_supplier → fact_ref['电芯'] → battery_detail.cell → "—"。
+- fact_library 补 4 款长尾车电芯（网查 2026-11-20）：奔驰CLA=宁德时代、羿驰05=孚能/宁德、
+  秦新能源=弗迪、e爱丽舍=江苏正力。
+- 结果：两张榜电池来源从 3/16 → 16/16、14/16 → 16/16 全覆盖。
+- 报告披露：该值为车系级电芯品牌，配置差异（如 MG4 宁德/瑞浦/清陶）以逐配置表为准。
+- BUG-034 进回归（34/34），A/B 27/27 通过。
+- 教训：任何"字段回退链"都要测 null 分支能否走到下一级——本 bug 藏了多个版本。

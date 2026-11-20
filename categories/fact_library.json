@@ -398,5 +398,22 @@
   "kwh": 85,
   "consumption": 14.6,
   "cell_brand": "中创新航"
- }
+ },
+ "奔驰CLA新能源": {
+  "cell_brand": "宁德时代",
+  "source": "domain_search_20261120"
+ },
+ "羿驰05": {
+  "cell_brand": "孚能科技/宁德时代",
+  "source": "domain_search_20261120"
+ },
+ "秦新能源": {
+  "cell_brand": "弗迪",
+  "source": "domain_search_20261120"
+ },
+ "e爱丽舍": {
+  "cell_brand": "江苏正力",
+  "source": "domain_search_20261120"
+ },
+ "updated": "2026-11-20"
 }

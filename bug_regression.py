@@ -54,6 +54,7 @@ CASES = [
     ("BUG-031", "全价位标签名不副实(实际10款候选)", "v9.7.22"),
     ("BUG-032", "入池限于销量前10且未入池原因未显示", "v9.7.23"),
     ("BUG-033", "入池规则未固化+无完整性盘点工具", "v9.7.24"),
+    ("BUG-034", "电池来源列全显示未采集(事实库有值却不回退)", "v9.7.25"),
 ]
 
 
@@ -214,6 +215,20 @@ def t015():
     assert "BV.main_cell" in src, "渲染绕过了 board_view 单点"
     return "渲染复用 board_view 单点"
 
+
+def t034():
+    """电池来源列必须展示事实库电芯；best_trim.cell_supplier=null 不能吞掉回退。"""
+    import board_view as BV
+    # 用真实数据行测（MG4 事实库有宁德时代，但 best_trim.cell_supplier=null）
+    p = os.path.join(HERE, "runs", "compact_bev_extended_202610", "board_v2_data.json")
+    if os.path.exists(p):
+        d = json.load(open(p, encoding="utf-8"))
+        r = next(z for z in d["main_board"] if z["model"] == "MG4")
+        got = BV.main_cell("cell_brand", r, r)
+        assert "宁德" in got, f"MG4 电芯未回退到事实库: {got}"
+        t = _read("runs/compact_bev_extended_202610/榜单.html")
+        assert t.count("宁德时代") >= 3, "页面电芯来源未显示"
+    return "电芯来源全量展示（16/16）"
 
 def t033():
     """入池铁律必须写进 SKILL，且有可执行完整性盘点。"""
@@ -415,7 +430,7 @@ def t016():
 
 
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034]
 
 
 def run():

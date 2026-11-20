@@ -399,19 +399,27 @@ def main_cell(key: str, row: dict, cand: dict, grade: str = "") -> str:
         return (flag + f"优：{'、'.join(v['pros'])}｜短：{'、'.join(v['cons'])}｜"
                 f"适合：{v['audience']}｜{v['advice']}")
     if key == "cell_brand":
-        # v9.7.2：电池来源跟随最高配置（845版=宁德+800V，不是610版的清陶+400V）
-        bd = row.get("best_trim_detail")
-        if bd:
-            brand = str(bd.get("cell_supplier") or "—")
-            charge = str(bd.get("charge") or "")
-            import re
-            mv = re.search(r"(900|800|400)\s*V", charge)
-            volt = (mv.group(1) + "V") if mv else None
-            return f"{brand} · {volt}" if volt else brand
+        # v9.7.25：电芯来源回退链——先最高配置，再事实库 fact_ref，再 battery_detail。
+        # 原 bug：bd 分支里 cell_supplier=null（auto_trims 记 null）时直接返回"—"，
+        # 永远走不到事实库回退，导致明明 fact_library 有电芯品牌却显示"未采集"。
         bp = row.get("battery_detail") or {}
-        v = fr.get("电芯")
-        brand = str(v) if v not in (None, "—", "") else str(bp.get("cell") or "—")
-        volt = bp.get("voltage")
+        fr_cell = fr.get("电芯")
+        bd = row.get("best_trim_detail")
+        bd_cell = (bd or {}).get("cell_supplier")
+        brand = None
+        if bd_cell not in (None, "", "—"):
+            brand = str(bd_cell)
+        elif fr_cell not in (None, "—", ""):
+            brand = str(fr_cell)
+        elif bp.get("cell") not in (None, "—", ""):
+            brand = str(bp.get("cell"))
+        else:
+            brand = "—"
+        # 电压：优先配置 charge，其次 battery_detail
+        charge = str((bd or {}).get("charge") or "")
+        import re
+        mv = re.search(r"(900|800|400)\s*V", charge)
+        volt = (mv.group(1) + "V") if mv else bp.get("voltage")
         if volt and volt != "未披露":
             brand = f"{brand} · {volt}"
         return brand
