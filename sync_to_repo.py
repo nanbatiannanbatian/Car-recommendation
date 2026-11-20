@@ -77,6 +77,7 @@ NEW_FILES = [
     "categories/vehicle_physics.json",          # 物理参数库（采集自汽车之家，整备质量/风阻/电压/换电）
     # v9.7.39 实际续航物理模型（skill 单一事实源）
     "ev_range_model.py",                        # 物理模型+真实数据对照表（页面从这里import常量）
+    "filings_board.py",                         # 申报车型列表（参考车预估+是否值得等）
 ]
 
 
