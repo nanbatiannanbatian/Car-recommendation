@@ -148,7 +148,7 @@
   "_first_party_note": "「一手」=可独立核验的原始记录（官方测评、投诉编号、监管公告、结构化销量）；厂商配置表与详情页属厂方口径，不算一手。",
   "boards": [
     {
-      "label": "中型纯电轿车（12–18万）",
+      "label": "中型纯电轿车（全价位）",
       "match": {
         "cls": "中型车",
         "power": "BEV"
@@ -161,8 +161,8 @@
           "BEV"
         ],
         "price_band": [
-          12,
-          18
+          0,
+          100
         ],
         "price_basis": "trim",
         "require_guide_price": true,
@@ -170,7 +170,7 @@
       }
     },
     {
-      "label": "中型纯电SUV（12–18万）",
+      "label": "中型纯电SUV（全价位）",
       "match": {
         "cls": "中型SUV",
         "power": "BEV"
@@ -183,8 +183,8 @@
           "BEV"
         ],
         "price_band": [
-          12,
-          18
+          0,
+          100
         ],
         "price_basis": "trim",
         "require_guide_price": true,

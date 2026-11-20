@@ -323,7 +323,11 @@ def main():
                     for tk, label in (("T1", "第一档"), ("T2", "第二档"), ("T3", "第三档")):
                         for nm in (tmap.get(tk) or []):
                             _tiers_v2[nm] = label
-                data_v2 = BV.build(cands, cfg_v2, pol, facts_v2, tiers=_tiers_v2)
+                # v9.7.10：页面与报告一致——只把通过闸门的候选（有档位的）传给渲染，
+                # 否则被生命周期闸门淘汰的停产车（如秦L EV）会出现在主榜却没档位。
+                _passed = set(_tiers_v2.keys())
+                cands_for_html = [c for c in cands if c.get("model") in _passed] if _passed else cands
+                data_v2 = BV.build(cands_for_html, cfg_v2, pol, facts_v2, tiers=_tiers_v2)
                 doc = RH.render(data_v2, summary, a.html_title, a.as_of)
                 hp = os.path.join(a.out, "榜单.html")
                 open(hp, "w", encoding="utf-8").write(doc)
