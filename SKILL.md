@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 9.7.8
+version: 9.7.9
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v9.7.8）
+# Car recommendation —— 可信购车榜单引擎（v9.7.9）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -31,6 +31,22 @@ author: "nanbatiannanbatian"
 >     python3 monthly.py --dry-run
 >     python3 filings.py --list
 >     python3 pipeline.py --category car_ev --candidates 候选池.json --out runs/x
+
+## ⛔ 最高优先级铁律：每款车必须有逐配置数据（2026-11-20 用户明确要求，强制）
+
+用户原话：「我们是按车型配置来的，缺少车型配置信息这个榜单参考意义大打折扣，
+宁愿多花时间搜集也不少搜集，确保以后每次的榜单车型配置都加上。」
+
+- **每一款进入榜单的车型，必须在 `categories/trims.json` 有 `trims[]` 逐配置记录**
+  （至少：配置名/指导价/电量/电芯/电压平台/快充/续航/关键配置），
+  否则该车型没有配置下拉框，榜单违背"按配置购车"的核心价值——**不可出榜**。
+- **出榜前必须校验**：`python3 trim_coverage.py --candidates <候选池.json>`（见 v9.7.9），
+  报出缺配置的车型。**有缺失时先补采配置数据，不许直接出榜**；
+  确实查不到配置的车，明确标注"配置待核"并移出主榜（只进落榜/待核名单），不混进主榜充数。
+- **禁止为赶时间跳过配置采集**。宁可多花时间网查（汽车之家/易车/厂商官网配置表），
+  也不许出一份缺配置的残缺榜单。新车型入池 = 8 维分 + 逐配置数据 + 证据来源，三者缺一不可。
+- 页面上每款车的主榜行、总分构成行、产品力榜行都必须有配置下拉框；
+  若某车无配置数据导致下拉框缺失，视为 bug，必须修复后交付。
 
 ## 榜单口径协议 ranking.py（v4.1）+ 榜序复核 pairwise.py（v4.2）
 
@@ -2405,3 +2421,17 @@ MG07 845版 87.9 #1、深蓝L06 87.8 #2（分差0.1，在算法噪声内）。
 - 实测：MG07 845版「高压快充、超充、三电强、智驾好/适合看重续航快充」vs 650版「智驾好、性价比高、
   操控好、车机流畅/适合预算敏感」；深蓝L06「三电强、安全高、智驾好、性价比高」——三者不再撞车。
 - 全 selftest + A/B 26 项 + node --check 通过。
+
+---
+
+## v9.7.9 · 逐配置覆盖铁律可执行化（2026-11-20，用户强制要求）
+
+用户原话：「我们是按车型配置来的，缺少车型配置信息这个榜单参考意义大打折扣，
+宁愿多花时间搜集也不少搜集，确保以后每次的榜单车型配置都加上。」
+
+- SKILL.md 顶部新增「⛔ 最高优先级铁律」章节（本文件最上方），写明每款车必须有 trims[] 逐配置数据。
+- 新增 `trim_coverage.py`：出榜前强制校验每款车都有逐配置数据，
+  `python3 trim_coverage.py --candidates <候选池> --strict` 缺配置则 exit 1。
+- `categories/trims.json` 补齐 12 款车配置（8 款 auto_trims.py 自动解析 + 4 款网查手工补录：
+  秦MAX EV/阿维塔06T/奥迪E5 Sportback/宝马i3），共 47 款在榜。
+- 2026-10 纯电中型轿车全价位榜重出：25 款全部有配置，75 个下拉框（25×3），25 个 details。
