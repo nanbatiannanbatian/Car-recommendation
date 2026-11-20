@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 9.7.20
+version: 9.7.21
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v9.7.20）
+# Car recommendation —— 可信购车榜单引擎（v9.7.21）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -2600,3 +2600,15 @@ DeepSeek 六轮评审第1条反复说"候选池规则看不到"——核实发�
   其它浮点也最多1位小数；底层 TRIMDATA 保真，只降展示精度（AION UT 34.868→≈35）。
 - 踩坑：`summary` 在报告拼装时（158行）尚未初始化（197行才建），pool_disclosure 写入要放初始化块里。
 - 不改分、不改排名/档位。BUG-029 进回归（29/29），A/B 27/27 通过。
+
+---
+
+## v9.7.21 · 候选池披露空指向修正 + 定稿（2026-11-20）
+
+DeepSeek 给 9/10 并认可定稿。三条小意见中：
+- 安全维度动态更新：未来数据工程，非当前可做，不改。
+- 「同级未入池车型见 report.md」是**空指向**（report 里根本没有未入池清单）——改为写实：
+  "汽车之家紧凑型车+纯电动 2026-10 车系月销榜前10，来源多为网查多源交叉，不入池的车只作参数参考"。BUG-030。
+- Lafa5 产品力>主榜加评价：**未采纳**——核实当前数据 rank_delta=0（产品力#6=主榜#6），
+  DeepSeek 引用的是旧数据；无事实依据加这句话等于编，拒绝。
+- 回归 30/30、A/B 27/27 通过。不升版本功能、只修展示层文案。
