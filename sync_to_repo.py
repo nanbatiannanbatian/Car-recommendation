@@ -68,6 +68,15 @@ NEW_FILES = [
     "categories/universe_compact_bev_202610.json",      # v9.7.30 紧凑纯电权威车型清单（完整性盘点）
     "categories/trim_verified.json",            # v9.7.3 六配置榜人工标注（参考）
     "categories/car_midsedan_allprice.json",    # 2026-10纯电中型轿车全价位榜配置
+    "trim_ingest.py",                           # v9.7.39 逐配置采集导入器（借 vehicle-data-hub/swoiow，不内置爬虫）
+    "schema_audit.py",                          # v9.7.39 逐配置字段规范对照（借 open-ev-data schema）
+    # 2026-11-20 跨能源形式选车适配比较器（用户多轮需求）
+    "build_energy_compare.py",                  # 比较器生成脚本（规则表唯一事实源）
+    "energy_compare.html",                      # 比较器交付页面（自包含）
+    "energy_compare_regress.py",                # 比较器回归测试（防补丁/防重跑退化，17项）
+    "categories/vehicle_physics.json",          # 物理参数库（采集自汽车之家，整备质量/风阻/电压/换电）
+    # v9.7.39 实际续航物理模型（skill 单一事实源）
+    "ev_range_model.py",                        # 物理模型+真实数据对照表（页面从这里import常量）
 ]
 
 
