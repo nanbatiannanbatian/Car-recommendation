@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 9.7.14
+version: 9.7.15
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v9.7.14）
+# Car recommendation —— 可信购车榜单引擎（v9.7.15）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -2499,3 +2499,20 @@ MG07 845版 87.9 #1、深蓝L06 87.8 #2（分差0.1，在算法噪声内）。
   目录项 `<a href="#sec-...">`；另加「↑ 回到顶部」。CSS 加 navbox/navgrid 样式 + h2 scroll-margin。
 - 不改分数/排名/档位/区块内容，只加导航层。
 - 验证：紧凑榜 9 项、中型榜 15 项，目录与 h2 锚点一一对应；BUG-020 进回归（20/20），A/B 27/27。
+
+---
+
+## v9.7.15 · 智驾分倒挂校正（DeepSeek 评审后核实，2026-11-20）
+
+外部评审指出零跑B01 adas=9.7 却让小鹏MONA M03 Max（750TOPS+全国无图城区NGP）只有 6.6 且标"智驾弱"，
+倒挂反直觉。逐条核实确认两个真 bug：
+
+- BUG-021：`deltas_for()` 的激光雷达判断只看 `key_configs`，auto_trims 补录车该字段常为空；
+  改为同时识别配置名里的「激光雷达」。修复后零跑激光版 adas 高于普通版。
+- BUG-022：车系基准 adas 无证据来源（source_ids=None）。网查核实后重定：
+  零跑B01 9.7→7.8（200TOPS，城区NOA仅5城白名单、无图未OTA、算法爬坡），
+  小鹏MONA M03 6.6→8.8（750TOPS图灵+全国无图即开即用+第二代VLA，纯视觉短板折扣）。
+- 排名随之修正：零跑B01 81.3→78.5（仍#1），小鹏MONA M03 73.9→76.8（#4→#2）。
+- 报告新增「外部评审回应与已知局限」6 条：入池理由、质量维零区分度、安全维弱区分、
+  智驾校正、纯产品力榜边界、AION UT 空间折扣。
+- BUG-021/022 进回归（22/22），A/B 27/27 通过。

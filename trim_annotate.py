@@ -71,7 +71,10 @@ def deltas_for(trim: dict, ref: dict) -> list[dict]:
             out.append({"dim": "powertrain", "delta": round(d, 2),
                         "conf": "medium", "why": f"电量 {k0}→{k1}kWh"})
     # 激光雷达
-    lidar = lambda t: any("激光雷达" in str(x) for x in (t.get("key_configs") or []))
+    # BUG-021：auto_trims 自动补录的 key_configs 常为空，但配置名里有「激光雷达」。
+    # 只看 key_configs 会把激光雷达版和非激光版判成一样，配置分失真。
+    lidar = lambda t: ("激光雷达" in str(t.get("name") or "")) or \
+                      any("激光雷达" in str(x) for x in (t.get("key_configs") or []))
     if lidar(trim) and not lidar(ref):
         out.append({"dim": "adas", "delta": 0.8, "conf": "high", "why": "新增激光雷达"})
     elif lidar(ref) and not lidar(trim):

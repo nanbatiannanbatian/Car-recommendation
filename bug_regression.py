@@ -41,6 +41,8 @@ CASES = [
     ("BUG-018", "营运/网约车未在主榜评价标识,误导私人购车者", "v9.7.12"),
     ("BUG-019", "生命周期状态英文(steady/active)直出页面", "v9.7.13"),
     ("BUG-020", "榜单缺少顶部导航目录与区块跳转锚点", "v9.7.14"),
+    ("BUG-021", "配置名含激光雷达但key_configs空致智驾分失真", "v9.7.15"),
+    ("BUG-022", "零跑B01智驾9.7高于小鹏6.6的倒挂(无证据基准)", "v9.7.15"),
 ]
 
 
@@ -202,6 +204,25 @@ def t015():
     return "渲染复用 board_view 单点"
 
 
+def t021():
+    """配置名里的激光雷达必须被识别（auto_trims 的 key_configs 常为空）。"""
+    import trim_annotate as TA
+    cands = json.load(open(os.path.join(HERE, "runs", "compact_bev_202610_candidates.json"), encoding="utf-8"))["candidates"]
+    cfg = json.load(open(os.path.join(HERE, "categories", "car_compact_bev_allprice.json"), encoding="utf-8"))
+    out = TA.annotate_all(cands, cfg)
+    d = out["零跑B01"]
+    lidar = next(t for t in d["trims"] if "激光雷达" in t["name"])
+    plain = next(t for t in d["trims"] if "悦享" in t["name"])
+    assert lidar["scores"]["adas"] > plain["scores"]["adas"], "激光雷达版智驾分未高于普通版"
+    return f"激光版{lidar['scores']['adas']} > 普通版{plain['scores']['adas']}"
+
+def t022():
+    """智驾基准不得无证据倒挂：小鹏750TOPS全国NOA不应低于零跑200TOPS白名单。"""
+    cands = json.load(open(os.path.join(HERE, "runs", "compact_bev_202610_candidates.json"), encoding="utf-8"))["candidates"]
+    sc = {c["model"]: c["scores"]["adas"] for c in cands}
+    assert sc["小鹏MONA M03"] > sc["零跑B01"], f"智驾倒挂: 小鹏{sc['小鹏MONA M03']} vs 零跑{sc['零跑B01']}"
+    return f"小鹏{sc['小鹏MONA M03']} > 零跑{sc['零跑B01']}（倒挂已修）"
+
 def t020():
     """顶部导航：目录项与 h2 锚点必须一一对应，来自 BLOCKS 单一来源。"""
     import re as _re
@@ -262,7 +283,7 @@ def t016():
 
 
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022]
 
 
 def run():
