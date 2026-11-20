@@ -1,7 +1,7 @@
 # 证据采集工具（内置自 research-collector）
 
-本目录是榜单引擎的**可选证据采集增强**，随包发布、无需另装 skill。
-脚本 `researcher.py` + `config.json` 来自 research-collector（176KB，无第三方重依赖，无硬编码路径）。
+本目录是榜单引擎的**内建证据采集模块**（v9.7.38 起完全整合，原 research-collector 能力已并入本引擎 SKILL.md「统一证据采集」章节）。
+脚本 `researcher.py` + `config.json` 随包发布，无第三方重依赖、无硬编码路径。
 
 ## 它是什么 / 不是什么
 

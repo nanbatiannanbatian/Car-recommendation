@@ -66,6 +66,7 @@ CASES = [
     ("BUG-043", "占位scored_trim致全榜低置信刷屏", "v9.7.35"),
     ("BUG-044", "skill升级后老分数混入新榜(无指纹门禁)", "v9.7.36"),
     ("BUG-045", "发布包缺内置证据采集工具(依赖外部skill)", "v9.7.37"),
+    ("BUG-046", "整合残留orchestrator死依赖", "v9.7.38"),
 ]
 
 
@@ -226,6 +227,18 @@ def t015():
     assert "BV.main_cell" in src, "渲染绕过了 board_view 单点"
     return "渲染复用 board_view 单点"
 
+
+def t046():
+    """research-collector 完全整合：无独立身份、无 orchestrator 死依赖。"""
+    sk = _read("SKILL.md")
+    assert "统一证据采集（内建" in sk, "采集能力未并入SKILL"
+    rp = _read("research/researcher.py")
+    assert "import orchestrator" not in rp and "def extract_sources" not in rp, "残留辩论引擎死代码"
+    rd = _read("research/README.md")
+    assert "内建证据采集模块" in rd, "README仍称外部来源"
+    cfg = json.load(open(os.path.join(HERE, "research", "config.json"), encoding="utf-8"))
+    assert "api_key_env" not in cfg, "残留废弃密钥配置"
+    return "完全整合：能力入SKILL+死代码清除+无外部依赖"
 
 def t045():
     """发布包自包含：证据采集工具必须在包内，不依赖外部 skill。"""
@@ -659,7 +672,7 @@ def t016():
 
 
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046]
 
 
 def run():

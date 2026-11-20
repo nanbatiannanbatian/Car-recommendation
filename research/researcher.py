@@ -13,19 +13,19 @@
 推荐用法：在 WorkBuddy 对话中触发 research-collector（或 omni-debate 的「研究流程」）时说
     「用 omni-debate 研究：1000-2000元意式磨豆机 Top10」
 本 agent（WorkBuddy）会先用 domain_search / WebFetch 联网检索、抓关键页、直接整理成
-research.json，再交给 orchestrator（omni-debate）跑辩论。这条路径不需要本脚本，也不消耗
+research.json。本引擎已移除辩论/orchestrator，全程无 LLM 排序。
 额外的 OmniRoute 调用。详见 research-collector 的 SKILL.md「五步协议」。
 
 本脚本仅作为「无 WorkBuddy 对话、纯脚本 / CI / 批量」场景的可选 fallback：
 把搜索引擎结果直接构造成 research.json。**默认不调模型抽取**，避免重复消耗
 OmniRoute（抽取应由 agent 在检索上下文里一次性完成）。如需脚本内也做结构化
-抽取，加 --extract 调一次 OmniRoute 模型（best-effort，失败则回退到链接列表）。
+结构化抽取走主路径（agent + domain_search/WebFetch），本脚本仅产出链接列表级 research.json。
 
-契约：research.json 的格式由 orchestrator.py 与 agent 共用，见 research-collector SKILL.md。
-依赖：仅标准库（--extract 时才临时 import orchestrator 复用其 chat）。
+契约：research.json 的格式见本引擎 SKILL.md「统一证据采集」章节。
+依赖：仅标准库（--extract 为旧辩论引擎遗留，本包已移除，见下方提示）。
 用法：
   python3 researcher.py --query "1000-2000元 意式磨豆机 推荐" --out runs/run1/research.json
-  python3 researcher.py --query "..." --backend baidu --extract   # 抽取版（需 OMNIROUTE_API_KEY）
+  python3 researcher.py --query "..." --backend baidu            # 链接列表级 research.json
   python3 researcher.py --list-sites                               # 列出 17 个站点级解析器
   python3 researcher.py --list-topics                              # 列出垂类画像与证据轨道
   python3 researcher.py --plan-sources --query "20万买SUV 看C-NCAP" --out runs/plan.json  # 判断门：先规划找哪些资料
@@ -773,45 +773,6 @@ def build_sources_from_results(results):
     return out
 
 
-def extract_sources(base, key, model, raw_text, cfg):
-    """可选：调 OmniRoute 模型把多段原始网页抽取为结构化来源数组。失败返回 []。"""
-    sys_p = ("你是资料抽取助手。下面是一组从网页抓取的原始内容（含标题、URL、正文/摘要）。"
-             "请抽取为结构化来源清单，只输出一个 JSON 数组，不要任何额外解释文字。"
-             "每个元素的字段："
-             "id(如 s1、s2，按出现顺序编号), "
-             "title(来源标题), url(链接), "
-             "publisher(发布方/平台，如 什么值得买/小红书/B站/百度百科/品牌官网/知乎), "
-             "type(review 评测 | ranking 排行榜 | spec 参数 | forum 讨论 | official 官方 | news 资讯), "
-             "published(发布时间字符串或 null), "
-             "summary(关键结论/数据，中文，≤120字), "
-             "candidates(提及的具体型号/产品名数组), "
-             "credibility_pre(对本次任务的初判可信度 high/medium/low/unknown)。")
-    usr_p = "原始内容：\n\n" + raw_text
-    import orchestrator as o  # 延迟 import，默认路径不需要
-    content, _ = o.chat(base, key, model,
-                        [{"role": "system", "content": sys_p},
-                         {"role": "user", "content": usr_p}], cfg, "researcher-extract")
-    m = re.search(r"\[.*\]", content, re.S)
-    if not m:
-        return []
-    try:
-        arr = json.loads(m.group(0))
-    except Exception:
-        return []
-    known = {"id", "title", "url", "publisher", "type", "published",
-             "summary", "candidates", "credibility_pre"}
-    clean = []
-    for i, it in enumerate(arr):
-        if not isinstance(it, dict):
-            continue
-        it = {k: it.get(k) for k in known}
-        it["id"] = it.get("id") or ("s" + str(i + 1))
-        if not it.get("url"):
-            continue
-        clean.append(it)
-    return clean
-
-
 # ----------------------------------------------------------------------------
 # 主流程
 # ----------------------------------------------------------------------------
@@ -877,32 +838,11 @@ def run_research(query, cfg, backend=None, max_sources=None, out_path=None,
     if review_mode:
         review_signals = summarize_review_signals(sources, cfg)
 
-    # 可选：--extract 时才调模型抽取，失败回退到上面的链接列表
-    if do_extract and base and raw_results:
-        sys.path.insert(0, HERE)
-        import orchestrator as o
-        key = o.resolve_key(cfg)
-        if key:
-            raws = []
-            for r in raw_results[:max_sources]:
-                page = fetch_page(r["url"], fetch_timeout)
-                text = (page or r.get("snippet", ""))[:3000]
-                if text:
-                    raws.append(f"标题: {r['title']}\nURL: {r['url']}\n内容:\n{text}")
-            if raws:
-                raw_blob = "\n\n---\n\n".join(raws)
-                print(f"[research][fallback] 调用模型抽取 {len(raws)} 段来源…", file=sys.stderr)
-                ext = extract_sources(base, key, rc.get("extract_model", "auto/best-fast"), raw_blob, cfg)
-                if ext:
-                    sources = ext
-                    print(f"[research][fallback] 模型抽取得到 {len(sources)} 条", file=sys.stderr)
-        else:
-            print("[research][fallback] 未找到 OMNIROUTE_API_KEY，--extract 跳过，使用链接列表", file=sys.stderr)
-        # 模型抽取覆盖了来源数组，需重新补广告识别
-        sources = apply_ad_detection(sources, cfg)
-        ad_summary = summarize_ad_risk(sources, cfg)
-        if review_mode:
-            review_signals = summarize_review_signals(sources, cfg)
+    # v9.7.38：辩论引擎已移除，--extract 旧模型抽取通道删除。
+    # 结构化抽取改走主路径（agent + domain_search/WebFetch 直接整理 research.json）。
+    if do_extract:
+        print("[research] --extract 已废弃（辩论引擎移除）；请走主路径结构化抽取，"
+              "本脚本仅产出链接列表级 research.json。", file=sys.stderr)
 
     note = ("由研究层 fallback 脚本抓取（站点级解析/通用检索/评价挖掘 + 广告识别，未做结构化抽取）；"
             "如需高质量来源，推荐改用 WorkBuddy 对话触发 research-collector / omni-debate，"
@@ -972,7 +912,7 @@ def main():
     ap.add_argument("--score-authors", help="对已有 research.json 的博主/资料员打分（含广告降权）并输出排行")
     ap.add_argument("--inplace", action="store_true", help="把打分/广告识别结果写回原 research.json")
     ap.add_argument("--extract", action="store_true",
-                    help="额外调一次 OmniRoute 模型做结构化抽取（需 OMNIROUTE_API_KEY；默认不抽取）")
+                    help="已废弃（辩论引擎移除）；结构化抽取走主路径 agent+domain_search")
     args = ap.parse_args()
 
     cfg = json.load(open(args.config, encoding="utf-8"))

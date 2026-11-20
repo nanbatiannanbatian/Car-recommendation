@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 9.7.37
+version: 9.7.38
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v9.7.37）
+# Car recommendation —— 可信购车榜单引擎（v9.7.38）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -1699,6 +1699,28 @@ python3 board_v2.py --candidates subset.json --out <出榜目录>   # 接回 v7 
 
 ---
 
+## 统一证据采集（内建，原 research-collector 能力已整合 v9.7.38）
+
+本引擎**自带**证据采集方法论与脚本（`research/`），不再依赖独立 skill。采集分三层，产出 `research.json`（证据）与候选池（车型）两份**职责分离**的产物。
+
+### 第 0 层：资料源规划（先规划再检索）
+不上去就照固定平台抓。先产出 source_plan，过目后再检索：①静态垂类画像（汽车画像必查 **C-NCAP / 中保研碰撞（注明年款+规程版本）、车质网投诉排行与典型故障、缺陷产品召回**）；②动态平台发现（陌生领域先搜权威评测/监管渠道，硬编码列表会过期）；③判断门（确认覆盖**正负双轨**、站点不重复、广告风险已标注）。
+**正负双轨取证**：正面证据（评测/参数/榜单）易被商单污染；负面证据（投诉/召回/碰撞/监管/差评）抗污染、是硬证据。缺一轨要显式报 `evidence_balance=missing_negative/positive`，不许静默跳过。
+
+### 第 0.5 层：候选池全量发现（与"候选池尽量收全"铁律合并）
+**先问"市面上有哪些在售车型"，再问"每款车有什么证据"。** 严禁从检索到的来源反推候选池（那会系统性漏掉新品和"越新越没差评"的车型）。多路合并：销量榜+级别筛选+官网/易车/汽车之家配置表+历史榜单；每款带 source_id，缺失标 unknown；零证据新品标 `new_product_zero_evidence` 而不是排除。**排序只能从候选池取，不能从来源反推。**（本条即最高优先级铁律"候选池尽量收全"的执行细则）
+
+### 证据优先级与五步协议
+优先级：**监管/安全/召回公示 ≥ 官方参数页 ≥ 第三方量化实测（带数字+单位+测量语境）≥ 第三方定性实测 ≥ 多博主横评 ≥ 社区口碑 ≥ 二手转述**。
+协议：规划+建池 → `domain_search` 起手2–4轮不同措辞、WebFetch抓关键页 → 筛选可追溯URL → 边搜边写来源对象并**跑广告识别** → 落盘 `research.json`（排行榜类同时落候选池）→ 说明边界（credibility_pre/ad_score 是启发式初标）。
+
+### 站点解析 / 广告降权 / 博主评分（脚本 `research/researcher.py`）
+17 站点解析器：`--list-sites` 查看；`--sites dongchedi,12365auto,cncap,ciasi` 定向采集；`--detect-ads <research.json> --inplace` 广告识别（查小黄车/报备/送测/合作，高_广告风险 −25 / 中 −10）；`--score-authors --inplace` 博主可信度（粉丝量级+认证+平台微调）。
+**边界**：脚本是"站点画像+检索词生成+广告降权"工具，**不是懂车帝/抖音私有API爬虫**（site_query 只生成 `site:` 检索词）；真正抓网页靠内置 domain_search/WebFetch，反爬/登录墙平台走检索摘要更稳。
+
+### 与出榜链路的接口（已消除旧 orchestrator 引用）
+`leaderboard.py --research research.json` 把证据覆盖层接进打分；`pipeline.py --candidates <候选池.json>` 消费候选池。**本引擎不走辩论/orchestrator，全程无 LLM 排序**——采集到的视频/评论是主观舆情，只作参考列与证据，**不进 8 维打分**（延续"事实列不计分"纪律）。
+
 ## v8.1 · 按需候选摄入 `--intake`：搜榜→有效销量→入池→复用/待采（2026-11-19）
 
 ### 为什么要改（用户明确否决 automation）
@@ -2951,3 +2973,22 @@ DeepSeek 定性："这是10款候选紧凑型纯电轿车的审计榜，不是�
   视频/评论是主观舆情，只作参考不进 8 维分（延续事实列不计分纪律）。
 - 验证：解包后 `python3 research/researcher.py --list-sites` 独立运行成功，17 站点解析器齐全。
 - BUG-045 进回归（45/45），包 0.74MB/105 文件。A/B 不受影响。
+
+---
+
+## v9.7.38 · research-collector 完全整合（2026-11-20，用户要求"完全整合+解决冲突+优化"）
+
+用户："是否可以把 research-collector 完全整合到我们的skill里面，如果有冲突是不是可以解决一下，优化一下"。
+
+- **冲突排查与解决**：
+  1) 身份冲突：采集器 SKILL.md 自称独立"研究素材收集器"、写"交给 omni-debate 消费方"→
+     方法论并入本 SKILL「统一证据采集」章节，去掉独立身份/对外契约表述。
+  2) 过时依赖：researcher.py 有 5 处 orchestrator 引用、`--extract` 会 `import orchestrator`——
+     而辩论引擎早已删除（SKILL.md:635 明确），跑 `--extract` 必 ImportError。
+     → 删除 extract_sources 死函数(37行)、清 5 处引用、config 删 api_key_env；
+     `--extract` 保留参数但优雅降级（提示走主路径，不再崩溃）。
+  3) 重复：采集器"第0.5步候选池全量发现"与本引擎"候选池尽量收全"铁律重叠→合并为同一执行细则。
+- 整合后 research/ 定位为"本引擎内建证据采集模块"（README 已改写），不再称外部 skill 来源。
+- 保留 research-collector 原 skill 不动（本机其它场景仍可用），但本引擎**不再依赖**它。
+- 完整性验证：SKILL有统一章节、脚本无 orchestrator/extract_sources、config无密钥、--list-sites/--list-topics可跑。
+- BUG-046 进回归（46/46），A/B 28/28 通过。researcher.py 不参与打分，指纹门禁不受影响。
