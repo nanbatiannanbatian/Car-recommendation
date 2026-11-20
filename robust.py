@@ -478,6 +478,136 @@ def kendall_matrix(rankings: dict):
             "min": min(vals) if vals else 1.0}
 
 
+# ---------------------------------------------------------------- 归一化敏感性审计（v9.7.39 借用 scikit-criteria）
+# 借鉴 scikit-criteria 的「方法学空间穷举」思想（arXiv:2509.24996）：归一化方式的选择
+# 会影响 20%–40% 的最终名次。原 robust.py 只换聚合/权重，归一化写死在各方法内部，
+# 看不到「同一份数据换归一化方式会不会换位」。这里把归一化作为独立变量做敏感性审计。
+# 纯标准库实现，不引入 numpy/scikit-criteria 依赖（与主链路零依赖原则一致）。
+NORMALIZATIONS = ["linear", "minmax", "vector", "zscore", "sum"]
+
+
+def _norm_minmax(matrix, types):
+    """极值归一到 [0,1]：benefit (x-min)/(max-min)，cost 取反。"""
+    best, worst = _best_worst(matrix, types)
+    out = []
+    for row in matrix:
+        nr = []
+        for j, t in enumerate(types):
+            span = abs(best[j] - worst[j]) or EPS
+            v = (row[j] - worst[j]) / span if t != "cost" else (best[j] - row[j]) / span
+            nr.append(v)
+        out.append(nr)
+    return out
+
+
+def _norm_zscore(matrix, types):
+    """z-score 归一（(x-μ)/σ，cost 取反），平移到正区间便于加权和。"""
+    n = len(matrix)
+    if n == 0:
+        return []
+    nc = len(types)
+    cols = [_col(matrix, j) for j in range(nc)]
+    mu = [sum(c) / len(c) for c in cols]
+    sd = [_std(c) or EPS for c in cols]
+    raw = []
+    for row in matrix:
+        z = [(row[j] - mu[j]) / sd[j] * (1 if types[j] != "cost" else -1)
+             for j in range(nc)]
+        raw.append(z)
+    mn = min(v for r in raw for v in r)
+    shift = (1e-6 - mn) if mn < 0 else 0.0
+    return [[v + shift for v in r] for r in raw]
+
+
+def _norm_sum(matrix, types):
+    """占比归一：benefit x/Σx，cost (1/x)/Σ(1/x)。"""
+    nc = len(types)
+    cols = [_col(matrix, j) for j in range(nc)]
+    out = [[0.0] * nc for _ in matrix]
+    for j, t in enumerate(types):
+        if t == "cost":
+            inv = [1.0 / max(abs(v), EPS) for v in cols[j]]
+            s = sum(inv) or EPS
+            vals = [v / s for v in inv]
+        else:
+            pos = [max(v, 0.0) for v in cols[j]]
+            s = sum(pos) or EPS
+            vals = [v / s for v in pos]
+        for i, v in enumerate(vals):
+            out[i][j] = v
+    return out
+
+
+def normalize_matrix(matrix, types, method="linear"):
+    """按指定方式归一到「越大越好」的可比区间。linear/vector 复用既有实现。"""
+    if method == "linear":
+        return _norm_linear(matrix, types)
+    if method == "vector":
+        return _norm_vector(matrix, types)
+    if method == "minmax":
+        return _norm_minmax(matrix, types)
+    if method == "zscore":
+        return _norm_zscore(matrix, types)
+    if method == "sum":
+        return _norm_sum(matrix, types)
+    raise ValueError("未知归一化方式: %s" % method)
+
+
+def normalization_audit(matrix, weights, types, names,
+                        normalizations=None, top_k=3, scheme="saw"):
+    """归一化敏感性审计：固定权重与聚合，只换归一化，看名次是否翻转。
+
+    固定聚合（默认 SAW=加权和）是为了把「归一化」隔离成唯一变量：
+    这样看到的名次变化只能来自归一化方式，而不是聚合方法差异。
+    scheme 可选 saw / topsis：topsis 内部自带 vector 归一，故只对 saw 严格隔离。
+
+    返回每个候选跨归一化的名次范围、两两 τ、以及人类可读报告。
+    """
+    norms = normalizations or NORMALIZATIONS
+    rankings, scores_by_norm = {}, {}
+    for nm in norms:
+        nmat = normalize_matrix(matrix, types, nm)
+        if scheme == "topsis":
+            sc = m_topsis(nmat, weights, types)
+        else:
+            sc = [sum(weights[j] * r[j] for j in range(len(weights))) for r in nmat]
+        scores_by_norm[nm] = sc
+        rankings[nm] = _ranks(sc)
+    km = kendall_matrix(rankings)
+    per_alt = {}
+    for i, name in enumerate(names):
+        rs = [rankings[nm][i] for nm in norms]
+        per_alt[name] = {"ranks": {nm: rankings[nm][i] for nm in norms},
+                         "min": min(rs), "max": max(rs), "range": max(rs) - min(rs)}
+    unstable = sorted(names, key=lambda x: (-per_alt[x]["range"], x))
+    if km["mean"] >= 0.95:
+        verdict = "归一化方式对名次影响很小（τ≥0.95），排名在此维度稳健。"
+    elif km["mean"] >= 0.85:
+        verdict = "归一化方式对名次有中等影响（τ 0.85–0.95），建议核对前三名。"
+    else:
+        verdict = "名次对归一化方式敏感（τ<0.85），**不能把名次当确定结论**，须结合三档分级使用。"
+    lines = [
+        "### 归一化敏感性审计（%d 种归一化 × %s，纯标准库）" % (len(norms), scheme),
+        "",
+        "- 两两 Kendall τ 均值 **%.3f**、最低 **%.3f**" % (km["mean"], km["min"]),
+        "- %s" % verdict,
+        "",
+        "| 归一化 | " + " | ".join(names) + " |",
+        "|---|" + "---|" * len(names),
+    ]
+    for nm in norms:
+        lines.append("| %s | " % nm + " | ".join(str(int(rankings[nm][i])) for i in range(len(names))) + " |")
+    lines += ["", "名次波动最大的候选："]
+    for name in unstable[:5]:
+        p = per_alt[name]
+        lines.append("- %s：%d–%d 名（跨 %d 位）" % (name, p["min"], p["max"], p["range"]))
+    return {"normalizations": norms, "scheme": scheme, "rankings": rankings,
+            "scores": scores_by_norm, "tau_matrix": km["matrix"],
+            "tau_mean": km["mean"], "tau_min": km["min"], "per_alt": per_alt,
+            "unstable_top": unstable[:5], "verdict": verdict,
+            "report": "\n".join(lines)}
+
+
 # ---------------------------------------------------------------- 名次置信区间
 def bootstrap_rank_ci(matrix, w, types, names, n_boot: int = 1000,
                       noise: float = 0.5, seed: int = 7, method: str = "saw"):
@@ -869,6 +999,22 @@ def selftest():
           f"好B={ci['好B']['p05']}-{ci['好B']['p95']} "
           f"差C={ci['差C']['p05']}-{ci['差C']['p95']} ｜ 强弱可辨={sep} 相近重叠={near}")
     ok &= sep
+
+    # 12) 归一化审计：完全分离的矩阵，任何归一化方式都不应换位
+    m12 = [[9, 2, 1], [6, 5, 4], [2, 8, 9]]
+    na = normalization_audit(m12, [1 / 3] * 3, ["benefit"] * 3,
+                             ["A", "B", "C"])
+    base_order = tuple(na["rankings"][na["normalizations"][0]])
+    all_same = all(tuple(na["rankings"][nm]) == base_order for nm in na["normalizations"])
+    print(f"  [12] 归一化审计 分离矩阵 τ均值={na['tau_mean']:.3f} 全序一致={all_same}")
+    ok &= all_same and na["tau_mean"] > 0.99
+    # 12b) 归一化不变量：linear/minmax 对整体正比例缩放不改变名次
+    scaled = [[v * 3 for v in row] for row in m12]
+    na2 = normalization_audit(scaled, [1 / 3] * 3, ["benefit"] * 3,
+                              ["A", "B", "C"], normalizations=["linear", "minmax"])
+    scale_stable = na2["rankings"]["linear"] == na["rankings"]["linear"]
+    print(f"  [12b] 归一化整体缩放不变: {scale_stable}")
+    ok &= scale_stable
 
     print("SELFTEST", "PASS" if ok else "FAIL")
     return ok
