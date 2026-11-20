@@ -147,6 +147,24 @@ def main():
     parts = [f"# {cfg.get('label')} · 出榜报告", ""]
     parts.append(f"> 来源：`{os.path.basename(a.candidates)}`；"
                  f"链路 取数→闸门→打分→稳健性→三档→审查。**全程无辩论。**")
+    # v9.7.17：候选池与证据质量披露自动生成（不再手工写报告，重跑不丢）
+    _all = cands
+    _src_named = sum(1 for c in _all if c.get("source_ids"))
+    _crash_named = sum(1 for c in _all
+                       if c.get("crash") and not any(k in str(c.get("crash")) for k in ("无", "未查到", "—")))
+    _ev_cnt = {k: sum(1 for c in _all if c.get("evidence_status") == k) for k in ("A", "B", "C")}
+    _ext_n = sum(1 for c in _all if c.get("extended") or c.get("score_evidence"))
+    parts.append(
+        f"> **候选池与证据披露（自动生成）：**本池 {len(_all)} 款，"
+        f"带核验来源 {_src_named}/{len(_all)}，有官方碰撞成绩 {_crash_named}/{len(_all)}，"
+        f"证据等级 A/B/C = {_ev_cnt['A']}/{_ev_cnt['B']}/{_ev_cnt['C']}，"
+        f"其中 {_ext_n} 款为网查补采（置信低）。"
+        "入池口径：官方二级分类 + 纯电 + 指导价；未见来源/无碰撞成绩的车只作参数参考，"
+        "不构成安全推荐。**没有官方碰撞成绩不记 0 分、只标缺失，降权≠安全。**")
+    parts.append(
+        "> **分数性质：**全部分数为「官方参数 + 客观差异规则推算」，**非实车实测**；"
+        "冬测续航达成率、充电曲线、麋鹿成绩等第三方统一实测未纳入打分。"
+        "档位与名次是两套逻辑，同档内逐名排序参考价值有限。")
     if custom:
         parts.append(f"> 用户优先级："
                      + " / ".join(f"{k} {int(v)}" for k, v in custom.items()))

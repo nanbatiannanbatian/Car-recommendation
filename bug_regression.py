@@ -45,6 +45,8 @@ CASES = [
     ("BUG-022", "零跑B01智驾9.7高于小鹏6.6的倒挂(无证据基准)", "v9.7.15"),
     ("BUG-023", "媒体通稿被当官方碰撞证据(零跑B01 B级)", "v9.7.16"),
     ("BUG-024", "风险信息埋深(估算/营运/稳健性未在主表显性化)", "v9.7.16"),
+    ("BUG-025", "智驾口径全池不一致(只校正B01和小鹏)", "v9.7.17"),
+    ("BUG-026", "报告披露手工写被pipeline重跑覆盖", "v9.7.17"),
 ]
 
 
@@ -206,6 +208,27 @@ def t015():
     return "渲染复用 board_view 单点"
 
 
+def t025():
+    """全池智驾基准必须按可用智驾统一口径，不能只校正个别车。"""
+    cands = json.load(open(os.path.join(HERE, "runs", "compact_bev_202610_candidates.json"), encoding="utf-8"))["candidates"]
+    sc = {c["model"]: c["scores"]["adas"] for c in cands}
+    # Lafa5 与 B01 硬件相同但可用性更高（全国NAC即开通 vs 5城白名单），应 >= B01
+    assert sc["零跑Lafa5"] >= sc["零跑B01"], f"同硬件车智驾倒挂: Lafa5 {sc['零跑Lafa5']} < B01 {sc['零跑B01']}"
+    # 全系无激光雷达无城区NOA的AION S不应高于有Orin-X的AION RT
+    assert sc["AION S"] < sc["AION RT"], "无NOA车智驾分虚高"
+    # 每款车都要有统一口径的校正理由
+    no_reason = [c["model"] for c in cands if "智驾口径统一" not in str(c.get("note") or "") and c["model"] not in ("小鹏MONA M03", "零跑B01")]
+    assert not no_reason, f"这些车未按统一口径校正: {no_reason}"
+    return "全池10款智驾口径统一"
+
+def t026():
+    """报告披露必须由 pipeline 自动生成，重跑不丢。"""
+    src = _read("pipeline.py")
+    assert "候选池与证据披露（自动生成）" in src, "披露未写进 pipeline"
+    rpt = _read("runs/compact_bev_allprice_202610/report.md")
+    assert "候选池与证据披露" in rpt, "报告缺自动披露段"
+    return "披露自动化，重跑不丢"
+
 def t023():
     """证据等级不得被媒体通稿升级：零跑B01 无官方碰撞记录必须 C。"""
     cands = json.load(open(os.path.join(HERE, "runs", "compact_bev_202610_candidates.json"), encoding="utf-8"))["candidates"]
@@ -307,7 +330,7 @@ def t016():
 
 
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026]
 
 
 def run():

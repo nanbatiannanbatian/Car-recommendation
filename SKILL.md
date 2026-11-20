@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 9.7.16
+version: 9.7.17
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v9.7.16）
+# Car recommendation —— 可信购车榜单引擎（v9.7.17）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -2534,3 +2534,21 @@ MG07 845版 87.9 #1、深蓝L06 87.8 #2（分差0.1，在算法噪声内）。
 - **P2** TCO 列未做（保值率库仅3款与本榜零交集，无数据不编造）；τ 展示已做。
 - **明确不做**：交互式权重模板切换（破坏可复现性）、剔除营运后的私人销量估算（无真实数据源）。
 - BUG-023/024 进回归（24/24），A/B 27/27 通过。
+
+---
+
+## v9.7.17 · 全池智驾口径统一 + 报告披露自动化（2026-11-20）
+
+DeepSeek 二轮评审指出「智驾校正只改了B01和小鹏，其他车是否一致」——核实属实：其余8款仍是历史人工分。
+按「可用智驾」统一口径重定全池（网查依据）：
+Lafa5 5.0→8.0（200TOPS+激光雷达+全国NAC即开通）、AION RT 5.4→7.2（高配Orin-X 254TOPS/仅选装打折）、
+秦PLUS 5.0→6.8（天神之眼B选装254TOPS，C版仅高速混合）、MG4 5.0→5.8（80TOPS高速NOA）、
+AION S 6.5→4.8（全系无NOA旧分虚高）、AION UT 5.0→4.5（中低配无L2）、荣威D6 5.0维持、领汇e5 6.5→5.0。
+每款 note 留校正理由。**BUG-025**。
+
+报告披露自动化：pipeline.py 生成报告时从候选池实时算「候选数/带来源/有碰撞/证据等级/网查补采数」
+写进 `候选池与证据披露` 段，不再手工写报告（此前每次重跑都被覆盖）。**BUG-026**。
+
+发现待确认问题：零跑B01 因证据 B→C 被三档规则打入第三档（暂缓），但它是销量第二、产品力第一，
+仅缺 C-NCAP 成绩——「无证据=暂缓」是否过严需用户确认后再改核心分档逻辑（本版未动）。
+BUG-025/026 进回归（26/26），A/B 27/27 通过。
