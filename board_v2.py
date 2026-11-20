@@ -423,6 +423,18 @@ def build(cands: list[dict], cfg: dict, policy: dict,
             for t in td.get("trims", []):
                 vrow = _copy.deepcopy(base)
                 vrow["best_trim_detail"] = t
+                # v9.7.26：配置级电芯/快充缺失时，继承车系事实库值并显式标注来源，
+                # 否则逐配置对比页两列全"—"（用户指出电芯信息本来就有）。
+                _fr = base.get("fact_ref") or {}
+                if not t.get("cell_supplier") and _fr.get("电芯") not in (None, "—", ""):
+                    t["cell_supplier"] = str(_fr["电芯"])
+                    t["cell_inherited"] = True
+                if not t.get("charge"):
+                    _bp = base.get("battery_detail") or {}
+                    _volt = _bp.get("voltage")
+                    if _volt and _volt != "未披露":
+                        t["charge"] = f"{_volt} 平台（车系级）"
+                        t["charge_inherited"] = True
                 v = _BV.car_verdict(vrow, vrow)
                 t["verdict"] = (f"优：{'、'.join(v['pros'])}｜短：{'、'.join(v['cons'])}｜"
                                 f"适合：{v['audience']}｜{v['advice']}")

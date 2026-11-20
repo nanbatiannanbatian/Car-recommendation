@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 9.7.25
+version: 9.7.26
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v9.7.25）
+# Car recommendation —— 可信购车榜单引擎（v9.7.26）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -2689,3 +2689,18 @@ DeepSeek 定性："这是10款候选紧凑型纯电轿车的审计榜，不是�
 - 报告披露：该值为车系级电芯品牌，配置差异（如 MG4 宁德/瑞浦/清陶）以逐配置表为准。
 - BUG-034 进回归（34/34），A/B 27/27 通过。
 - 教训：任何"字段回退链"都要测 null 分支能否走到下一级——本 bug 藏了多个版本。
+
+---
+
+## v9.7.26 · 全字段显示自检（2026-11-20，用户要求检查哪些值没显示）
+
+用户："再检查一下榜单里面哪些值没有显示，确认是否有问题"。逐列扫描主榜 12 列 + 逐配置 11 列，结果：
+
+- **修复 3 处真问题**：① 6 款长尾车 lifecycle 漏填→补录；② 逐配置表电芯列 99 处空→继承车系事实库值
+  并标「车系」（`cell_inherited`，表示未逐配置核验）；③ 得分理由 1 处「—」→「基准配置（无配置级差异）」。
+- **真实数据缺口（不编造）**：99/110 配置电压/快充未采集，页面明确显示「未披露」，
+  不伪装成有值也不为空；有官方数据再补。报告写明这是采集缺口非渲染遗漏。
+- 最终：主榜 12 列零缺失；逐配置 11 列零异常空白（电芯全有、快充缺口明确标注）。
+- BUG-035 进回归（35/35），A/B 27/27 通过。
+- 教训（重复踩坑）：在 bug_regression 里写含引号的正则必须用 raw 字符串，否则 Python 语法错；
+  更稳的做法是简化断言、不硬写复杂正则。

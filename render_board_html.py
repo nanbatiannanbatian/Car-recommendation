@@ -396,13 +396,17 @@ def render(data, summary, title, as_of):
                 for t in td["trims"]:
                     sc = t.get("scores") or {}
                     flag = " ★" if t.get("name") == best else ""
-                    why = "、".join((t.get("reasons") or {}).get("powertrain") or []) or "—"
+                    why = "、".join((t.get("reasons") or {}).get("powertrain") or []) or "基准配置（无配置级差异）"
                     note = t.get("note") or ""
+                    cell_val = str(t.get("cell_supplier") or "未披露")
+                    if t.get("cell_inherited"):
+                        cell_val += '<span class="flag flag-est" title="车系级电芯，未逐配置核验">车系</span>'
+                    charge_val = str(t.get("charge") or "未披露")
                     H.append(f"<tr><td class='name'>{e(t.get('name'))}{flag}</td>"
                              f"<td>{e(t.get('price'))}</td>"
                              f"<td>{_kwh_cell(t, r.get('note'))}</td>"
-                             f"<td class='ref'>{e(t.get('cell_supplier'))}</td>"
-                             f"<td class='ref'>{e(t.get('charge'))}</td>"
+                             f"<td class='ref'>{cell_val}</td>"
+                             f"<td class='ref'>{e(charge_val)}</td>"
                              f"<td>{num(sc.get('powertrain'))}</td><td>{num(sc.get('adas'))}</td>"
                              f"<td>{num(sc.get('value'))}</td>"
                              f"<td><span class='score'>{e(t.get('total'))}</span></td>"

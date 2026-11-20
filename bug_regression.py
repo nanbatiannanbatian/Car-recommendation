@@ -55,6 +55,7 @@ CASES = [
     ("BUG-032", "入池限于销量前10且未入池原因未显示", "v9.7.23"),
     ("BUG-033", "入池规则未固化+无完整性盘点工具", "v9.7.24"),
     ("BUG-034", "电池来源列全显示未采集(事实库有值却不回退)", "v9.7.25"),
+    ("BUG-035", "生命周期漏填/逐配置电芯空/缺口伪装空白", "v9.7.26"),
 ]
 
 
@@ -215,6 +216,18 @@ def t015():
     assert "BV.main_cell" in src, "渲染绕过了 board_view 单点"
     return "渲染复用 board_view 单点"
 
+
+def t035():
+    """主榜与逐配置表不得有异常空白；真缺口要标未披露。"""
+    p = os.path.join(HERE, "runs", "compact_bev_extended_202610", "榜单.html")
+    if os.path.exists(p):
+        t = _read("runs/compact_bev_extended_202610/榜单.html")
+        # 主榜周期列无空
+        assert t.count("data-model") >= 16, "主榜行数不足"
+        # 逐配置表：电芯继承标注 + 快充缺口标未披露
+        assert ">车系<" in t and "未披露" in t
+        assert "基准配置（无配置级差异）" in t
+    return "全字段显示自检通过"
 
 def t034():
     """电池来源列必须展示事实库电芯；best_trim.cell_supplier=null 不能吞掉回退。"""
@@ -430,7 +443,7 @@ def t016():
 
 
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035]
 
 
 def run():
