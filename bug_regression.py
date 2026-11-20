@@ -85,6 +85,7 @@ CASES = [
     ("BUG-062", "家族制80%阈值语义漂移(名义80%实际83%)", "v9.7.43"),
     ("BUG-063", "分数改了证据文本没同步(分数证据脱节)", "v9.7.43"),
     ("BUG-064", "碰撞体系硬编码散落5处致新体系被漏", "v9.7.44"),
+    ("BUG-065", "二值命中截断埋没稳稳第5的车(Model3)+产品力市场口径不清", "v9.7.48"),
 ]
 
 
@@ -1176,8 +1177,40 @@ def t064():
     return "碰撞体系单一真相源：12体系+别名归一+全链路引用+徽标全显示"
 
 
+def t065():
+    """连续名次指标补二值命中盲区 + 产品力≠市场热度口径说明。"""
+    import leaderboard as L
+    import robust as R
+    cfg = json.load(open(os.path.join(HERE, "categories", "car_midsedan_allprice.json"), encoding="utf-8"))
+    d = json.load(open(os.path.join(HERE, "runs", "midsedan_bev_1218_202610", "candidates_allprice.json"), encoding="utf-8"))["candidates"]
+    d = L.with_config_scores(d, cfg)
+    names, matrix, types, _ = L.decision_matrix(d, cfg)
+    schemes = L.build_schemes(cfg)
+    res = R.run_robust(matrix, schemes["基准"], types, names, top_k=3, scheme_weights=L._clean_schemes(schemes))
+    # 连续名次字段存在且合理
+    m3 = res["per_alt"]["特斯拉Model 3"]
+    assert m3.get("rank_mean") is not None and 4 <= m3["rank_mean"] <= 7, \
+        f"Model3平均名次应稳定在5附近: {m3.get('rank_mean')}"
+    assert m3.get("rank_span"), "缺名次区间"
+    # 报告：平均名次列 + Model3不再被剔除 + 口径说明
+    assert "平均名次" in res["report"] and "特斯拉Model 3" in res["report"], "报告中Model3被埋没"
+    assert "产品力" in res["report"] and "市场热度" in res["report"], "缺口径边界说明"
+    # 页面传字段
+    psrc = _read("pipeline.py")
+    assert "rank_mean_by_model" in psrc and "scope_note" in psrc, "pipeline未传连续名次/口径"
+    rsrc = _read("render_board_html.py")
+    assert "算法平均名次" in rsrc and "口径边界" in rsrc, "页面未展示"
+    # summary 真实产物
+    sp = os.path.join(HERE, "runs", "bev_midsedan_202610_full", "summary.json")
+    if os.path.exists(sp):
+        st = (json.load(open(sp, encoding="utf-8")).get("stability") or {})
+        assert "特斯拉Model 3" in (st.get("rank_mean_by_model") or {}), "summary缺Model3平均名次"
+        assert "市场热度" in (st.get("scope_note") or ""), "summary缺口径说明"
+    return f"连续名次补盲区：Model3平均第{m3['rank_mean']:.1f}(区间{m3['rank_span']})可见+产品力≠市场热度口径说明"
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065]
 
 
 def run():

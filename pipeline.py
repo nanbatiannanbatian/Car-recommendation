@@ -351,6 +351,15 @@ def main():
             "kendall_mean": round(float(_rob.get("kendall_mean") or 0), 3),
             "n_methods": _rob.get("n_methods"), "n_schemes": _rob.get("n_schemes"),
             "note": "10种MCDA×多套权重两两Kendall τ均值；<0.8逐名排序不可靠，≥0.9较稳定",
+            # v9.7.48：连续名次指标（补二值命中截断盲区）+ 产品力≠市场热度口径
+            "rank_mean_by_model": {
+                nm: round(float(a["rank_mean"]), 1)
+                for nm, a in (_rob.get("per_alt") or {}).items()
+                if a.get("rank_mean") is not None},
+            "scope_note": ("本榜8维衡量产品力而非市场热度：品牌力/超充网络/保值预期/售后覆盖"
+                           "未单列计分。可能出现产品力排第5但全球销量第一（如Model3）——"
+                           "不是算法错也不是市场错，是二者回答的问题不同。算法间高度相关"
+                           "只说明共享偏见、不代表结论正确。"),
         }
         parts.append("")
         parts.append(L.weight_audit(passed, cfg, wv)["report"])

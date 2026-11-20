@@ -737,6 +737,16 @@ def run_robust(matrix, weights, types, names, top_k=3,
                 _fam_hits[nm].add(fam)
     n_fam = len(METHOD_FAMILIES)
 
+    # v9.7.48：连续名次指标（补二值"进前top_k"截断的信息损失）。
+    # Model3 曾"家族命中0%"但其实是稳定第5、距第3名仅0.009分——
+    # 硬截断把它和"排第20"混为一谈。平均名次+区间能区分"稳但靠后"与"不稳"。
+    _base_pos = {nm: [] for nm in names}
+    for r in base_runs:
+        if "ranks" not in r:
+            continue
+        for i, nm in enumerate(names):
+            _base_pos[nm].append(r["ranks"][i])
+
     def _verdict(freq, n, strict=1.0, good=0.85, mid=0.5):
         r = freq / n if n else 0
         if r >= strict:
@@ -760,6 +770,10 @@ def run_robust(matrix, weights, types, names, top_k=3,
             "family_hits": len(_fam_hits[nm]),
             "family_n": n_fam,
             "family_names": sorted(_fam_hits[nm]),
+            # v9.7.48：连续名次（基准权重跨算法），补二值命中截断的盲区
+            "rank_mean": (sum(_base_pos[nm]) / len(_base_pos[nm])) if _base_pos[nm] else None,
+            "rank_median": (sorted(_base_pos[nm])[len(_base_pos[nm]) // 2]) if _base_pos[nm] else None,
+            "rank_span": (min(_base_pos[nm]), max(_base_pos[nm])) if _base_pos[nm] else None,
             "method_range": (mh[0], mh[-1]) if mh else (0, 0),
             "method_median": mh[len(mh) // 2] if mh else 0,
             "topk_freq": joint_freq[nm] / total,
@@ -815,16 +829,29 @@ def _build_report(names, order, per_alt, per_method, scheme_top, base_top,
     L.append("> 目的不是再给一个名次，而是回答「这个名次换一种算法会不会变」。")
     L.append("> 顺序变了，说明原结论是算法的偏好；顺序不变，才算产品本身的差异。")
     L.append("")
+    # v9.7.48：口径边界——排名相关性≠正确性，产品力榜≠市场热度榜（业内共识）
+    L.append("> **口径边界（务必先读）**：本节只检验「同一份评分矩阵下换算法名次变不变」，"
+             "**不检验排名是否符合真实市场**。业内共识（DecisionMind/Sałabun）："
+             "算法间高度相关只说明它们共享同一套偏见，不代表结论正确——"
+             "「哪个对」必须由数据与方法本身判断。本榜 8 维衡量的是**产品力**，"
+             "**不是市场热度**：品牌力、超充网络、保值预期、售后覆盖等真实购车因子"
+             "未单列计分。因此可能出现「产品力排第5、但全球销量第一」（如 Model 3）——"
+             "这不是算法错，也不是市场错，是二者回答的问题不同。"
+             "买车时请把本榜当作「产品力筛选」，再叠加你个人的品牌/充电/保值偏好。")
+    L.append("")
 
     L.append(f"## 一、方法稳定性（同一套基准权重，{len(METHODS)} 种聚合算法）")
     L.append("")
-    L.append(f"| 候选 | 进前{top_k} | 名次区间 | 中位 | 判定 |")
-    L.append("|---|---|---|---|---|")
+    # v9.7.48：加"平均名次"连续指标——二值"进前top_k"会埋没"稳稳第5"的车
+    # （Model3 10算法全是第5、距第3名仅0.009分，命中0%但并非不稳）。
+    L.append(f"| 候选 | 进前{top_k} | 平均名次 | 名次区间 | 中位 | 判定 |")
+    L.append("|---|---|---|---|---|---|")
     for nm in order:
         a = per_alt[nm]
-        if a["method_hits"] == 0 and len(order) > top_k + 4:
-            continue
-        L.append(f"| {nm} | {a['method_hits']}/{n_meth} | "
+        # 不再剔除零命中车：平均名次能区分"稳但靠后"与"真不稳"，全展示更透明
+        _rm = a.get("rank_mean")
+        _mean_txt = f"{_rm:.1f}" if _rm is not None else "—"
+        L.append(f"| {nm} | {a['method_hits']}/{n_meth} | {_mean_txt} | "
                  f"{a['method_range'][0]:g}–{a['method_range'][1]:g} | "
                  f"{a['method_median']:g} | {a['method_verdict']} |")
     stable = [nm for nm in order if per_alt[nm]["method_verdict"] == "稳定"]

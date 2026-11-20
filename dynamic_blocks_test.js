@@ -1,4 +1,7 @@
-// dynamic_blocks_test.js — 用极简 DOM stub 跑页面JS，验证4个动态区块随环境分实时重绘
+// dynamic_blocks_test.js — 验证「定稿榜固定 + 场景推演器分离」（v9.7.49）
+// 核心断言：
+//  1) 首次加载：定稿区(fixed-three/fixed-robust)被算好；sim-state=默认画像
+//  2) 改推演条件：定稿区内容不变；只有 sim-state 变为推演态
 // 由 midsuv_full_regress.py 调用。退出码0=全过。
 const fs=require('fs');
 const pagePath=process.argv[2];
@@ -6,7 +9,7 @@ const html=fs.readFileSync(pagePath,'utf8');
 const scripts=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m=>m[1]).join('\n');
 
 const els={};
-function mkEl(id){return {id,innerHTML:'',value:'',style:{},addEventListener(){},appendChild(){},
+function mkEl(id){return {id,innerHTML:'',value:'',textContent:'',style:{},addEventListener(){},appendChild(){},
   classList:{add(){},remove(){}},querySelectorAll(){return [];},querySelector(){return mkEl('sub');},
   getAttribute(){return null;},setAttribute(){}};}
 global.document={getElementById(id){return els[id]||(els[id]=mkEl(id));},
@@ -15,32 +18,56 @@ global.window=global;
 ['pLow','pHigh','wEnergy'].forEach(id=>els[id]=mkEl(id));
 els.pLow.value='0'; els.pHigh.value='999'; els.wEnergy.value='100';
 els.bodyFilter=mkEl('bodyFilter'); els.bodyFilter.value='ALL';
+// sim-state 在 HTML 里的初始文本（真实页面首次加载钩子尚未定义时的值）——从 HTML 提取，不硬编码
+const simInit=(html.match(/id="sim-state"[^>]*>([^<]*)</)||[])[1]||'';
+els['sim-state']=mkEl('sim-state'); els['sim-state'].textContent=simInit;
 
-let failed=[];
-function ok(name,cond){ console.log((cond?'PASS':'FAIL')+'  '+name); if(!cond)failed.push(name); }
+let pass=0, fail=[];
+function ok(name,cond,msg){ if(cond){pass++;} else {fail.push(name+(msg?' :: '+msg:''));} console.log((cond?'PASS':'FAIL')+'  '+name+(msg?' :: '+msg:'')); }
 
 const verify=`
 ;(function(){
-  var ids=['dyn-tiers','dyn-bands','dyn-three','dyn-robust'];
-  function snap(){return ids.map(function(id){return document.getElementById(id).innerHTML;});}
-  var s0=snap();
-  window.__firstFilled=s0.every(function(x){return x.length>20;});
-  var cond={operation:'no',winter_temp:'m10to0',annual_km:'15to25',single_trip:'300to500',long_trip_freq:'few',home_charger:'home',plate_limit:'no',hold_years:'5to8',highway_ratio:'20to40',boxy:'no',drive_style:'normal',ac_usage:'normal'};
-  function rowsFor(c){return CARS.map(function(car){var a=adjust(car,c);var hard=a.hard.reduce(function(s,h){return s+(h.pt||0);},0);var soft=a.total-hard;var adj=Math.max(-10,Math.min(10,soft*1))+hard;var tier=compositeTier(car.product+adj);if(a.hard.some(function(h){return h.downgrade;}))tier=tier==='T1'?'T2':(tier==='T2'?'T3':'T3');return Object.assign({},car,{price:car.price!=null?car.price:car.priceLow,adjTotal:a.total,hard:a.hard,composite:car.product+adj,tier:tier});});}
-  window.onBoardRerender(rowsFor(cond),cond,1);
-  var sA=snap();
-  var condB={}; for(var k in cond)condB[k]=cond[k]; condB.home_charger='none';condB.plate_limit='yes';condB.operation='yes';
-  window.onBoardRerender(rowsFor(condB),condB,1);
-  var sB=snap();
-  window.__changed=sA.map(function(x,i){return x!==sB[i];});
-  window.__t1count=[(sA[0].match(/T1（\\d+款）/g)||[])[0],(sB[0].match(/T1（\\d+款）/g)||[])[0]];
+  window.__expose={FACTORS:FACTORS,CARS:CARS,adjust:adjust,rangeCalc:rangeCalc,compositeTier:compositeTier};
 })();
 `;
 eval(scripts + verify);
-ok('onBoardRerender钩子已定义', typeof window.onBoardRerender==='function');
-ok('首次加载4区块均填充', window.__firstFilled===true);
-const names=['三档分级','价位子榜','三榜并列','稳健性'];
-window.__changed.forEach((v,i)=>ok('动态区块随条件变化:'+names[i], v===true));
-console.log('T1数量 默认→极端:', JSON.stringify(window.__t1count));
-if(failed.length){console.error('失败 '+failed.length+' 项');process.exit(1);}
-console.log('dynamic_blocks_test: 5/5 通过');
+const X=window.__expose;
+
+// 1) 首次加载：定稿区被填充
+const fixedThree0=document.getElementById('fixed-three').innerHTML;
+const fixedRobust0=document.getElementById('fixed-robust').innerHTML;
+ok('钩子onBoardRerender已定义', typeof window.onBoardRerender==='function');
+ok('首次加载三榜定稿已算', fixedThree0.length>50 && fixedThree0.includes('纯产品力榜'), fixedThree0.length+'字符');
+ok('首次加载稳健性定稿已算', fixedRobust0.length>100 && fixedRobust0.includes('跨度'), fixedRobust0.length+'字符');
+ok('首次推演态=默认画像', document.getElementById('sim-state').textContent.includes('默认画像'),
+   document.getElementById('sim-state').textContent);
+ok('稳健性含6场景', ['无家充','北方极寒','长途高频','营运','限牌城市','默认画像'].every(s=>fixedRobust0.includes(s)));
+
+// 2) 模拟用户改推演条件：构造 rows 调 onBoardRerender（推演路径）
+const base={}; for(const k of Object.keys(X.FACTORS)) base[k]=X.FACTORS[k].default;
+function rowsFor(c,scale){
+  return X.CARS.map(car=>{
+    const a=X.adjust(car,c);
+    const hard=a.hard.reduce((s,h)=>s+(h.pt||0),0);
+    const soft=a.total-hard;
+    const adj=Math.max(-10,Math.min(10,soft*scale))+hard;
+    let tier=X.compositeTier(car.product+adj);
+    if(a.hard.some(h=>h.downgrade))tier=tier==='T1'?'T2':(tier==='T2'?'T3':'T3');
+    return Object.assign({},car,{price:car.price!=null?car.price:car.priceLow,adjTotal:a.total,hard:a.hard,composite:car.product+adj,tier});
+  });
+}
+const custom={...base,home_charger:'none',plate_limit:'yes',operation:'yes'};
+window.onBoardRerender(rowsFor(custom,1.5),custom,1.5);
+
+ok('改条件后定稿三榜不变', document.getElementById('fixed-three').innerHTML===fixedThree0);
+ok('改条件后定稿稳健性不变', document.getElementById('fixed-robust').innerHTML===fixedRobust0);
+const st=document.getElementById('sim-state').textContent;
+ok('改条件后推演态标识变化', st.includes('自定义') && st.includes('推演态'), st);
+
+// 3) 恢复默认→标识回到"与定稿一致"，定稿仍不变
+window.onBoardRerender(rowsFor(base,1),base,1);
+ok('恢复默认后标识回默认', document.getElementById('sim-state').textContent.includes('默认画像'));
+ok('恢复默认后定稿三榜仍不变', document.getElementById('fixed-three').innerHTML===fixedThree0);
+
+if(fail.length){console.error('\n失败 '+fail.length+' 项:');fail.forEach(f=>console.error('  '+f));process.exit(1);}
+console.log('\ndynamic_blocks_test: '+pass+'/'+pass+' 通过（定稿固定/推演分离成立）');

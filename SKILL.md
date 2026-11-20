@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 9.7.48
+version: 9.7.49
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v9.7.47）
+# Car recommendation —— 可信购车榜单引擎（v9.7.48）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -93,7 +93,8 @@ python3 energy_router.py "<用户原始提问>"    # 返回 board_type/powers/ne
   + `ev_range_model.py` 物理续航 + 6 条硬条件惩罚（无桩纯电−15/极寒低价−12/短持有−8/长途续航不足−10/限牌油车−8/营运油车−10，
   全额计入+降档+红标）。**禁止另写简化调节逻辑**；通过 `EC.build(cars_override=…, extra_head=…, extra_tail=…)` 注入榜单数据。
 - **全套区块 = `cross_energy_sections.py::BLOCKS`（对齐 board_view 18 项契约）+ 导航卡**。必要区块 `REQUIRED` 自检齐全。
-- **环境分对区块的作用域（必须分明，2026-11-20 用户追问后定稿）**：只有内容依赖综合分/档位/名次的区块随环境分实时更新——`DYNAMIC_BLOCKS={band_subboards, tiers, three_board, robustness}`，通过比较器 `render()` 末尾的 `window.onBoardRerender(rows,cond,scale)` 钩子 JS 重绘；`main_board` 主表本就动态。**固定不受影响**（且禁止误改）：逐配置对比/总分构成(8维权重)/逐车取证/生命周期/导语/方法边界/复现/审查边界(事实或说明)，以及 `product_power` 纯产品力榜——它是刻意基准，场景调节不得污染。区块标题带🔄(动态)/固定标识。回归 `dynamic_blocks_test.js` 用 DOM stub 实跑验证切换条件后4区块确实变化。
+- **定稿榜固定 + 场景推演器分离（v9.7.49 用户追问"让区块随环境分变是否好方法"后重构，取代旧的4区块动态方案）**：**榜单是可复现结论，推演是个人探索，同页混时态会破坏可复现性**。故：①`cross_energy_sections.py` 的 14 区块**全部是默认画像下的静态定稿快照**（`DYNAMIC_BLOCKS=∅`），可引用、可截图、不随下拉变化；②稳健性 = 跨 6 个代表性场景（默认/无家充/北方极寒/长途高频/营运/限牌）的**名次跨度**，首次加载用引擎算一次后固定——这才配叫"跨场景稳健性"（旧做法"当前场景下换力度"是概念错误）；③页面中部比较器主区的 12 项下拉 + 实时表 = **场景推演器**，`window.onBoardRerender(rows,cond,scale)` 钩子**只更新推演态标识 `sim-state`**（默认画像/自定义N项），绝不改写定稿区块。回归 `dynamic_blocks_test.js` 用 DOM stub 实跑验证「改条件后定稿区不变、只有标识变」。
+- **全环境项回归（`env_options_test.js`，77项）**：见上一条 test(v9.7.47)——遍历 12 项×每选项断言生效/无NaN/硬条件阈值/极端组合合法，中性选项白名单需 hint 有据。此测试守引擎，与本页展示层分离。
 - **全环境项回归（`env_options_test.js`，77项）**：遍历 12 项×每个选项，断言每项非中性选项至少对某车生效（软分/硬条件/续航之一变化）、无 NaN/越界、关键硬条件阈值正确（无桩纯电−15/极寒低价−12/限牌油车−8/营运油车−10/over8纯电+1.0）、极端组合结果合法。设计为中性的选项（hint 含"不调节/默认/平衡点"）登记在 `NEUTRAL_OPTIONS` 并要求其 hint 有据，禁止用白名单掩盖漏实现。**已抓出并修复**：`hold_years=over8` 选项 hint 承诺"纯电加分"但引擎漏实现（完全无效），已补软调节（纯电+1.0/插混增程+0.3/油车油混−0.3）。
 - 出 B 类固定榜命令：`python3 build_midsuv_full.py`（读候选池+补采分→构造 cars→注入区块→交互 HTML）。
 - 回归：`midsuv_full_regress.py`（30 项，含 node 实跑环境分 + 反向篡改）；`energy_compare_regress.py` 20 项守引擎。
@@ -509,6 +510,8 @@ python3 leaderboard.py --tier car_ev --candidates cands.json --out tier.md
 **证据文本一致性门禁（v9.7.43）**：`evidence_consistency.py` 检查 `score_evidence.safety` 文本不得与 `safety_basis`/`scores` 矛盾——防"分数改了证据说明没同步"（007GT 曾分数8.8/basis=euro_ncap，文本却还写"无官方碰撞成绩"）。三条规则：文本说无成绩但有权威basis / 文本说有成绩但basis空 / 文本主体系与basis不符（佐证体系不算）。出榜拦截，回归 `t063` 锁死。
 
 **碰撞体系单一真相源（v9.7.44）**：`crash_systems.py` 定义全球 **12 个权威碰撞体系**（C-NCAP/C-IASI/Euro NCAP/ANCAP/IIHS/NHTSA-NCAP/JNCAP/KNCAP/ASEAN NCAP/Latin NCAP/Bharat NCAP/Global NCAP）的 code/中文名/别名/家族/权威性。此前这些定义散落5处（映射表/徽标/证据门禁/安全门禁/leaderboard），每加一个体系改5处→漏掉 Model3 的 Euro NCAP。现全链路 import 它，加新体系只改这一个文件。`normalize()` 做别名归一（E-NCAP/Euro NCAP/euro_ncap→同一 code），防不同写法漏判。`official_safety_scores.json` 只管"各体系如何映射到0-10分"（NCAP家族星级共用一套、C-IASI等级制/IIHS奖项制各自映射）。回归 `t064` 锁死12体系+别名+全链路引用。
+
+**连续名次补二值命中盲区 + 产品力≠市场热度口径（v9.7.48）**：用户质疑「Model3 全球热销但家族命中0%，是不是算法不准/太学术」。实测发现 Model3 总分87.2全场第4、8维全优，10算法稳定排第5（SAW 0.943 vs 第4名深蓝L06 0.952，仅差0.009）——**不是不稳，是"稳稳第5"被"进前3"二值截断埋没**（稳健性表此前还直接剔除零命中车）。业内（DecisionMind/Sałabun/NCBI rank aggregation）：①排名相关性≠正确性，算法高度相关可能只共享偏见；②top-k二值截断会因cutoff误导，差0.009和差9分算成一样。修复：`robust.per_alt` 加 `rank_mean`/`rank_span`（连续名次），稳健性表加"平均名次"列且不再剔除零命中车；pipeline→summary→页面展示平均名次TOP5 + 口径边界框。报告写明：本榜8维衡量**产品力非市场热度**，品牌/超充网络/保值/售后未单列计分，所以「产品力第5但销量第一」不是算法错也不是市场错，是二者回答的问题不同。**不改T1门槛、不加市场维度**（用户选：透明披露比硬塞维度诚实）。回归 `t065` 锁死。
 | 第二档 | 无第三档风险，但未达第一档 | 要不要按偏好取舍 |
 | 第三档 | 证据 C / 无交付 / 月销 <500 / 人工标注硬伤 | 现在该不该看它 |
 

@@ -65,6 +65,7 @@ NEG_TARGETS = {
     "t062": ["t1_min_family_hits"],
     "t063": ["证据文本一致性门禁"],
     "t064": ["crash_systems"],
+    "t065": ["rank_mean_by_model"],
 }
 
 # 数据断言型：测试名 -> (文件路径, 车型/键, 篡改模式)

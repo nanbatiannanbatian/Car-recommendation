@@ -60,16 +60,19 @@ def run():
         powers = set(c["power"] for c in cars)
         check("覆盖多能源", len(powers) >= 3, str(powers))
 
-    # 4b. 动态区块：4 个区块需随环境分实时重绘（用户要求）
+    # 4b. 定稿榜固定/推演器分离（v9.7.49）：定稿区静态、推演器只改标识
     check("比较器有重排钩子", "window.onBoardRerender" in html and "onBoardRerender(rows, cond, scale)" in html)
-    check("动态区块标识", html.count("随环境分实时更新") >= 4, str(html.count("随环境分实时更新")))
-    for cid in ("dyn-tiers", "dyn-bands", "dyn-three", "dyn-robust"):
-        check(f"动态容器存在:{cid}", f'id="{cid}"' in html)
-    check("动态重绘JS内嵌", "function onRerender" in html and "getElementById('dyn-tiers')" in html)
-    # node + DOM stub 实跑：切换条件后 4 区块必须变化
+    check("定稿榜导航标注", "定稿榜导航" in html and "不随场景变化" in html)
+    check("推演器标识存在", 'id="sim-state"' in html and "推演态" in html)
+    for cid in ("fixed-three", "fixed-robust"):
+        check(f"定稿容器存在:{cid}", f'id="{cid}"' in html)
+    check("6场景稳健性内嵌", all(s in html for s in ("无家充","北方极寒","长途高频","营运","限牌城市")))
+    check("旧动态容器已移除", 'id="dyn-' not in html)
+    check("定稿区JS首次算一次", "finalizeFixed" in html and "ROBUST_SCENARIOS" in html)
+    # node + DOM stub 实跑：改条件定稿区不变、推演态标识变
     nt = subprocess.run(["node", "dynamic_blocks_test.js", OUT], cwd=HERE,
                         capture_output=True, text=True, timeout=60)
-    check("动态区块实跑(node)全过", nt.returncode == 0 and "5/5 通过" in nt.stdout,
+    check("定稿固定/推演分离(node)全过", nt.returncode == 0 and "10/10 通过" in nt.stdout,
           (nt.stdout or nt.stderr)[-300:])
     # 4c. 全环境项测试：12项×每个选项都生效、结果无异常（用户要求"每个环境修改是否起效果"）
     et = subprocess.run(["node", "env_options_test.js", OUT], cwd=HERE,

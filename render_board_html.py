@@ -373,6 +373,16 @@ def render(data, summary, title, as_of):
                  '<b>第二档是「按偏好取舍组」，组内名次会随算法权重变动，请勿严格按数字先后选车</b>，'
                  '结合档位、评价与逐配置对比做决定。' + _tau_txt + '。'
                  '「唯一名次」只在本榜 8 维规则内成立，不是购车唯一结论。</div>')
+        # v9.7.48：连续名次(补二值命中盲区) + 产品力≠市场热度口径说明
+        _rm = _stab.get("rank_mean_by_model") or {}
+        if _rm:
+            _top_rm = sorted(_rm.items(), key=lambda kv: kv[1])[:5]
+            _rm_txt = "、".join(f"{e(m)} 平均第{v:g}" for m, v in _top_rm)
+            H.append(f'<div class="stability-tip"><b>算法平均名次（连续指标，补「进前三」硬截断的盲区）：</b>'
+                     f'{_rm_txt}。平均名次越接近1越稳压；「家族命中0%」可能是"稳稳第5"而非不稳。</div>')
+        if _stab.get("scope_note"):
+            H.append('<div class="stability-tip" style="border-left-color:#16794a;background:#eef8f1">'
+                     '<b>口径边界：</b>' + e(_stab["scope_note"]) + '</div>')
         tb_main = meta.get("trim_board") or {}
         # v9.7.34：低置信标记只在"有区分度"时显示——全high或全low时逐车标没有意义，
         # 全low是系统性数据问题，应在顶部提示修数据而非标每一款。
