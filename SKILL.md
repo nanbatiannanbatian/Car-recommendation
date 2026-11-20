@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 9.7.27
+version: 9.7.28
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v9.7.27）
+# Car recommendation —— 可信购车榜单引擎（v9.7.28）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -47,6 +47,12 @@ author: "nanbatiannanbatian"
   也不许出一份缺配置的残缺榜单。新车型入池 = 8 维分 + 逐配置数据 + 证据来源，三者缺一不可。
 - 页面上每款车的主榜行、总分构成行、产品力榜行都必须有配置下拉框；
   若某车无配置数据导致下拉框缺失，视为 bug，必须修复后交付。
+- **原始库→事实库必须全字段映射**（2026-11-20 用户追加）：原始库 `all_data.json` 的字段
+  （kwh/cell/sales/life/trim/来源URL/证据引文…）不得"原始有、事实库没有"。
+  用 `python3 facts_sync.py --check` 校验，`--apply` 同步，`--report` 看字段覆盖报告。
+  原始库确实没有的字段（电压/碰撞/气囊/智驾硬件）必须逐一网查核实是"真没有"还是"漏采"，
+  结论写进 `facts_sync.NOT_IN_SOURCE_DETAIL`，不许把"没去采"当"数据源没有"。
+
 - **电压平台/快充也是必采字段**（2026-11-20 用户追加）：配置级 `charge` 必须写清电压平台（400V/800V）
   与快充时间（如「800V·3C 快充16min」）。数据源：汽车之家/易车参数页的「高压平台(V)」「快充时间(min)」、
   厂商官网配置表。电压是**配置级差异**（如零跑B01 590版400V/670版800V），不可只记车系级。
@@ -2722,3 +2728,21 @@ DeepSeek 定性："这是10款候选紧凑型纯电轿车的审计榜，不是�
 - SKILL 铁律新增：电压平台/快充为必采字段，不可只记车系级、不可留空标未披露了事。
 - BUG-036 进回归（36/36），A/B 27/27 通过。
 - 教训：判断"数据真的没有"之前，先查权威参数源到底有没有这个字段——别把"没去采"当"采不到"。
+
+---
+
+## v9.7.28 · 原始库→事实库全字段映射（2026-11-20，用户要求）
+
+用户："增加原始数据库到实时库的事实映射，不要原始库有数据事实库里面没有；
+原始库没有的数据要再查找明确是不是真的没有还是 bug"。
+
+- 核实原始库 `all_data.json` 有 19 字段/73款，事实库 `fact_library.json` 只映射了 5 个——
+  sales/life/life_note/trim/cons_quote/cons_src 等 773 个字段值丢失。
+- 新增 `facts_sync.py`：11 字段映射表 + 6 来源字段收进 `_source`，`--check/--apply/--report`。
+  手工核验值优先不被覆盖；已同步 773 字段，`--check` 全绿。
+- 原始库没有的字段逐一核实并写进 `NOT_IN_SOURCE_DETAIL`：
+  **charge/voltage**=有但漏采（已 v9.7.27 修，110/110配置）；
+  **crash**=这批紧凑纯电真没有（ice_crash.json 187款0命中，MG4仅Euro NCAP不在库）；
+  **airbags**=另有专门库 airbags.json；**adas_hw**=另有配置表/thirdparty库。
+- 接入 A/B COVERAGE 与 bug 回归：**37/37**、A/B **28/28** 通过。
+- 教训：别假设"原始库没有"=数据源没有——先查权威参数源与专门库，区分漏采/真无/另有库。

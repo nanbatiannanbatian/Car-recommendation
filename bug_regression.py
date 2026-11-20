@@ -57,6 +57,7 @@ CASES = [
     ("BUG-034", "电池来源列全显示未采集(事实库有值却不回退)", "v9.7.25"),
     ("BUG-035", "生命周期漏填/逐配置电芯空/缺口伪装空白", "v9.7.26"),
     ("BUG-036", "电压快充99处未披露(实为未采集非无数据)", "v9.7.27"),
+    ("BUG-037", "原始库773字段未映射到事实库", "v9.7.28"),
 ]
 
 
@@ -217,6 +218,18 @@ def t015():
     assert "BV.main_cell" in src, "渲染绕过了 board_view 单点"
     return "渲染复用 board_view 单点"
 
+
+def t037():
+    """原始库→事实库映射完整；原始库没有的字段有核实结论。"""
+    import facts_sync as FS
+    if not FS.DEFAULT_SRC or not os.path.exists(FS.DEFAULT_SRC):
+        return "原始库不在本机（发布环境），跳过映射检查"
+    changed, rows, facts = FS.sync(apply=False)
+    assert not changed, f"仍有 {len(changed)} 字段未同步"
+    assert "_meta" in facts and facts["_meta"].get("sync_tool") == "facts_sync.py"
+    for f in ("charge/voltage", "crash", "airbags", "adas_hw"):
+        assert f in FS.NOT_IN_SOURCE_DETAIL, f"缺核实结论: {f}"
+    return f"映射完整({len(rows)}款)，原始库缺字段均有核实结论"
 
 def t036():
     """电压/快充必须采集而非标未披露；配置级差异要体现。"""
@@ -460,7 +473,7 @@ def t016():
 
 
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037]
 
 
 def run():
