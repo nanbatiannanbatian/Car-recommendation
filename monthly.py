@@ -91,6 +91,13 @@ def prev_month(y, m, back=1):
     return y, m
 
 
+def default_sales_month():
+    """纯日历推断的销量数据月 = 上个月(YYYYMM)，不联网。用于出榜页面/报告的 as_of 默认值，
+    避免数据月停留在"—"而用户看不到榜单基于哪个月销量。真正探测(月初回退上上个月)走 probe_month()。"""
+    y, m = prev_month(dt.date.today().year, dt.date.today().month)
+    return f"{y*100+m}"
+
+
 def probe_month(fh, prefer=None, max_back=4):
     """从 prefer（默认上个月）往前找第一个有数据的月份。返回 (yyyymm, 说明)。"""
     import fetch_dcd_sales as D
@@ -108,7 +115,12 @@ def probe_month(fh, prefer=None, max_back=4):
             rows = []
             tried.append(f"{ym}: 接口异常 {type(e).__name__}")
         if rows:
-            note = f"{ym}" + (f"（原定 {prefer} 不可用，已回退 {i} 个月）" if i else "")
+            if prefer:
+                base = f"{prefer}"
+            else:
+                sy, sm = prev_month(today.year, today.month)  # 探测起点=上个月
+                base = f"{sy*100+sm}"
+            note = f"{ym}" + (f"（原定 {base} 不可用，已回退 {i} 个月）" if i else "")
             log(f"  目标月份 = {note}，纯电榜 {len(rows)} 款", fh)
             return ym, note
         tried.append(f"{ym}: 无数据")

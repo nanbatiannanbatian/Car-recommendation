@@ -70,6 +70,8 @@ NEW_FILES = [
     "categories/car_midsedan_allprice.json",    # 2026-10纯电中型轿车全价位榜配置
     "trim_ingest.py",                           # v9.7.39 逐配置采集导入器（借 vehicle-data-hub/swoiow，不内置爬虫）
     "schema_audit.py",                          # v9.7.39 逐配置字段规范对照（借 open-ev-data schema）
+    "negative_regression.py",                   # v9.7.43 失败回测框架（注入错误验证回归非摆设）
+    "sibling_check.py",                         # v9.7.43 同源车评分一致性门禁
     # 2026-11-20 跨能源形式选车适配比较器（用户多轮需求）
     "build_energy_compare.py",                  # 比较器生成脚本（规则表唯一事实源）
     "energy_compare.html",                      # 比较器交付页面（自包含）

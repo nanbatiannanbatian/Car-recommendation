@@ -81,8 +81,8 @@ border-radius:50%;font-weight:700;background:var(--soft);color:var(--ink2)}
 .rk.g3{background:#f3dfd6;color:#9b4a2f}
 .score{font-size:17px;font-weight:700;color:var(--accent2)}
 .delta-up{color:#c8442e;font-weight:700}.delta-down{color:#1a7f37;font-weight:700}
-.tier{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;color:#fff}
-.T1{background:var(--t1)}.T2{background:var(--t2)}.T3{background:var(--t3)}
+.tier{display:inline-block;padding:3px 9px;border-radius:20px;font-size:12px;font-weight:700;color:#fff;background:#5f6b78;white-space:nowrap}
+.tier.T1{background:var(--t1)}.tier.T2{background:var(--t2)}.tier.T3{background:var(--t3)}
 .ref{color:var(--ink2);font-size:12px;text-align:left;line-height:1.6}
 .ref .tag{color:var(--accent);font-weight:600}
 .band{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 18px;margin-bottom:12px}
@@ -169,6 +169,9 @@ def risk_flags(r: dict) -> str:
         out.append('<span class="flag flag-est" title="该车型部分参数为估算/待核；分数仅用于同车配置相对对比，跨车型横向对比可信度下降">⚠估算待核</span>')
     if any(k in note for k in ("营运", "网约", "B端", "出租", "对公")):
         out.append('<span class="flag flag-fleet" title="营运/网约车为主，属硬风险（第三档）；非私人购车首选">营运为主</span>')
+    # v9.7.43：销量口径异常标注（季度初出口集中/促销透支/清库等导致的单月异常低值，非产品力问题）
+    if any(k in note for k in ("销量口径异常", "出口集中", "季度初出口", "促销透支")):
+        out.append('<span class="flag flag-est" title="该车型当月销量为口径性异常低值（如季度初出口集中、促销透支、清库），非产品力问题，不改档位；见生命周期提示与逐车取证依据">⚠销量口径异常</span>')
     crash = str(r.get("crash") or "")
     if not crash or any(k in crash for k in ("无", "未查到", "未披露")):
         out.append('<span class="flag flag-warn" title="无中保研/中汽研/C-NCAP可查询的官方碰撞报告；安全无官方实锤，证据已降权但不判劣">缺官方碰撞</span>')
@@ -188,7 +191,17 @@ def rank_badge(rank):
 
 
 def tier_badge(t):
-    return f'<span class="tier {e(t)}">{e(t)}</span>' if t else ""
+    """档位徽标：CSS 颜色类是英文 T1/T2/T3（见 .tier.T1/.T2/.T3），
+    此前误用中文当 class（tier 第二档）导致 CSS 匹配不上→白字无背景看不清。
+    显示文字保留中文，class 用英文，两者分离。"""
+    raw = str(t or "")
+    cls = {"第一档": "T1", "第二档": "T2", "第三档": "T3"}.get(raw, "")
+    if not cls and raw in ("T1", "T2", "T3"):
+        cls = raw  # 兼容英文档位值（selftest/部分数据源）
+    if not cls:
+        return ""
+    label = {"T1": "第一档", "T2": "第二档", "T3": "第三档"}.get(cls, raw)
+    return f'<span class="tier {cls}" title="{e(label)}">{e(label)}</span>'
 
 
 def render(data, summary, title, as_of):
@@ -348,10 +361,10 @@ def render(data, summary, title, as_of):
                             k in str(r.get("note") or "") for k in ("营运", "网约", "B端"))
                         if is_fleet:
                             lab = ('<span class="flag flag-fleet" '
-                                   'title="C-T3：营运/交付硬风险，第三档暂缓">C·营运风险</span>')
+                                   'title="营运/交付硬风险，第三档暂缓">营运风险</span>')
                         else:
                             lab = ('<span class="flag flag-warn" '
-                                   'title="C-T2：参数完备但缺官方碰撞/口碑实锤，留第二档；安全置信度勿对标A类">C·证据不足</span>')
+                                   'title="参数完备但缺官方碰撞/口碑实锤，留第二档；安全置信度勿对标 A 级证据">证据不足</span>')
                         H.append(f"<td class='{cls}'>{lab}</td>")
                     else:
                         H.append(f"<td class='{cls}'>{e(val)}</td>")
@@ -854,6 +867,9 @@ def selftest():
         ("分段汇总", "分段汇总总榜" in doc),
         ("产品力榜", "纯产品力总榜" in doc and "与性价比的关系" in doc),
         ("事实覆盖披露", "事实参考列覆盖" in doc),
+        ("档位徽标class用英文T1/T2/T3", 'class="tier T1"' in doc and 'class="tier T2"' in doc),
+        ("档位徽标中文可读", "第一档" in doc and "第二档" in doc),
+        ("档位CSS颜色规则存在", ".tier.T1{background:var(--t1)}" in CSS),
     ]
     bad = [n for n, ok in checks if not ok]
     # 注册表契约
@@ -873,7 +889,7 @@ def main():
     ap.add_argument("--summary", help="pipeline.py 的 summary.json（可选，用于三档）")
     ap.add_argument("--out", help="输出 html 路径（--selftest 时不需要）")
     ap.add_argument("--title", help="页面标题（缺省取 data.meta.title）")
-    ap.add_argument("--as-of", default="—", help="数据月，如 202610")
+    ap.add_argument("--as-of", default=None, help="销量数据月(YYYYMM)，默认自动取上个月")
     ap.add_argument("--selftest", action="store_true", help="结构自检（不依赖真实数据）")
     a = ap.parse_args()
 
@@ -882,9 +898,16 @@ def main():
     if not a.data or not a.out:
         ap.error("渲染需要 --data 与 --out（或加 --selftest）")
 
+    _as_of = a.as_of
+    if not _as_of:
+        try:
+            import monthly as _MO
+            _as_of = _MO.default_sales_month()
+        except Exception:
+            _as_of = "—"
     data = json.load(open(a.data, encoding="utf-8"))
     summary = json.load(open(a.summary, encoding="utf-8")) if a.summary and os.path.exists(a.summary) else None
-    doc = render(data, summary, a.title, a.as_of)
+    doc = render(data, summary, a.title, _as_of)
     os.makedirs(os.path.dirname(os.path.abspath(a.out)), exist_ok=True)
     open(a.out, "w", encoding="utf-8").write(doc)
     print(f"[ok] {a.out}（{len(doc)} 字符）")

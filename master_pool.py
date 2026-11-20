@@ -494,6 +494,16 @@ def _row_to_sales(row: dict) -> dict | None:
 def cmd_intake(args):
     """按需候选摄入：搜榜 → 有效销量 → 达标筛选 → 池内复用/池外建档。默认 dry-run。"""
     import json as _json
+    # 销量月份时效（2026-11-20 用户强制）：auto = 探测"上个月，月初未出取上上个月"，不硬编码历史月。
+    if str(args.month).lower() == "auto":
+        if args.sales_cache:
+            raise SystemExit("--month auto 与 --sales-cache 冲突：离线快照请显式指定 --month")
+        import monthly as _M
+        # 只探测"上个月→上上个月"两个月：上上个月销量一定已发布，不需要再往前回退。
+        ym, note = _M.probe_month(None, prefer=None, max_back=2)
+        print(f"[intake] 销量口径月份自动探测 = {note}")
+        args.month = str(ym)
+        args._sales_month_note = note
     pool = load_pool(args.pool)
     cfg = load_config(args.config)
     idx = index_by_key(pool)
@@ -874,7 +884,7 @@ def main():
     ap.add_argument("--apply", action="store_true", help="rescore/intake 写回（默认 dry-run）")
     # intake 专用
     ap.add_argument("--sales-cache", help="懂车帝逐月榜快照 json（离线可复现）；不给则实时拉")
-    ap.add_argument("--month", default="202610", help="数据月（截止），默认 202610")
+    ap.add_argument("--month", default="auto", help="数据月(截止)：auto=探测上个月/月初回退(默认)；或显式 YYYYMM；--sales-cache 复现时须显式给")
     ap.add_argument("--months", type=int, default=6, help="逐月回看月数，默认 6")
     ap.add_argument("--min-sales", type=int, default=1000, help="有效销量门槛，默认 1000")
     ap.add_argument("--intake-report", help="intake 报告输出路径")

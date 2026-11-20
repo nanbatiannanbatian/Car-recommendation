@@ -320,6 +320,10 @@ def car_verdict(row: dict, cand: dict, meta: dict | None = None) -> dict:
     fleet_flag = any(k in note_text for k in ("营运", "网约", "B端", "出租", "对公"))
     if fleet_flag:
         cons.insert(0, "营运/网约车为主")
+    # v9.7.43：销量口径异常（出口集中/促销透支/清库导致的单月低值，非产品力问题）
+    sales_anomaly = any(k in note_text for k in ("销量口径异常", "出口集中", "季度初出口", "促销透支"))
+    if sales_anomaly:
+        cons.append("当月销量为出口/促销口径性低值，非产品力问题")
     # 适合人群：按最突出的维度机械映射
     top = max((k for k in labels if isinstance(sc.get(k), (int, float))),
               key=lambda k: sc[k], default="")
@@ -336,7 +340,7 @@ def car_verdict(row: dict, cand: dict, meta: dict | None = None) -> dict:
     elif tier == "第三档":
         advice = "暂缓（第三档，等证据）"
     elif ev == "C":
-        advice = "谨慎（证据C）"
+        advice = "谨慎（证据等级 C：新上市或样本不足）"
     else:
         advice = "按偏好选（第二档）"
     return {"pros": pros[:4], "cons": cons[:4], "audience": audience, "advice": advice, "fleet": fleet_flag}

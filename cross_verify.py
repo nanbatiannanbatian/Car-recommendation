@@ -416,6 +416,35 @@ FIELD_LABEL = {
 }
 
 
+def check_internal_consistency(cands: list[dict]) -> dict:
+    """条目内一致性门禁（v9.7.43）：查"同一事实多字段自相矛盾"。
+    现有工具只查跨源一致(cross_verify)和字段格式(schema_audit)，
+    没人查 note 自由文本 vs 结构化字段冲不冲突——深蓝L06 note写"无碰撞成绩"
+    但 crash="C-NCAP 92.3%"/evidence=A，脏 note 滞留数轮没被发现，就是这个问题。
+    规则保守，只报确定性矛盾，避免误报：
+      - note 明确断言「无碰撞成绩/无官方碰撞成绩/没有碰撞成绩」
+      - 且 crash 有真实成绩 或 safety_basis 是官方碰撞源
+    """
+    conflicts = []
+    for c in cands:
+        note = str(c.get("note") or "")
+        crash = str(c.get("crash") or "")
+        basis = str(c.get("safety_basis") or "")
+        asserts_none = any(k in note for k in ("无碰撞成绩", "无官方碰撞成绩", "没有碰撞成绩"))
+        has_real = (crash and not any(k in crash for k in ("无", "未查到", "—", "未披露"))
+                    and ("NCAP" in crash or "CIASI" in crash)) or basis in ("cncap", "ciasi", "c-ncap", "ciasi_checked", "euro_ncap", "ancap")
+        if asserts_none and has_real:
+            conflicts.append({
+                "model": c.get("model"),
+                "field": "crash",
+                "note": note[:80],
+                "crash": crash[:60],
+                "basis": basis,
+                "fix": "删除 note 里的『无碰撞成绩』断言或更新为最新成绩；note 是展示文案，不得与结构字段矛盾",
+            })
+    return {"checked": len(cands), "conflicts": conflicts, "passed": not conflicts}
+
+
 def verify_all(root=HERE, models=None, dcd_path="", pool_only=True):
     """主入口：返回 {car: {field: adjudication}}。
     pool_only=True 时只输出总池内的车（用户关心的是候选池核验结果）；

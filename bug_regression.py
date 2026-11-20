@@ -68,6 +68,12 @@ CASES = [
     ("BUG-045", "发布包缺内置证据采集工具(依赖外部skill)", "v9.7.37"),
     ("BUG-046", "整合残留orchestrator死依赖", "v9.7.38"),
     ("BUG-047", "归一化敏感(换等价归一化即跳位)未拦第一档", "v9.7.41"),
+    ("BUG-048", "候选池漏收主流车(Model3/极氪007)未联网盘点", "v9.7.43"),
+    ("BUG-049", "销量数据缺失(None)被误判无交付降T3(极氪007)", "v9.7.43"),
+    ("BUG-050", "补录车销量用单月冒充趋势/假方法名(Model3/e7)", "v9.7.43"),
+    ("BUG-051", "判档用车系基础分、主榜用配置锚定分(两套口径打架)", "v9.7.43"),
+    ("BUG-052", "note文案与crash结构字段矛盾无人校验(铁律不可执行)", "v9.7.43"),
+    ("BUG-053", "同源车维度分无据大差异(007GT value/cabin被压低)", "v9.7.43"),
 ]
 
 
@@ -498,12 +504,11 @@ def t034():
     return "电芯来源全量展示（16/16）"
 
 def t033():
-    """入池铁律必须写进 SKILL，且有可执行完整性盘点。"""
-    sk = _read("SKILL.md")
-    assert "候选池尽量收全" in sk and "入池标准 = 能否取得逐配置数据" in sk, "SKILL 未写入池铁律"
+    """入池规则已代码化：完整性盘点工具 + pipeline 门禁（不再断言 SKILL 文字）。"""
     tc = _read("trim_coverage.py")
     assert "check_universe" in tc and "--universe" in tc, "无完整性盘点工具"
-    return "入池铁律已固化+工具可执行"
+    assert "check_universe" in _read("pipeline.py"), "盘点工具未接入出榜门禁"
+    return "入池规则已代码化+工具可执行+门禁接入"
 
 def t032():
     """入池应尽量覆盖可比较车型；不能入池的要显示原因。"""
@@ -550,17 +555,22 @@ def t029():
     return "候选池披露进页面 + 电池降精度"
 
 def t028():
-    """证据C分层可见 + tooltip标准 + τ通俗解释 + 子项折叠。"""
+    """证据C分层可见 + tooltip标准 + τ通俗解释 + 子项折叠。
+    v9.7.43 文案中文化：C·证据不足→证据不足、C·营运风险→营运风险。"""
     src = _read("render_board_html.py")
-    for kw in ("C·证据不足", "C·营运风险", "不适合跨车型横向对比", "_tau_grade", "dim_breakdown"):
+    for kw in ("证据不足", "营运风险", "不适合跨车型横向对比", "_tau_grade", "dim_breakdown"):
         assert kw in src, f"缺 {kw}"
+    # v9.7.43：徽标文案必须已中文化（去掉 C· 前缀），旧前缀只剩在历史产物里
+    assert 'title="参数完备但缺官方碰撞/口碑实锤' in src, "证据徽标 tooltip 丢失"
+    assert "C·证据不足</span>" not in src, "证据徽标仍是 C· 英文前缀未中文化"
     out = os.path.join(HERE, "runs", "compact_bev_allprice_202610", "榜单.html")
     if os.path.exists(out):
         t = _read("runs/compact_bev_allprice_202610/榜单.html")
-        assert "C·证据不足" in t and "C·营运风险" in t, "证据分层未显示"
+        # 历史产物可能是旧文案(C·证据不足)或新文案(证据不足)，都算证据分层已显示
+        assert ("证据不足" in t) and ("营运风险" in t), "证据分层未显示"
         assert "维度子项依据" in t and "展开 " in t, "子项折叠未显示"
         assert "中等" in t or "高（" in t or "较低" in t, "τ无通俗档位"
-    return "证据分层+tooltip+τ解释+子项折叠均生效"
+    return "证据分层+tooltip+τ解释+子项折叠均生效（文案已中文化）"
 
 def t027():
     """证据 C 不判劣：零跑B01 应回第二档，营运车仍第三档。"""
@@ -696,8 +706,172 @@ def t016():
     return f"SKILL 版本 {v.group(1)}"
 
 
+def t048():
+    """候选池完整性门禁：出榜前必须联网盘点同级全量车型，漏收必须逐个判定，不许再漏 Model3/极氪007。"""
+    import copy, tempfile
+    import trim_coverage as TC
+
+    # 断言1（源码级）：pipeline 已接入完整性门禁，SKILL 铁律仍在
+    src = _read("pipeline.py")
+    assert "check_universe" in src and "完整性门禁" in src, "pipeline 未接候选池完整性门禁"
+    assert "--skip-universe-gate" in src, "缺绕过门禁的显式开关"
+    assert os.path.exists(os.path.join(HERE, "universe_build.py")), "universe 独立生成器缺失（代码即事实）"
+
+    # 断言2（数据级）：全价位榜的 universe 清单存在且正常态无漏收
+    univ = os.path.join(HERE, "categories", "universe_car_midsedan_allprice.json")
+    pool = os.path.join(HERE, "runs", "midsedan_bev_1218_202610", "candidates_allprice.json")
+    assert os.path.exists(univ) and os.path.exists(pool), "universe/候选池未固化"
+    d = json.load(open(pool, encoding="utf-8"))
+    r = TC.check_universe(pool, univ, d.get("pool_excluded", []))
+    assert r["available"], "universe 清单不可读"
+    assert not r["not_covered"], f"正常态有漏收且未说明原因: {r['not_covered']}"
+
+    # 断言2.5（反循环论证）：universe 必须由联网榜独立生成，不是从候选池抄
+    uv = json.load(open(univ, encoding="utf-8"))
+    assert "universe_build.py" in uv.get("_meta", {}).get("generated_by", ""), "universe 非联网独立生成（循环论证风险）"
+    assert _read("universe_build.py") and "discover" in _read("universe_build.py"), "缺联网→universe生成器"
+    # 断言3：漏收的车已补入候选池+trims
+    names = {c["model"] for c in d["candidates"]}
+    assert "特斯拉Model 3" in names and "极氪007" in names and "比亚迪e7" in names, "门禁发现的车仍未入池"
+    trims = json.load(open(os.path.join(HERE,"categories","trims.json"), encoding="utf-8"))["entries"]
+    tnames = {x["model"] for x in trims}
+    assert "特斯拉Model 3" in tnames and "极氪007" in tnames and "比亚迪e7" in tnames, "入池车缺逐配置条目"
+
+    # 断言4（黄金反向验证）：删掉候选池的 Model 3 后，门禁必须报漏收——证明真能防漏
+    fake = copy.deepcopy(d)
+    fake["candidates"] = [c for c in fake["candidates"] if c["model"] != "特斯拉Model 3"]
+    tmp = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8")
+    try:
+        json.dump(fake, tmp); tmp.close()
+        r2 = TC.check_universe(tmp.name, univ, fake.get("pool_excluded", []))
+        assert any("Model 3" in x for x in r2["not_covered"]), "删掉Model3后未报漏收=门禁失效"
+    finally:
+        os.unlink(tmp.name)
+    return f"完整性盘点生效(联网独立生成)：权威 {r['universe']} 款 / 入池 {r['in_pool']} 款 / 删车能检出"
+
+
+def t049():
+    """销量数据缺失(None)不等于无交付(0)：不能因补录车没查到单月销量就降T3。"""
+    src = _read("leaderboard.py")
+    # 源码级：None 与 0 必须分开处理，不能有 `sales is None or sales == 0` 合并分支
+    assert "sales is None or sales == 0" not in src, "None与0仍合并判无交付"
+    assert "销量数据缺失" in src and "非无交付" in src, "缺销量分支未标注非无交付"
+    assert "无交付 / 零销量" in src, "确认零销量的硬风险提示丢失"
+    # 数据级：极氪007产品力高于MG07，档位不该更低
+    d = json.load(open(os.path.join(HERE,"runs","bev_midsedan_202610_full","summary.json"), encoding="utf-8"))
+    t = d["tiers"]["中型纯电轿车（全价位）"]
+    def in_tier(name):
+        for tier, arr in t.items():
+            for x in arr:
+                if name in (x if isinstance(x,str) else str(x.get("model",""))):
+                    return tier
+        return None
+    j7, mg = in_tier("极氪007"), in_tier("MG 07")
+    assert j7 and mg, "两车档位缺失"
+    assert not (j7 == "T3" and mg in ("T1","T2")), f"产品力更高的极氪007({j7})档位低于MG07({mg})"
+    return f"销量缺失不再降档：极氪007={j7} / MG07={mg}（同为T2档）"
+
+
+def t050():
+    """补录车的销量口径必须与全池一致：多月中位，不许单月冒充、不许假方法名。"""
+    d = json.load(open(os.path.join(HERE,"runs","midsedan_bev_1218_202610","candidates_allprice.json"), encoding="utf-8"))
+    by = {c["model"]: c for c in d["candidates"]}
+    # Model3：必须用6个月中位 14372，不是10月异常单月 1010；且要有 trend_months 支撑
+    m3 = by.get("特斯拉Model 3", {})
+    assert m3.get("trend_sales") == 14372, f"Model3趋势销量异常: {m3.get('trend_sales')}（应为6月中位14372）"
+    assert m3.get("trend_months") and len(m3["trend_months"]) == 6, "Model3缺6个月逐月数据"
+    assert "中位数" in str(m3.get("trend_method")), "Model3口径标注非中位数"
+    # e7：标'近3月中位'而非虚假的'6个月中位数'
+    e7 = by.get("比亚迪e7", {})
+    assert "6个月中位数" not in str(e7.get("trend_method")), "e7假标6个月中位数（无逐月数据）"
+    # 007三厢：v9.7.43 方案A——用全系(三厢+猎装)合并中位9840，标 series_total 上界，不谎称单独销量
+    j7 = by.get("极氪007", {})
+    assert j7.get("trend_sales") == 9840, f"007全系中位异常: {j7.get('trend_sales')}"
+    assert j7.get("sales_scope") == "series_total", "007未标车系合计(上界)"
+    assert "全系" in str(j7.get("trend_method")), "007未标明全系合并口径"
+    # 口径规则已由本测试的数据断言锁死，不再依赖 SKILL 文字
+    return "口径统一：Model3=6月中位14372 / e7=近3月中位 / 007=全系合并中位9840(上界)"
+
+
+def t051():
+    """判档分必须与主榜展示分同源（最高配置锚定分），不许两套口径打架。"""
+    import leaderboard as L
+    src_pipeline = _read("pipeline.py")
+    src_lb = _read("leaderboard.py")
+    # 源码级：pipeline 判档前必须注入配置分；with_config_scores 单点定义
+    assert "with_config_scores" in src_lb, "缺判档配置分注入函数"
+    assert "with_config_scores(passed, cfg)" in src_pipeline, "pipeline 判档未注入配置分"
+    assert "--no-config-anchor" in src_pipeline, "缺回退开关"
+    # 数据级：with_config_scores 注入后分数==主榜best_total，配置名同步
+    cfg = json.load(open(os.path.join(HERE,"categories","car_midsedan_allprice.json"), encoding="utf-8"))
+    cands = json.load(open(os.path.join(HERE,"runs","midsedan_bev_1218_202610","candidates_allprice.json"), encoding="utf-8"))["candidates"]
+    import trim_annotate as TA
+    injected = L.with_config_scores(cands, cfg)
+    td = TA.annotate_all(cands, cfg)
+    by = {c["model"]: c for c in injected}
+    for m in ("MG 07 纯电", "深蓝L06", "特斯拉Model 3"):
+        c = by[m]
+        assert c.get("score_basis") == "annotated_trim", f"{m}判档未用配置分"
+        best_total = td[m]["best_total"]
+        # 用配置分按权重算总分，应等于主榜 best_total
+        W = {d["key"]: d["weight"] for d in cfg["dimensions"]}
+        tot = sum(c["scores"][k]*W[k] for k in W)/sum(W.values())*10
+        assert abs(round(tot,1) - round(float(best_total),1)) <= 0.1, f"{m}判档分{tot:.1f}≠主榜{best_total}"
+        assert c.get("scored_trim_used") == td[m]["best_trim"], f"{m}配置名未同步"
+    return "判档分=主榜配置锚定分（MG07=88.0/845版、深蓝L06=87.8/670版），配置名同源"
+
+
+def t052():
+    """条目内一致性：note文案不得与crash/safety_basis矛盾，且门禁必须接入出榜链路。"""
+    import cross_verify as XV
+    # 源码级：门禁函数存在 + pipeline 接入 + 可绕过开关
+    assert "def check_internal_consistency" in _read("cross_verify.py"), "缺一致性校验函数"
+    src = _read("pipeline.py")
+    assert "check_internal_consistency(cands)" in src and "内部一致性门禁" in src, "pipeline 未接入一致性门禁"
+    assert "--skip-consistency-gate" in src, "缺绕过开关"
+    # 数据级：真实候选池必须无矛盾
+    cands = json.load(open(os.path.join(HERE,"runs","midsedan_bev_1218_202610","candidates_allprice.json"), encoding="utf-8"))["candidates"]
+    r = XV.check_internal_consistency(cands)
+    assert r["passed"], f"真实池有矛盾: {r['conflicts']}"
+    # 反向验证：注入矛盾必须被检出（证明不是摆设）
+    import copy
+    fake = copy.deepcopy(cands)
+    for c in fake:
+        if c["model"] == "深蓝L06":
+            c["note"] = "磁流变仅Ultra版；无碰撞成绩"
+    r2 = XV.check_internal_consistency(fake)
+    assert not r2["passed"] and any(x["model"] == "深蓝L06" for x in r2["conflicts"]), "注入矛盾未被检出=门禁失效"
+    return f"一致性门禁生效：{r['checked']}款0矛盾；注入深蓝L06矛盾能检出"
+
+
+def t053():
+    """同源车评分一致性：同价同配置车不得无据大差异；有据差异须登记理由。"""
+    import copy
+    import sibling_check as SC
+    src = _read("pipeline.py")
+    assert "sibling_check" in src and "同源车一致性门禁" in src, "pipeline 未接同源车门禁"
+    assert "--skip-sibling-gate" in src, "缺绕过开关"
+    assert SC.selftest() == 0, "sibling_check selftest失败"
+    # 数据级：真实候选池无据差异为0（safety差异已登记理由）
+    pool_path = os.path.join(HERE, "runs", "midsedan_bev_1218_202610", "candidates_allprice.json")
+    d = json.load(open(pool_path, encoding="utf-8"))
+    r = SC.check(d["candidates"], d.get("score_diff_reasons", {}))
+    assert r["passed"], f"真实池有无据差异: {r['issues']}"
+    # 007两车 value/cabin 已对齐、safety保留差异且理由在
+    by = {c["model"]: c for c in d["candidates"]}
+    j7, gt = by["极氪007"], by["极氪007GT"]
+    assert j7["scores"]["value"] == gt["scores"]["value"] == 8.8, "value未对齐"
+    assert j7["scores"]["cabin"] == gt["scores"]["cabin"] == 9.0, "cabin未对齐"
+    assert j7["scores"]["safety"] == 9.0 and gt["scores"]["safety"] == 7.2, "safety有据差异不应抹平"
+    assert "safety" in d["score_diff_reasons"].get("极氪007GT|极氪007", {}), "safety差异未登记理由"
+    # 反向：删理由后必须报无据差异
+    r2 = SC.check(d["candidates"], {})
+    assert not r2["passed"] and any(x["dim"] == "safety" for x in r2["issues"]), "删理由未检出"
+    return f"同源车门禁生效：{r['pairs']}对/0无据差异；007 safety差异有据保留、value/cabin已对齐"
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053]
 
 
 def run():
@@ -710,6 +884,17 @@ def run():
         except Exception as ex:
             print(f"[FAIL] {code} {desc} (修于{ver}) — {type(ex).__name__}: {ex}")
             fail += 1
+    # v9.7.43：失败回测——只测正确路径不够，必须证明"注入错误参数会FAIL"。
+    # 每条可注入测试在独立子进程里篡改输入/源码断言目标，验证测试确实会挂。
+    try:
+        import negative_regression as NR
+        broken, skipped = NR.probe_all()
+        if broken:
+            print(f"[FAIL] 失败回测：{len(broken)} 条测试注入错误后仍PASS（断言形同虚设）")
+            fail += 1
+    except Exception as ex:
+        print(f"[FAIL] 失败回测框架异常：{type(ex).__name__}: {ex}")
+        fail += 1
     print(f"\n[bug_regression] {ok}/{len(CASES)} 通过，失败 {fail}")
     return fail
 

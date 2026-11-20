@@ -202,7 +202,15 @@ def main():
              "这正是上一版把深蓝 S05 误放进中型榜的原因。")
 
     if a.json:
+        # v9.7.43：导出全量联网榜（含池内车），供 universe_build 独立生成权威清单。
+        # 此前只导出 outside（池外），导致 universe 只能从候选池抄=循环论证。
+        all_rows = [{"name": r["name"], "power": r["power"],
+                     "price_min": (r["price"][0] if r["price"] else None),
+                     "price_max": (r["price"][1] if r["price"] else None),
+                     "sales": r["sales"], "in_pool": r["in_pool"]}
+                    for r in (inside + outside + ambiguous)]
         payload = {"month": str(a.month), "band": [lo, hi], "min_sales": a.min_sales,
+                   "all": all_rows,
                    "outside": [{"name": r["name"], "power": r["power"],
                                 "price_min": r["price"][0], "price_max": r["price"][1],
                                 "sales": r["sales"], "newish": r["newish"],

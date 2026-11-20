@@ -96,6 +96,8 @@ def main():
                     help="把质量与品控作为第 8 维进综合打分；可与 --complaints 联用")
     ap.add_argument("--no-thirdparty", action="store_true",
                     help="跳过第三方实测/拆车证据（默认启用，走 adjust 封顶通道）")
+    ap.add_argument("--no-config-anchor", action="store_true",
+                    help="判档改用候选池车系基础分（回退到 v9.7.42 老口径，仅供 A/B 对照；默认用主榜同款最高配置分）")
     ap.add_argument("--airbag-gate", action="store_true",
                     help="把「气囊基线已核验（前排侧气囊+前后排头部气帘齐备）」"
                          "作为第一档硬门槛；未核验的车不降分、只不进第一档")
@@ -110,7 +112,11 @@ def main():
                     help="跳过具体配置阶梯与带内配置推荐（默认启用，回测对照用）")
     ap.add_argument("--no-html", action="store_true",
                     help="不随报告生成 HTML 榜单页（默认生成，需 board_v2 链路）")
-    ap.add_argument("--as-of", default="—", help="HTML 页面数据月标注，如 202610")
+    ap.add_argument("--as-of", default=None, help="HTML 页面销量数据月标注(YYYYMM)，默认自动取上个月；出榜须让用户看到基于哪月销量")
+    ap.add_argument("--universe", help="候选池完整性盘点的同级权威车型清单JSON(默认 categories/universe_<category>.json)")
+    ap.add_argument("--skip-universe-gate", action="store_true", help="跳过完整性门禁(须在报告说明为何同级漏收车无需处理)")
+    ap.add_argument("--skip-consistency-gate", action="store_true", help="跳过条目内一致性门禁(须在报告说明为何note与结构字段矛盾不是错误)")
+    ap.add_argument("--skip-sibling-gate", action="store_true", help="跳过同源车评分一致性门禁(须在报告说明为何无据差异合理)")
     ap.add_argument("--html-title", help="HTML 页面标题")
     ap.add_argument("--force-stale", action="store_true",
                     help="强制使用旧指纹候选池出榜（仅调试/回测用，报告会标注数据过期）")
@@ -135,6 +141,45 @@ def main():
 
     data = json.load(open(a.candidates, encoding="utf-8"))
     cands = data.get("candidates", data)
+
+    # v9.7.43：候选池完整性门禁——出榜前必须联网盘点同级全量在售车型，与候选池比对。
+    # 漏收的车必须逐个判定：能入池的补入候选池+trims.json，不能入池的写进 pool_excluded[] 并写明事实原因。
+    # 这是对"Model 3 漏收"事故的根因修复（此前只靠人记得盘点，没接进出榜链路）。
+    import trim_coverage as TC
+    _univ = a.universe or os.path.join(_here, "categories", f"universe_{a.category}.json")
+    if os.path.exists(_univ) and not a.skip_universe_gate:
+        _ur = TC.check_universe(a.candidates, _univ, data.get("pool_excluded", []))
+        if _ur.get("available") and _ur.get("not_covered"):
+            sys.exit("完整性门禁：以下同级在售车漏收且未说明原因：" +
+                     "、".join(_ur["not_covered"]) +
+                     "\n→ 能入池的补入候选池+categories/trims.json；"
+                     "不能入池的写进 pool_excluded[] 并写明事实原因。"
+                     "\n→ 确认已处理仍要出榜用 --skip-universe-gate（须在报告说明理由）。")
+        print(f"[完整性门禁] 同级权威 {_ur.get('universe', 0)} 款 / 入池 {_ur.get('in_pool', 0)} 款 / 漏收未说明 0")
+
+    # v9.7.43：条目内一致性门禁——note 文案不得与 crash/safety_basis 等结构字段矛盾。
+    # 深蓝L06 note 写"无碰撞成绩"却有 C-NCAP 92.3%/证据A，脏数据滞留数轮没人发现——
+    # 因为此前只有"铁律"没有可执行校验。铁律=自然语言提示，会忘；门禁=代码，不会漏。
+    import cross_verify as XV
+    _ic = XV.check_internal_consistency(cands)
+    if not _ic["passed"] and not a.skip_consistency_gate:
+        lines = [f"  - {x['model']}：note「{x['note']}」 vs crash「{x['crash']}」" for x in _ic["conflicts"]]
+        sys.exit("内部一致性门禁：note 文案与结构字段自相矛盾：\n" + "\n".join(lines) +
+                 "\n→ 修数据（更新/删除冲突文案），不许只改展示绕过。"
+                 "\n→ 确认为口径差非错误时用 --skip-consistency-gate 并在报告说明。")
+    print(f"[内部一致性门禁] {_ic['checked']} 款候选，note/结构字段矛盾 0")
+
+    # v9.7.43：同源车评分一致性门禁——同品牌/同价带/同词根的车，维度分差>1.5
+    # 必须在 score_diff_reasons 登记事实理由，否则拦截。根治"证据不足被当成产品差"
+    # （007GT 曾 value 6.0/cabin 8.4 无据压低）。
+    import sibling_check as SC
+    _sr = SC.check(cands, data.get("score_diff_reasons", {}))
+    if not _sr["passed"] and not a.skip_sibling_gate:
+        lines = [f"  - {x['pair']} {x['dim']} 差{x['diff']}（{x['a']} vs {x['b']}）" for x in _sr["issues"]]
+        sys.exit("同源车评分一致性门禁：以下同源车维度分差>1.5且未登记理由：\n" + "\n".join(lines) +
+                 "\n→ 对齐分数，或在候选池 score_diff_reasons[车A|车B][维度] 写明事实差异原因。"
+                 "\n→ 确认差异合理用 --skip-sibling-gate（须在报告说明）。")
+    print(f"[同源车一致性门禁] {_sr['pairs']} 对同源车 / 无据差异 {len(_sr['issues'])}")
 
     # 第三方实测/拆车证据 → adjust（带封顶）。放在闸门之前：adjust 不影响准入，
     # 只影响名次；审计行进报告，方便逐条质疑。
@@ -249,6 +294,9 @@ def main():
             summary["review"][label] = "无车过闸"
             continue
         _band = ((board.get("gates") or {}).get("price_band") or [None, None])[1]
+        # v9.7.43：判档/主表/稳健性统一用「主榜同款最高配置分」，杜绝车系基础分与
+        # 配置锚定分两套口径打架（MG07 主榜845版88.0、判档却用610版84.0→0/60）。
+        passed = L.with_config_scores(passed, cfg) if not a.no_config_anchor else passed
         parts.append(L.top_table(passed, cfg, wv, 10, band=_band)["report"])
         parts.append("")
         _tier = L.tier_report(passed, cfg, wv, label, airbag_gate=a.airbag_gate, crash_gate=a.crash_gate)
@@ -395,7 +443,14 @@ def main():
                 _passed = set(_tiers_v2.keys())
                 cands_for_html = [c for c in cands if c.get("model") in _passed] if _passed else cands
                 data_v2 = BV.build(cands_for_html, cfg_v2, pol, facts_v2, tiers=_tiers_v2)
-                doc = RH.render(data_v2, summary, a.html_title, a.as_of)
+                _as_of = a.as_of
+                if not _as_of:
+                    try:
+                        import monthly as _MO
+                        _as_of = _MO.default_sales_month()
+                    except Exception:
+                        _as_of = "—"
+                doc = RH.render(data_v2, summary, a.html_title, _as_of)
                 hp = os.path.join(a.out, "榜单.html")
                 open(hp, "w", encoding="utf-8").write(doc)
                 print(f"[ok] {hp}")

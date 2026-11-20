@@ -517,7 +517,7 @@ def cli(argv=None):
     ap.add_argument("--no-experience", action="store_true",
                     help="不应用体验证据修正（只看硬件口径，A/B 对照用）")
     ap.add_argument("--html-title", help="HTML 页面标题（缺省用 data.meta.title）")
-    ap.add_argument("--as-of", default="—", help="HTML 页面数据月标注，如 202610")
+    ap.add_argument("--as-of", default=None, help="HTML 页面销量数据月标注(YYYYMM)，默认自动取上个月")
     ap.add_argument("--summary", help="pipeline.py 的 summary.json，给 HTML 提供三档分级")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args(argv)
@@ -554,7 +554,14 @@ def cli(argv=None):
             try:
                 import render_board_html as RH
                 summary = _load(a.summary) if a.summary and os.path.exists(a.summary) else None
-                doc = RH.render(data, summary, a.html_title, a.as_of)
+                _as_of = a.as_of
+                if not _as_of:
+                    try:
+                        import monthly as _MO
+                        _as_of = _MO.default_sales_month()
+                    except Exception:
+                        _as_of = "—"
+                doc = RH.render(data, summary, a.html_title, _as_of)
                 hp = os.path.join(a.out, "榜单.html")
                 open(hp, "w", encoding="utf-8").write(doc)
                 print("[ok] 榜单.html ->", hp)

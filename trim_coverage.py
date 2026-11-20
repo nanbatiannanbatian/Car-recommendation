@@ -78,9 +78,27 @@ def report(r: dict) -> str:
     return "\n".join(L)
 
 
+def _uname(s):
+    """车型名归一化：去空格、小写、去品牌前缀+动力后缀，用于 universe 比对。
+    销量榜用「MG 07 EV/特斯拉Model 3/ZEEKR 007」，候选池用「MG 07 纯电/特斯拉Model 3/极氪007」——
+    精确字符串会误报漏收，必须归一化。"""
+    n = "".join(c for c in str(s).lower() if c.isalnum())
+    for suf in ("ev", "pureev", "bev", "phev", "dmi", "evphev", "纯电"):
+        if n.endswith(suf) and len(n) > len(suf) + 2:
+            n = n[:-len(suf)]
+            break
+    # 品牌前缀归一化：中英文品牌统一去掉（只留车型主体）
+    for brand in ("特斯拉", "tesla", "zeekr", "极氪", "byd", "比亚迪", "上汽mg", "mg", "蔚来", "nio"):
+        if n.startswith(brand) and len(n) > len(brand) + 2:
+            n = n[len(brand):]
+            break
+    return n
+
+
 def check_universe(cands_path: str, universe_path: str | None, excluded: list | None = None) -> dict:
     """候选池完整性盘点（v9.7.24）：对照权威车型清单，报出漏收的车型。
-    universe json 格式：{"models": ["车型A", ...]} 或纯 list。"""
+    universe json 格式：{"models": ["车型A", ...]} 或纯 list。
+    v9.7.43：用归一化名称比对（去空格/EV后缀），避免别名误报漏收。"""
     if not universe_path or not os.path.exists(universe_path):
         return {"available": False}
     u = json.load(open(universe_path, encoding="utf-8"))
@@ -89,9 +107,14 @@ def check_universe(cands_path: str, universe_path: str | None, excluded: list | 
     cands = pool.get("candidates", []) if isinstance(pool, dict) else pool
     inpool = {c.get("model") for c in cands}
     excluded = {x.get("model") for x in (excluded or [])}
-    missing = sorted(universe - inpool - excluded)
+    # 归一化集合
+    uni_n = {_uname(x): x for x in universe}
+    in_n = {_uname(x) for x in inpool}
+    exc_n = {_uname(x) for x in excluded}
+    missing_n = sorted(set(uni_n) - in_n - exc_n)
+    missing = [uni_n[n] for n in missing_n]  # 用 universe 原名报出
     return {"available": True, "universe": len(universe), "in_pool": len(inpool),
-            "excluded_with_reason": len(inpool & excluded) + len(excluded & universe),
+            "excluded_with_reason": len(in_n & exc_n) + len(exc_n & set(uni_n)),
             "not_covered": missing}
 
 

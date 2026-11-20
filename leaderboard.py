@@ -434,6 +434,33 @@ def evidence_coverage(cands: list[dict], cfg: dict, sources: list[dict]) -> dict
 
 
 # ---------------------------------------------------------------- 决策矩阵与权重情景
+def with_config_scores(cands: list[dict], cfg: dict) -> list[dict]:
+    """把候选的 scores 替换为「主榜同款最高配置」的 scores —— 判档与主榜同源。
+
+    v9.7.43 根因修复：此前 tier_report/robust_report 用候选池车系基础分
+    （如 MG07 的 610版 84.0），而主榜 board_v2 用最高配置锚定分（845版 88.0），
+    造成「主榜第2、档位判定却 0/60 进不了前三」的口径打架。
+    本函数用 trim_annotate.annotate_all 现算 best_trim.scores，深拷贝注入，
+    不污染原始候选；无配置数据的车保留原 scores（score_basis=series_base）。
+    """
+    import copy
+    import trim_annotate as TA
+    out = copy.deepcopy(cands)
+    td_all = TA.annotate_all(out, cfg)
+    if not td_all:
+        return out
+    for c in out:
+        td = td_all.get(c.get("model")) or {}
+        best_name = td.get("best_trim")
+        best = next((t for t in td.get("trims", []) if t.get("name") == best_name), None)
+        sc = (best or {}).get("scores")
+        if sc and all(k in sc for k in (d["key"] for d in cfg.get("dimensions", []))):
+            c["scores"] = sc
+            c["score_basis"] = "annotated_trim"
+            c["scored_trim_used"] = best_name
+    return out
+
+
 def decision_matrix(cands: list[dict], cfg: dict):
     """候选 → (names, matrix, types, imputed)。
 
@@ -967,9 +994,15 @@ def tier_report(cands: list[dict], cfg: dict, weights: list[float] | None = None
         ev_soft = []
         if ev in rules["risk_evidence"]:
             ev_soft.append(f"证据 {ev}：一手证据不足（不进第一档，但不判劣）")
-        if sales is None or sales == 0:
+        # v9.7.43：区分「销量数据缺失(None)」与「确认零销量/无交付(0)」——
+        # 此前 `sales is None or == 0` 合并处理，导致补录但未查到单月销量的车(如极氪007三厢版,
+        # 产品力87.6/10次进前3)被误判「无交付」降T3。数据缺失是证据问题，不是交付失败：
+        # 不降T3，但写进 ev_soft 只降低第一档资格，并在报告标注「销量待核」。
+        if sales is None:
+            ev_soft.append("销量数据缺失（未查到可靠单月销量，非无交付）：不进第一档，但不判劣、不降第三档")
+        elif sales == 0:
             if lc["status"] != "new_launch":
-                risks.append("无交付 / 无销量数据")
+                risks.append("无交付 / 零销量")
         elif sales < rules["risk_low_sales"] and not quiet:
             risks.append(f"趋势月销仅 {sales:,}，保有量过低")
         if c.get("tier_risk"):
@@ -986,8 +1019,10 @@ def tier_report(cands: list[dict], cfg: dict, weights: list[float] | None = None
                "evidence_soft": ev_soft,
                "norm_swing": norm_swing.get(nm),
                "norm_detail": norm_detail.get(nm),
-               "price": c.get("price") or "", "trim": (c.get("trim") or {}).get("name")
-               if isinstance(c.get("trim"), dict) else (c.get("trim") or "")}
+               "price": c.get("price") or "",
+               # v9.7.43：判档已用配置锚定分，评分配置名也必须跟着用同款，
+               # 否则第一档表显示610版、分却是845版的（标签与分数不同源）。
+               "trim": (c.get("scored_trim_used") or (c.get("trim") or {}).get("name"))}
 
         blockers = []
         if a["method_freq"] < rules["t1_min_method_freq"]:
@@ -1488,7 +1523,7 @@ def review_report(cands: list[dict], cfg: dict, weights: list[float] | None = No
         if ab_conflict:
             S["warn"].append(
                 f"**{len(ab_conflict)} 款气囊配置口径冲突**：{'、'.join(ab_conflict)}。"
-                "两源说法不一致时记 null，不参与任何加减分；见「被动安全配置」一节的逐条依据。")
+                "两源说法不一致时记空值，不参与任何加减分；见「被动安全配置」一节的逐条依据。")
         if ab_unknown:
             S["info"].append(
                 f"**{len(ab_unknown)} 款气囊配置未核验**（按 trim 未找到可点开的配置页）："
