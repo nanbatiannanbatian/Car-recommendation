@@ -51,9 +51,25 @@ EXCLUDE_FILES = {                                     # 文件名精确排除
     "build_release.py",       # 打包脚本自身
     "sync_to_repo.py",        # 作者私用同步脚本，含本机仓库路径
 }
-EXCLUDE_GLOBS = ["*.bak", "*.bak-*", "*.tmp", "*.pyc", "*.orig"]
+EXCLUDE_GLOBS = ["*.bak", "*.bak-*", "*.tmp", "*.pyc", "*.orig",
+                 # v6.0/v6.1 配置快照遗留，无任何代码/文档引用（已核实）；解压后共 223KB
+                 "trims_v61polluted.json", "trims_v60before.json",
+                 # 回归测试脚本：开发者用，不属于 skill 运行能力（SKILL.md 约定一次性/测试脚本不进发布包）
+                 "*_regress.py",
+                 # 一次性榜单生成脚本：仅产出某月某价位的一次性 run 页面，非通用能力
+                 "build_midsedan_202609.py", "build_midsuv_202610.py",
+                 # 采集/验证脚本（0 import）：其产出的数据已固化在包内，仅历史演进段提及、无 SKILL.md 运行命令
+                 "ice_crash.py", "ice_funnel.py", "ice_sales.py", "ice_sensitivity.py", "verify_mcda.py",
+                 # 一次性数据采集脚本：作者维护数据时用，仅文档提及、无代码调用
+                 "fetch_bili.py", "fetch_cncap.py",
+                 # 注：lifecycle_fetch/sync_cncap/auto_levels/auto_trims 虽无 import，
+                 #     但被文档命令或其他模块以文件名引用，排除会触发文档引用检查失败/运行风险，保留。
+                 ]
 EXCLUDE_DIRS = {"runs", "cache", "__pycache__", "dist", ".git"}
-MAX_ZIP_BYTES = 3 * 1024 * 1024                      # 官方 3MB 上限
+MAX_ZIP_BYTES = 3 * 1024 * 1024                      # 官方压缩 zip 体积上限 3MB
+# 官方实际校验的是「解压后」总大小 <= 3MB；此前只查压缩后体积导致上传被拒。
+# 该常量把口径代码化，打包时第二个检查会用解压后总字节数比较。
+MAX_UNCOMPRESSED_BYTES = 3 * 1024 * 1024
 
 # 敏感信息特征：本机绝对路径 / 用户名 / 常见密钥形态
 SENSITIVE_PATTERNS = [
@@ -229,15 +245,23 @@ def build_zip(files):
     if m:
         version = m.group(1).strip().strip('"\'')
     out = DIST / f"{SKILL_NAME}-v{version}.zip"
+    uncompressed = 0
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as z:
         for p in files:
             arc = f"{SKILL_NAME}/{p.relative_to(HERE).as_posix()}"
             z.write(p, arc)
+            uncompressed += p.stat().st_size
     size = out.stat().st_size
     if size > MAX_ZIP_BYTES:
         out.unlink()
-        fail(f"zip 体积 {size/1048576:.2f}MB 超过官方 3MB 上限")
-    info(f"打包完成：{out.name}（{size/1048576:.2f}MB，{len(files)} 文件）")
+        fail(f"zip 体积 {size/1048576:.2f}MB 超过官方压缩上限 3MB")
+    # 关键：官方校验「解压后」总大小。压缩后 <3MB 不代表解压后 <3MB（曾因此被拒）。
+    if uncompressed > MAX_UNCOMPRESSED_BYTES:
+        out.unlink()
+        over = uncompressed - MAX_UNCOMPRESSED_BYTES
+        fail(f"解压后总大小 {uncompressed/1024:.1f}KB 超过官方 3MB 限制（超出 {over/1024:.1f}KB）；"
+             f"请清理无引用的大文件或从 EXCLUDE_GLOBS 排除")
+    info(f"打包完成：{out.name}（压缩 {size/1048576:.2f}MB / 解压后 {uncompressed/1024:.1f}KB，{len(files)} 文件）")
     return out
 
 
