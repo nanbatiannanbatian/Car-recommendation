@@ -218,8 +218,17 @@ def main():
         _band = ((board.get("gates") or {}).get("price_band") or [None, None])[1]
         parts.append(L.top_table(passed, cfg, wv, 10, band=_band)["report"])
         parts.append("")
-        parts.append(L.tier_report(passed, cfg, wv, label, airbag_gate=a.airbag_gate, crash_gate=a.crash_gate)["report"])
+        _tier = L.tier_report(passed, cfg, wv, label, airbag_gate=a.airbag_gate, crash_gate=a.crash_gate)
+        parts.append(_tier["report"])
         parts.append("")
+        # v9.7.18：证据 C 软提示（只降第一档资格、不判劣）——写入 summary 供页面展示
+        _soft = []
+        for _tk in ("T1", "T2", "T3"):
+            for _rec in (_tier.get("detail") or {}).get(_tk, []):
+                if _rec.get("evidence_soft"):
+                    _soft.append({"model": _rec.get("model"), "tier": _tk,
+                                  "reason": "；".join(_rec["evidence_soft"])})
+        summary.setdefault("evidence_soft", []).extend(_soft)
         parts.append(L.review_report(passed, cfg, wv)["report"])
         parts.append("")
         _rob = L.robust_report(passed, cfg, custom)

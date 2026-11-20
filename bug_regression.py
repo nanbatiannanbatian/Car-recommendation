@@ -47,6 +47,7 @@ CASES = [
     ("BUG-024", "风险信息埋深(估算/营运/稳健性未在主表显性化)", "v9.7.16"),
     ("BUG-025", "智驾口径全池不一致(只校正B01和小鹏)", "v9.7.17"),
     ("BUG-026", "报告披露手工写被pipeline重跑覆盖", "v9.7.17"),
+    ("BUG-027", "证据C一律第三档(无碰撞成绩被判暂缓)", "v9.7.18"),
 ]
 
 
@@ -208,6 +209,19 @@ def t015():
     return "渲染复用 board_view 单点"
 
 
+def t027():
+    """证据 C 不判劣：零跑B01 应回第二档，营运车仍第三档。"""
+    import json as _json
+    cfg_out = os.path.join(HERE, "runs", "compact_bev_allprice_202610", "summary.json")
+    if os.path.exists(cfg_out):
+        s = _json.load(open(cfg_out, encoding="utf-8"))
+        t = next(iter(s.get("tiers", {}).values()), {})
+        assert "零跑B01" in t.get("T2", []), "证据C的车被误判第三档"
+        assert "领汇e5" in t.get("T3", []) and "AION S" in t.get("T3", []), "营运车应保留第三档"
+    src = _read("leaderboard.py")
+    assert "ev_soft" in src, "证据C软提示逻辑缺失"
+    return "证据C不判劣，营运硬风险仍T3"
+
 def t025():
     """全池智驾基准必须按可用智驾统一口径，不能只校正个别车。"""
     cands = json.load(open(os.path.join(HERE, "runs", "compact_bev_202610_candidates.json"), encoding="utf-8"))["candidates"]
@@ -330,7 +344,7 @@ def t016():
 
 
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027]
 
 
 def run():

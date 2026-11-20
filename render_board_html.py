@@ -482,6 +482,12 @@ document.addEventListener('change',function(ev){
             H.append(f'<div class="tier-card {k}"><h3>{names[k]}（{len(models)} 款）</h3>'
                      f'<ul>{"".join(f"<li>{e(m)}</li>" for m in models) if models else "<li>—</li>"}</ul></div>')
         H.append("</div>")
+        _es = (summary or {}).get("evidence_soft") or []
+        if _es:
+            _lines = "；".join(f"{e(x.get('model'))}（{e(x.get('tier'))}）" for x in _es)
+            H.append(f'<div class="rule"><b>证据分级提示（v9.7.18）：</b>{_lines} '
+                     '一手证据不足（多为缺官方碰撞成绩）——已降低第一档资格，'
+                     '<b>但不因此判劣或打入「暂缓」</b>；真正的硬风险（停产/无交付/营运为主）才进第三档。</div>')
 
     # ---- 价位段子榜 / 分段汇总（多段才有）
     if "band_subboards" in ids:

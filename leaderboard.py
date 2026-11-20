@@ -935,8 +935,14 @@ def tier_report(cands: list[dict], cfg: dict, weights: list[float] | None = None
         if lc["status"] == "discontinued":
             risks.append(f"已停产{'（' + lc['note'] + '）' if lc['note'] else ''}"
                          f"{'，替代车型 ' + lc['successor'] if lc['successor'] else ''}")
+        # v9.7.18：证据 C（多为缺官方碰撞成绩）不再一律判第三档。
+        # 原逻辑把「没有证据」当成「车有硬伤」，与「降权≠判劣」纪律矛盾——
+        # 零跑B01 销量第二/产品力第一，仅因无 C-NCAP 成绩被打成暂缓，明显过严。
+        # 新规则：证据 C 只降低第一档资格（下面 t1_evidence 仍要求 A），
+        # 并写进 t1_notes 做提示；只有停产/无交付/低销量/人工 tier_risk 等硬风险才进第三档。
+        ev_soft = []
         if ev in rules["risk_evidence"]:
-            risks.append(f"证据 {ev}：一手证据不足")
+            ev_soft.append(f"证据 {ev}：一手证据不足（不进第一档，但不判劣）")
         if sales is None or sales == 0:
             if lc["status"] != "new_launch":
                 risks.append("无交付 / 无销量数据")
@@ -953,6 +959,7 @@ def tier_report(cands: list[dict], cfg: dict, weights: list[float] | None = None
                "score": total_score.get(nm), "note": c.get("note") or "",
                "sales_scope": c.get("sales_scope"), "sales_note": c.get("sales_note"),
                "lifecycle": lc,
+               "evidence_soft": ev_soft,
                "price": c.get("price") or "", "trim": (c.get("trim") or {}).get("name")
                if isinstance(c.get("trim"), dict) else (c.get("trim") or "")}
 
@@ -1004,8 +1011,12 @@ def tier_report(cands: list[dict], cfg: dict, weights: list[float] | None = None
         if risks:
             tiers["T3"].append(rec)
         elif not blockers:
+            if ev_soft:
+                rec.setdefault("t1_notes", []).extend(ev_soft)
             tiers["T1"].append(rec)
         else:
+            if ev_soft:
+                rec.setdefault("t2_notes", []).extend(ev_soft)
             tiers["T2"].append(rec)
 
     for k in tiers:
@@ -1035,7 +1046,7 @@ def tier_report(cands: list[dict], cfg: dict, weights: list[float] | None = None
              f"全情景命中 ≥{rules['t1_min_joint_freq']:.0%}、证据 ∈ {rules['t1_evidence']}、"
              f"趋势月销 ≥{int(rules['t1_min_sales']):,}{ab_cond} | 换算法换权重都在前列，不用取舍 |")
     L.append("| **第二档** | 不触发第三档风险，但未达第一档 | 强弱项分明，取舍交给滑杆 |")
-    L.append(f"| **第三档** | 证据 ∈ {rules['risk_evidence']} / 无交付 / 月销 "
+    L.append(f"| **第三档** | 硬风险：停产 / 无交付 / 月销极低 / 营运为主 "
              f"<{int(rules['risk_low_sales']):,} / 人工标注硬伤 | 不是车差，是现在没资格被推荐 |")
     L.append("")
 
