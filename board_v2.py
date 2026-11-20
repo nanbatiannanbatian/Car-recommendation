@@ -407,6 +407,8 @@ def build(cands: list[dict], cfg: dict, policy: dict,
         r["trim"] = _c.get("trim")
         r["evidence_status"] = _c.get("evidence_status")
         r["lifecycle"] = _c.get("lifecycle")
+        # v9.7.12：note 随行带出，供 car_verdict 识别营运/网约车（只读证据关键词）
+        r["note"] = _c.get("note")
         # v9.6.1：档位（从 summary.tiers 反查）、电压/封装（按评分配置）
         r["tier"] = (tiers or {}).get(r["model"]) or r.get("tier") or ""
         _bp = battery_platform.get(r["model"], {})

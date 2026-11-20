@@ -194,7 +194,10 @@ def render(data, summary, title, as_of):
                     H.append(f"<td>{e(val)}</td>")   # 月销不随配置变
                 elif k == "verdict":
                     v = BV.car_verdict(r, r)
+                    # v9.7.12：营运/网约车为主——醒目前置标识，让私人购车者一眼看出场景不同
+                    flag = '<b style="color:#b42318">⚠ 营运车为主</b><br>' if v.get("fleet") else ""
                     H.append(f"<td class='ref c-verdict' style='font-size:12px;line-height:1.5'>"
+                             f"{flag}"
                              f"<b style='color:#1a7f37'>优</b> {'、'.join(e(x) for x in v['pros'])}<br>"
                              f"<b style='color:#b42318'>短</b> {'、'.join(e(x) for x in v['cons'])}<br>"
                              f"适合：{e(v['audience'])}｜<b>{e(v['advice'])}</b></td>")
@@ -299,7 +302,7 @@ function applyTrim(model,idx){
     if(c('c-price'))c('c-price').textContent=v.price;
     if(c('c-cell'))c('c-cell').textContent=v.cell;
     if(c('c-kwh'))c('c-kwh').textContent=v.kwh;
-    if(c('c-verdict')&&v.verdict)c('c-verdict').innerHTML=v.verdict.replace(/优：/,'<b style="color:#1a7f37">优</b> ').replace(/｜短：/,'<br><b style="color:#b42318">短</b> ').replace(/｜适合：/,'<br>适合：').replace(/｜(建议|暂缓|谨慎|落榜)/,'<br><b>$1</b>');
+    if(c('c-verdict')&&v.verdict){var flag=v.verdict.indexOf('营运')>=0?'<b style="color:#b42318">⚠ 营运车为主</b><br>':'';c('c-verdict').innerHTML=flag+v.verdict.replace(/优：/,'<b style="color:#1a7f37">优</b> ').replace(/｜短：/,'<br><b style="color:#b42318">短</b> ').replace(/｜适合：/,'<br>适合：').replace(/｜(建议|暂缓|谨慎|落榜)/,'<br><b>$1</b>');}
     row.querySelectorAll('.dimcell').forEach(function(d){
       var k=d.getAttribute('data-dim');
       if(v.scores[k]!=null)d.textContent=Number(v.scores[k]).toFixed(1);});

@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 9.7.11
+version: 9.7.12
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v9.7.11）
+# Car recommendation —— 可信购车榜单引擎（v9.7.12）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -2463,3 +2463,17 @@ MG07 845版 87.9 #1、深蓝L06 87.8 #2（分差0.1，在算法噪声内）。
 - 榜单逐行自检：10 款全有档位、30 下拉框、10 details、10/10 配置分有差异、报告页面一致。
 - 报告披露：MG4 销量冠军但产品力 #7（不是销量榜）；领汇e5/AION S 为营运车，低置信不代表私人推荐。
 - 全 selftest + A/B 27/27 + bug回归 17/17 通过。
+
+---
+
+## v9.7.12 · 营运/网约车在主榜评价显著标识（2026-11-20，用户确认后实施）
+
+用户：营运网约车是不是要在主榜评价体现，让人一目了然。确认后实施。
+
+- `car_verdict()` 只读 `note` 明确关键词（营运/网约/B端/出租/对公）识别营运车，不猜；
+  返回 `fleet` 标志，把「营运/网约车为主」写入短板、适合人群改为「营运/网约采购（非私人代步首选）」。
+- `build()` 把候选 note 注入 row，让评价能读到证据。
+- 主榜渲染与 JS 下拉联动都前置红色「⚠ 营运车为主」标识，切配置不消失；
+  `main_cell('verdict')` 同步加标识。不改分数/排名/档位。
+- 效果：紧凑榜领汇e5/AION S、中型榜红旗E-QM5 有标识，其余车无；两榜 JS 语法通过。
+- 新增 BUG-018 进 bug_regression（18/18）；A/B 27/27 通过。

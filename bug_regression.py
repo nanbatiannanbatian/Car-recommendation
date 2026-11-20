@@ -38,6 +38,7 @@ CASES = [
     ("BUG-015", "展示逻辑两处漂移(单入口收敛)", "v9.0.0"),
     ("BUG-016", "提交到错误分支/中文引号commit失败", "v9.7.2"),
     ("BUG-017", "自动补录车scored_trim匹配失败致配置分全相同", "v9.7.11"),
+    ("BUG-018", "营运/网约车未在主榜评价标识,误导私人购车者", "v9.7.12"),
 ]
 
 
@@ -199,6 +200,22 @@ def t015():
     return "渲染复用 board_view 单点"
 
 
+def t018():
+    """营运车标识：note 有营运关键词必须在评价里显著标注，且不影响非营运车。"""
+    import board_view as BV
+    fleet = {"model": "网约车", "note": "比亚迪领汇品牌B端网约车，营运采购为主",
+             "scores": {"value": 9.0}, "tier": "第三档"}
+    normal = {"model": "家用车", "note": "私人代步家用",
+              "scores": {"value": 9.0}, "tier": "第一档"}
+    vf = BV.main_cell("verdict", fleet, fleet)
+    vn = BV.main_cell("verdict", normal, normal)
+    assert "营运车为主" in vf, f"营运车未标识: {vf[:80]}"
+    assert "营运" not in vn, f"非营运车误标: {vn[:80]}"
+    # 页面渲染路径
+    src = _read("render_board_html.py")
+    assert "v.get(\"fleet\")" in src, "主榜渲染未用营运标识"
+    return "营运车标识生效且无误标"
+
 def t017():
     """auto_trims 补录车 scored_trim 匹配失败时必须有 fallback，配置分不能全相同。"""
     import trim_annotate as TA
@@ -220,7 +237,7 @@ def t016():
 
 
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018]
 
 
 def run():

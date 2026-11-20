@@ -310,12 +310,20 @@ def car_verdict(row: dict, cand: dict, meta: dict | None = None) -> dict:
         pros.append("配置均衡")
     if not cons:
         cons.append("无明显结构化短板")
+    # v9.7.12：营运/网约车识别——只读 note 明确关键词，不猜。
+    # 有证据才标，让私人购车者一眼看出使用场景不同。
+    note_text = str(row.get("note") or cand.get("note") or "")
+    fleet_flag = any(k in note_text for k in ("营运", "网约", "B端", "出租", "对公"))
+    if fleet_flag:
+        cons.insert(0, "营运/网约车为主")
     # 适合人群：按最突出的维度机械映射
     top = max((k for k in labels if isinstance(sc.get(k), (int, float))),
               key=lambda k: sc[k], default="")
     audience = {"powertrain": "看重续航快充", "safety": "家庭安全优先", "adas": "常用智驾",
                 "space": "大空间家用", "value": "预算敏感", "control": "爱驾驶",
                 "cabin": "重车机体验", "quality": "求省心耐用"}.get(top, "综合家用")
+    if fleet_flag:
+        audience = "营运/网约采购（非私人代步首选）"
     # 建议：三档 + 证据 + 生命周期
     if not tier:
         advice = "落榜/待核（无档位）"
@@ -327,7 +335,7 @@ def car_verdict(row: dict, cand: dict, meta: dict | None = None) -> dict:
         advice = "谨慎（证据C）"
     else:
         advice = "按偏好选（第二档）"
-    return {"pros": pros[:4], "cons": cons[:4], "audience": audience, "advice": advice}
+    return {"pros": pros[:4], "cons": cons[:4], "audience": audience, "advice": advice, "fleet": fleet_flag}
 
 
 MAIN_COL_LABELS = {
@@ -383,7 +391,8 @@ def main_cell(key: str, row: dict, cand: dict, grade: str = "") -> str:
         return f"—（{reason}）" if reason else "—"
     if key == "verdict":
         v = car_verdict(row, cand)
-        return (f"优：{'、'.join(v['pros'])}｜短：{'、'.join(v['cons'])}｜"
+        flag = '<b style="color:#b42318">⚠ 营运车为主</b>｜' if v.get("fleet") else ""
+        return (flag + f"优：{'、'.join(v['pros'])}｜短：{'、'.join(v['cons'])}｜"
                 f"适合：{v['audience']}｜{v['advice']}")
     if key == "cell_brand":
         # v9.7.2：电池来源跟随最高配置（845版=宁德+800V，不是610版的清陶+400V）
