@@ -1,0 +1,649 @@
+{
+ "candidates": [
+  {
+   "model": "MG4",
+   "cls": "紧凑型车",
+   "price_guide": [
+    6.88,
+    10.28
+   ],
+   "trim": {
+    "name": "530 智趣版",
+    "price": 9.68
+   },
+   "sales": 15503,
+   "range_km": 530,
+   "kwh": 53.9,
+   "cell": "瑞浦兰钧/宁德时代",
+   "wb": 2750,
+   "length": 4395,
+   "susp_f": "麦弗逊",
+   "susp_r": "扭力梁",
+   "drive": "前驱",
+   "zero100": 7.7,
+   "charge_min": 21,
+   "lidar": false,
+   "tops": null,
+   "noa_city": false,
+   "noa_hw": false,
+   "screen_in": 12.3,
+   "chip": null,
+   "crash": "Euro NCAP 五星（2022）",
+   "crash_src": "euro_ncap",
+   "life": "active",
+   "note": "两厢；530 版电芯为宁德时代，437 版为瑞浦兰钧；半固态版清陶｜[v9.7.17智驾口径统一] adas 5.0→5.8：地平线J6E 80TOPS+高速NOA（智趣版及以上），无激光雷达无城区NOA",
+   "power": "BEV",
+   "scores": {
+    "powertrain": 7.3,
+    "safety": 8.2,
+    "space": 5.7,
+    "control": 6.2,
+    "adas": 5.8,
+    "value": 9.59,
+    "cabin": 6.8
+   },
+   "explain": {
+    "powertrain": 7.3,
+    "safety": 8.2,
+    "safety_gap": false,
+    "space": 5.7,
+    "control": 6.2,
+    "adas": 5.0,
+    "value": 9.59,
+    "km_per_wan": 54.75,
+    "kwh_per_wan": 5.57,
+    "cabin": 6.8,
+    "cabin_gap": true
+   },
+   "trend_sales": 15503,
+   "price": "6.88–10.28",
+   "sales_scope": "pure_bev",
+   "safety_basis": "euro_ncap",
+   "lifecycle": {
+    "status": "active",
+    "note": "",
+    "date": ""
+   },
+   "evidence_status": "A",
+   "evidence_note": "官方碰撞成绩（Euro NCAP 五星（2022））",
+   "cell_tier": 1,
+   "source_ids": [
+    "domain_search_20261120_adas_fullpool"
+   ]
+  },
+  {
+   "model": "小鹏MONA M03",
+   "cls": "紧凑型车",
+   "price_guide": [
+    11.98,
+    15.18
+   ],
+   "trim": {
+    "name": "610 超长续航 Max",
+    "price": 13.98
+   },
+   "sales": 7160,
+   "range_km": 610,
+   "kwh": 61.6,
+   "cell": "亿纬动力",
+   "wb": 2815,
+   "length": 4785,
+   "susp_f": "麦弗逊",
+   "susp_r": "扭力梁",
+   "drive": "前驱",
+   "zero100": 7.4,
+   "charge_min": 15,
+   "lidar": false,
+   "tops": null,
+   "noa_city": true,
+   "noa_hw": true,
+   "screen_in": 15.6,
+   "chip": null,
+   "crash": "无",
+   "crash_src": "none",
+   "life": "active",
+   "note": "纯视觉方案；Max 版带城区 NOA，Plus 版不带｜[v9.7.15智驾基准校正] adas 6.6→8.8：750TOPS图灵芯片+全国无图城区NGP即开即用，纯视觉短板折扣",
+   "power": "BEV",
+   "scores": {
+    "powertrain": 8.1,
+    "safety": 7.0,
+    "space": 7.0,
+    "control": 6.2,
+    "adas": 8.8,
+    "value": 8.61,
+    "cabin": 7.3
+   },
+   "explain": {
+    "powertrain": 8.1,
+    "safety": 7.0,
+    "safety_gap": true,
+    "space": 7.0,
+    "control": 6.2,
+    "adas": 6.6,
+    "value": 8.61,
+    "km_per_wan": 43.63,
+    "kwh_per_wan": 4.41,
+    "cabin": 7.3,
+    "cabin_gap": true
+   },
+   "trend_sales": 7160,
+   "price": "11.98–15.18",
+   "sales_scope": "pure_bev",
+   "safety_basis": "none",
+   "lifecycle": {
+    "status": "active",
+    "note": "",
+    "date": ""
+   },
+   "evidence_status": "B",
+   "evidence_note": "官方配置表与指导价可核验；无 C-NCAP/C-IASI 成绩",
+   "cell_tier": 2,
+   "source_ids": [
+    "domain_search_20261120_adas"
+   ]
+  },
+  {
+   "model": "AION RT",
+   "cls": "紧凑型车",
+   "price_guide": [
+    9.98,
+    12.88
+   ],
+   "trim": {
+    "name": "710 智豪版",
+    "price": 11.98
+   },
+   "sales": 5914,
+   "range_km": 710,
+   "kwh": 70.1,
+   "cell": "宁德时代",
+   "wb": 2775,
+   "length": 4865,
+   "susp_f": "麦弗逊",
+   "susp_r": "扭力梁",
+   "drive": "前驱",
+   "zero100": 7.7,
+   "charge_min": 24,
+   "lidar": false,
+   "tops": null,
+   "noa_city": false,
+   "noa_hw": true,
+   "screen_in": 14.6,
+   "chip": null,
+   "crash": "无",
+   "crash_src": "none",
+   "life": "new_launch",
+   "note": "2027 款 8 月换代；710km 是同级最长续航之一｜[v9.7.17智驾口径统一] adas 5.4→7.2：高配Orin-X 254TOPS+126线激光雷达+无图城区NDA，但仅高配/选装可得，打折",
+   "power": "BEV",
+   "scores": {
+    "powertrain": 8.7,
+    "safety": 7.0,
+    "space": 6.9,
+    "control": 6.2,
+    "adas": 7.2,
+    "value": 9.93,
+    "cabin": 6.8
+   },
+   "explain": {
+    "powertrain": 8.7,
+    "safety": 7.0,
+    "safety_gap": true,
+    "space": 6.9,
+    "control": 6.2,
+    "adas": 5.4,
+    "value": 9.93,
+    "km_per_wan": 59.27,
+    "kwh_per_wan": 5.85,
+    "cabin": 6.8,
+    "cabin_gap": true
+   },
+   "trend_sales": 5914,
+   "price": "9.98–12.88",
+   "sales_scope": "pure_bev",
+   "safety_basis": "none",
+   "lifecycle": {
+    "status": "new_launch",
+    "date": "",
+    "note": "",
+    "source": "候选池人工标注",
+    "source_type": "manual"
+   },
+   "evidence_status": "B",
+   "evidence_note": "官方配置表与指导价可核验；无 C-NCAP/C-IASI 成绩",
+   "cell_tier": 1,
+   "source_ids": [
+    "domain_search_20261120_adas_fullpool"
+   ]
+  },
+  {
+   "model": "零跑B01",
+   "cls": "紧凑型车",
+   "price_guide": [
+    9.58,
+    14.97
+   ],
+   "trim": {
+    "name": "670 激光雷达版",
+    "price": 11.98
+   },
+   "sales": 4399,
+   "range_km": 670,
+   "kwh": 69.7,
+   "cell": "宁德时代/国轩高科",
+   "wb": 2735,
+   "length": 4770,
+   "susp_f": "麦弗逊",
+   "susp_r": "多连杆",
+   "drive": "后驱",
+   "zero100": 6.1,
+   "charge_min": 16,
+   "lidar": true,
+   "tops": 200,
+   "noa_city": true,
+   "noa_hw": true,
+   "screen_in": 14.6,
+   "chip": "骁龙8650",
+   "crash": "无",
+   "crash_src": "none",
+   "life": "active",
+   "note": "670 版 800V；激光雷达版 11.98 万是同级最低门槛。多家媒体通稿称「C-NCAP 五星」，但中汽测评官网检索「零跑B01」无任何记录，不采信｜[v9.7.15智驾基准校正] adas 9.7→7.8：200TOPS但城区NOA仅5城白名单/无图未OTA，硬件冗余≠当前可用｜[v9.7.16证据收敛] 媒体五星通稿不等于官方碰撞报告：中汽测评官网检索无记录，B→C（不升级证据等级）",
+   "power": "BEV",
+   "scores": {
+    "powertrain": 8.6,
+    "safety": 7.0,
+    "space": 6.4,
+    "control": 8.0,
+    "adas": 7.8,
+    "value": 9.74,
+    "cabin": 7.2
+   },
+   "explain": {
+    "powertrain": 8.6,
+    "safety": 7.0,
+    "safety_gap": true,
+    "space": 6.4,
+    "control": 8.0,
+    "adas": 9.7,
+    "value": 9.74,
+    "km_per_wan": 55.93,
+    "kwh_per_wan": 5.82,
+    "cabin": 7.2,
+    "cabin_gap": false
+   },
+   "trend_sales": 4399,
+   "price": "9.58–14.97",
+   "sales_scope": "pure_bev",
+   "safety_basis": "none",
+   "lifecycle": {
+    "status": "active",
+    "note": "",
+    "date": ""
+   },
+   "evidence_status": "C",
+   "evidence_note": "官方配置表与指导价可核验；无 C-NCAP/C-IASI 成绩",
+   "cell_tier": 1,
+   "source_ids": [
+    "domain_search_20261120_adas",
+    "cncap_official_lookup_negative_20261120"
+   ]
+  },
+  {
+   "model": "零跑Lafa5",
+   "cls": "紧凑型车",
+   "price_guide": [
+    9.78,
+    12.98
+   ],
+   "trim": {
+    "name": "605 Pro",
+    "price": 11.18
+   },
+   "sales": 4356,
+   "range_km": 605,
+   "kwh": 67.1,
+   "cell": "国轩高科/中创新航/福鼎时代",
+   "wb": 2735,
+   "length": 4430,
+   "susp_f": "麦弗逊",
+   "susp_r": "多连杆",
+   "drive": "后驱",
+   "zero100": 6.5,
+   "charge_min": 19,
+   "lidar": false,
+   "tops": null,
+   "noa_city": false,
+   "noa_hw": false,
+   "screen_in": 14.6,
+   "chip": null,
+   "crash": "无",
+   "crash_src": "none",
+   "life": "active",
+   "note": "两厢掀背；后驱 + 多连杆，同价少见；底盘与 Stellantis 联调｜[v9.7.17智驾口径统一] adas 5.0→8.0：200TOPS骁龙8650+128线激光雷达+全国无图城市NAC上市即开通（与B01同硬件，旧5.0明显低）",
+   "power": "BEV",
+   "scores": {
+    "powertrain": 8.1,
+    "safety": 7.0,
+    "space": 5.7,
+    "control": 8.0,
+    "adas": 8.0,
+    "value": 9.7,
+    "cabin": 6.8
+   },
+   "explain": {
+    "powertrain": 8.1,
+    "safety": 7.0,
+    "safety_gap": true,
+    "space": 5.7,
+    "control": 8.0,
+    "adas": 5.0,
+    "value": 9.7,
+    "km_per_wan": 54.11,
+    "kwh_per_wan": 6.0,
+    "cabin": 6.8,
+    "cabin_gap": true
+   },
+   "trend_sales": 4356,
+   "price": "9.78–12.98",
+   "sales_scope": "pure_bev",
+   "safety_basis": "none",
+   "lifecycle": {
+    "status": "active",
+    "note": "",
+    "date": ""
+   },
+   "evidence_status": "B",
+   "evidence_note": "官方配置表与指导价可核验；无 C-NCAP/C-IASI 成绩",
+   "cell_tier": 1,
+   "source_ids": [
+    "domain_search_20261120_adas_fullpool"
+   ]
+  },
+  {
+   "model": "秦PLUS EV",
+   "cls": "紧凑型车",
+   "price_guide": [
+    7.98,
+    17.98
+   ],
+   "trim": {
+    "name": "510km 领先型",
+    "price": 11.98
+   },
+   "sales": 2744,
+   "range_km": 510,
+   "kwh": 57.6,
+   "cell": "弗迪",
+   "wb": 2718,
+   "length": 4765,
+   "susp_f": "麦弗逊",
+   "susp_r": "扭力梁",
+   "drive": "前驱",
+   "zero100": 7.9,
+   "charge_min": 30,
+   "lidar": false,
+   "tops": null,
+   "noa_city": false,
+   "noa_hw": false,
+   "screen_in": 12.8,
+   "chip": null,
+   "crash": "无",
+   "crash_src": "none",
+   "life": "active",
+   "note": "纯电口径 2,744 台；车系合计 9,546 台含 DM-i，已拆分｜[v9.7.17智驾口径统一] adas 5.0→6.8：天神之眼B选装254TOPS+192线激光雷达+城区NOA；C版84TOPS仅高速+12月OTA，混合打折",
+   "power": "BEV",
+   "scores": {
+    "powertrain": 6.8,
+    "safety": 7.0,
+    "space": 6.4,
+    "control": 6.2,
+    "adas": 6.8,
+    "value": 8.68,
+    "cabin": 6.8
+   },
+   "explain": {
+    "powertrain": 6.8,
+    "safety": 7.0,
+    "safety_gap": true,
+    "space": 6.4,
+    "control": 6.2,
+    "adas": 5.0,
+    "value": 8.68,
+    "km_per_wan": 42.57,
+    "kwh_per_wan": 4.81,
+    "cabin": 6.8,
+    "cabin_gap": true
+   },
+   "trend_sales": 2744,
+   "price": "7.98–17.98",
+   "sales_scope": "pure_bev",
+   "safety_basis": "none",
+   "lifecycle": {
+    "status": "active",
+    "note": "",
+    "date": ""
+   },
+   "evidence_status": "B",
+   "evidence_note": "官方配置表与指导价可核验；无 C-NCAP/C-IASI 成绩",
+   "cell_tier": 1,
+   "source_ids": [
+    "domain_search_20261120_adas_fullpool"
+   ]
+  },
+  {
+   "model": "荣威D6",
+   "cls": "紧凑型车",
+   "price_guide": [
+    9.98,
+    13.98
+   ],
+   "trim": {
+    "name": "520km 舒享版",
+    "price": 11.48
+   },
+   "sales": 1867,
+   "range_km": 520,
+   "kwh": 53.95,
+   "cell": "宁德时代",
+   "wb": 2750,
+   "length": 4792,
+   "susp_f": "麦弗逊",
+   "susp_r": "扭力梁",
+   "drive": "前驱",
+   "zero100": 8.4,
+   "charge_min": 21,
+   "lidar": false,
+   "tops": null,
+   "noa_city": false,
+   "noa_hw": false,
+   "screen_in": 12.3,
+   "chip": null,
+   "crash": "无",
+   "crash_src": "none",
+   "life": "active",
+   "note": "520 版电芯是宁德时代，450 版是瑞浦兰钧；无 L2｜[v9.7.17智驾口径统一] adas 5.0→5.0：全系标配L2（ACC+车道保持），无激光雷达无城区NOA，维持",
+   "power": "BEV",
+   "scores": {
+    "powertrain": 7.3,
+    "safety": 7.0,
+    "space": 6.4,
+    "control": 6.2,
+    "adas": 5.0,
+    "value": 8.8,
+    "cabin": 6.8
+   },
+   "explain": {
+    "powertrain": 7.3,
+    "safety": 7.0,
+    "safety_gap": true,
+    "space": 6.4,
+    "control": 6.2,
+    "adas": 5.0,
+    "value": 8.8,
+    "km_per_wan": 45.3,
+    "kwh_per_wan": 4.7,
+    "cabin": 6.8,
+    "cabin_gap": true
+   },
+   "trend_sales": 1867,
+   "price": "9.98–13.98",
+   "sales_scope": "pure_bev",
+   "safety_basis": "none",
+   "lifecycle": {
+    "status": "active",
+    "note": "",
+    "date": ""
+   },
+   "evidence_status": "B",
+   "evidence_note": "官方配置表与指导价可核验；无 C-NCAP/C-IASI 成绩",
+   "cell_tier": 1,
+   "source_ids": [
+    "domain_search_20261120_adas_fullpool"
+   ]
+  },
+  {
+   "model": "AION UT",
+   "cls": "紧凑型车",
+   "price_guide": [
+    6.98,
+    10.18
+   ],
+   "trim": {
+    "name": "530 宁德版",
+    "price": 8.68
+   },
+   "sales": 1858,
+   "range_km": 530,
+   "kwh": 52.0,
+   "cell": "宁德时代",
+   "wb": 2750,
+   "length": 4270,
+   "susp_f": "麦弗逊",
+   "susp_r": "扭力梁",
+   "drive": "前驱",
+   "zero100": 7.9,
+   "charge_min": 24,
+   "lidar": false,
+   "tops": null,
+   "noa_city": false,
+   "noa_hw": false,
+   "screen_in": 14.6,
+   "chip": null,
+   "crash": "无",
+   "crash_src": "none",
+   "life": "active",
+   "note": "车身仅 4270mm，官方二级分类仍属紧凑型车；电池容量为估算待核｜[v9.7.17智驾口径统一] adas 5.0→4.5：中低配无L2仅540影像，顶配才L2，无激光雷达无城区NOA，全池最素",
+   "power": "BEV",
+   "scores": {
+    "powertrain": 7.3,
+    "safety": 7.0,
+    "space": 5.7,
+    "control": 6.2,
+    "adas": 4.5,
+    "value": 10.08,
+    "cabin": 6.8
+   },
+   "explain": {
+    "powertrain": 7.3,
+    "safety": 7.0,
+    "safety_gap": true,
+    "space": 5.7,
+    "control": 6.2,
+    "adas": 5.0,
+    "value": 10.08,
+    "km_per_wan": 61.06,
+    "kwh_per_wan": 5.99,
+    "cabin": 6.8,
+    "cabin_gap": true
+   },
+   "trend_sales": 1858,
+   "price": "6.98–10.18",
+   "sales_scope": "pure_bev",
+   "safety_basis": "none",
+   "lifecycle": {
+    "status": "active",
+    "note": "",
+    "date": ""
+   },
+   "evidence_status": "B",
+   "evidence_note": "官方配置表与指导价可核验；无 C-NCAP/C-IASI 成绩",
+   "cell_tier": 1,
+   "source_ids": [
+    "domain_search_20261120_adas_fullpool"
+   ]
+  },
+  {
+   "model": "领汇e5",
+   "cls": "紧凑型车",
+   "power": "BEV",
+   "price_guide": [
+    8.98,
+    13.08
+   ],
+   "price": 8.98,
+   "trim": {
+    "name": "530km 营运版",
+    "price": 8.98
+   },
+   "trend_sales": 1300,
+   "cell_brand": "弗迪(刀片)",
+   "evidence_status": "C",
+   "crash": "未查到C-NCAP成绩",
+   "note": "比亚迪领汇品牌B端网约车，基于秦PLUS EV；1300辆多为营运采购，非私人市场｜[v9.7.17智驾口径统一] adas 6.5→5.0：B端网约车基础L2，无激光雷达无城区NOA，旧6.5无依据｜[v9.7.18三档规则] 营运属性定为硬风险（保留第三档），证据C本身不再判劣",
+   "scores": {
+    "powertrain": 7.8,
+    "safety": 7.0,
+    "adas": 5.0,
+    "space": 8.0,
+    "value": 8.5,
+    "control": 7.0,
+    "cabin": 7.0,
+    "quality": 7.5
+   },
+   "adjust": 0.0,
+   "lifecycle": {
+    "status": "steady"
+   },
+   "source_ids": [
+    "domain_search_20261120_adas_fullpool"
+   ],
+   "tier_risk": "营运/网约车为主，非私人购车首选"
+  },
+  {
+   "model": "AION S",
+   "cls": "紧凑型车",
+   "power": "BEV",
+   "price_guide": [
+    13.08,
+    15.68
+   ],
+   "price": 13.68,
+   "trim": {
+    "name": "魅 580",
+    "price": 13.68
+   },
+   "trend_sales": 1084,
+   "cell_brand": "因湃/中创新航",
+   "evidence_status": "C",
+   "crash": "未查到C-NCAP成绩",
+   "note": "广汽埃安，大量营运/网约采购；销量以B端为主｜[v9.7.17智驾口径统一] adas 6.5→4.8：全系无激光雷达/无城区NOA/低配连ACC都没有，仅Plus为L2；旧6.5虚高｜[v9.7.18三档规则] 营运属性定为硬风险（保留第三档），证据C本身不再判劣",
+   "scores": {
+    "powertrain": 7.5,
+    "safety": 7.0,
+    "adas": 4.8,
+    "space": 7.8,
+    "value": 7.5,
+    "control": 7.0,
+    "cabin": 7.2,
+    "quality": 7.5
+   },
+   "adjust": 0.0,
+   "lifecycle": {
+    "status": "steady"
+   },
+   "source_ids": [
+    "domain_search_20261120_adas_fullpool"
+   ],
+   "tier_risk": "营运/网约车为主，非私人购车首选"
+  }
+ ]
+}

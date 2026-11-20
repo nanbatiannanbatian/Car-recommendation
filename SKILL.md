@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 9.7.29
+version: 9.7.30
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v9.7.29）
+# Car recommendation —— 可信购车榜单引擎（v9.7.30）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -50,6 +50,14 @@ author: "nanbatiannanbatian"
 - **弗迪电芯必须标代际与闪充**（2026-11-20 用户要求）：事实库 `fact_library.json` 的 `cell_gen`/`cell_flash`
   字段有值时，主榜电池来源列显示「弗迪[二代/闪充]」等。**关键事实：二代刀片 ≠ 都支持闪充**
   （如 2026款秦PLUS EV 全系二代刀片但快充仅60-70kW 非闪充）；按事实标注，不臆断、不盲从"二代=闪充"。
+
+- **候选池必须固化在 `categories/` 随包发布**（2026-11-20 用户追责"下次运行会不会又错"）：
+  不能只活在 `runs/`（跑批产物、不进同步白名单、换机器就丢）。已固化：
+  `categories/candidates_compact_bev_extended.json`（16款扩展榜）、
+  `categories/candidates_compact_bev_audit.json`（10款审计榜）、
+  `categories/universe_compact_bev_202610.json`（完整性盘点清单）。
+  新车型/手工核验分数/生命周期/代际等修复必须写回这些随包文件，并在 `sync_to_repo.py` 白名单登记。
+  出榜命令引用 `categories/` 下的候选池，不引用 `runs/` 下的一次性文件。
 
 - **原始库→事实库必须全字段映射**（2026-11-20 用户追加）：原始库 `all_data.json` 的字段
   （kwh/cell/sales/life/trim/来源URL/证据引文…）不得"原始有、事实库没有"。
@@ -2765,3 +2773,19 @@ DeepSeek 定性："这是10款候选紧凑型纯电轿车的审计榜，不是�
   但快充仅60-70kW（非闪充），闪充只有630km特定版本/部分车型。按事实标注不盲从。
 - 新建事实库条目：领汇e5、比亚迪e3（原来只在候选池，事实库无）。
 - 两榜披露+BUG-038 进回归（38/38），A/B 28/28 通过。
+
+---
+
+## v9.7.30 · 候选池固化防丢失（2026-11-20，用户追责"下次运行会不会又错"）
+
+用户担心："是不是写入代码里了，不要下次运行榜单照样出错"。核查发现**真风险**：
+两份候选池只活在 `runs/`（跑批产物、sync_to_repo 明确不同步、换机器就丢），
+其中 6 款长尾车、手工分数（零跑B01 adas 7.8）、证据等级、生命周期、代际标注全靠这几个一次性文件。
+
+- 固化到 `categories/` 随包发布：candidates_compact_bev_extended.json（16款）、
+  candidates_compact_bev_audit.json（10款）、universe_compact_bev_202610.json（权威清单），
+  并加入 sync_to_repo.py 白名单。
+- **冷启动验证**：从随包候选池重跑两张榜，13/13 历史修复点全部自动呈现
+  （入池/未入池原因/候选池披露/电池来源/弗迪代际/电压/导航/证据分层/τ/定位…）。
+- BUG-039 进回归断言（持仓固化+白名单+数据完整性），**39/39**、A/B **28/28** 通过。
+- 铁律追加：候选池必须在 categories/，修复写回随包文件并登记白名单，出榜不引用 runs 一次性文件。

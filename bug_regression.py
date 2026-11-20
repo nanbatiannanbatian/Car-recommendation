@@ -59,6 +59,7 @@ CASES = [
     ("BUG-036", "电压快充99处未披露(实为未采集非无数据)", "v9.7.27"),
     ("BUG-037", "原始库773字段未映射到事实库", "v9.7.28"),
     ("BUG-038", "弗迪电池未标代际/误以为二代都闪充", "v9.7.29"),
+    ("BUG-039", "扩展候选池只在runs未固化(下次运行丢失)", "v9.7.30"),
 ]
 
 
@@ -219,6 +220,28 @@ def t015():
     assert "BV.main_cell" in src, "渲染绕过了 board_view 单点"
     return "渲染复用 board_view 单点"
 
+
+def t039():
+    """候选池必须固化在 categories（随包同步），不能只活在 runs。"""
+    import os as _os
+    for f in ("categories/candidates_compact_bev_extended.json",
+              "categories/candidates_compact_bev_audit.json",
+              "categories/universe_compact_bev_202610.json"):
+        p = _os.path.join(HERE, f)
+        assert _os.path.exists(p), f"候选池未固化: {f}"
+    # 同步白名单要包含
+    sync = _read("sync_to_repo.py")
+    assert "candidates_compact_bev_extended.json" in sync and "candidates_compact_bev_audit.json" in sync
+    # 内容完整性：6 款长尾车 + 分数 + 生命周期 + 代际事实
+    ext = json.load(open(os.path.join(HERE, "categories", "candidates_compact_bev_extended.json"), encoding="utf-8"))
+    models = {c["model"] for c in ext["candidates"]}
+    for m in ("奔驰CLA新能源", "羿驰05", "曹操60", "秦新能源", "e爱丽舍", "比亚迪e3"):
+        assert m in models, f"固化候选池缺车: {m}"
+    b01 = next(c for c in ext["candidates"] if c["model"] == "零跑B01")
+    assert b01["scores"]["adas"] == 7.8 and b01.get("evidence_status") == "C"
+    fl = json.load(open(os.path.join(HERE, "categories", "fact_library.json"), encoding="utf-8"))
+    assert fl.get("秦PLUS EV", {}).get("cell_flash") == "非闪充"
+    return "候选池已固化随包，关键修复数据齐全"
 
 def t038():
     """弗迪电芯标代际；二代不等于闪充，按事实标注。"""
@@ -486,7 +509,7 @@ def t016():
 
 
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039]
 
 
 def run():
