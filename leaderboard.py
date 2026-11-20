@@ -870,12 +870,18 @@ def tier_rules(cfg: dict) -> dict:
         "t1_min_sales": float(t.get("t1_min_sales", 2000)),
         "risk_evidence": t.get("risk_evidence") or ["C"],
         "risk_low_sales": float(t.get("risk_low_sales", 500)),
+        # v9.7.41：归一化敏感性判据。第一档要求「换算法、换权重都靠前」，
+        # 归一化方式也是「算法选择」的一种——若换个等价的归一化就跳位，说明这个
+        # 「稳」是假象。默认 2 位：跨 5 种归一化名次波动 >2 位不进第一档（降第二档）。
+        # 只拦第一档，绝不进第三档：名次不稳是算法精度问题，不是产品硬伤。
+        "t1_max_norm_swing": int(t.get("t1_max_norm_swing", 2)),
+        "norm_audit_enabled": bool(t.get("norm_audit_enabled", True)),
     }
 
 
 def tier_report(cands: list[dict], cfg: dict, weights: list[float] | None = None,
                 label: str | None = None, airbag_gate: bool = False,
-                crash_gate: bool = False) -> dict:
+                crash_gate: bool = False, norm_audit: bool | None = None) -> dict:
     """按「稳定性 × 证据 × 市场验证」判三档，不排名次。
 
     为什么不分 1–10 名：名次的可解释性依赖于「分差大于算法噪声」。
@@ -906,6 +912,24 @@ def tier_report(cands: list[dict], cfg: dict, weights: list[float] | None = None
     total_score = {r["model"]: r["total"] for r in rows}
 
     scen_hit = {nm: [s for s, tops in scheme_top.items() if nm in tops] for nm in names}
+
+    # v9.7.41：归一化敏感性审计（借 scikit-criteria 方法学空间思想）。
+    # 换算法、换权重都靠前才够第一档；归一化方式也是「算法选择」的一部分——
+    # 换个等价归一化就跳位，说明「稳」是假象。只拦第一档，不进第三档。
+    # norm_audit=None 时听配置开关；显式 False 可关（如缺维度样本太少的老榜）。
+    do_norm = rules["norm_audit_enabled"] if norm_audit is None else norm_audit
+    norm_swing = {}   # 车型 → 跨归一化名次跨度（位）
+    norm_detail = {}  # 车型 → {ranks, tau_mean}
+    if do_norm and hasattr(robust, "normalization_audit"):
+        try:
+            na = robust.normalization_audit(
+                matrix, schemes["基准"], types, names, top_k=top_k)
+            for nm in names:
+                pa = na["per_alt"][nm]
+                norm_swing[nm] = pa["range"]
+                norm_detail[nm] = {"ranks": pa["ranks"], "tau_mean": na["tau_mean"]}
+        except Exception:
+            norm_swing, norm_detail = {}, {}  # 审计失败优雅降级，不阻断出榜
 
     band_mean = {}
     for d in dims:
@@ -960,6 +984,8 @@ def tier_report(cands: list[dict], cfg: dict, weights: list[float] | None = None
                "sales_scope": c.get("sales_scope"), "sales_note": c.get("sales_note"),
                "lifecycle": lc,
                "evidence_soft": ev_soft,
+               "norm_swing": norm_swing.get(nm),
+               "norm_detail": norm_detail.get(nm),
                "price": c.get("price") or "", "trim": (c.get("trim") or {}).get("name")
                if isinstance(c.get("trim"), dict) else (c.get("trim") or "")}
 
@@ -1006,6 +1032,14 @@ def tier_report(cands: list[dict], cfg: dict, weights: list[float] | None = None
             rec.setdefault("lc_notes", []).append(
                 f"月销 {(sales or 0):,} 低于阈值，但处于{LC_LABEL.get(lc['status'], lc['status'])}，"
                 f"不作为市场验证失败的证据（改款后需重新评估）")
+        # v9.7.41：归一化敏感性——名次跨归一化方式波动过大，不满足「换算法也稳」。
+        # 只拦第一档；名次不稳是算法精度问题，不是产品硬伤，绝不进第三档。
+        sw = norm_swing.get(nm)
+        if sw is not None and sw > rules["t1_max_norm_swing"]:
+            blockers.append(f"归一化敏感：跨方式名次波动 {sw} 位 > {rules['t1_max_norm_swing']} 位")
+            rec.setdefault("t2_notes", []).append(
+                f"名次在 5 种归一化间摆动 {sw} 位（换等价归一化就换位），"
+                f"不满足「换算法也稳」，不进第一档；这不是产品缺陷，不降第三档")
         rec["t1_blockers"] = blockers
 
         if risks:
@@ -1042,9 +1076,12 @@ def tier_report(cands: list[dict], cfg: dict, weights: list[float] | None = None
     L.append("|---|---|---|")
     ab_cond = "、气囊基线无明确缺失（未核验不拦，只标待补）" if airbag_gate else ""
     ab_cond += "、有官方碰撞成绩（C-NCAP/C-IASI）" if crash_gate else ""
+    norm_cond = ""
+    if do_norm and norm_swing:
+        norm_cond = f"、跨归一化名次波动 ≤{rules['t1_max_norm_swing']} 位"
     L.append(f"| **第一档** | 基准算法命中 ≥{rules['t1_min_method_freq']:.0%}、"
              f"全情景命中 ≥{rules['t1_min_joint_freq']:.0%}、证据 ∈ {rules['t1_evidence']}、"
-             f"趋势月销 ≥{int(rules['t1_min_sales']):,}{ab_cond} | 换算法换权重都在前列，不用取舍 |")
+             f"趋势月销 ≥{int(rules['t1_min_sales']):,}{ab_cond}{norm_cond} | 换算法换权重都在前列，不用取舍 |")
     L.append("| **第二档** | 不触发第三档风险，但未达第一档 | 强弱项分明，取舍交给滑杆 |")
     L.append(f"| **第三档** | 硬风险：停产 / 无交付 / 月销极低 / 营运为主 "
              f"<{int(rules['risk_low_sales']):,} / 人工标注硬伤 | 不是车差，是现在没资格被推荐 |")
@@ -1116,6 +1153,19 @@ def tier_report(cands: list[dict], cfg: dict, weights: list[float] | None = None
 
     L.append(f"## 第二档 · 同档竞争（{len(tiers['T2'])} 款，档内不排名次）")
     L.append("")
+    # v9.7.41：把「卡在第一档哪一条」显性化——原来第二档表格只看得到 note，
+    # 归一化拦下的车读者不知道为什么没进第一档，等于把判据藏在代码里。
+    norm_blocked = [r for r in tiers["T2"]
+                    if any("归一化敏感" in b for b in r.get("t1_blockers", []))]
+    if norm_blocked:
+        L.append("> **名次对归一化敏感，未进第一档**（换等价的归一化方式就会换位，"
+                 "说明名次落在算法选择噪声内；不降第三档，因为这不是产品问题）：")
+        for r in norm_blocked:
+            L.append(f"> - **{r['model']}**：跨 5 种归一化名次 "
+                     f"{min(r['norm_detail']['ranks'].values()):.0f}–"
+                     f"{max(r['norm_detail']['ranks'].values()):.0f} 名。"
+                     f"{'；'.join(r.get('t2_notes', []))}")
+        L.append("")
     if tiers["T2"]:
         with_trig = [r for r in tiers["T2"] if r["scenarios"]]
         no_trig = [r for r in tiers["T2"] if not r["scenarios"]]
@@ -1171,6 +1221,7 @@ def tier_report(cands: list[dict], cfg: dict, weights: list[float] | None = None
             "detail": tiers, "rules": rules, "kendall": res["kendall_mean"],
             "n_runs": res["n_runs"], "n_schemes": res["n_schemes"],
             "n_methods": res["n_methods"], "tau_matrix": res["tau_matrix"],
+            "norm_swing": norm_swing, "norm_audit_enabled": bool(norm_swing),
             "report": "\n".join(L)}
 
 

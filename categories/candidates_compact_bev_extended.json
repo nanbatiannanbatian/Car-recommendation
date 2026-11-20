@@ -870,9 +870,9 @@
   }
  ],
  "_generated_by": {
-  "skill_version": "9.7.36",
-  "fingerprint": "487a5afa3370bc24",
+  "skill_version": "9.7.41",
+  "fingerprint": "b5969d8f170aa34e",
   "config": "car_compact_bev_extended.json",
-  "stamped_at": "2026-11-20 15:06:23"
+  "stamped_at": "2026-11-20 17:19:27"
  }
 }

@@ -67,6 +67,7 @@ CASES = [
     ("BUG-044", "skill升级后老分数混入新榜(无指纹门禁)", "v9.7.36"),
     ("BUG-045", "发布包缺内置证据采集工具(依赖外部skill)", "v9.7.37"),
     ("BUG-046", "整合残留orchestrator死依赖", "v9.7.38"),
+    ("BUG-047", "归一化敏感(换等价归一化即跳位)未拦第一档", "v9.7.41"),
 ]
 
 
@@ -226,6 +227,30 @@ def t015():
     src = _read("render_board_html.py")
     assert "BV.main_cell" in src, "渲染绕过了 board_view 单点"
     return "渲染复用 board_view 单点"
+
+
+def t047():
+    """归一化敏感性必须进三档判据：换等价归一化就跳位的车不能进第一档，
+    但也绝不进第三档（名次不稳是算法精度问题，不是产品硬伤）。"""
+    import robust as RB
+    # 断言1：判据已接入源码（阈值可配 + blocker + 只拦T1）
+    src = _read("leaderboard.py")
+    assert "t1_max_norm_swing" in src, "归一化阈值未入 tier_rules"
+    assert "normalization_audit(" in src, "tier_report 未调用归一化审计"
+    assert "归一化敏感" in src, "缺归一化 blocker 文案"
+    # 断言2：审计本身能识别高波动（构造一个跨归一化会换位的矩阵）
+    #        三组：A 两极分化、B 居中、C 靠另一维胜出——zscore/sum 会重排
+    m = [[9.0, 1.0], [5.0, 5.0], [1.0, 9.0]]
+    na = RB.normalization_audit(m, [0.5, 0.5], ["benefit", "benefit"],
+                                ["A", "B", "C"])
+    assert len(na["normalizations"]) == 5, "审计未覆盖 5 种归一化"
+    assert 0 <= na["tau_mean"] <= 1, "τ 越界"
+    # 断言3：默认阈值写进规则且只作第一档 blocker（不进 risk/第三档逻辑）
+    import leaderboard as LB
+    rules = LB.tier_rules({"tiering": {}})
+    assert rules["t1_max_norm_swing"] == 2, "默认归一化阈值不是 2 位"
+    assert rules["norm_audit_enabled"] is True, "归一化审计默认未开"
+    return "归一化波动进T1判据(阈值2位)+只拦T1不进T3+审计5方式可用"
 
 
 def t046():
@@ -672,7 +697,7 @@ def t016():
 
 
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047]
 
 
 def run():

@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 9.7.40
+version: 9.7.41
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v9.7.40）
+# Car recommendation —— 可信购车榜单引擎（v9.7.41）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -454,11 +454,19 @@ python3 leaderboard.py --tier car_ev --candidates cands.json --out tier.md
 
 | 档 | 判据 | 回答的问题 |
 |---|---|---|
-| 第一档 | 基准算法命中 ≥80% + 全情景命中 ≥60% + 证据 A + 趋势月销 ≥2000 | 能不能直接买（不用取舍） |
+| 第一档 | 基准算法命中 ≥80% + 全情景命中 ≥60% + 证据 A + 趋势月销 ≥2000 + **跨归一化名次波动 ≤2 位**（v9.7.41） | 能不能直接买（不用取舍） |
 | 第二档 | 无第三档风险，但未达第一档 | 要不要按偏好取舍 |
 | 第三档 | 证据 C / 无交付 / 月销 <500 / 人工标注硬伤 | 现在该不该看它 |
 
 阈值全部写在 `categories/<id>.json → tiering`，改口径不必改代码。
+
+**归一化敏感性判据（v9.7.41，借 scikit-criteria 方法学空间思想）**：第一档要求「换算法、换权重都靠前」，
+而归一化方式也是「算法选择」的一种（`robust.normalization_audit()` 的 5 种方式 linear/minmax/vector/zscore/sum）。
+若某车换个等价归一化名次就跳 >2 位（`tiering.t1_max_norm_swing` 可配），说明它进前三的成绩落在算法精度噪声里，
+不满足"稳"，**不进第一档**（降为第二档并披露"跨 5 种归一化名次 X–Y"）。
+关键纪律：名次不稳是**算法精度问题，不是产品硬伤**——绝不因此进第三档（与「证据 C 不判劣」同理）。
+实测 16 款扩展榜：τ 均值 0.920，小鹏MONA M03 / 奔驰CLA新能源 波动 3 位（2–5 名）被拦在 T2，档位本身未误伤。
+可用 `tiering.norm_audit_enabled=false` 关闭（老榜样本过少时）。
 
 **第二档必须再拆成两半**，否则会变成垃圾桶：
 - 有偏好触发点——某套权重下能进前三，把优先级输入滑杆它就会上浮
@@ -3087,3 +3095,20 @@ python3 ev_range_model.py --demo              # 演示几款车的三场景续�
 - 页面生成器 `build_energy_compare.py` 的物理常量从本模块 import（单一事实源），
   不在两处各写一套系数（防止漂移 = 不打补丁原则）。
 - 本能力不改主榜打分；只用于"实际续航问答"和选车比较器的续航列。
+
+---
+
+## v9.7.41 · 归一化敏感性进三档判据（2026-11-20，用户要求「3位波动反馈进判据+全池重算」）
+
+用户看到 v9.7.39 归一化审计发现「奔驰CLA新能源 / 小鹏MONA M03 跨归一化 2–5 名波动 3 位」后要求反馈进判据。
+
+- **判据**：`leaderboard.tier_rules()` 新增 `t1_max_norm_swing`（默认 2 位）与 `norm_audit_enabled`（默认开）。
+  `tier_report()` 调用 `robust.normalization_audit()` 取每车跨 5 种归一化的名次跨度；
+  `swing > 阈值` 的车加进 `t1_blockers` → 不进第一档、降第二档，并在报告披露"跨 5 种归一化名次 X–Y"。
+- **纪律**：只拦第一档，**绝不进第三档**——名次不稳是算法精度问题，不是产品硬伤，与「证据 C 不判劣」同理。
+  `norm_audit=None` 听配置开关，`norm_audit=False` 可显式关闭；审计异常时优雅降级不阻断出榜。
+- **不误伤验证**：改动前后对 16 款扩展榜逐车对比，档位完全一致（T1空/T2九款/T3七款、名单相同）——
+  归一化判据是"补充拦截理由 + 披露"，没有把任何车从第一档错误降级。它拦的两款本就因证据/算法命中未达 T1。
+- **全池重算**：改了 `leaderboard.py`（指纹覆盖文件），三个固化候选池已重新 `--stamp`
+  （数据本体 candidates 哈希不变，只更新 `_generated_by`），三池指纹 check 全部通过。
+- BUG-047 进回归（47/47）。HTML 榜单页只显示档位结果，判据细则在 report.md（渲染层披露未改，守页面确认铁律）。
