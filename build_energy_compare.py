@@ -182,8 +182,8 @@ FACTORS = {
         ],
     },
     "boxy": {
-        "label": "方盒子/风味越野造型", "default": "no",
-        "desc": "如钛7这类承载式方盒子：车重风阻大，高速能耗显著上升",
+        "label": "方盒子造型", "default": "no",
+        "desc": "方盒子车型车重风阻大，高速能耗显著上升（如钛7这类承载式方盒子）",
         "options": [
             {"v": "no",  "label": "普通造型", "hint": "按实际风阻参数计算（默认）"},
             {"v": "yes", "label": "看重方盒子/风味越野", "hint": "按方盒子修正能耗，叠加高频高速时混动意义打折"},
@@ -208,6 +208,19 @@ FACTORS = {
         ],
     },
 }
+
+
+# 用车条件下拉分组（v9.7.50）：按业内调研的决策权重分三组，帮助用户聚焦。
+# 不改动 FACTORS 的 v/default/options，故回归（env_options_test）行为不变。
+FACTOR_GROUPS = [
+    ("核心能源决策", ["home_charger", "winter_temp", "annual_km", "single_trip",
+                   "long_trip_freq", "plate_limit", "hold_years", "highway_ratio"],
+     "以下 8 项直接决定燃油/混动/纯电谁更合适（依据：家充是油电分水岭、−10℃纯电平均衰减32.7%、绿牌通行红利等）"),
+    ("能耗微调", ["boxy", "drive_style", "ac_usage"],
+     "以下 3 项主要影响电耗与有效续航，不改变能源形式的大方向"),
+    ("特殊场景", ["operation"],
+     "营运/网约等高频场景，家用用户可忽略"),
+]
 
 
 def norm(s):
@@ -329,21 +342,33 @@ def js(obj):
     return json.dumps(obj, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
 
 
-def build(cars_override=None, out=None, extra_head="", extra_tail="", title=None):
+def build(cars_override=None, out=None, extra_head="", extra_tail="", title=None,
+          def_low=12, def_high=14, def_body="轿车"):
     """生成交互比较器页面。默认无参数=原行为（整池67款，向后兼容）。
     cars_override: 外部注入的车列表（含补采分），用于特定榜单。
     extra_head/extra_tail: 注入到 <body> 前 / </body> 前的额外HTML（正式榜导航/区块）。
+    def_low/def_high/def_body: 预算与车身的默认过滤值——注入特定榜单时必须传该榜口径，
+      否则会沿用"12–14万轿车"示例默认值，导致 SUV 榜默认空表（已出过此 bug）。
     """
     cars = cars_override if cars_override is not None else load_cars()
     html = HTML_TEMPLATE
     if title:
         html = html.replace("<title>选车适配调节器 · 产品力主榜 + 用车条件修正</title>",
                             f"<title>{title}</title>")
+    body_opts = "".join(
+        f'<option value="{v}"{" selected" if v == def_body else ""}>{label}</option>'
+        for v, label in (("轿车","轿车"),("SUV","SUV"),("ALL","全部")))
     reps = {
+        "__DEF_LOW__": str(def_low),
+        "__DEF_HIGH__": str(def_high),
+        "__DEF_BODY__": def_body,
+        "__DEF_FILTER_HINT__": f"默认 {def_low}–{def_high} 万 · {dict(轿车='轿车',SUV='SUV',ALL='全部').get(def_body,def_body)}",
+        "__BODY_OPTIONS__": body_opts,
         "__EXTRA_HEAD__": extra_head,
         "__EXTRA_TAIL__": extra_tail,
         "__CARS_JSON__": js(cars),
         "__FACTORS_JSON__": js(FACTORS),
+        "__FACTOR_GROUPS_JSON__": js(FACTOR_GROUPS),
         "__DIMS_JSON__": js(DIMS),
         "__WEIGHTMAP_JSON__": js(WEIGHT_MAP),
         "__POWERS_JSON__": js(POWERS),
@@ -399,6 +424,9 @@ header .sub{color:var(--sub);font-size:14px;max-width:980px}
 .panel h2{margin:0 0 4px;font-size:17px}
 .panel .hint{color:var(--sub);font-size:12px;margin:0 0 14px}
 .cond-panel{position:sticky;top:20px}
+.grp-head{margin:14px 0 8px;padding:7px 10px;background:#faf9f6;border-left:3px solid #1f6f8b;border-radius:5px}
+.grp-head b{font-size:12.5px;color:#15181c}
+.grp-head span{display:block;font-size:10.5px;color:#5b6470;line-height:1.45;margin-top:3px}
 .fg{margin-bottom:13px}
 .fg label{display:block;font-weight:600;font-size:13px;margin-bottom:5px}
 .fg label .w{float:right;color:var(--sub);font-weight:400;font-size:11px}
@@ -477,18 +505,14 @@ __EXTRA_HEAD__
     <div class="fg" style="margin-top:16px;border-top:1px solid var(--line);padding-top:14px">
       <label>车型过滤 · 预算区间（万元）</label>
       <div class="fg-row">
-        <input type="number" id="pLow" value="12" step="0.5" min="0">
-        <input type="number" id="pHigh" value="14" step="0.5" min="0">
+        <input type="number" id="pLow" value="__DEF_LOW__" step="0.5" min="0">
+        <input type="number" id="pHigh" value="__DEF_HIGH__" step="0.5" min="0">
       </div>
-      <div class="fh">默认 12–14 万（示例：12–14 万轿车）</div>
+      <div class="fh">__DEF_FILTER_HINT__</div>
     </div>
     <div class="fg">
       <label>车身类型</label>
-      <select id="bodyFilter">
-        <option value="轿车" selected>轿车</option>
-        <option value="SUV">SUV</option>
-        <option value="ALL">全部</option>
-      </select>
+      <select id="bodyFilter">__BODY_OPTIONS__</select>
     </div>
     <div class="fg">
       <label>场景调节力度 <span id="wLabel">100%</span></label>
@@ -546,6 +570,7 @@ __EXTRA_HEAD__
 <script>
 const CARS=__CARS_JSON__;
 const FACTORS=__FACTORS_JSON__;
+const FACTOR_GROUPS=__FACTOR_GROUPS_JSON__;
 const DIMS=__DIMS_JSON__;
 const WM=__WEIGHTMAP_JSON__;
 const PHYS=__PHYS_JSON__;
@@ -574,20 +599,32 @@ const POOL_POWERS=[...new Set(CARS.map(c=>c.power))];
 
 function buildConds(){
   const box=document.getElementById('conds'); box.innerHTML='';
-  for(const [fid,f] of Object.entries(FACTORS)){
-    const d=document.createElement('div'); d.className='fg';
-    const defOpt=f.options.find(o=>o.v===f.default);
-    d.innerHTML='<label>'+f.label+'<span class="w"><span class="def-tag">默认</span></span></label>'+
-      '<select id="c_'+fid+'">'+f.options.map(o=>'<option value="'+o.v+'"'+(o.v===f.default?' selected':'')+'>'+o.label+'</option>').join('')+'</select>'+
-      '<div class="fh">'+f.desc+'<br><span style="color:#8a929b">当前：'+defOpt.hint+'</span></div>';
-    d.querySelector('select').addEventListener('change',()=>{
-      const sel=d.querySelector('select');
-      const o=f.options.find(o=>o.v===sel.value);
-      d.querySelector('.fh span').textContent='当前：'+o.hint;
-      render();
+  // 按 FACTOR_GROUPS 分组渲染；未在分组中的项放到"其他"避免遗漏
+  const grouped=new Set();
+  (FACTOR_GROUPS||[]).forEach(function(g){
+    const hd=document.createElement('div'); hd.className='grp-head';
+    hd.innerHTML='<b>'+g[0]+'</b><span>'+g[2]+'</span>';
+    box.appendChild(hd);
+    g[1].forEach(function(fid){
+      const f=FACTORS[fid]; if(!f)return; grouped.add(fid);
+      box.appendChild(makeCond(fid,f));
     });
-    box.appendChild(d);
-  }
+  });
+  for(const [fid,f] of Object.entries(FACTORS)) if(!grouped.has(fid)) box.appendChild(makeCond(fid,f));
+}
+function makeCond(fid,f){
+  const d=document.createElement('div'); d.className='fg';
+  const defOpt=f.options.find(o=>o.v===f.default);
+  d.innerHTML='<label>'+f.label+'<span class="w"><span class="def-tag">默认</span></span></label>'+
+    '<select id="c_'+fid+'">'+f.options.map(o=>'<option value="'+o.v+'"'+(o.v===f.default?' selected':'')+'>'+o.label+'</option>').join('')+'</select>'+
+    '<div class="fh">'+f.desc+'<br><span style="color:#8a929b">当前：'+defOpt.hint+'</span></div>';
+  d.querySelector('select').addEventListener('change',()=>{
+    const sel=d.querySelector('select');
+    const o=f.options.find(o=>o.v===sel.value);
+    d.querySelector('.fh span').textContent='当前：'+o.hint;
+    render();
+  });
+  return d;
 }
 function readCond(){const c={};for(const fid of Object.keys(FACTORS))c[fid]=document.getElementById('c_'+fid).value;return c;}
 
@@ -854,9 +891,9 @@ function resetAll(){
     const o=f.options.find(o=>o.v===f.default);
     s.parentElement.querySelector('.fh span').textContent='当前：'+o.hint;
   }
-  document.getElementById('pLow').value=12;
-  document.getElementById('pHigh').value=14;
-  document.getElementById('bodyFilter').value='轿车';
+  document.getElementById('pLow').value=__DEF_LOW__;
+  document.getElementById('pHigh').value=__DEF_HIGH__;
+  document.getElementById('bodyFilter').value='__DEF_BODY__';
   document.getElementById('wEnergy').value=100;
   carSort={k:'composite',dir:-1};
   document.querySelectorAll('#carTable th').forEach(x=>x.classList.remove('sorted'));

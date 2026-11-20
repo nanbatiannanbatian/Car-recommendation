@@ -13,7 +13,7 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 9.7.49
+version: 9.7.50
 author: "nanbatiannanbatian"
 ---
 
@@ -94,6 +94,7 @@ python3 energy_router.py "<用户原始提问>"    # 返回 board_type/powers/ne
   全额计入+降档+红标）。**禁止另写简化调节逻辑**；通过 `EC.build(cars_override=…, extra_head=…, extra_tail=…)` 注入榜单数据。
 - **全套区块 = `cross_energy_sections.py::BLOCKS`（对齐 board_view 18 项契约）+ 导航卡**。必要区块 `REQUIRED` 自检齐全。
 - **定稿榜固定 + 场景推演器分离（v9.7.49 用户追问"让区块随环境分变是否好方法"后重构，取代旧的4区块动态方案）**：**榜单是可复现结论，推演是个人探索，同页混时态会破坏可复现性**。故：①`cross_energy_sections.py` 的 14 区块**全部是默认画像下的静态定稿快照**（`DYNAMIC_BLOCKS=∅`），可引用、可截图、不随下拉变化；②稳健性 = 跨 6 个代表性场景（默认/无家充/北方极寒/长途高频/营运/限牌）的**名次跨度**，首次加载用引擎算一次后固定——这才配叫"跨场景稳健性"（旧做法"当前场景下换力度"是概念错误）；③页面中部比较器主区的 12 项下拉 + 实时表 = **场景推演器**，`window.onBoardRerender(rows,cond,scale)` 钩子**只更新推演态标识 `sim-state`**（默认画像/自定义N项），绝不改写定稿区块。回归 `dynamic_blocks_test.js` 用 DOM stub 实跑验证「改条件后定稿区不变、只有标识变」。
+- **用车条件分组与默认过滤（v9.7.50）**：12 项条件按业内调研权重分三组展示——核心能源决策8项（充电条件/冬季气温/年里程/单次里程/长途频率/限牌/持有年限/高速占比）、能耗微调3项（方盒子造型/驾驶风格/空调）、特殊场景1项（营运）；`box` 文案统一为「方盒子造型」。**默认过滤必须随榜口径注入**：`build_energy_compare.build(def_low,def_high,def_body)` 传该榜级别/价位（中型SUV榜=12-18万/SUV）——历史上因沿用示例默认「12-14万轿车」导致 SUV 榜默认空表，回归 `filter_default_test.js` 守此（10项：默认非空表/有匹配车/分组/文案）。
 - **全环境项回归（`env_options_test.js`，77项）**：见上一条 test(v9.7.47)——遍历 12 项×每选项断言生效/无NaN/硬条件阈值/极端组合合法，中性选项白名单需 hint 有据。此测试守引擎，与本页展示层分离。
 - **全环境项回归（`env_options_test.js`，77项）**：遍历 12 项×每个选项，断言每项非中性选项至少对某车生效（软分/硬条件/续航之一变化）、无 NaN/越界、关键硬条件阈值正确（无桩纯电−15/极寒低价−12/限牌油车−8/营运油车−10/over8纯电+1.0）、极端组合结果合法。设计为中性的选项（hint 含"不调节/默认/平衡点"）登记在 `NEUTRAL_OPTIONS` 并要求其 hint 有据，禁止用白名单掩盖漏实现。**已抓出并修复**：`hold_years=over8` 选项 hint 承诺"纯电加分"但引擎漏实现（完全无效），已补软调节（纯电+1.0/插混增程+0.3/油车油混−0.3）。
 - 出 B 类固定榜命令：`python3 build_midsuv_full.py`（读候选池+补采分→构造 cars→注入区块→交互 HTML）。
@@ -1003,6 +1004,19 @@ python3 sync_cell_brand.py --check cands.json --json audit.json
 
 **踩过的坑**：GitHub 推送常遇间歇性断连（Connection reset / 21s 超时）；环境变量里有
 `HTTPS_PROXY=127.0.0.1:60770`，时通时断。推送失败时重试即可，不是代码问题。
+
+**新增文件必须先加白名单（2026-11-20 踩坑）**：同步集只认"仓库已有文件 + NEW_FILES 白名单"。
+新建的 `.py`/`.json` 若不在白名单，`--check` 会显示"内容相同、跳过"而**静默不同步**——
+曾导致 crash_systems.py/evidence_consistency.py/safety_check.py/official_safety_scores.json
+4 个新文件改了却上不了 GitHub。**每次新建代码文件，立即加进 sync_to_repo.py 的 NEW_FILES**，
+加完再 `--check` 确认出现在"将复制"清单里。
+
+**多会话并行改代码的纪律（2026-11-20，两个会话同时改本 skill）**：不强制单会话独占，
+但必须遵守——① **提交前先 `git log --oneline -5` + `git status`**，确认没有别的会话已提交
+（曾出现另一会话的 test commit 和版本号撞号）；② **版本号撞号要记录不抢号**，若发现
+version 已被并行推进，以远端为准、在 commit message 写明"与另一会话撞号、内容无冲突"；
+③ **共用定义放唯一真相源**（如 crash_systems.py），减少多处改动重叠；改完跑全套回归
+确认双方改动兼容（曾验证双会话改动并存时 65/65 仍全绿）。
 
 ## 工信部备案预测与第三方视频证据（v5.5）
 

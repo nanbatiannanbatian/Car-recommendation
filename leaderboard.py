@@ -1045,6 +1045,9 @@ def tier_report(cands: list[dict], cfg: dict, weights: list[float] | None = None
                "family_hits": a.get("family_hits"),
                "family_n": a.get("family_n"),
                "family_names": a.get("family_names") or [],
+               # v9.7.48：连续名次（强推荐OR路径用，补二值命中盲区）
+               "rank_mean": a.get("rank_mean"),
+               "rank_span": a.get("rank_span"),
                "joint_hits": a["topk_count"], "joint_freq": a["topk_freq"],
                "scenarios": scen_hit[nm], "risks": risks, "best": best_dim(nm),
                "score": total_score.get(nm), "note": c.get("note") or "",
@@ -1145,13 +1148,27 @@ def tier_report(cands: list[dict], cfg: dict, weights: list[float] | None = None
             # 但换算法不够稳（命中未达T1）。回答"车好，只是分数挤团不够稳压"。
             # 不是新档位，只是T2内的可视化提示，不改三档结构。
             _sc = total_score.get(nm) or 0
+            _fam_ok = (rec.get("family_freq") or 0) >= 0.5
+            # v9.7.48：OR路径——连续名次稳定也算强推荐（Model3家族0票但平均5.6/区间5-9，
+            # 是"稳稳第5"不是不稳）。门槛：平均名次≤6 且 名次跨度≤5（排除大起大落）。
+            _rm = rec.get("rank_mean")
+            _span = rec.get("rank_span") or (0, 99)
+            _steady_ok = (_rm is not None and _rm <= 6 and (_span[1] - _span[0]) <= 5)
             rec["strong_pick"] = bool(
                 has_crash_evidence and _sc >= 80 and not risks
-                and (rec.get("family_freq") or 0) >= 0.5)
+                and (_fam_ok or _steady_ok))
+            rec["strong_pick_reason"] = "family" if _fam_ok else ("steady" if _steady_ok else "")
             if rec["strong_pick"]:
+                if _fam_ok:
+                    _why = (f"独立算法家族命中 {rec.get('family_hits')}/{rec.get('family_n')}="
+                            f"{rec.get('family_freq', 0):.0%}<{rules.get('t1_min_family_hits') or '阈值'}票，"
+                            f"换算法不够稳压")
+                else:
+                    _why = (f"10算法平均第{_rm:.1f}、名次区间{_span[0]:g}–{_span[1]:g}（稳定），"
+                            f"只是未在多数算法进前三")
                 rec.setdefault("t2_notes", []).append(
-                    f"强推荐候选：总分{_sc:.1f}+{c.get('safety_basis')}碰撞实锤，"
-                    f"独立算法家族命中 {rec.get('family_hits')}/{rec.get('family_n')}={rec.get('family_freq', 0):.0%}<{rules.get('t1_min_family_hits') or '阈值'}票故未进第一档；车本身无明显短板")
+                    f"强推荐候选：总分{_sc:.1f}+{cn_name(c.get('safety_basis'))}碰撞实锤，{_why}；"
+                    f"车本身无明显短板，按你的偏好取舍即可")
             tiers["T2"].append(rec)
 
     for k in tiers:

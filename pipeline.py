@@ -374,6 +374,10 @@ def main():
         # v9.7.43：第二档"强推荐"名单（有碰撞实锤+高分+无硬风险，但换算法不够稳压）
         summary.setdefault("strong_picks", {})[label] = [
             x["model"] for x in (_tr.get("detail") or {}).get("T2", []) if x.get("strong_pick")]
+        # v9.7.48：强推荐原因(family=家族命中不够 / steady=稳定但名次略后)，供页面分情况说明
+        summary.setdefault("strong_pick_reasons", {})[label] = {
+            x["model"]: x.get("strong_pick_reason") or ""
+            for x in (_tr.get("detail") or {}).get("T2", []) if x.get("strong_pick")}
         # v9.7.43：高分低档车的T1卡点导出给页面（如实展示为何分高却没推荐）
         _blockers = {}
         for _tk in ("T1", "T2", "T3"):

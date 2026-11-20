@@ -86,6 +86,7 @@ CASES = [
     ("BUG-063", "分数改了证据文本没同步(分数证据脱节)", "v9.7.43"),
     ("BUG-064", "碰撞体系硬编码散落5处致新体系被漏", "v9.7.44"),
     ("BUG-065", "二值命中截断埋没稳稳第5的车(Model3)+产品力市场口径不清", "v9.7.48"),
+    ("BUG-066", "第一档过严叙事局限+强推荐未标稳稳第5的车+并行纪律", "v9.7.50"),
 ]
 
 
@@ -1209,8 +1210,41 @@ def t065():
     return f"连续名次补盲区：Model3平均第{m3['rank_mean']:.1f}(区间{m3['rank_span']})可见+产品力≠市场热度口径说明"
 
 
+def t066():
+    """强推荐OR路径(稳定但名次略后) + 一档+强推荐叙事 + 并行纪律固化。"""
+    import leaderboard as L
+    cfg = json.load(open(os.path.join(HERE, "categories", "car_midsedan_allprice.json"), encoding="utf-8"))
+    d = json.load(open(os.path.join(HERE, "runs", "midsedan_bev_1218_202610", "candidates_allprice.json"), encoding="utf-8"))["candidates"]
+    r = L.tier_report(d, cfg, None, "测试", airbag_gate=True, crash_gate=False)
+    # T1不放宽
+    assert set(r["tiers"]["T1"]) == {"极氪007GT", "极氪007"}, "T1不应放宽"
+    # 强推荐OR路径：稳稳第5的Model3应被标(steady)，且T1仍2款
+    by = {x["model"]: x for x in r["detail"]["T2"]}
+    m3 = by.get("特斯拉Model 3")
+    assert m3 and m3.get("strong_pick"), "Model3稳稳第5应进强推荐"
+    assert m3.get("strong_pick_reason") == "steady", f"应走steady路径: {m3.get('strong_pick_reason')}"
+    # 无碰撞实锤的车不能靠steady混进强推荐
+    mg = by.get("MG 07 纯电")
+    assert mg and not mg.get("strong_pick"), "MG07无碰撞实锤不应强推"
+    # 叙事：一档+强推荐共同清单
+    rsrc = _read("render_board_html.py")
+    assert "与第一档共同构成" in rsrc and "只有几款" in rsrc, "缺一档+强推荐叙事"
+    assert "换算法会换位" in rsrc and "稳定地排第5左右" in rsrc, "缺两种强推荐原因的文案"
+    # 并行纪律固化
+    sksrc = _read("SKILL.md")
+    assert "多会话并行改代码的纪律" in sksrc and "新增文件必须先加白名单" in sksrc, \
+        "并行/白名单纪律未固化"
+    # 真实产物
+    sp = os.path.join(HERE, "runs", "bev_midsedan_202610_full", "summary.json")
+    if os.path.exists(sp):
+        s = json.load(open(sp, encoding="utf-8"))
+        picks = (s.get("strong_picks") or {}).get("中型纯电轿车（全价位）") or []
+        assert "特斯拉Model 3" in picks, "产物强推荐缺Model3"
+    return "强推荐OR路径：Model3走steady进强推荐、T1仍2款、MG07无实锤被挡；并行纪律已固化"
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066]
 
 
 def run():

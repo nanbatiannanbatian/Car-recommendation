@@ -79,6 +79,11 @@ def run():
                         capture_output=True, text=True, timeout=90)
     check("全环境项测试(node)全过", et.returncode == 0 and "77/77 通过" in et.stdout,
           (et.stdout or et.stderr)[-400:])
+    # 4d. 默认过滤/分组/文案（用户报"默认无匹配车型"bug + 方盒子改名 + 条件分组）
+    ft = subprocess.run(["node", "filter_default_test.js", OUT], cwd=HERE,
+                        capture_output=True, text=True, timeout=60)
+    check("默认过滤/分组/文案(node)全过", ft.returncode == 0 and "10/10 通过" in ft.stdout,
+          (ft.stdout or ft.stderr)[-400:])
 
     # 5. 占位符已替换
     check("无占位符残留", "__EXTRA_" not in html and "__CARS_JSON__" not in html)

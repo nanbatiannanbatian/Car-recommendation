@@ -118,8 +118,9 @@ def main():
         cars_override=cars,
         out=OUT,
         extra_head=nav,
-        extra_tail=secs + "\n" + CES.dynamic_script(),  # 注入区块 + 随环境分实时重绘的JS
+        extra_tail=secs + "\n" + CES.dynamic_script(),  # 注入区块 + 定稿/推演分离脚本
         title="2026年10月 12-18万 中型SUV 跨能源正式榜（产品力+环境分）",
+        def_low=12, def_high=18, def_body="SUV",  # 本榜口径：12–18万中型SUV（避免默认轿车12-14万导致空表）
     )
     # 校验
     html = open(OUT,encoding="utf-8").read()

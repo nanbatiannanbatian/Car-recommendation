@@ -684,20 +684,29 @@ document.addEventListener('change',function(ev){
         names = {"T1": "第一档 · 可直接买", "T2": "第二档 · 按偏好取舍", "T3": "第三档 · 证据不足/暂缓"}
         # v9.7.43：第二档内"强推荐"标记——有碰撞实锤+高分+无硬风险，只是换算法不够稳压
         _strong = set()
+        _strong_reason = {}
         if summary:
-            _sp = (summary.get("strong_picks") or {})
-            for _v in _sp.values():
-                _strong.update(_v if isinstance(_v, list) else [])
+            for _k, _v in (summary.get("strong_picks") or {}).items():
+                _models = _v if isinstance(_v, list) else []
+                _strong.update(_models)
+                for _m in _models:
+                    _strong_reason[_m] = ((summary.get("strong_pick_reasons") or {}).get(_k) or {}).get(_m, "")
         for k in ("T1", "T2", "T3"):
             models = tiers.get(k) or []
             lis = "".join(
-                f"<li>{e(m)}{'<b class=\"strong-tag\" title=\"有权威碰撞实锤+高分+无硬风险；仅因换算法名次不够稳压未进第一档\">强推荐</b>' if (k=='T2' and m in _strong) else ''}</li>"
+                f"<li>{e(m)}{('<b class=\"strong-tag\" title=\"' +
+                    ('有权威碰撞实锤+高分，家族命中不够稳压（换算法会换位）' if _strong_reason.get(m)=='family' else
+                     '有权威碰撞实锤+高分+连续名次稳定（稳定地排第5左右），只是未在多数算法进前三') +
+                    '\">强推荐</b>') if (k=='T2' and m in _strong) else ''}</li>"
                 for m in models) if models else "<li>—</li>"
             H.append(f'<div class="tier-card {k}"><h3>{names[k]}（{len(models)} 款）</h3><ul>{lis}</ul></div>')
         H.append("</div>")
         if _strong:
-            H.append('<div class="rule"><b>强推荐说明：</b>第二档中带「强推荐」标的车，有权威碰撞实锤、总分高、无硬风险，'
-                     '仅因换算法/换权重时名次不够稳压而未进第一档——车本身没有明显短板，按你的偏好取舍即可。</div>')
+            H.append('<div class="rule"><b>强推荐说明（与第一档共同构成"可优先看"清单）：</b>'
+                     '第二档带「强推荐」的车，有权威碰撞实锤、总分高、无硬风险——'
+                     '要么家族命中不够（换算法会换位），要么连续名次稳定只是排在第5左右。'
+                     '两类都是"车本身没短板，只是不够稳压"，按你的品牌/充电/保值偏好取舍即可。'
+                     '第一档只有几款，不代表只有那几款能买——强推荐同样值得认真看。</div>')
         _es = (summary or {}).get("evidence_soft") or []
         if _es:
             _lines = "；".join(f"{e(x.get('model'))}（{e(x.get('tier'))}）" for x in _es)
