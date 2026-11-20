@@ -487,9 +487,10 @@ function render(){
       '<td class="num">'+(r.price!=null?r.price:(r.priceLow+'–'+r.priceHigh))+'</td>'+
       '<td class="num">'+(r.cltc||'—')+'</td>'+
       '<td class="num">'+(r.cons?r.cons:'—')+'</td>'+
-      '<td class="num">'+(r.rc?
+      '<td class="num">'+(r.eff!=null&&r.rc?
         '<details class="adj"><summary>'+r.eff+' km</summary><div class="adjbox"><b>续航估算（'+r.rc.method+'）</b><br>'+
-        r.rc.steps.map(s=>'· '+s).join('<br>')+'</div></details>' : '—')+'</td>'+
+        r.rc.steps.map(s=>'· '+s).join('<br>')+'</div></details>' :
+        (r.power==='BEV'?'<span title="无电量数据，未编造续航">数据待核</span>':'<span title="有油箱兜底，不计算纯电续航">—</span>'))+'</td>'+
       '<td class="num">'+r.product.toFixed(1)+'</td>'+
       '<td class="num"><details class="adj"><summary class="'+adjCls+'">'+adjTxt+'</summary>'+
         '<div class="adjbox">调节明细（软 '+(r.adjTotal>0?'+':'')+r.adjTotal.toFixed(1)+'；硬条件不缩放）<br>'+detail+cap+hardHtml+'</div></details></td>'+

@@ -84,6 +84,16 @@ def run():
                         capture_output=True, text=True, timeout=60)
     check("默认过滤/折叠/文案(node)全过", ft.returncode == 0 and "15/15 通过" in ft.stdout,
           (ft.stdout or ft.stderr)[-400:])
+    # 4e. 纯电续航非null（用户报 ID.AURA T6 null km）——通用电量文本提取器 + 渲染防御
+    import build_midsuv_full as BMF
+    check("电量提取:国轩高科59.9kWh", BMF.extract_kwh(["国轩高科59.9kWh磷酸铁锂电池"]) == 59.9)
+    check("电量提取:77.94kWh电池", BMF.extract_kwh(["77.94kWh电池+190kW"]) == 77.94)
+    check("电量提取:无电量返回None", BMF.extract_kwh(["无电量信息"]) is None and BMF.extract_kwh(None) is None)
+    check("电量提取:多配置取最大", BMF.extract_kwh(["59.9kWh", "77.5kWh", "66kWh"]) == 77.5)
+    vt = subprocess.run(["node", "ev_range_test.js", OUT], cwd=HERE,
+                        capture_output=True, text=True, timeout=60)
+    check("纯电续航非null(node)全过", vt.returncode == 0 and "9/9 通过" in vt.stdout,
+          (vt.stdout or vt.stderr)[-400:])
 
     # 5. 占位符已替换
     check("无占位符残留", "__EXTRA_" not in html and "__CARS_JSON__" not in html)

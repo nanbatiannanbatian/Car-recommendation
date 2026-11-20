@@ -7,7 +7,7 @@ build_midsuv_full.py — 2026-10 12-18万 中型SUV 跨能源【完整正式榜�
 环境分引擎不重写——import build_energy_compare 的常量/公式，保证单一事实源。
 本脚本只负责：①构造 cars 数据；②算默认画像三榜；③生成区块；④调 EC.build 注入。
 """
-import json, os, sys
+import json, os, sys, re
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -21,6 +21,27 @@ QUERY = "2026年10月 12-18万 中型SUV 前十排行榜"
 
 
 def norm(s): return "".join(ch for ch in str(s).lower() if ch.isalnum())
+
+_KWH_RE = re.compile(r'(\d+(?:\.\d+)?)\s*k\s*w\s*h', re.I)
+
+def extract_kwh(texts):
+    """通用电量提取器：从任意文本（key_configs/name/备注）里提取 kWh 数值。
+    补采数据常把电量写成文本（如「国轩高科59.9kWh磷酸铁锂」「77.94kWh电池」），
+    结构化 battery_kwh 字段常为空。取所有配置里的最大值作为该车电量基准。
+    修 v9.7.52：此前只认 battery_kwh 字段，导致 ID.AURA T6 / 马自达EZ-60 等车 kwh=null → 续航 null km。
+    """
+    vals = []
+    for t in texts or []:
+        if t is None: continue
+        s = t if isinstance(t, str) else json.dumps(t, ensure_ascii=False)
+        for m in _KWH_RE.finditer(s):
+            try:
+                v = float(m.group(1))
+                if 10 <= v <= 250:   # 合理乘用车电量区间，滤掉误匹配
+                    vals.append(v)
+            except ValueError:
+                pass
+    return max(vals) if vals else None
 
 
 def load_context():
@@ -63,12 +84,19 @@ def build_cars(cands, scores, mp, trims, vp, fl_by):
         ts = sup.get("trims") or trims.get(k, []) or []
         meta["trims"][c["model"]] = ts
         meta["rationale"][c["model"]] = sup.get("rationale") or {}
-        # 电量/CLTC
+        # 电量/CLTC：结构化字段优先，缺失时从 key_configs/name 文本兜底提取（v9.7.52）
         kwh = cltc = None
         vals_k = [float(t["battery_kwh"]) for t in ts if t.get("battery_kwh")]
         vals_c = [float(t["cltc_km"]) for t in ts if t.get("cltc_km")]
         if vals_k: kwh = max(vals_k)
         if vals_c: cltc = int(max(vals_c))
+        if kwh is None:
+            # 把每个配置的 key_configs + name 拼成文本，统一走正则提取
+            texts = []
+            for t in ts:
+                texts.append(t.get("name"))
+                texts.extend(t.get("key_configs") or [])
+            kwh = extract_kwh(texts)
         fe = fl_by.get(k, {})
         cons = None
         if fe.get("consumption"):
