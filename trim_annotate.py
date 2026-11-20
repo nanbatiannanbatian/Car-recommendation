@@ -48,6 +48,28 @@ def weighted_total(scores: dict) -> float:
     return round(sum(float(scores.get(k, 0)) * v for k, v in W.items()) * 10, 1)
 
 
+def charge_minutes(t: dict) -> tuple[float | None, str]:
+    """从配置 charge 文本提取"等效 10-80%（70%区间）"快充分钟数。
+
+    口径陷阱：文本混用 10-80%(70%区间) / 30-80%(50%) / 10-70%(60%)，
+    直接比数字会虚高误导。按区间宽度线性折算到 70% 再比较。
+    返回 (等效分钟, 口径说明)；解析不出返回 (None, "")。
+    """
+    c = str(t.get("charge") or "")
+    m = re.search(r"(\d{2})\s*[-–]\s*(\d{2})%?\s*(?:约|大约)?\s*(\d+(?:\.\d+)?)\s*min", c)
+    if not m:
+        m2 = re.search(r"(\d+(?:\.\d+)?)\s*min", c)
+        if m2:
+            return float(m2.group(1)), "未标区间(按原文)"
+        return None, ""
+    lo, hi, mins = int(m.group(1)), int(m.group(2)), float(m.group(3))
+    span = hi - lo
+    if span <= 0:
+        return None, ""
+    equiv = round(mins / span * 70, 1)
+    return equiv, f"{lo}-{hi}% {mins:g}min→等效10-80% {equiv:g}min"
+
+
 def deltas_for(trim: dict, ref: dict) -> list[dict]:
     """该配置相对参考配置的客观差异 → 维度调整（带置信度）。"""
     out = []
@@ -56,6 +78,22 @@ def deltas_for(trim: dict, ref: dict) -> list[dict]:
     if c800(trim) and not c800(ref):
         out.append({"dim": "powertrain", "delta": 0.8, "conf": "high",
                     "why": "800V高压平台（配置表明确）"})
+    # v9.7.31：快充能力 delta——只比"等效10-80%分钟数"，不按品牌/电池代际。
+    # 同车系内闪充配置 vs 慢充配置才加分（如二代海鸥高配闪充 vs 低配非闪充）。
+    # 全系皆闪充的车，其优势应在人工基准分体现，不由本 delta 重复加。
+    ct, cwhy = charge_minutes(trim)
+    cr, _ = charge_minutes(ref)
+    if ct is not None and cr is not None and (cr - ct) >= 5:
+        # 按"比参考配置快多少"分档（相对差），不按绝对分钟数——
+        # 全系慢充的车系内部快一点也该体现；闪充车系差距更大则加更多。
+        if cr - ct >= 15:
+            d = 0.5
+        elif cr - ct >= 8:
+            d = 0.3
+        else:
+            d = 0.15
+        out.append({"dim": "powertrain", "delta": d, "conf": "medium",
+                    "why": f"快充{cwhy}（较参考快{cr-ct:g}min）+{d}"})
     # 续航
     r1, r0 = trim.get("cltc_km"), ref.get("cltc_km")
     if isinstance(r1, (int, float)) and isinstance(r0, (int, float)):

@@ -60,6 +60,7 @@ CASES = [
     ("BUG-037", "原始库773字段未映射到事实库", "v9.7.28"),
     ("BUG-038", "弗迪电池未标代际/误以为二代都闪充", "v9.7.29"),
     ("BUG-039", "扩展候选池只在runs未固化(下次运行丢失)", "v9.7.30"),
+    ("BUG-040", "快充能力无配置级delta且口径混用会虚高", "v9.7.31"),
 ]
 
 
@@ -220,6 +221,24 @@ def t015():
     assert "BV.main_cell" in src, "渲染绕过了 board_view 单点"
     return "渲染复用 board_view 单点"
 
+
+def t040():
+    """快充口径归一化 + 配置级 delta：不同区间可比，闪充配置加分。"""
+    import trim_annotate as TA
+    # 口径归一化：30-80% 20min 应折算等效28min，不能当20min用
+    eq, _ = TA.charge_minutes({"charge": "400V/3C，30–80% 约 20min"})
+    assert eq is not None and 27 <= eq <= 29, f"口径折算错误: {eq}"
+    # 兆瓦闪充 10-70% 5min 折算后不能虚高成 5min 当10-80%
+    eq2, _ = TA.charge_minutes({"charge": "800V 兆瓦闪充 10-70% 5min"})
+    assert eq2 is not None and 5 < eq2 < 7, f"闪充口径折算错误: {eq2}"
+    # 配置级 delta：同车系快充版应比慢充版多快充加成
+    d = json.load(open(os.path.join(HERE, "categories", "trims.json"), encoding="utf-8"))
+    e = next(x for x in d["entries"] if x["model"] == "MG 07 纯电")
+    slow = next(t for t in e["trims"] if "650" in t["name"])
+    fast = next(t for t in e["trims"] if "845" in t["name"])
+    ds = TA.deltas_for(fast, slow)
+    assert any("快充" in x["why"] and x["delta"] > 0 for x in ds), "快充配置delta未生效"
+    return "快充口径归一化+配置级delta生效"
 
 def t039():
     """候选池必须固化在 categories（随包同步），不能只活在 runs。"""
@@ -509,7 +528,7 @@ def t016():
 
 
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040]
 
 
 def run():
