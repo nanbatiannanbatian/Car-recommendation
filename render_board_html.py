@@ -432,28 +432,36 @@ def render(data, summary, title, as_of):
                             for i, t in enumerate(td["trims"]))
                         sel = (f'<br><select class="trimsel" data-model="{e(r["model"])}" '
                                f'style="font-size:11px;max-width:160px">{opts}</select>')
-                    # v9.7.52：强推荐金标（主榜可见），hover显示原因
-                    _sp_badge = ""
-                    if r["model"] in _strong:
-                        _why = ("家族命中不够稳压（换算法会换位）" if _strong_reason.get(r["model"]) == "family"
-                                else "连续名次稳定、只是排在第5左右")
-                        _sp_badge = (f'<b class="strong-main" title="强推荐：有权威碰撞实锤+高分+无硬风险；'
-                                     f'{e(_why)}。与第一档共同构成可优先看清单">强推</b>')
-                    H.append(f"<td class='name'>{e(val)}{risk_flags(r)}{crash_badge(r)}{_sp_badge}{sel}</td>")
+                    # v9.7.53：强推金标移到档位列（车名列不再重复显示）
+                    H.append(f"<td class='name'>{e(val)}{risk_flags(r)}{crash_badge(r)}{sel}</td>")
                 elif k == "total":
                     H.append(f"<td class='c-total'><span class='score'>{e(val)}</span></td>")
                 elif k == "tier":
                     _tier_cell = tier_badge(r.get("tier"))
-                    # v9.7.43：高分(TOP10)却未进一档的车，档位列加"为何未进一档"标记
-                    _bi = _t1blk.get(r["model"])
-                    if _bi and (r.get("rank") or 99) <= 10:
-                        _bl = list(_bi.get("blockers") or [])
-                        # 碰撞缺失注明"非不安全"，避免误导
-                        _bl = [("无权威碰撞成绩（非不安全，仅证据等级较低）" if "无权威碰撞成绩" in b else b)
-                               for b in _bl]
-                        _tip = "；".join(_bl) + "。——不在意这些因素的用户可将其纳入购买考虑，非产品力差。"
-                        _tier_cell += (f'<span class="flag flag-lowtier" title="{e(_tip)}">'
-                                       f'为何未进一档</span>')
+                    _is_strong = r["model"] in _strong
+                    if _is_strong:
+                        # v9.7.53：强推金标放档位列，hover讲清"为何未进一档+为何仍强推"
+                        _why = ("家族命中不够稳压（换算法会换位）" if _strong_reason.get(r["model"]) == "family"
+                                else "连续名次稳定、只是排在第5左右")
+                        _extra = ""
+                        _bi_s = _t1blk.get(r["model"])
+                        if _bi_s and (r.get("rank") or 99) <= 10:
+                            _extra = "未进第一档因：" + "；".join(_bi_s.get("blockers") or []) + "。"
+                        _tip_s = (f"强推荐：有权威碰撞实锤+高分+无硬风险。{_why}。"
+                                  f"{_extra}与第一档共同构成可优先看清单——车本身没短板，按你的偏好取舍即可")
+                        _tier_cell += (f'<b class="strong-main" title="{e(_tip_s)}">强推</b>')
+                    else:
+                        # v9.7.43：高分(TOP10)却未进一档的车，档位列加"为何未进一档"标记
+                        # （强推车已在上面金标里解释，不重复叠加两个标记）
+                        _bi = _t1blk.get(r["model"])
+                        if _bi and (r.get("rank") or 99) <= 10:
+                            _bl = list(_bi.get("blockers") or [])
+                            # 碰撞缺失注明"非不安全"，避免误导
+                            _bl = [("无权威碰撞成绩（非不安全，仅证据等级较低）" if "无权威碰撞成绩" in b else b)
+                                   for b in _bl]
+                            _tip = "；".join(_bl) + "。——不在意这些因素的用户可将其纳入购买考虑，非产品力差。"
+                            _tier_cell += (f'<span class="flag flag-lowtier" title="{e(_tip)}">'
+                                           f'为何未进一档</span>')
                     H.append(f"<td>{_tier_cell}</td>")   # 档位固定，不参与联动
                 elif k == "evidence":
                     cls = {"A": "delta-up", "B": "", "C": "delta-down"}.get(val, "")

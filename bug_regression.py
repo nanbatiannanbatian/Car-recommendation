@@ -87,7 +87,7 @@ CASES = [
     ("BUG-064", "碰撞体系硬编码散落5处致新体系被漏", "v9.7.44"),
     ("BUG-065", "二值命中截断埋没稳稳第5的车(Model3)+产品力市场口径不清", "v9.7.48"),
     ("BUG-066", "第一档过严叙事局限+强推荐未标稳稳第5的车+并行纪律", "v9.7.50"),
-    ("BUG-067", "强推荐只在三档卡片显示、打分主榜看不到", "v9.7.52"),
+    ("BUG-067", "强推荐金标移到档位列+hover讲清为何强推/为何未进一档", "v9.7.53"),
 ]
 
 
@@ -1245,10 +1245,10 @@ def t066():
 
 
 def t067():
-    """强推荐在打分主榜车名后显示金标（不只是三档卡片），非强推车不误标。"""
+    """强推荐金标在打分主榜【档位列】显示（车名列不重复），hover讲清为何强推+为何未进一档。"""
     p = os.path.join(HERE, "runs", "bev_midsedan_202610_full", "榜单.html")
     if not os.path.exists(p):
-        return "强推主榜金标：产物缺失跳过"
+        return "强推主榜档位列金标：产物缺失跳过"
     import re
     h = _read("runs/bev_midsedan_202610_full/榜单.html")
     i, j = h.find('id="mainBoard"'), h.find("</table>", h.find('id="mainBoard"'))
@@ -1256,17 +1256,23 @@ def t067():
     body = h[i:j]
     assert ".strong-main" in _read("render_board_html.py"), "缺金标CSS"
     assert body.count("strong-main") >= 2, "主榜无强推金标"
-    # 强推车行内有金标，非强推车(MG07)无
+    # 强推车：档位列(td index 6)有金标、车名列(td index 1)无、且不叠加"为何未进一档"
     for m in ("特斯拉Model 3", "深蓝L06"):
         k = body.find("data-model='" + m + "'")
         row = body[k:body.find("</tr>", k)] if k >= 0 else ""
-        assert "strong-main" in row, f"{m}主榜行缺金标"
+        tds = re.findall(r"<td[^>]*>(.*?)</td>", row, re.S)
+        assert len(tds) > 6, f"{m}主榜列数异常"
+        assert "strong-main" in tds[6], f"{m}档位列缺金标"
+        assert "strong-main" not in tds[1], f"{m}车名列应移除金标"
+        assert "为何未进一档" not in row, f"{m}强推车不应叠加低档标记"
     k = body.find("data-model='MG 07 纯电'")
     mg_row = body[k:body.find("</tr>", k)] if k >= 0 else ""
     assert "strong-main" not in mg_row, "MG07非强推却误标"
-    # hover含原因（steady/family二者之一）
+    assert "为何未进一档" in mg_row, "MG07高分低档仍应显示为何未进一档"
+    # hover含强推理由 + 未进一档原因
     tips = re.findall(r'strong-main" title="([^"]+)"', body)
-    assert tips and any("强推荐" in t and ("稳定" in t or "家族命中" in t) for t in tips), "金标hover缺原因"
+    assert tips and all("强推荐" in t and "未进第一档因" in t for t in tips), "金标hover缺强推/未进档理由"
+    return f"强推金标在档位列({body.count('strong-main')}处)、车名无重复、hover讲清双重理由、非强推不误标"
     return f"强推主榜金标：{body.count('strong-main')}处(hover含原因)，非强推车不误标"
 
 
