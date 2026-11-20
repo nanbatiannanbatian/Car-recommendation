@@ -1,0 +1,733 @@
+{
+ "candidates": [
+  {
+   "model": "长安启源Q05",
+   "cls": "紧凑型SUV",
+   "power": "BEV",
+   "price_guide": [
+    7.99,
+    11.49
+   ],
+   "price": 9.74,
+   "trim": {
+    "name": "待配置核验",
+    "price": 9.74
+   },
+   "trend_sales": 20022,
+   "scores": {
+    "powertrain": 7.8,
+    "safety": 7.0,
+    "space": 5.7,
+    "control": 6.2,
+    "adas": 6.6,
+    "value": 9.16,
+    "cabin": 6.8,
+    "quality": 8.0
+   },
+   "evidence_status": "C",
+   "note": "纯电紧凑SUV销量第一；新车爬坡；网查2026-11-20｜[SUV榜智驾口径统一] adas 5.0→6.6：激光极智版9.99万起征程6M+禾赛AT128+高速/城市快速路领航，非全系",
+   "source_ids": [
+    "domain_search_20261120_suv"
+   ],
+   "extended": false,
+   "lifecycle": {
+    "status": "new_launch",
+    "note": "2026新车，渠道铺坡"
+   }
+  },
+  {
+   "model": "AION i60",
+   "cls": "紧凑型SUV",
+   "power": "BEV",
+   "price_guide": [
+    10.28,
+    14.28
+   ],
+   "price": 12.28,
+   "trim": {
+    "name": "待配置核验",
+    "price": 12.28
+   },
+   "trend_sales": 12296,
+   "scores": {
+    "powertrain": 8.7,
+    "safety": 7.0,
+    "space": 6.4,
+    "control": 7.3,
+    "adas": 6.0,
+    "value": 9.68,
+    "cabin": 6.8,
+    "quality": 8.0
+   },
+   "evidence_status": "C",
+   "note": "纯电12296(增程1862另计)；网查2026-11-20｜[SUV榜智驾口径统一] adas 5.0→6.0：ADiGO智驾，需核实是否带城区NOA，保守给高速NOA水平",
+   "source_ids": [
+    "domain_search_20261120_suv"
+   ],
+   "extended": false,
+   "lifecycle": {
+    "status": "new_launch",
+    "note": "2026新车爬坡"
+   }
+  },
+  {
+   "model": "元PLUS",
+   "cls": "紧凑型SUV",
+   "power": "BEV",
+   "price_guide": [
+    11.99,
+    14.99
+   ],
+   "price": 13.49,
+   "trim": {
+    "name": "待配置核验",
+    "price": 13.49
+   },
+   "trend_sales": 11954,
+   "scores": {
+    "powertrain": 8.1,
+    "safety": 7.0,
+    "space": 6.4,
+    "control": 8.0,
+    "adas": 6.8,
+    "value": 8.5,
+    "cabin": 7.3,
+    "quality": 8.0
+   },
+   "evidence_status": "C",
+   "note": "第三代全系二代刀片+800V闪充；网查2026-11-20｜[SUV榜智驾口径统一] adas 5.4→6.8：第三代可选天神之眼B激光版(城市NOA)，非全系；基础版天神之眼C",
+   "source_ids": [
+    "domain_search_20261120_suv"
+   ],
+   "extended": false,
+   "lifecycle": {
+    "status": "new_launch",
+    "note": "第三代2026-05上市"
+   }
+  },
+  {
+   "model": "深蓝S05",
+   "cls": "紧凑型SUV",
+   "power": "BEV",
+   "price_guide": [
+    11.99,
+    15.19
+   ],
+   "price": 13.59,
+   "trim": {
+    "name": "待配置核验",
+    "price": 13.59
+   },
+   "trend_sales": 11411,
+   "scores": {
+    "powertrain": 7.8,
+    "safety": 7.0,
+    "space": 7.0,
+    "control": 8.0,
+    "adas": 6.2,
+    "value": 8.38,
+    "cabin": 7.3,
+    "quality": 8.0
+   },
+   "evidence_status": "C",
+   "note": "纯电11411(增程5033另计)；网查2026-11-20｜[SUV榜智驾口径统一] adas 5.0→6.2：DEEPAL AD高速NOA，无城区",
+   "source_ids": [
+    "domain_search_20261120_suv"
+   ],
+   "extended": false,
+   "lifecycle": {
+    "status": "steady",
+    "note": "在售"
+   }
+  },
+  {
+   "model": "铂智3X",
+   "cls": "紧凑型SUV",
+   "power": "BEV",
+   "price_guide": [
+    10.98,
+    15.98
+   ],
+   "price": 13.48,
+   "trim": {
+    "name": "待配置核验",
+    "price": 13.48
+   },
+   "trend_sales": 9101,
+   "scores": {
+    "powertrain": 6.8,
+    "safety": 8.6,
+    "space": 6.4,
+    "control": 6.2,
+    "adas": 6.4,
+    "value": 8.44,
+    "cabin": 7.2,
+    "quality": 8.0
+   },
+   "evidence_status": "C",
+   "note": "广汽丰田合资纯电；网查2026-11-20｜[SUV榜智驾口径统一] adas 5.0→6.4：430Air+起行泊一体，Momenta方案高速NOA+城区部分",
+   "source_ids": [
+    "domain_search_20261120_suv"
+   ],
+   "extended": false,
+   "lifecycle": {
+    "status": "steady",
+    "note": "在售"
+   }
+  },
+  {
+   "model": "海狮05EV",
+   "cls": "紧凑型SUV",
+   "power": "BEV",
+   "price_guide": [
+    11.99,
+    16.38
+   ],
+   "price": 14.18,
+   "trim": {
+    "name": "待配置核验",
+    "price": 14.18
+   },
+   "trend_sales": 9033,
+   "scores": {
+    "powertrain": 8.1,
+    "safety": 7.0,
+    "space": 6.4,
+    "control": 8.0,
+    "adas": 5.8,
+    "value": 8.5,
+    "cabin": 7.3,
+    "quality": 8.0
+   },
+   "evidence_status": "C",
+   "note": "比亚迪海洋网纯电；网查2026-11-20｜[SUV榜智驾口径统一] adas 5.0→5.8：天神之眼C基础版高速领航+泊车，无城区",
+   "source_ids": [
+    "domain_search_20261120_suv"
+   ],
+   "extended": false,
+   "lifecycle": {
+    "status": "steady",
+    "note": "在售"
+   }
+  },
+  {
+   "model": "零跑B10",
+   "cls": "紧凑型SUV",
+   "power": "BEV",
+   "price_guide": [
+    9.98,
+    14.98
+   ],
+   "price": 12.48,
+   "trim": {
+    "name": "待配置核验",
+    "price": 12.48
+   },
+   "trend_sales": 7719,
+   "scores": {
+    "powertrain": 8.1,
+    "safety": 7.0,
+    "space": 5.7,
+    "control": 8.0,
+    "adas": 7.2,
+    "value": 9.62,
+    "cabin": 6.8,
+    "quality": 8.0
+   },
+   "evidence_status": "C",
+   "note": "零售7719/批发11623，取零售；网查2026-11-20｜[SUV榜智驾口径统一] adas 5.0→7.2：540激光雷达版11.98万8650+27传感器+城区NOA，非全系",
+   "source_ids": [
+    "domain_search_20261120_suv"
+   ],
+   "extended": false,
+   "lifecycle": {
+    "status": "steady",
+    "note": "在售"
+   }
+  },
+  {
+   "model": "银河E5",
+   "cls": "紧凑型SUV",
+   "power": "BEV",
+   "price_guide": [
+    10.78,
+    17.98
+   ],
+   "price": 14.38,
+   "trim": {
+    "name": "待配置核验",
+    "price": 14.38
+   },
+   "trend_sales": 6214,
+   "scores": {
+    "powertrain": 7.6,
+    "safety": 7.0,
+    "space": 6.4,
+    "control": 7.7,
+    "adas": 5.0,
+    "value": 9.04,
+    "cabin": 7.7,
+    "quality": 8.0
+   },
+   "evidence_status": "C",
+   "note": "零售6214/批发14194，取零售；网查2026-11-20｜[SUV榜智驾口径统一] adas 5.0→5.0：全系不支持高速NOA（网查确认），基础L2",
+   "source_ids": [
+    "domain_search_20261120_suv"
+   ],
+   "extended": false,
+   "lifecycle": {
+    "status": "steady",
+    "note": "在售"
+   }
+  },
+  {
+   "model": "领克20",
+   "cls": "紧凑型SUV",
+   "power": "BEV",
+   "price_guide": [
+    12.38,
+    16.38
+   ],
+   "price": 14.38,
+   "trim": {
+    "name": "待配置核验",
+    "price": 14.38
+   },
+   "trend_sales": 5082,
+   "scores": {
+    "powertrain": 8.2,
+    "safety": 7.0,
+    "space": 6.8,
+    "control": 8.2,
+    "adas": 7.6,
+    "value": 8.5,
+    "cabin": 7.8,
+    "quality": 8.0
+   },
+   "evidence_status": "C",
+   "note": "吉利领克纯电紧凑SUV；网查2026-11-20｜8维分按网查配置规则推算：全系激光雷达+征程6M128TOPS+城区NOA+D2D；800V6C",
+   "source_ids": [
+    "domain_search_20261120_suv"
+   ],
+   "extended": true,
+   "lifecycle": {
+    "status": "new_launch",
+    "note": "2026新车"
+   }
+  },
+  {
+   "model": "钛3",
+   "cls": "紧凑型SUV",
+   "power": "BEV",
+   "price_guide": [
+    14.38,
+    16.98
+   ],
+   "price": 15.68,
+   "trim": {
+    "name": "待配置核验",
+    "price": 15.68
+   },
+   "trend_sales": 4016,
+   "scores": {
+    "powertrain": 7.8,
+    "safety": 7.0,
+    "space": 6.5,
+    "control": 8.0,
+    "adas": 5.5,
+    "value": 8.0,
+    "cabin": 7.0,
+    "quality": 8.0
+   },
+   "evidence_status": "C",
+   "note": "方程豹钛3，纯电硬派；网查2026-11-20｜8维分按网查配置规则推算：方程豹钛3，400V，智驾天神之眼C高速为主",
+   "source_ids": [
+    "domain_search_20261120_suv"
+   ],
+   "extended": true,
+   "lifecycle": {
+    "status": "steady",
+    "note": "在售"
+   }
+  },
+  {
+   "model": "MG 4X",
+   "cls": "紧凑型SUV",
+   "power": "BEV",
+   "price_guide": [
+    9.98,
+    11.68
+   ],
+   "price": 10.83,
+   "trim": {
+    "name": "待配置核验",
+    "price": 10.83
+   },
+   "trend_sales": 3507,
+   "scores": {
+    "powertrain": 8.0,
+    "safety": 8.2,
+    "space": 6.5,
+    "control": 8.5,
+    "adas": 6.0,
+    "value": 8.8,
+    "cabin": 7.2,
+    "quality": 8.0
+   },
+   "evidence_status": "C",
+   "note": "名爵纯电紧凑SUV；网查2026-11-20｜8维分按网查配置规则推算：宁德64.2kWh/3C16min；智享版征程6E高速NOA无城区；欧洲五星标准",
+   "source_ids": [
+    "domain_search_20261120_suv"
+   ],
+   "extended": true,
+   "lifecycle": {
+    "status": "new_launch",
+    "note": "2026新车上市"
+   }
+  },
+  {
+   "model": "AION Y",
+   "cls": "紧凑型SUV",
+   "power": "BEV",
+   "price_guide": [
+    9.98,
+    13.68
+   ],
+   "price": 11.83,
+   "trim": {
+    "name": "待配置核验",
+    "price": 11.83
+   },
+   "trend_sales": 3022,
+   "scores": {
+    "powertrain": 7.2,
+    "safety": 7.0,
+    "space": 7.0,
+    "control": 6.5,
+    "adas": 4.8,
+    "value": 8.0,
+    "cabin": 6.8,
+    "quality": 8.0
+   },
+   "evidence_status": "C",
+   "note": "埃安AION Y纯电；网查2026-11-20｜8维分按网查配置规则推算：2026在售版基础L2无NOA（改款激光雷达版未上市）；B端为主",
+   "source_ids": [
+    "domain_search_20261120_suv"
+   ],
+   "extended": true,
+   "lifecycle": {
+    "status": "steady",
+    "note": "在售老款"
+   }
+  },
+  {
+   "model": "欧拉5 EV",
+   "cls": "紧凑型SUV",
+   "power": "BEV",
+   "price_guide": [
+    9.98,
+    13.38
+   ],
+   "price": 11.68,
+   "trim": {
+    "name": "待配置核验",
+    "price": 11.68
+   },
+   "trend_sales": 3019,
+   "scores": {
+    "powertrain": 7.5,
+    "safety": 7.0,
+    "space": 6.5,
+    "control": 7.5,
+    "adas": 7.8,
+    "value": 8.2,
+    "cabin": 7.2,
+    "quality": 8.0
+   },
+   "evidence_status": "C",
+   "note": "长城欧拉纯电；网查2026-11-20｜8维分按网查配置规则推算：激光雷达版才有城区NOA(Orin-Y 200TOPS)；非全系",
+   "source_ids": [
+    "domain_search_20261120_suv"
+   ],
+   "extended": true,
+   "lifecycle": {
+    "status": "new_launch",
+    "note": "2026新车"
+   }
+  },
+  {
+   "model": "AION N60",
+   "cls": "紧凑型SUV",
+   "power": "BEV",
+   "price_guide": [
+    10.98,
+    12.98
+   ],
+   "price": 11.98,
+   "trim": {
+    "name": "待配置核验",
+    "price": 11.98
+   },
+   "trend_sales": 2622,
+   "scores": {
+    "powertrain": 7.8,
+    "safety": 7.0,
+    "space": 7.0,
+    "control": 7.2,
+    "adas": 8.2,
+    "value": 8.8,
+    "cabin": 7.8,
+    "quality": 8.0
+   },
+   "evidence_status": "C",
+   "note": "埃安新车；网查2026-11-20｜8维分按网查配置规则推算：全系激光雷达192线+8650/200TOPS+城区NOA，10.68万起",
+   "source_ids": [
+    "domain_search_20261120_suv"
+   ],
+   "extended": true,
+   "lifecycle": {
+    "status": "new_launch",
+    "note": "2026-04上市"
+   }
+  },
+  {
+   "model": "悦意03",
+   "cls": "紧凑型SUV",
+   "power": "BEV",
+   "price_guide": [
+    7.98,
+    14.99
+   ],
+   "price": 11.48,
+   "trim": {
+    "name": "待配置核验",
+    "price": 11.48
+   },
+   "trend_sales": 2309,
+   "scores": {
+    "powertrain": 6.8,
+    "safety": 7.0,
+    "space": 6.5,
+    "control": 6.5,
+    "adas": 4.5,
+    "value": 8.2,
+    "cabin": 6.5,
+    "quality": 8.0
+   },
+   "evidence_status": "C",
+   "note": "一汽奔腾悦意03纯电；网查2026-11-20｜8维分按网查配置规则推算：一汽奔腾，纯L2无NOA无激光雷达，9传感器",
+   "source_ids": [
+    "domain_search_20261120_suv"
+   ],
+   "extended": true,
+   "lifecycle": {
+    "status": "steady",
+    "note": "在售"
+   }
+  },
+  {
+   "model": "极氪X",
+   "cls": "紧凑型SUV",
+   "power": "BEV",
+   "price_guide": [
+    15.58,
+    17.58
+   ],
+   "price": 16.58,
+   "trim": {
+    "name": "待配置核验",
+    "price": 16.58
+   },
+   "trend_sales": 219,
+   "scores": {
+    "powertrain": 7.0,
+    "safety": 7.5,
+    "space": 5.8,
+    "control": 8.0,
+    "adas": 5.0,
+    "value": 6.5,
+    "cabin": 7.5,
+    "quality": 8.0
+   },
+   "evidence_status": "C",
+   "note": "极氪X，超16万上界仅部分配置在带内；网查2026-11-20｜8维分按网查配置规则推算：2026款国内版EyeQ4无激光雷达无NOA；15.58万起偏贵",
+   "source_ids": [
+    "domain_search_20261120_suv"
+   ],
+   "extended": true,
+   "lifecycle": {
+    "status": "steady",
+    "note": "2026款在售"
+   }
+  },
+  {
+   "model": "宝骏云海",
+   "cls": "紧凑型SUV",
+   "power": "BEV",
+   "price_guide": [
+    10.98,
+    16.58
+   ],
+   "price": 13.78,
+   "trim": {
+    "name": "待配置核验",
+    "price": 13.78
+   },
+   "trend_sales": 142,
+   "scores": {
+    "powertrain": 7.5,
+    "safety": 7.0,
+    "space": 7.0,
+    "control": 7.2,
+    "adas": 7.0,
+    "value": 8.5,
+    "cabin": 7.5,
+    "quality": 8.0
+   },
+   "evidence_status": "C",
+   "note": "宝骏纯电，销量极低；网查2026-11-20｜8维分按网查配置规则推算：大疆灵眸2.0Max全系标配，高速NOA+城市记忆领航，无激光雷达",
+   "source_ids": [
+    "domain_search_20261120_suv"
+   ],
+   "extended": true,
+   "lifecycle": {
+    "status": "steady",
+    "note": "在售"
+   }
+  },
+  {
+   "model": "五菱星光S",
+   "cls": "紧凑型SUV",
+   "power": "BEV",
+   "price_guide": [
+    9.98,
+    12.98
+   ],
+   "price": 11.48,
+   "trim": {
+    "name": "待配置核验",
+    "price": 11.48
+   },
+   "trend_sales": 48,
+   "scores": {
+    "powertrain": 6.8,
+    "safety": 7.0,
+    "space": 6.5,
+    "control": 6.5,
+    "adas": 5.0,
+    "value": 8.0,
+    "cabin": 6.8,
+    "quality": 8.0
+   },
+   "evidence_status": "C",
+   "note": "五菱星光S纯电，销量极低；网查2026-11-20｜8维分按网查配置规则推算：灵眸基础版，无城区NOA；月销48辆极低",
+   "source_ids": [
+    "domain_search_20261120_suv"
+   ],
+   "extended": true,
+   "lifecycle": {
+    "status": "steady",
+    "note": "在售，销量极低"
+   }
+  },
+  {
+   "model": "MG ES5",
+   "cls": "紧凑型SUV",
+   "power": "BEV",
+   "price_guide": [
+    13.69,
+    19.69
+   ],
+   "price": 16.69,
+   "trim": {
+    "name": "待配置核验",
+    "price": 16.69
+   },
+   "trend_sales": 12,
+   "scores": {
+    "powertrain": 7.0,
+    "safety": 7.0,
+    "space": 6.5,
+    "control": 7.0,
+    "adas": 5.0,
+    "value": 7.5,
+    "cabin": 7.0,
+    "quality": 8.0
+   },
+   "evidence_status": "C",
+   "note": "MG ES5，销量极低且超价带；网查2026-11-20｜8维分按网查配置规则推算：MG Pilot基础L2，激光雷达/508TOPS说法存疑；月销12辆",
+   "source_ids": [
+    "domain_search_20261120_suv"
+   ],
+   "extended": true,
+   "lifecycle": {
+    "status": "steady",
+    "note": "在售，销量极低"
+   }
+  },
+  {
+   "model": "睿蓝7",
+   "cls": "紧凑型SUV",
+   "power": "BEV",
+   "price_guide": [
+    11.57,
+    16.97
+   ],
+   "price": 14.27,
+   "trim": {
+    "name": "待配置核验",
+    "price": 14.27
+   },
+   "trend_sales": 30,
+   "scores": {
+    "powertrain": 7.2,
+    "safety": 7.0,
+    "space": 7.0,
+    "control": 7.0,
+    "adas": 5.2,
+    "value": 7.0,
+    "cabin": 7.0,
+    "quality": 8.0
+   },
+   "evidence_status": "C",
+   "note": "睿蓝7，销量极低；网查2026-11-20｜8维分按网查配置规则推算：顶配猎光Max激光雷达但月销30辆，品牌退出风险",
+   "source_ids": [
+    "domain_search_20261120_suv"
+   ],
+   "extended": true,
+   "lifecycle": {
+    "status": "steady",
+    "note": "在售，品牌风险"
+   }
+  }
+ ],
+ "pool_meta": {
+  "board": "紧凑型SUV",
+  "power": "BEV",
+  "price_band": [
+   8,
+   16
+  ],
+  "as_of": "202610",
+  "intake": "能取得逐配置数据的都入池；销量低只影响档位",
+  "notes": [
+   "入池标准=能取得逐配置数据，20款候选全部8维分+逐配置齐全",
+   "未入池2款：小鹏MONA L03(纯电14885)/iCAR超级V23(2585)——配置表索引无车系，标注配置待核",
+   "元UP/零跑A10属小型SUV不属紧凑型；宋Pro DM-i/海狮05DM-i等插混按纯电口径剔除",
+   "零跑B10零售7719/批发11623、银河E5零售6214/批发14194，取零售",
+   "总池9款adas按可用智驾统一校正；销量低只影响档位不影响入池"
+  ]
+ },
+ "pool_excluded": [
+  {
+   "model": "小鹏MONA L03",
+   "sales": 14885,
+   "reason": "汽车之家配置表索引无该车系（纯电14885辆但配置数据不可得），标注配置待核不入主榜"
+  },
+  {
+   "model": "iCAR 超级V23",
+   "sales": 2585,
+   "reason": "汽车之家配置表索引无该车系，标注配置待核不入主榜"
+  }
+ ]
+}

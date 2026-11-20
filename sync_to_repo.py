@@ -59,6 +59,8 @@ NEW_FILES = [
     "categories/car_compact_bev_extended.json",  # 2026-10紧凑型纯电16款扩展榜配置
     "categories/candidates_compact_bev_extended.json",  # v9.7.30 16款扩展候选池（固化，不依赖runs）
     "categories/candidates_compact_bev_audit.json",     # v9.7.30 10款审计榜候选池（固化，不依赖runs）
+    "categories/candidates_compact_suv_bev.json",        # v9.7.32 紧凑纯电SUV榜候选池（固化）
+    "categories/car_compact_suv_bev.json",                # v9.7.32 紧凑纯电SUV榜配置
     "categories/universe_compact_bev_202610.json",      # v9.7.30 紧凑纯电权威车型清单（完整性盘点）
     "categories/trim_verified.json",            # v9.7.3 六配置榜人工标注（参考）
     "categories/car_midsedan_allprice.json",    # 2026-10纯电中型轿车全价位榜配置

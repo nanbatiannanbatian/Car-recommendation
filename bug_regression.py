@@ -61,6 +61,7 @@ CASES = [
     ("BUG-038", "弗迪电池未标代际/误以为二代都闪充", "v9.7.29"),
     ("BUG-039", "扩展候选池只在runs未固化(下次运行丢失)", "v9.7.30"),
     ("BUG-040", "快充能力无配置级delta且口径混用会虚高", "v9.7.31"),
+    ("BUG-041", "紧凑SUV榜候选池/配置未固化", "v9.7.32"),
 ]
 
 
@@ -221,6 +222,23 @@ def t015():
     assert "BV.main_cell" in src, "渲染绕过了 board_view 单点"
     return "渲染复用 board_view 单点"
 
+
+def t041():
+    """紧凑纯电SUV榜：候选池/配置固化，未入池原因可见，20款配置齐全。"""
+    for f in ("categories/candidates_compact_suv_bev.json",
+              "categories/car_compact_suv_bev.json"):
+        assert os.path.exists(os.path.join(HERE, f)), f"未固化: {f}"
+    src = _read("sync_to_repo.py")
+    assert "candidates_compact_suv_bev.json" in src
+    p = os.path.join(HERE, "runs", "compact_suv_bev_202610", "榜单.html")
+    if os.path.exists(p):
+        t = _read("runs/compact_suv_bev_202610/榜单.html")
+        assert "未入池车型及原因" in t and "小鹏MONA L03" in t
+        assert "候选池与证据披露" in t
+        m = re.search(r"<h2[^>]*>打分主榜.*?<tbody>(.*?)</tbody>", t, re.S)
+        rows = re.findall(r"<tr data-model=", m.group(1)) if m else []
+        assert len(rows) == 20, f"入池数不对: {len(rows)}"
+    return "紧凑SUV榜20款入池+未入池原因+固化"
 
 def t040():
     """快充口径归一化 + 配置级 delta：不同区间可比，闪充配置加分。"""
@@ -528,7 +546,7 @@ def t016():
 
 
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041]
 
 
 def run():

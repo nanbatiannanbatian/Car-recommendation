@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 9.7.31
+version: 9.7.32
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v9.7.31）
+# Car recommendation —— 可信购车榜单引擎（v9.7.32）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -2812,3 +2812,18 @@ DeepSeek 定性："这是10款候选紧凑型纯电轿车的审计榜，不是�
 - 实测 MG07 845版（等效16.8min）vs 650版（28min）得 +0.3 快充delta；海鸥/元PLUS三代等入榜即自动生效。
 - 现有两紧凑榜无配置间快充差异（0配置触发），排名不变；BUG-040 进回归（40/40），A/B 28/28。
 - 教训：改规则前先确认真实调用链；改在没人读的模块=白改。
+
+---
+
+## v9.7.32 · 紧凑型纯电SUV前十榜（8-16万，2026-10）
+
+新榜单：20款候选全部逐配置齐全，10款取前十。要点：
+- 入池按"能取得逐配置数据"：20/24入池；未入池2款（MONA L03 14885辆、iCAR V23 2585辆）
+  因配置表索引无车系，标注"配置待核"并在页面显示原因。
+- 元UP/零跑A10属小型SUV不入紧凑池；宋Pro DM-i等插混按纯电口径剔除。
+- 零跑B10/银河E5零售批发差异大，取零售。
+- 总池9款老adas(多为5.0)按"可用智驾"统一校正（B10 5.0→7.2激光城区NOA等）。
+- 候选池+配置固化在 categories/（candidates_compact_suv_bev.json / car_compact_suv_bev.json），
+  pool_meta.notes 由 pipeline 自动披露，重跑不丢。
+- 前十：AION N60/i60/领克20/MG4X/元PLUS/B10/欧拉5/宝骏云海/海狮05EV/深蓝S05；τ=0.872。
+- BUG-041 进回归（41/41），A/B 28/28 通过。

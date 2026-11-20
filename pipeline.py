@@ -162,6 +162,9 @@ def main():
         f"其中 {_ext_n} 款为网查补采（置信低）。"
         "入池口径：官方二级分类 + 纯电 + 指导价；未见来源/无碰撞成绩的车只作参数参考，"
         "不构成安全推荐。**没有官方碰撞成绩不记 0 分、只标缺失，降权≠安全。**")
+    _pmnotes = (_pool_data.get("pool_meta") or {}).get("notes") if isinstance(_pool_data, dict) else None
+    if _pmnotes:
+        parts.append("> **候选池说明：**" + "；".join(str(x) for x in _pmnotes) + "。")
     parts.append(
         "> **分数性质：**全部分数为「官方参数 + 客观差异规则推算」，**非实车实测**；"
         "冬测续航达成率、充电曲线、麋鹿成绩等第三方统一实测未纳入打分。"
