@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 9.7.19
+version: 9.7.20
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v9.7.19）
+# Car recommendation —— 可信购车榜单引擎（v9.7.20）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -2586,3 +2586,17 @@ tooltip含糊；τ只写数字无解释；8维仍是黑盒。核实后落地：
 - 生命周期已在主表"周期"列（豆包该条为旧版误判），未动。
 - 未做：私人/营运销量拆分（无真实营运占比数据源，标估算也是编）、权重模板切换（破坏可复现）、TCO（保值率库零交集）。
 - BUG-028 进回归（28/28），A/B 27/27 通过。
+
+---
+
+## v9.7.20 · 候选池披露进页面 + 估算电池降精度（2026-11-20）
+
+DeepSeek 六轮评审第1条反复说"候选池规则看不到"——核实发现披露**只在 report.md，HTML 页面没有**，
+评审看的是页面。这是多轮误解的根因：写在报告≠用户看得到。
+
+- `pipeline.py`：把候选池统计（总数/带来源/有碰撞/证据A/B/C/网查补采）写进 `summary.pool_disclosure`。
+- `render_board_html.py`：导航区下方显示候选池披露段，页面读者一眼可见入池口径与"降权≠安全"。
+- 估算电池值降精度：`_kwh_cell()` 对候选 note 含估算/待核的值显示 `≈整数+估标记`，
+  其它浮点也最多1位小数；底层 TRIMDATA 保真，只降展示精度（AION UT 34.868→≈35）。
+- 踩坑：`summary` 在报告拼装时（158行）尚未初始化（197行才建），pool_disclosure 写入要放初始化块里。
+- 不改分、不改排名/档位。BUG-029 进回归（29/29），A/B 27/27 通过。

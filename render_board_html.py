@@ -114,6 +114,20 @@ def delta_label(d) -> str:
     return '<span title="rank_delta 0">无明显影响</span>'
 
 
+def _kwh_cell(t: dict, car_note: str = "") -> str:
+    """v9.7.20：估算/待核的电池值降精度显示（三位小数显得像实测，实为估算）。"""
+    v = t.get("battery_kwh")
+    if not isinstance(v, (int, float)):
+        return "—"
+    note = str(t.get("note") or "") + " " + str(car_note or "")
+    if "估算" in note or "待核" in note:
+        return f'≈{round(v)}<span class="flag flag-est" title="该电量为估算/待核，非官方实测值">估</span>'
+    # 未标估算但精度>1位小数也降精度（自动解析不应显示伪精确）
+    if isinstance(v, float) and abs(v - round(v, 1)) > 0.001:
+        return f'≈{round(v, 1)}'
+    return str(v)
+
+
 def dim_breakdown(r: dict, tb_entry: dict, dims: list) -> str:
     """v9.7.19：维度子项依据折叠面板（默认收起）。数据来自 best_trim_detail.deltas + note，不编造。"""
     bd = r.get("best_trim_detail") or {}
@@ -224,6 +238,16 @@ def render(data, summary, title, as_of):
         H.append('<div class="navbox" id="top"><h3>本榜导航 · 点击直达各部分</h3>'
                  '<div class="navgrid">' + "".join(nav_items) + '</div>'
                  '<div class="topbar"><a href="#top">↑ 回到顶部</a></div></div>')
+    # v9.7.20：候选池与证据披露同步到页面（评审反复指出报告里有、页面看不到）
+    _pool = (summary or {}).get("pool_disclosure")
+    if _pool:
+        H.append(f'<div class="rule"><b>候选池与证据披露：</b>本池 {e(_pool["total"])} 款，'
+                 f'带核验来源 {e(_pool["sourced"])}/{e(_pool["total"])}，'
+                 f'有官方碰撞成绩 {e(_pool["crash"])}/{e(_pool["total"])}，'
+                 f'证据 A/B/C = {e(_pool["ev_a"])}/{e(_pool["ev_b"])}/{e(_pool["ev_c"])}，'
+                 f'网查补采 {e(_pool["extended"])} 款（置信低）。'
+                 '入池口径：官方二级分类 + 纯电 + 指导价；同级未入池车型见 report.md。'
+                 '<b>没有官方碰撞成绩不记 0 分、只标缺失，降权≠安全。</b></div>')
 
     # ---- lede（注册区块，文案统一在 board_view）
     if "lede" in ids:
@@ -362,7 +386,8 @@ def render(data, summary, title, as_of):
                     why = "、".join((t.get("reasons") or {}).get("powertrain") or []) or "—"
                     note = t.get("note") or ""
                     H.append(f"<tr><td class='name'>{e(t.get('name'))}{flag}</td>"
-                             f"<td>{e(t.get('price'))}</td><td>{e(t.get('battery_kwh'))}</td>"
+                             f"<td>{e(t.get('price'))}</td>"
+                             f"<td>{_kwh_cell(t, r.get('note'))}</td>"
                              f"<td class='ref'>{e(t.get('cell_supplier'))}</td>"
                              f"<td class='ref'>{e(t.get('charge'))}</td>"
                              f"<td>{num(sc.get('powertrain'))}</td><td>{num(sc.get('adas'))}</td>"

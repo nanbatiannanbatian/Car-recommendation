@@ -49,6 +49,7 @@ CASES = [
     ("BUG-026", "报告披露手工写被pipeline重跑覆盖", "v9.7.17"),
     ("BUG-027", "证据C一律第三档(无碰撞成绩被判暂缓)", "v9.7.18"),
     ("BUG-028", "证据C风险类型未分层/tooltip含糊/τ无通俗解释", "v9.7.19"),
+    ("BUG-029", "候选池披露只在report不在页面/估算电池伪精确", "v9.7.20"),
 ]
 
 
@@ -210,6 +211,20 @@ def t015():
     return "渲染复用 board_view 单点"
 
 
+def t029():
+    """候选池披露必须进页面；估算电池值降精度显示。"""
+    src = _read("pipeline.py")
+    assert "pool_disclosure" in src, "summary 未写候选池披露"
+    assert "_kwh_cell" in _read("render_board_html.py"), "电池降精度函数缺失"
+    p = os.path.join(HERE, "runs", "compact_bev_allprice_202610", "榜单.html")
+    if os.path.exists(p):
+        t = _read("runs/compact_bev_allprice_202610/榜单.html")
+        assert "候选池与证据披露" in t, "页面缺候选池披露"
+        assert "≈" in t, "估算电池未降精度"
+        s = json.load(open(os.path.join(HERE, "runs", "compact_bev_allprice_202610", "summary.json"), encoding="utf-8"))
+        assert s.get("pool_disclosure", {}).get("total") == 10
+    return "候选池披露进页面 + 电池降精度"
+
 def t028():
     """证据C分层可见 + tooltip标准 + τ通俗解释 + 子项折叠。"""
     src = _read("render_board_html.py")
@@ -358,7 +373,7 @@ def t016():
 
 
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029]
 
 
 def run():

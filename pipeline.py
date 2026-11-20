@@ -192,6 +192,12 @@ def main():
         "category": a.category, "source": os.path.basename(a.candidates),
         "in": len(cands), "passed": 0, "dropped": 0, "sliders": custom,
         "boards": {}, "tiers": {}, "review": {},
+        # v9.7.20：候选池披露同步给页面（评审反复指出报告有、页面看不到）
+        "pool_disclosure": {
+            "total": len(_all), "sourced": _src_named, "crash": _crash_named,
+            "ev_a": _ev_cnt["A"], "ev_b": _ev_cnt["B"], "ev_c": _ev_cnt["C"],
+            "extended": _ext_n,
+        },
     }
     if a.quality:
         cands, _ = QS.apply(cands, cdata)
