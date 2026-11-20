@@ -388,6 +388,11 @@ def build(cands: list[dict], cfg: dict, policy: dict,
     by_model = {c["model"]: c for c in cands}
     for r in rows:
         r["fact_ref"] = fact_columns(by_model[r["model"]], facts, policy)
+        # v9.7.29：弗迪电芯代际+闪充标记带进 fact_ref（事实库有则显示）
+        _fk = facts.get(r["model"]) or {}
+        if isinstance(_fk, dict) and _fk.get("cell_gen"):
+            r["fact_ref"]["电芯代际"] = _fk["cell_gen"]
+            r["fact_ref"]["电芯闪充"] = _fk.get("cell_flash")
         # v9.7.2：kWh/万元、电量、电芯按最高配置重算（与主榜分数/配置同口径）
         bd = r.get("best_trim_detail")
         if bd:

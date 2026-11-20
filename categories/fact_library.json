@@ -82,7 +82,10 @@
    "flags": [
     "新车"
    ]
-  }
+  },
+  "cell_gen": "二代",
+  "cell_flash": "闪充",
+  "cell_gen_basis": "2026款二代刀片630km闪充版（domain_search 2026-11-20）"
  },
  "海豹06EV": {
   "kwh": 56.64,
@@ -100,7 +103,10 @@
    "cons_quote": "27款 EV 630旗舰型 ... CLTC纯电续航里程[km] 630 ... 电池电量[kWh] 64.32 百公里耗电量[kWh/100km] 11.4",
    "cons_trim": "27款 EV 630旗舰型",
    "sales_src": "baseline_trend"
-  }
+  },
+  "cell_gen": "二代",
+  "cell_flash": "待核",
+  "cell_gen_basis": "630km二代刀片，闪充版未正式上市（domain_search 2026-11-20）"
  },
  "MG 07 纯电": {
   "kwh": 67.0,
@@ -221,7 +227,10 @@
    "flags": [
     "月销<3000"
    ]
-  }
+  },
+  "cell_gen": "一代",
+  "cell_flash": "非闪充",
+  "cell_gen_basis": "老e-TNGA平台弗迪一代（domain_search 2026-11-20）"
  },
  "极狐贝塔S3": {
   "kwh": 54.0,
@@ -276,7 +285,10 @@
    "cons_quote": "26款 EV 710远航旗舰版 ... CLTC纯电续航里程[km] 710 ... 电池电量[kWh] 82.73 ... 百公里耗电量[kWh/100km] 13.3",
    "cons_trim": "26款 EV 710远航旗舰版",
    "sales_src": "baseline_trend"
-  }
+  },
+  "cell_gen": "二代",
+  "cell_flash": "闪充",
+  "cell_gen_basis": "2026款首批二代刀片，9分钟10-97%（domain_search 2026-11-20）"
  },
  "极狐阿尔法T5": {
   "kwh": 64.8,
@@ -430,7 +442,10 @@
    "flags": [
     "月销<3000"
    ]
-  }
+  },
+  "cell_gen": "一代",
+  "cell_flash": "非闪充",
+  "cell_gen_basis": "弗迪一代老平台（domain_search 2026-11-20）"
  },
  "大众ID.AURA T6": {
   "kwh": 77.5,
@@ -548,7 +563,10 @@
    "flags": [
     "月销<3000"
    ]
-  }
+  },
+  "cell_gen": "待核",
+  "cell_flash": "待核",
+  "cell_gen_basis": "弗迪/宁德混装代际未明（domain_search 2026-11-20）"
  },
  "大众与众09": {
   "kwh": 91.963,
@@ -751,7 +769,10 @@
    "cons_src": "https://car.m.yiche.com/xiaopengmona/peizhi/?from=ybm",
    "cons_quote": "|540 长续航Plus版|2026|在售|11.98万|纯电|...|CLTC纯电续航里程[km] 540|电芯品牌 弗迪|百公里耗电量[kWh/100km] 10.8|",
    "cons_trim": "540 长续航Plus版"
-  }
+  },
+  "cell_gen": "待核",
+  "cell_flash": "待核",
+  "cell_gen_basis": "弗迪电芯但代际未见官方明示，不臆断（domain_search 2026-11-20）"
  },
  "AION RT": {
   "kwh": 70.1,
@@ -826,7 +847,10 @@
    "flags": [
     "月销<3000"
    ]
-  }
+  },
+  "cell_gen": "二代",
+  "cell_flash": "非闪充",
+  "cell_gen_basis": "2026款全系二代刀片CTB，快充60-70kW；630km闪充版待上市（domain_search 2026-11-20）"
  },
  "荣威D6": {
   "kwh": 53.95,
@@ -939,7 +963,10 @@
    "cons_src": "https://car.m.yiche.com/yuanplus/peizhi/?from=ybm",
    "cons_quote": "|540km 领先型|2026|在售|11.99万|纯电|...|CLTC纯电续航里程[km] 540|电芯品牌 弗迪|百公里耗电量[kWh/100km] 11.8|",
    "cons_trim": "540km 领先型"
-  }
+  },
+  "cell_gen": "二代",
+  "cell_flash": "闪充",
+  "cell_gen_basis": "第三代2026-05全系二代刀片+800V闪充（domain_search 2026-11-20）"
  },
  "深蓝S05": {
   "kwh": 56.12,
@@ -993,7 +1020,10 @@
    "cons_src": "https://car.yiche.com/bydauto/m191788/peizhi/",
    "cons_quote": "26款 EV 540km 闪充领航版 ... CLTC纯电续航里程[km] 540 ... 百公里耗电量[kWh/100km] 11.8 ... 电池电量[kWh] 57.55 百公里耗电量[kWh/100km] 11.8",
    "cons_trim": "EV 540km 闪充领航版"
-  }
+  },
+  "cell_gen": "待核",
+  "cell_flash": "待核",
+  "cell_gen_basis": "弗迪刀片年款代际未明（domain_search 2026-11-20）"
  },
  "零跑B10": {
   "kwh": 69.7,
@@ -1097,7 +1127,10 @@
    "cons_src": "https://car.m.yiche.com/haiou/peizhi/?from=ybm",
    "cons_quote": "420km 后驱自在版|2027|在售|7.59万|...|磷酸铁锂电池|39.2|...|420|弗迪|95|9.9",
    "cons_trim": "2027款 420km 后驱自在版"
-  }
+  },
+  "cell_gen": "二代(高配)/一代(低配)",
+  "cell_flash": "仅高配闪充",
+  "cell_gen_basis": "第二代海鸥自在/飞翔/智趣二代刀片，活力/自由版一代（domain_search 2026-11-20）"
  },
  "比亚迪海豚": {
   "kwh": 44.93,
@@ -1114,7 +1147,10 @@
    "cons_src": "https://car.m.yiche.com/biyadiea1/peizhi/?from=ybm",
    "cons_quote": "420km 自由版|2025|在售|10.68万|...|磷酸铁锂电池|44.93|...|420|弗迪|11.2|70|-",
    "cons_trim": "2025款 420km 自由版"
-  }
+  },
+  "cell_gen": "一代",
+  "cell_flash": "非闪充",
+  "cell_gen_basis": "在售款弗迪一代（domain_search 2026-11-20）"
  },
  "吉利星愿": {
   "kwh": 47.14,
@@ -1228,7 +1264,10 @@
    "flags": [
     "销量未知"
    ]
-  }
+  },
+  "cell_gen": "一代",
+  "cell_flash": "非闪充",
+  "cell_gen_basis": "在售款弗迪一代（domain_search 2026-11-20）"
  },
  "AION Y Plus": {
   "kwh": 58.9,
@@ -1416,7 +1455,10 @@
  },
  "秦新能源": {
   "cell_brand": "弗迪",
-  "source": "domain_search_20261120"
+  "source": "domain_search_20261120",
+  "cell_gen": "一代",
+  "cell_flash": "非闪充",
+  "cell_gen_basis": "秦纯电老平台（domain_search 2026-11-20）"
  },
  "e爱丽舍": {
   "cell_brand": "江苏正力",
@@ -1448,5 +1490,19 @@
    "flags"
   ],
   "note": "本段由原始库自动同步；手工核验值优先，不被覆盖。"
+ },
+ "领汇e5": {
+  "cell_brand": "弗迪(刀片)",
+  "cell_gen": "一代",
+  "cell_flash": "非闪充",
+  "cell_gen_basis": "比亚迪e5平台弗迪刀片老款（domain_search 2026-11-20）",
+  "source": "候选池 cell_brand"
+ },
+ "比亚迪e3": {
+  "cell_brand": "弗迪",
+  "cell_gen": "一代",
+  "cell_flash": "非闪充",
+  "cell_gen_basis": "2021款43.2kWh弗迪一代（domain_search 2026-11-20）",
+  "source": "候选池补采"
  }
 }

@@ -415,6 +415,15 @@ def main_cell(key: str, row: dict, cand: dict, grade: str = "") -> str:
             brand = str(bp.get("cell"))
         else:
             brand = "—"
+        # v9.7.29：弗迪电芯标代际+闪充（事实库核验），二代≠都支持闪充，按事实标
+        if "弗迪" in brand:
+            gen = fr.get("电芯代际")
+            flash = fr.get("电芯闪充")
+            if gen:
+                tag = str(gen)
+                if flash and flash != "待核":
+                    tag += f"/{flash}"
+                brand = f"{brand}[{tag}]"
         # 电压：优先配置 charge，其次 battery_detail
         charge = str((bd or {}).get("charge") or "")
         import re

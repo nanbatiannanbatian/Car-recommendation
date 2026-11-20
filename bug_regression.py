@@ -58,6 +58,7 @@ CASES = [
     ("BUG-035", "生命周期漏填/逐配置电芯空/缺口伪装空白", "v9.7.26"),
     ("BUG-036", "电压快充99处未披露(实为未采集非无数据)", "v9.7.27"),
     ("BUG-037", "原始库773字段未映射到事实库", "v9.7.28"),
+    ("BUG-038", "弗迪电池未标代际/误以为二代都闪充", "v9.7.29"),
 ]
 
 
@@ -218,6 +219,18 @@ def t015():
     assert "BV.main_cell" in src, "渲染绕过了 board_view 单点"
     return "渲染复用 board_view 单点"
 
+
+def t038():
+    """弗迪电芯标代际；二代不等于闪充，按事实标注。"""
+    fl = json.load(open(os.path.join(HERE, "categories", "fact_library.json"), encoding="utf-8"))
+    assert fl.get("秦PLUS EV", {}).get("cell_gen") == "二代"
+    assert fl.get("秦PLUS EV", {}).get("cell_flash") == "非闪充", "二代≠闪充的事实未体现"
+    assert fl.get("秦新能源", {}).get("cell_gen") == "一代"
+    p = os.path.join(HERE, "runs", "compact_bev_extended_202610", "榜单.html")
+    if os.path.exists(p):
+        t = _read("runs/compact_bev_extended_202610/榜单.html")
+        assert "弗迪[二代/非闪充]" in t, "页面未显示代际"
+    return "弗迪代际标注+二代非闪充事实"
 
 def t037():
     """原始库→事实库映射完整；原始库没有的字段有核实结论。"""
@@ -473,7 +486,7 @@ def t016():
 
 
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038]
 
 
 def run():

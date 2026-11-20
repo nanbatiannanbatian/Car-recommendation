@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 9.7.28
+version: 9.7.29
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v9.7.28）
+# Car recommendation —— 可信购车榜单引擎（v9.7.29）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -47,6 +47,10 @@ author: "nanbatiannanbatian"
   也不许出一份缺配置的残缺榜单。新车型入池 = 8 维分 + 逐配置数据 + 证据来源，三者缺一不可。
 - 页面上每款车的主榜行、总分构成行、产品力榜行都必须有配置下拉框；
   若某车无配置数据导致下拉框缺失，视为 bug，必须修复后交付。
+- **弗迪电芯必须标代际与闪充**（2026-11-20 用户要求）：事实库 `fact_library.json` 的 `cell_gen`/`cell_flash`
+  字段有值时，主榜电池来源列显示「弗迪[二代/闪充]」等。**关键事实：二代刀片 ≠ 都支持闪充**
+  （如 2026款秦PLUS EV 全系二代刀片但快充仅60-70kW 非闪充）；按事实标注，不臆断、不盲从"二代=闪充"。
+
 - **原始库→事实库必须全字段映射**（2026-11-20 用户追加）：原始库 `all_data.json` 的字段
   （kwh/cell/sales/life/trim/来源URL/证据引文…）不得"原始有、事实库没有"。
   用 `python3 facts_sync.py --check` 校验，`--apply` 同步，`--report` 看字段覆盖报告。
@@ -2746,3 +2750,18 @@ DeepSeek 定性："这是10款候选紧凑型纯电轿车的审计榜，不是�
   **airbags**=另有专门库 airbags.json；**adas_hw**=另有配置表/thirdparty库。
 - 接入 A/B COVERAGE 与 bug 回归：**37/37**、A/B **28/28** 通过。
 - 教训：别假设"原始库没有"=数据源没有——先查权威参数源与专门库，区分漏采/真无/另有库。
+
+---
+
+## v9.7.29 · 弗迪电芯代际标注（2026-11-20，用户要求）
+
+用户："弗迪电池是一代还是二代的标注一下，二代都是闪充电池"。
+
+- 事实库 `fact_library.json` 给 16 款弗迪车标 `cell_gen`/`cell_flash`/`cell_gen_basis`
+  （网查比亚迪官方/工信部/易车 2026-11-20）：二代（秦MAX/海狮06EV/秦PLUS EV/元PLUS三代等）、
+  一代（秦新能源/比亚迪e3/领汇e5/丰田bZ3等）、待核（MONA M03/铂智7）。
+- board_v2 把代际带进 fact_ref，main_cell 在电池来源列显示「弗迪[二代/非闪充]」等。
+- **重要事实更正**：用户"二代都是闪充"不完全成立——2026款秦PLUS EV 全系二代刀片（CTB）
+  但快充仅60-70kW（非闪充），闪充只有630km特定版本/部分车型。按事实标注不盲从。
+- 新建事实库条目：领汇e5、比亚迪e3（原来只在候选池，事实库无）。
+- 两榜披露+BUG-038 进回归（38/38），A/B 28/28 通过。
