@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 9.7.18
+version: 9.7.19
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v9.7.18）
+# Car recommendation —— 可信购车榜单引擎（v9.7.19）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -2567,3 +2567,22 @@ BUG-025/026 进回归（26/26），A/B 27/27 通过。
 - `pipeline.py` 把证据C软提示写进 `summary.evidence_soft`，页面三档区块展示"不因此判劣"提示。
 - 修正踩坑：detail/tiers 结构不同（tiers=车型名列表，detail=rec 列表），用 detail 取 evidence_soft。
 - 结果：零跑B01 回 T2，领汇e5/AION S 仍 T3。BUG-027 进回归（27/27），A/B 27/27 通过。
+
+---
+
+## v9.7.19 · 证据风险分层可视化 + 子项依据（2026-11-20，豆包评审P0/P1）
+
+豆包指出：证据C风险类型内部有区分但主表只显示一个C，用户分不清"缺碰撞证据"与"营运车"；
+tooltip含糊；τ只写数字无解释；8维仍是黑盒。核实后落地：
+
+- **证据列分层**：C 分两类显示——`C·证据不足`（参数完备但缺官方碰撞/口碑实锤，留T2，勿对标A类安全置信度）
+  与 `C·营运风险`（营运/交付硬风险，T3暂缓）。按 `tier_risk` 字段判定，不猜。
+- **tooltip 标准化**：缺官方碰撞/低置信/估算待核/营运为主各自的 title 写清含义与适用边界
+  （"低置信分数仅同车配置对比，不适合跨车型横向对比"）。
+- **τ 通俗解释**：τ≥0.9「高（排序稳定）」/ ≥0.8「中等（组内名次波动较大）」/ 否则「较低」，
+  并写明"越接近1越一致，τ<0.9 勿严格按数字先后选车"。
+- **维度子项依据**：总分构成表后加折叠面板（默认收起），列出每维分数来源
+  （配置级 deltas 逐条理由 + 车系基准 + 取证 note），不编造、不重复主榜内容。
+- 生命周期已在主表"周期"列（豆包该条为旧版误判），未动。
+- 未做：私人/营运销量拆分（无真实营运占比数据源，标估算也是编）、权重模板切换（破坏可复现）、TCO（保值率库零交集）。
+- BUG-028 进回归（28/28），A/B 27/27 通过。

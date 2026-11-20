@@ -114,17 +114,50 @@ def delta_label(d) -> str:
     return '<span title="rank_delta 0">无明显影响</span>'
 
 
+def dim_breakdown(r: dict, tb_entry: dict, dims: list) -> str:
+    """v9.7.19：维度子项依据折叠面板（默认收起）。数据来自 best_trim_detail.deltas + note，不编造。"""
+    bd = r.get("best_trim_detail") or {}
+    sc = bd.get("scores") or r.get("scores") or {}
+    deltas = bd.get("deltas") or []
+    by_dim = {}
+    for d in deltas:
+        by_dim.setdefault(d.get("dim"), []).append(d)
+    parts = []
+    for dim in dims:
+        k = dim.get("key")
+        v = sc.get(k)
+        if not isinstance(v, (int, float)):
+            continue
+        ds = by_dim.get(k) or []
+        if ds:
+            detail = "；".join(f"{e(str(x.get('why') or ''))} {float(x.get('delta') or 0):+.2f}"
+                              for x in ds if isinstance(x, dict))
+            kind = "配置差异（客观参数）"
+        else:
+            detail = "该车系基准分（无配置级差异）"
+            kind = "车系基准"
+        parts.append(f"<li><b>{e(dim.get('label') or k)} {num(v)}</b>"
+                     f" <span style='color:#7b8590'>[{kind}]</span>：{detail}</li>")
+    note = str(r.get("note") or "")
+    if note:
+        parts.append(f"<li style='color:#7b8590'>车系取证：{e(note[:180])}</li>")
+    return ("<details style='margin:6px 0'><summary style='cursor:pointer'>"
+            f"展开 {e(r.get('model'))} 的维度子项依据（8 维分怎么来的）</summary>"
+            "<ul style='font-size:12px;line-height:1.7;margin:8px 0 8px 18px'>"
+            + "".join(parts) + "</ul></details>") if parts else ""
+
+
 def risk_flags(r: dict) -> str:
     """v9.7.16：主表风险标记——估算/插补、营运车、缺官方碰撞报告。只读事实字段，不编造。"""
     out = []
     note = str(r.get("note") or "")
     if any(k in note for k in ("估算", "待核", "插补")):
-        out.append('<span class="flag flag-est" title="该配置部分参数为估算/待核，得分存在不确定性">⚠估算待核</span>')
+        out.append('<span class="flag flag-est" title="该车型部分参数为估算/待核；分数仅用于同车配置相对对比，跨车型横向对比可信度下降">⚠估算待核</span>')
     if any(k in note for k in ("营运", "网约", "B端", "出租", "对公")):
-        out.append('<span class="flag flag-fleet" title="营运占比高，非私人购车首选">营运为主</span>')
+        out.append('<span class="flag flag-fleet" title="营运/网约车为主，属硬风险（第三档）；非私人购车首选">营运为主</span>')
     crash = str(r.get("crash") or "")
     if not crash or any(k in crash for k in ("无", "未查到", "未披露")):
-        out.append('<span class="flag flag-warn" title="无官方碰撞报告，证据等级已降权">缺官方碰撞</span>')
+        out.append('<span class="flag flag-warn" title="无中保研/中汽研/C-NCAP可查询的官方碰撞报告；安全无官方实锤，证据已降权但不判劣">缺官方碰撞</span>')
     return "".join(out)
 
 
@@ -222,9 +255,12 @@ def render(data, summary, title, as_of):
                  '但<b>档位、三榜并列、稳健性、审查边界按最高配置口径固定不变</b>（权威结论不随预览改变）。</div>')
         _stab = (summary or {}).get("stability") or {}
         _tau = _stab.get("kendall_mean")
-        _tau_txt = (f'本次 10 种算法两两 τ 均值 <b>{_tau:.3f}</b>'
-                    + ('（较稳定，但前几名仍看分差）' if isinstance(_tau,(int,float)) and _tau>=0.9
-                       else '（<b>方法间分歧明显，逐名排序参考价值有限</b>）')) if isinstance(_tau,(int,float)) else ''
+        _tau_txt = ''
+        if isinstance(_tau, (int, float)):
+            _tau_grade = ('高（排序稳定）' if _tau >= 0.9 else
+                          '中等（组内名次波动较大）' if _tau >= 0.8 else '较低（逐名排序不可靠）')
+            _tau_txt = (f'算法一致性 τ=<b>{_tau:.3f}</b>（越接近1越一致，本次一致性'
+                        f'<b>{_tau_grade}</b>；τ&lt;0.9 时请勿严格按数字先后选车）')
         H.append('<div class="stability-tip"><b>怎么读这张榜：</b>同档位内各行已用底色分组——'
                  '<b>第二档是「按偏好取舍组」，组内名次会随算法权重变动，请勿严格按数字先后选车</b>，'
                  '结合档位、评价与逐配置对比做决定。' + _tau_txt + '。'
@@ -259,14 +295,25 @@ def render(data, summary, title, as_of):
                 elif k == "tier":
                     H.append(f"<td>{tier_badge(r.get('tier'))}</td>")   # 档位固定，不参与联动
                 elif k == "evidence":
-                    cls = {"A": "delta-up", "C": "delta-down"}.get(val, "")
-                    H.append(f"<td class='{cls}'>{e(val)}</td>")
+                    cls = {"A": "delta-up", "B": "", "C": "delta-down"}.get(val, "")
+                    if val == "C":
+                        is_fleet = bool(r.get("tier_risk")) or any(
+                            k in str(r.get("note") or "") for k in ("营运", "网约", "B端"))
+                        if is_fleet:
+                            lab = ('<span class="flag flag-fleet" '
+                                   'title="C-T3：营运/交付硬风险，第三档暂缓">C·营运风险</span>')
+                        else:
+                            lab = ('<span class="flag flag-warn" '
+                                   'title="C-T2：参数完备但缺官方碰撞/口碑实锤，留第二档；安全置信度勿对标A类">C·证据不足</span>')
+                        H.append(f"<td class='{cls}'>{lab}</td>")
+                    else:
+                        H.append(f"<td class='{cls}'>{e(val)}</td>")
                 elif k == "kwh_per_wan":
                     g = gmap.get("kWh/万元", "")
                     H.append(f'<td class="c-kwh" style="color:{BV.grade_color(g) if g else "inherit"}">{e(val)}</td>')
                 elif k == "trim":
                     cf = (td.get("best_confidence") or "")
-                    cf_flag = ('<span class="flag flag-est" title="基准配置匹配或证据不足，分数只作相对参考">低置信</span>'
+                    cf_flag = ('<span class="flag flag-est" title="低置信=配置匹配或一手证据不足；分数仅用于同车配置对比，不适合跨车型横向对比">低置信</span>'
                                if cf in ("low", "低") else "")
                     H.append(f"<td class='ref c-trim'>{e(val)}{cf_flag}</td>")
                 elif k == "price":
@@ -367,6 +414,14 @@ def render(data, summary, title, as_of):
                          f"{num(v) if isinstance(v,(int,float)) else '—'}</td>")
             H.append(f"<td class='totalcell'><span class='score'>{num(r.get('total'))}</span></td></tr>")
         H.append("</tbody></table>")
+        # v9.7.19：维度子项依据（折叠，默认收起，不破坏主榜简洁）
+        H.append('<div class="rule" style="margin-top:12px"><b>维度子项依据（点开看每维分怎么来的）：</b>'
+                 '分数来自官方参数 + 配置差异规则推算，非实车实测。配置级差异逐条列出，'
+                 '无差异的维度显示车系基准分。</div>')
+        for r in rows:
+            bd_html = dim_breakdown(r, (meta.get("trim_board") or {}).get(r["model"]) or {}, dims)
+            if bd_html:
+                H.append(bd_html)
         # 配置切换联动脚本：三表联动（主榜/总分构成/产品力），事件委托绑定
         if tb:
             s2 = json.dumps(tb, ensure_ascii=False)

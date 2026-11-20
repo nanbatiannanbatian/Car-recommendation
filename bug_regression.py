@@ -48,6 +48,7 @@ CASES = [
     ("BUG-025", "智驾口径全池不一致(只校正B01和小鹏)", "v9.7.17"),
     ("BUG-026", "报告披露手工写被pipeline重跑覆盖", "v9.7.17"),
     ("BUG-027", "证据C一律第三档(无碰撞成绩被判暂缓)", "v9.7.18"),
+    ("BUG-028", "证据C风险类型未分层/tooltip含糊/τ无通俗解释", "v9.7.19"),
 ]
 
 
@@ -209,6 +210,19 @@ def t015():
     return "渲染复用 board_view 单点"
 
 
+def t028():
+    """证据C分层可见 + tooltip标准 + τ通俗解释 + 子项折叠。"""
+    src = _read("render_board_html.py")
+    for kw in ("C·证据不足", "C·营运风险", "不适合跨车型横向对比", "_tau_grade", "dim_breakdown"):
+        assert kw in src, f"缺 {kw}"
+    out = os.path.join(HERE, "runs", "compact_bev_allprice_202610", "榜单.html")
+    if os.path.exists(out):
+        t = _read("runs/compact_bev_allprice_202610/榜单.html")
+        assert "C·证据不足" in t and "C·营运风险" in t, "证据分层未显示"
+        assert "维度子项依据" in t and "展开 " in t, "子项折叠未显示"
+        assert "中等" in t or "高（" in t or "较低" in t, "τ无通俗档位"
+    return "证据分层+tooltip+τ解释+子项折叠均生效"
+
 def t027():
     """证据 C 不判劣：零跑B01 应回第二档，营运车仍第三档。"""
     import json as _json
@@ -344,7 +358,7 @@ def t016():
 
 
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028]
 
 
 def run():
