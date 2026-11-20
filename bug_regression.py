@@ -51,6 +51,7 @@ CASES = [
     ("BUG-028", "证据C风险类型未分层/tooltip含糊/τ无通俗解释", "v9.7.19"),
     ("BUG-029", "候选池披露只在report不在页面/估算电池伪精确", "v9.7.20"),
     ("BUG-030", "候选池披露指向不存在的report清单(空指向)", "v9.7.21"),
+    ("BUG-031", "全价位标签名不副实(实际10款候选)", "v9.7.22"),
 ]
 
 
@@ -211,6 +212,17 @@ def t015():
     assert "BV.main_cell" in src, "渲染绕过了 board_view 单点"
     return "渲染复用 board_view 单点"
 
+
+def t031():
+    """榜单定位不得暗示全市场覆盖；审计榜定位要显式。"""
+    cfg = json.load(open(os.path.join(HERE, "categories", "car_compact_bev_allprice.json"), encoding="utf-8"))
+    assert "全价位" not in cfg.get("label", ""), f"标签仍暗示全价位: {cfg['label']}"
+    assert "审计榜" in cfg.get("label", ""), "缺审计榜定位"
+    p = os.path.join(HERE, "runs", "compact_bev_allprice_202610", "榜单.html")
+    if os.path.exists(p):
+        t = _read("runs/compact_bev_allprice_202610/榜单.html")
+        assert "不是全市场全价位" in t, "页面缺定位说明"
+    return "标签诚实：10款候选审计榜"
 
 def t030():
     """候选池披露不得指向不存在的内容。"""
@@ -381,7 +393,7 @@ def t016():
 
 
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031]
 
 
 def run():

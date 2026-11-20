@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 9.7.21
+version: 9.7.22
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v9.7.21）
+# Car recommendation —— 可信购车榜单引擎（v9.7.22）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -2612,3 +2612,17 @@ DeepSeek 给 9/10 并认可定稿。三条小意见中：
 - Lafa5 产品力>主榜加评价：**未采纳**——核实当前数据 rank_delta=0（产品力#6=主榜#6），
   DeepSeek 引用的是旧数据；无事实依据加这句话等于编，拒绝。
 - 回归 30/30、A/B 27/27 通过。不升版本功能、只修展示层文案。
+
+---
+
+## v9.7.22 · 榜单定位正名（2026-11-20）
+
+DeepSeek 定性："这是10款候选紧凑型纯电轿车的审计榜，不是全市场全价位覆盖榜"。核实属实：
+配置闸门 ≤100万但候选只有6.88–17.98万、"全价位"标签名不副实。
+
+- 配置 label 改「紧凑型纯电轿车前十榜（2026-10 · 10款候选审计榜）」。
+- 页面顶部加定位说明：可审计横向对比榜，不是全市场覆盖榜；未入池≠更差；
+  名次排序/同档组可信度/三档能不能买三者区分。
+- 阈值（第一档命中≥80%/全情景≥60%/月销≥3000）其实 report 已有，DeepSeek 看页面没看到——
+  载体差问题，本版不重复搬（报告是完整口径来源）。
+- BUG-031 进回归（31/31），A/B 27/27 通过。定稿。
