@@ -198,12 +198,13 @@ def crash_badge(r: dict) -> str:
     文案=体系+关键数字（得分率/星级/C-IASI等级），完整描述放 hover title。
     """
     basis = str(r.get("safety_basis") or "").lower()
-    sys_cn = {"cncap": "C-NCAP", "c-ncap": "C-NCAP", "ciasi": "C-IASI",
-              "ciasi_checked": "C-IASI", "euro_ncap": "Euro NCAP",
-              "ancap": "ANCAP", "iihs": "IIHS"}.get(basis)
+    # 中文名从 crash_systems 唯一真相源读（加体系只改那一处）
+    import crash_systems as CS
+    sys_cn = CS.cn_name(basis) if CS.is_official(basis) else None
     if not sys_cn:
         return ""
     crash = str(r.get("crash") or "")
+    _family = CS.family(basis)
     # 关键数字：优先得分率(92.3%)，其次星级，再C-IASI等级串
     key = ""
     # C-IASI 是等级制(G/A/M/P)，不取百分号（如 ET5 的 96% 其实是 E-NCAP 分项非 C-IASI）
@@ -214,12 +215,13 @@ def crash_badge(r: dict) -> str:
     else:
         m = re.search(r"(\d{2}(?:\.\d)?)\s*%", crash)
         if m:
-            # 取第一个百分号数字；Euro NCAP 常有多个分项，取碰撞保护那个更有意义
-            pcts = re.findall(r"(\d{2}(?:\.\d)?)\s*%", crash)
-            if sys_cn == "Euro NCAP" and len(pcts) >= 3:
-                key = pcts[2] + "%"  # 顺序：安全驾驶/碰撞避免/碰撞保护 → 取碰撞保护
+            if sys_cn == "Euro NCAP":
+                # Euro NCAP 分项多且顺序不固定，按关键词取"乘员/碰撞保护"，
+                # 不能按位置（Model3=成人96/儿童86/行人74/安全94，007=安全79/避免89/保护93）
+                occ = re.search(r"(?:成人乘员|乘员|碰撞保护)[^\d]{0,6}(\d{2}(?:\.\d)?)\s*%", crash)
+                key = (occ.group(1) if occ else m.group(1)) + "%"
             else:
-                key = pcts[0] + "%"
+                key = m.group(1) + "%"
     if not key:
         star = re.search(r"(五星|四星|5星|4星|TSP\+|TSP)", crash, re.I)
         if star:

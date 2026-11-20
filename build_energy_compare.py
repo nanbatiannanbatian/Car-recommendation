@@ -329,10 +329,19 @@ def js(obj):
     return json.dumps(obj, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
 
 
-def build():
-    cars = load_cars()
+def build(cars_override=None, out=None, extra_head="", extra_tail="", title=None):
+    """生成交互比较器页面。默认无参数=原行为（整池67款，向后兼容）。
+    cars_override: 外部注入的车列表（含补采分），用于特定榜单。
+    extra_head/extra_tail: 注入到 <body> 前 / </body> 前的额外HTML（正式榜导航/区块）。
+    """
+    cars = cars_override if cars_override is not None else load_cars()
     html = HTML_TEMPLATE
+    if title:
+        html = html.replace("<title>选车适配调节器 · 产品力主榜 + 用车条件修正</title>",
+                            f"<title>{title}</title>")
     reps = {
+        "__EXTRA_HEAD__": extra_head,
+        "__EXTRA_TAIL__": extra_tail,
         "__CARS_JSON__": js(cars),
         "__FACTORS_JSON__": js(FACTORS),
         "__DIMS_JSON__": js(DIMS),
@@ -350,9 +359,10 @@ def build():
     }
     for k, v in reps.items():
         html = html.replace(k, v)
-    with open(OUT, "w", encoding="utf-8") as f:
+    dest = out or OUT
+    with open(dest, "w", encoding="utf-8") as f:
         f.write(html)
-    print("wrote:", OUT, len(html), "chars,", len(cars), "cars")
+    print("wrote:", dest, len(html), "chars,", len(cars), "cars")
     from collections import Counter
     print("power dist:", dict(Counter(c["power"] for c in cars)))
     print("with consumption:", sum(1 for c in cars if c["cons"]), "/ with kwh:", sum(1 for c in cars if c["kwh"]))
@@ -450,6 +460,7 @@ details.adj summary{cursor:pointer;outline:none;text-decoration:underline dotted
 </style>
 </head>
 <body>
+__EXTRA_HEAD__
 <div class="wrap">
 <header>
   <h1>选车适配<em>调节器</em> · 产品力主榜 + 用车条件修正</h1>
@@ -848,6 +859,7 @@ function resetAll(){
 buildConds();
 render();
 </script>
+__EXTRA_TAIL__
 </body>
 </html>
 """

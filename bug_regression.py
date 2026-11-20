@@ -82,6 +82,8 @@ CASES = [
     ("BUG-059", "高分低档车未标注为何分高却不推荐", "v9.7.43"),
     ("BUG-060", "生命周期状态on_sale漏中文映射页面直出英文", "v9.7.43"),
     ("BUG-061", "MCDA相关算法重复计票虚高命中率", "v9.7.43"),
+    ("BUG-062", "家族制80%阈值语义漂移(名义80%实际83%)", "v9.7.43"),
+    ("BUG-063", "分数改了证据文本没同步(分数证据脱节)", "v9.7.43"),
 ]
 
 
@@ -1013,6 +1015,8 @@ def t058():
     cases = [
         ({"safety_basis": "cncap", "crash": "C-NCAP 2024 92.3%五星"}, "C-NCAP 92.3%"),
         ({"safety_basis": "euro_ncap", "crash": "Euro NCAP 2026五星(安全驾驶79%/碰撞避免89%/碰撞保护93%)"}, "Euro NCAP 93%"),
+        # Euro NCAP分项顺序不固定：Model3是成人96/儿童86/行人74/安全94，不能按位置取
+        ({"safety_basis": "euro_ncap", "crash": "Euro NCAP 2019五星(成人乘员96%/儿童86%/行人74%/安全辅助94%)"}, "Euro NCAP 96%"),
         ({"safety_basis": "ciasi", "crash": "E-NCAP 2023五星(乘员96%)+中保研C-IASI AGGG最优点评"}, "C-IASI AGGG"),
         ({"safety_basis": None, "crash": "无官方成绩"}, ""),
     ]
@@ -1098,8 +1102,52 @@ def t061():
     return f"算法家族去重生效：6家族，007家族命中{j7:.0%} vs MG07{mg:.0%}(原6/10抱团虚高)"
 
 
+def t062():
+    """家族命中阈值用票数语义：6家族至少5票，避免80%无法整除的语义漂移。"""
+    import leaderboard as L
+    cfg = json.load(open(os.path.join(HERE, "categories", "car_midsedan_allprice.json"), encoding="utf-8"))
+    rules = L.tier_rules(cfg)
+    assert rules["t1_min_family_hits"] == 5, f"默认票数阈值应为5: {rules['t1_min_family_hits']}"
+    # 显式ratio可回退
+    cfg2 = json.loads(json.dumps(cfg))
+    cfg2["tiering"]["t1_min_family_hits"] = "ratio"
+    assert L.tier_rules(cfg2)["t1_min_family_hits"] is None, "ratio回退失效"
+    src = _read("leaderboard.py")
+    assert "t1_min_family_hits" in src and "≥{rules['t1_min_family_hits']}/{len(robust.METHOD_FAMILIES)}票" in src, \
+        "报告未显示票数语义"
+    # 数据级：007(6票)/007GT(5票)过，MG07(2票)不过
+    d = json.load(open(os.path.join(HERE, "runs", "midsedan_bev_1218_202610", "candidates_allprice.json"), encoding="utf-8"))["candidates"]
+    r = L.tier_report(d, cfg, None, "测试", airbag_gate=False, crash_gate=False)
+    assert "极氪007" in r["tiers"]["T1"] and "极氪007GT" in r["tiers"]["T1"], "5票/6票应过T1"
+    assert "MG 07 纯电" not in r["tiers"]["T1"], "2票不应过T1"
+    return "家族阈值票数化：≥5/6票，消除80%语义漂移；007=6票/007GT=5票过，MG07=2票不过"
+
+
+def t063():
+    """分数证据文本一致性：文本不得与safety_basis矛盾；全场扫描+注入能检出。"""
+    import copy
+    import evidence_consistency as EC
+    assert EC.selftest() == 0, "证据一致性selftest失败"
+    psrc = _read("pipeline.py")
+    assert "evidence_consistency" in psrc and "证据文本一致性门禁" in psrc, "pipeline未接证据门禁"
+    pool = json.load(open(os.path.join(HERE, "runs", "midsedan_bev_1218_202610", "candidates_allprice.json"), encoding="utf-8"))["candidates"]
+    r = EC.check(pool)
+    assert r["passed"], f"真实池有矛盾: {r['issues']}"
+    # 关键车文本已按字段修正
+    by = {c["model"]: c for c in pool}
+    for n in ("极氪007", "极氪007GT"):
+        txt = EC._safety_text(by[n])
+        assert "无官方碰撞" not in txt and "Euro NCAP" in txt, f"{n}证据文本未同步: {txt}"
+    # 反向：注入"有basis却写无成绩"必须检出
+    fake = copy.deepcopy(pool[:1])
+    fake[0]["safety_basis"] = "cncap"
+    fake[0]["score_evidence"] = {"safety": ["无官方碰撞成绩-0.5"]}
+    assert not EC.check(fake)["passed"], "注入矛盾未检出"
+    return f"证据文本一致性：全场{r['checked']}款0矛盾；007/GT已同步Euro NCAP；注入矛盾能检出"
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063]
 
 
 def run():

@@ -203,6 +203,16 @@ def main():
         sys.exit("生命周期中文化门禁：以下状态值无中文映射，页面会直出英文：\n" + "\n".join(lines) +
                  "\n→ 在 board_view.LIFECYCLE_STATUS_CN 补映射。")
 
+    # v9.7.43：分数证据文本一致性门禁——score_evidence 文本不得与 safety_basis 矛盾
+    # （007GT 曾分数改8.8/basis改euro_ncap，文本却还写"无官方碰撞成绩"）。
+    import evidence_consistency as EC
+    _ec = EC.check(cands)
+    if not _ec["passed"]:
+        lines = [f"  - [{x['rule']}] {x['model']}: {x['basis']} / {x['text']}" for x in _ec["issues"]]
+        sys.exit("证据文本一致性门禁：以下车的证据文本与结构化字段矛盾：\n" + "\n".join(lines) +
+                 "\n→ 按结构化字段(safety_basis/scores)修正 score_evidence 文本，不许只改展示绕过。")
+    print(f"[证据文本一致性门禁] {_ec['checked']} 款有证据文本 / 矛盾 0")
+
     # 第三方实测/拆车证据 → adjust（带封顶）。放在闸门之前：adjust 不影响准入，
     # 只影响名次；审计行进报告，方便逐条质疑。
     tp_audit = []

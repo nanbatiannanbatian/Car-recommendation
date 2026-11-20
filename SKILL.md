@@ -13,7 +13,7 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 9.7.44
+version: 9.7.45
 author: "nanbatiannanbatian"
 ---
 
@@ -85,6 +85,17 @@ python3 energy_router.py "<用户原始提问>"    # 返回 board_type/powers/ne
 
 接入方式：出榜脚本调用 `ER.classify(USER_QUERY)`，用返回的 `powers` 做候选池能源闸门，把
 `board_type`/`reason` 写进榜单页面（参考 build_midsuv_202610.py）。回归：`energy_router_regress.py`（含反向篡改）。
+
+**⛔ B 类正式榜必须有「真环境分 + 全套区块导航」（2026-11-20 用户强制，禁止简陋版）**
+用户质疑跨能源前十榜"没有环境打分、没有参考可信榜本榜导航多项，严重不足"。根因：早期只用 3 项固定加分当环境分、
+页面只有 5-6 个简陋区块。现固化为（代码化，见 `build_midsuv_full.py` + `cross_energy_sections.py`）：
+- **环境分引擎单一事实源 = `build_energy_compare.py`**：12 项用车条件下拉（营运/气温/里程/长途/充电/限牌/持有/高速/方盒子/驾驶/空调）
+  + `ev_range_model.py` 物理续航 + 6 条硬条件惩罚（无桩纯电−15/极寒低价−12/短持有−8/长途续航不足−10/限牌油车−8/营运油车−10，
+  全额计入+降档+红标）。**禁止另写简化调节逻辑**；通过 `EC.build(cars_override=…, extra_head=…, extra_tail=…)` 注入榜单数据。
+- **全套区块 = `cross_energy_sections.py::BLOCKS`（对齐 board_view 18 项契约）+ 导航卡**。必要区块 `REQUIRED` 自检齐全。
+- 出 B 类固定榜命令：`python3 build_midsuv_full.py`（读候选池+补采分→构造 cars→注入区块→交互 HTML）。
+- 回归：`midsuv_full_regress.py`（30 项，含 node 实跑环境分 + 反向篡改）；`energy_compare_regress.py` 20 项守引擎。
+- 交付 B 类榜默认给**完整交互榜**（HTML），静态前十表可作为结论速览一并给。
 
 **出榜前自检**：判定结果要在回复开头讲明（"这是 A 类同能源榜，走XX流程" 或 "这是 B 类跨能源榜，加环境分"），
 并注明"由 energy_router 自动判定、未询问用户"；再按对应流程执行；两类都先过「每车逐配置数据」铁律与「候选池收全」铁律。
@@ -487,9 +498,13 @@ python3 leaderboard.py --tier car_ev --candidates cands.json --out tier.md
 
 | 档 | 判据 | 回答的问题 |
 |---|---|---|
-| 第一档 | **独立算法家族命中 ≥80%** + 全情景命中 ≥60% + 证据 A + 趋势月销 ≥2000 + **跨归一化名次波动 ≤2 位**（v9.7.43） | 能不能直接买（不用取舍） |
+| 第一档 | **独立算法家族命中 ≥5/6票** + 全情景命中 ≥60% + 证据 A + 趋势月销 ≥2000 + **跨归一化名次波动 ≤2 位**（v9.7.43） | 能不能直接买（不用取舍） |
 
 **算法家族去重（v9.7.43）**：`robust.METHODS` 10 种 MCDA 算法按实测 Kendall τ≥0.8 聚类成 **6 个独立家族**（加权和系 saw/moora/waspas/spotis/edas、距离 topsis、折衷 vikor、边界 mabac、偏好流 promethee、灰色关联 gra）。第一档命中率按家族计票（每家族1票），不再按10种算法逐票——此前 saw~moora τ=1.0、saw系5种高度相关，MG07 曾"6/10命中"但6票全是同一家族虚高。家族去重后 MG07=33%、007GT=83%、007=100%，更真实反映独立算法支持。分组见 `robust.METHOD_FAMILIES`，回归 `t061` 锁死。
+
+**阈值用票数不用比例（v9.7.43）**：家族数=6 无法整除 80%（实际变成83.3%），故第一档阈值改为**明确票数** `tiering.t1_min_family_hits=5`（6家族至少5票认可），报告文案同步显示"≥5/6票"，消除"名义80%、实际83%"的语义漂移。配置写 `"ratio"` 可回退按比例（旧榜兼容）。
+
+**证据文本一致性门禁（v9.7.43）**：`evidence_consistency.py` 检查 `score_evidence.safety` 文本不得与 `safety_basis`/`scores` 矛盾——防"分数改了证据说明没同步"（007GT 曾分数8.8/basis=euro_ncap，文本却还写"无官方碰撞成绩"）。三条规则：文本说无成绩但有权威basis / 文本说有成绩但basis空 / 文本主体系与basis不符（佐证体系不算）。出榜拦截，回归 `t063` 锁死。
 | 第二档 | 无第三档风险，但未达第一档 | 要不要按偏好取舍 |
 | 第三档 | 证据 C / 无交付 / 月销 <500 / 人工标注硬伤 | 现在该不该看它 |
 

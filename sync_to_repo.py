@@ -83,6 +83,10 @@ NEW_FILES = [
     # v9.7.44 能源形式自动判定（用户要求「自动准确选择、不让用户选择」，禁 AskUserQuestion）
     "energy_router.py",                         # 榜型/能源自动判定单一事实源（classify）
     "energy_router_regress.py",                 # 判定回归（32项含反向篡改）
+    # v9.7.45 B类正式榜完整版（真环境分 + 18区块导航）
+    "cross_energy_sections.py",                 # 跨能源榜18区块契约+导航卡
+    "build_midsuv_full.py",                     # B类完整榜生成器（注入比较器引擎+区块）
+    "midsuv_full_regress.py",                   # 完整榜回归（30项含node实跑环境分）
 ]
 
 

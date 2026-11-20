@@ -62,6 +62,8 @@ NEG_TARGETS = {
     "t059": ["为何未进一档"],
     "t060": ["_lc = BView.check_lifecycle_coverage(cands)"],
     "t061": ["独立算法家族命中"],
+    "t062": ["t1_min_family_hits"],
+    "t063": ["证据文本一致性门禁"],
 }
 
 # 数据断言型：测试名 -> (文件路径, 车型/键, 篡改模式)

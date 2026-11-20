@@ -1152,7 +1152,7 @@ def tier_report(cands: list[dict], cfg: dict, weights: list[float] | None = None
             if rec["strong_pick"]:
                 rec.setdefault("t2_notes", []).append(
                     f"强推荐候选：总分{_sc:.1f}+{c.get('safety_basis')}碰撞实锤，"
-                    f"独立算法家族命中 {rec.get('family_hits')}/{rec.get('family_n')}={rec.get('family_freq', 0):.0%}<80%故未进第一档；车本身无明显短板")
+                    f"独立算法家族命中 {rec.get('family_hits')}/{rec.get('family_n')}={rec.get('family_freq', 0):.0%}<{rules.get('t1_min_family_hits') or '阈值'}票故未进第一档；车本身无明显短板")
             tiers["T2"].append(rec)
 
     for k in tiers:
