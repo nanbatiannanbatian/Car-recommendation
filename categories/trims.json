@@ -6980,7 +6980,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 53.1,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "因湃/中创新航",
      "supplier_class": "undisclosed",
      "cltc_km": 503.0,
      "charge": "400V 快充",
@@ -6996,7 +6996,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 46.764,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "因湃/中创新航",
      "supplier_class": "undisclosed",
      "cltc_km": 430.0,
      "charge": "400V 快充",
@@ -7012,7 +7012,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 55.587,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "因湃/中创新航",
      "supplier_class": "undisclosed",
      "cltc_km": 505.0,
      "charge": "400V 快充",
@@ -7028,7 +7028,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 54.0,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "因湃/中创新航",
      "supplier_class": "undisclosed",
      "cltc_km": 503.0,
      "charge": "400V 快充",
@@ -9202,7 +9202,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 61.52,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "吉曜通行",
      "supplier_class": "undisclosed",
      "cltc_km": 545.0,
      "charge": "400V 快充约25min",
@@ -9210,7 +9210,8 @@
      "key_configs": [],
      "group": "2027款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "领克20 2027款 545 长续航Max",
@@ -9218,7 +9219,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 61.52,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "吉曜通行",
      "supplier_class": "undisclosed",
      "cltc_km": 545.0,
      "charge": "400V 快充约25min",
@@ -9226,7 +9227,8 @@
      "key_configs": [],
      "group": "2027款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "领克20 2027款 630 超长续航Max",
@@ -9234,7 +9236,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 70.01,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "吉曜通行",
      "supplier_class": "undisclosed",
      "cltc_km": 630.0,
      "charge": "400V 快充约25min",
@@ -9242,7 +9244,8 @@
      "key_configs": [],
      "group": "2027款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "领克20 2027款 630 超长续航Ultra",
@@ -9250,7 +9253,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 70.01,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "吉曜通行",
      "supplier_class": "undisclosed",
      "cltc_km": 630.0,
      "charge": "400V 快充约25min",
@@ -9258,7 +9261,8 @@
      "key_configs": [],
      "group": "2027款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "领克20 2027款",
@@ -9266,7 +9270,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 70.01,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "吉曜通行",
      "supplier_class": "undisclosed",
      "cltc_km": 580.0,
      "charge": "400V 快充约25min",
@@ -9274,7 +9278,8 @@
      "key_configs": [],
      "group": "2027款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     }
    ],
    "price_band_max": 16.0,
@@ -9312,7 +9317,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 64.3,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "弗迪(第二代刀片)",
      "supplier_class": "undisclosed",
      "cltc_km": 510.0,
      "charge": "800V 快充约18min",
@@ -9320,7 +9325,8 @@
      "key_configs": [],
      "group": "2026款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "钛3 2026款 620KM 闪充",
@@ -9328,7 +9334,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 75.6,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "弗迪(第二代刀片)",
      "supplier_class": "undisclosed",
      "cltc_km": 620.0,
      "charge": "800V 快充约18min",
@@ -9336,7 +9342,8 @@
      "key_configs": [],
      "group": "2026款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "钛3 2026款 565KM 四驱闪充",
@@ -9344,7 +9351,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 75.6,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "弗迪(第二代刀片)",
      "supplier_class": "undisclosed",
      "cltc_km": 565.0,
      "charge": "800V 快充约18min",
@@ -9352,7 +9359,8 @@
      "key_configs": [],
      "group": "2026款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     }
    ],
    "price_band_max": 16.0,
@@ -9390,7 +9398,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 53.9,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "清陶动力(半固态)",
      "supplier_class": "undisclosed",
      "cltc_km": 510.0,
      "charge": "400V 快充约25min",
@@ -9398,7 +9406,8 @@
      "key_configs": [],
      "group": "2026款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "MG 4X 2026款 610 自由",
@@ -9406,7 +9415,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 64.2,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "宁德时代(时代一汽)",
      "supplier_class": "undisclosed",
      "cltc_km": 610.0,
      "charge": "400V 快充约25min",
@@ -9414,7 +9423,8 @@
      "key_configs": [],
      "group": "2026款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "MG 4X 2026款 510 半固态智享",
@@ -9422,7 +9432,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 53.9,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "清陶动力(半固态)",
      "supplier_class": "undisclosed",
      "cltc_km": 510.0,
      "charge": "400V 快充约25min",
@@ -9430,7 +9440,8 @@
      "key_configs": [],
      "group": "2026款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "MG 4X 2026款 610 智享",
@@ -9438,7 +9449,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 64.2,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "宁德时代(时代一汽)",
      "supplier_class": "undisclosed",
      "cltc_km": 610.0,
      "charge": "400V 快充约25min",
@@ -9446,7 +9457,8 @@
      "key_configs": [],
      "group": "2026款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     }
    ],
    "price_band_max": 16.0,
@@ -9484,7 +9496,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 49.75,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "亿纬动力",
      "supplier_class": "undisclosed",
      "cltc_km": 430.0,
      "charge": "400V 快充约24min",
@@ -9492,7 +9504,8 @@
      "key_configs": [],
      "group": "2025款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "AION Y 2024款 Younger",
@@ -9500,7 +9513,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 49.75,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "亿纬动力",
      "supplier_class": "undisclosed",
      "cltc_km": 430.0,
      "charge": "400V 快充约24min",
@@ -9508,7 +9521,8 @@
      "key_configs": [],
      "group": "2024款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "AION Y 2025款 Plus 510 智享",
@@ -9516,7 +9530,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 58.4,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "宁德时代(时代广汽)/因湃电池(混装)",
      "supplier_class": "undisclosed",
      "cltc_km": 510.0,
      "charge": "400V 快充约24min",
@@ -9524,7 +9538,8 @@
      "key_configs": [],
      "group": "2025款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "AION Y 2025款 Plus 510 智",
@@ -9532,7 +9547,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 58.4,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "宁德时代(时代广汽)/因湃电池(混装)",
      "supplier_class": "undisclosed",
      "cltc_km": 510.0,
      "charge": "400V 快充约24min",
@@ -9540,7 +9555,8 @@
      "key_configs": [],
      "group": "2025款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "AION Y 2024款 Younger 星耀",
@@ -9548,7 +9564,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 49.75,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "亿纬动力",
      "supplier_class": "undisclosed",
      "cltc_km": 430.0,
      "charge": "400V 快充约24min",
@@ -9556,7 +9572,8 @@
      "key_configs": [],
      "group": "2024款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "AION Y 2025款 Plus 610 智享",
@@ -9564,7 +9581,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 68.2,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "亿纬动力",
      "supplier_class": "undisclosed",
      "cltc_km": 610.0,
      "charge": "400V 快充约24min",
@@ -9572,7 +9589,8 @@
      "key_configs": [],
      "group": "2025款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "AION Y 2026款 Plus 510 智享",
@@ -9580,7 +9598,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 58.4,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "宁德时代(时代广汽)/因湃电池(混装)",
      "supplier_class": "undisclosed",
      "cltc_km": 510.0,
      "charge": "400V 快充约24min",
@@ -9588,7 +9606,8 @@
      "key_configs": [],
      "group": "2026款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     }
    ],
    "price_band_max": 16.0,
@@ -9626,7 +9645,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 45.3,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "蜂巢能源",
      "supplier_class": "undisclosed",
      "cltc_km": 480.0,
      "charge": "400V 快充约30min",
@@ -9634,7 +9653,8 @@
      "key_configs": [],
      "group": "2026款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "5 EV 2026款 480km Pro",
@@ -9642,7 +9662,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 45.3,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "蜂巢能源",
      "supplier_class": "undisclosed",
      "cltc_km": 480.0,
      "charge": "400V 快充约30min",
@@ -9650,7 +9670,8 @@
      "key_configs": [],
      "group": "2026款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "5 EV 2026款 580km Max",
@@ -9658,7 +9679,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 58.3,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "蜂巢能源",
      "supplier_class": "undisclosed",
      "cltc_km": 580.0,
      "charge": "400V 快充约30min",
@@ -9666,7 +9687,8 @@
      "key_configs": [],
      "group": "2026款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "5 EV 2026款 480km 激光雷达",
@@ -9674,7 +9696,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 45.3,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "蜂巢能源",
      "supplier_class": "undisclosed",
      "cltc_km": 480.0,
      "charge": "400V 快充约30min",
@@ -9682,7 +9704,8 @@
      "key_configs": [],
      "group": "2026款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "5 EV 2026款 580km 激光雷达",
@@ -9690,7 +9713,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 58.3,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "蜂巢能源",
      "supplier_class": "undisclosed",
      "cltc_km": 580.0,
      "charge": "400V 快充约30min",
@@ -9698,7 +9721,8 @@
      "key_configs": [],
      "group": "2026款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     }
    ],
    "price_band_max": 16.0,
@@ -9736,7 +9760,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 45.582,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "因湃电池",
      "supplier_class": "undisclosed",
      "cltc_km": 410.0,
      "charge": "400V 快充约24min",
@@ -9744,7 +9768,8 @@
      "key_configs": [],
      "group": "2026款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "AION N60 2026款 510 激光雷达Ultra",
@@ -9752,7 +9777,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 57.433,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "因湃电池",
      "supplier_class": "undisclosed",
      "cltc_km": 510.0,
      "charge": "400V 快充约24min",
@@ -9760,7 +9785,8 @@
      "key_configs": [],
      "group": "2026款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "AION N60 2026款 610 激光雷达Ultra",
@@ -9768,7 +9794,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 69.753,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "因湃电池",
      "supplier_class": "undisclosed",
      "cltc_km": 610.0,
      "charge": "400V 快充约24min",
@@ -9776,7 +9802,8 @@
      "key_configs": [],
      "group": "2026款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     }
    ],
    "price_band_max": 16.0,
@@ -9814,7 +9841,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 48.35,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "中创新航/武汉楚能(混装)",
      "supplier_class": "undisclosed",
      "cltc_km": 445.0,
      "charge": "400V 快充约30min",
@@ -9822,7 +9849,8 @@
      "key_configs": [],
      "group": "2026款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "悦意03 2025款 445km 质选",
@@ -9830,7 +9858,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 48.35,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "中创新航/武汉楚能(混装)",
      "supplier_class": "undisclosed",
      "cltc_km": 445.0,
      "charge": "400V 快充约30min",
@@ -9838,7 +9866,8 @@
      "key_configs": [],
      "group": "2025款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "悦意03 2026款 565km 欣喜",
@@ -9846,7 +9875,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 61.47,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "中创新航/武汉楚能(混装)",
      "supplier_class": "undisclosed",
      "cltc_km": 565.0,
      "charge": "400V 快充约30min",
@@ -9854,7 +9883,8 @@
      "key_configs": [],
      "group": "2026款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "悦意03 2025款 565km 畅享",
@@ -9862,7 +9892,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 61.47,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "中创新航/武汉楚能(混装)",
      "supplier_class": "undisclosed",
      "cltc_km": 565.0,
      "charge": "400V 快充约30min",
@@ -9870,7 +9900,8 @@
      "key_configs": [],
      "group": "2025款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "悦意03 2025款 445km 心悦",
@@ -9878,7 +9909,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 48.35,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "中创新航/武汉楚能(混装)",
      "supplier_class": "undisclosed",
      "cltc_km": 445.0,
      "charge": "400V 快充约30min",
@@ -9886,7 +9917,8 @@
      "key_configs": [],
      "group": "2025款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "悦意03 2026款 445km 享悦",
@@ -9894,7 +9926,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 48.35,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "中创新航/武汉楚能(混装)",
      "supplier_class": "undisclosed",
      "cltc_km": 445.0,
      "charge": "400V 快充约30min",
@@ -9902,7 +9934,8 @@
      "key_configs": [],
      "group": "2026款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "悦意03 2025款 445km 欢悦",
@@ -9910,7 +9943,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 48.35,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "中创新航/武汉楚能(混装)",
      "supplier_class": "undisclosed",
      "cltc_km": 445.0,
      "charge": "400V 快充约30min",
@@ -9918,7 +9951,8 @@
      "key_configs": [],
      "group": "2025款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "悦意03 2025款 565km 乐享",
@@ -9926,7 +9960,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 61.47,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "中创新航/武汉楚能(混装)",
      "supplier_class": "undisclosed",
      "cltc_km": 565.0,
      "charge": "400V 快充约30min",
@@ -9934,7 +9968,8 @@
      "key_configs": [],
      "group": "2025款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "悦意03 2026款 445km 领悦",
@@ -9942,7 +9977,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 48.35,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "中创新航/武汉楚能(混装)",
      "supplier_class": "undisclosed",
      "cltc_km": 445.0,
      "charge": "400V 快充约30min",
@@ -9950,7 +9985,8 @@
      "key_configs": [],
      "group": "2026款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "悦意03 2026款 565km 欣享",
@@ -9958,7 +9994,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 61.47,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "中创新航/武汉楚能(混装)",
      "supplier_class": "undisclosed",
      "cltc_km": 565.0,
      "charge": "400V 快充约30min",
@@ -9966,7 +10002,8 @@
      "key_configs": [],
      "group": "2026款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "悦意03 2025款 565km 悠享",
@@ -9974,7 +10011,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 61.47,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "中创新航/武汉楚能(混装)",
      "supplier_class": "undisclosed",
      "cltc_km": 565.0,
      "charge": "400V 快充约30min",
@@ -9982,7 +10019,8 @@
      "key_configs": [],
      "group": "2025款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "悦意03 2026款 565km 欣耀",
@@ -9990,7 +10028,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 61.47,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "中创新航/武汉楚能(混装)",
      "supplier_class": "undisclosed",
      "cltc_km": 565.0,
      "charge": "400V 快充约30min",
@@ -9998,7 +10036,8 @@
      "key_configs": [],
      "group": "2026款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "悦意03 2025款 565km 臻享",
@@ -10006,7 +10045,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 61.47,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "中创新航/武汉楚能(混装)",
      "supplier_class": "undisclosed",
      "cltc_km": 565.0,
      "charge": "400V 快充约30min",
@@ -10014,7 +10053,8 @@
      "key_configs": [],
      "group": "2025款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "悦意03 2025款 565km 务",
@@ -10022,7 +10062,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 61.47,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "中创新航/武汉楚能(混装)",
      "supplier_class": "undisclosed",
      "cltc_km": 565.0,
      "charge": "400V 快充约30min",
@@ -10030,7 +10070,8 @@
      "key_configs": [],
      "group": "2025款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     }
    ],
    "price_band_max": 16.0,
@@ -10068,7 +10109,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 61.47,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "衢州极电",
      "supplier_class": "undisclosed",
      "cltc_km": 530.0,
      "charge": "400V 快充约30min",
@@ -10076,7 +10117,8 @@
      "key_configs": [],
      "group": "2026款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "极氪X 2026款 Max四座",
@@ -10084,7 +10126,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 61.47,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "衢州极电",
      "supplier_class": "undisclosed",
      "cltc_km": 530.0,
      "charge": "400V 快充约30min",
@@ -10092,7 +10134,8 @@
      "key_configs": [],
      "group": "2026款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "极氪X 2026款 Ultra五座",
@@ -10100,7 +10143,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 66.0,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "宁德时代(时代吉利)",
      "supplier_class": "undisclosed",
      "cltc_km": 512.0,
      "charge": "400V 快充约30min",
@@ -10108,7 +10151,8 @@
      "key_configs": [],
      "group": "2026款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     }
    ],
    "price_band_max": 16.0,
@@ -10146,7 +10190,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 56.7,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "江苏正力",
      "supplier_class": "undisclosed",
      "cltc_km": 500.0,
      "charge": "400V 快充约30min",
@@ -10154,7 +10198,8 @@
      "key_configs": [],
      "group": "2026款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "云海 2026款 500km 纯电俊雅",
@@ -10162,7 +10207,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 56.7,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "江苏正力",
      "supplier_class": "undisclosed",
      "cltc_km": 500.0,
      "charge": "400V 快充约30min",
@@ -10170,7 +10215,8 @@
      "key_configs": [],
      "group": "2026款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "云海 2026款 500km 纯电",
@@ -10178,7 +10224,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 56.7,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "江苏正力",
      "supplier_class": "undisclosed",
      "cltc_km": 500.0,
      "charge": "400V 快充约30min",
@@ -10186,7 +10232,8 @@
      "key_configs": [],
      "group": "2026款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "云海 2026款 600km 纯电标准",
@@ -10194,7 +10241,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 69.2,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "江苏正力",
      "supplier_class": "undisclosed",
      "cltc_km": 600.0,
      "charge": "400V 快充约30min",
@@ -10202,7 +10249,8 @@
      "key_configs": [],
      "group": "2026款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "云海 2026款 600km 纯电",
@@ -10210,7 +10258,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 69.2,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "江苏正力",
      "supplier_class": "undisclosed",
      "cltc_km": 600.0,
      "charge": "400V 快充约30min",
@@ -10218,7 +10266,8 @@
      "key_configs": [],
      "group": "2026款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "云海 2026款 600km 纯电俊雅",
@@ -10226,7 +10275,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 69.2,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "江苏正力",
      "supplier_class": "undisclosed",
      "cltc_km": 600.0,
      "charge": "400V 快充约30min",
@@ -10234,7 +10283,8 @@
      "key_configs": [],
      "group": "2026款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "云海 2025款 600km 纯电出行",
@@ -10242,7 +10292,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 69.2,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "江苏正力",
      "supplier_class": "undisclosed",
      "cltc_km": 600.0,
      "charge": "400V 快充约30min",
@@ -10250,7 +10300,8 @@
      "key_configs": [],
      "group": "2025款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     }
    ],
    "price_band_max": 16.0,
@@ -10288,7 +10339,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 60.0,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "江苏正力",
      "supplier_class": "undisclosed",
      "cltc_km": 510.0,
      "charge": "400V 快充约30min",
@@ -10296,7 +10347,8 @@
      "key_configs": [],
      "group": "2025款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "五菱星光S 2025款 510km 旗舰型",
@@ -10304,7 +10356,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 60.0,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "江苏正力",
      "supplier_class": "undisclosed",
      "cltc_km": 510.0,
      "charge": "400V 快充约30min",
@@ -10312,7 +10364,8 @@
      "key_configs": [],
      "group": "2025款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     }
    ],
    "price_band_max": 16.0,
@@ -10350,7 +10403,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 62.2,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "时代上汽(宁德时代)",
      "supplier_class": "undisclosed",
      "cltc_km": 515.0,
      "charge": "400V 快充约30min",
@@ -10358,7 +10411,8 @@
      "key_configs": [],
      "group": "2025款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "MG ES5 2025款 525max 智驾",
@@ -10366,7 +10420,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 62.2,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "时代上汽(宁德时代)",
      "supplier_class": "undisclosed",
      "cltc_km": 525.0,
      "charge": "400V 快充约30min",
@@ -10374,7 +10428,8 @@
      "key_configs": [],
      "group": "2025款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "MG ES5 2025款 515pro 尊驾",
@@ -10382,7 +10437,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 62.2,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "时代上汽(宁德时代)",
      "supplier_class": "undisclosed",
      "cltc_km": 515.0,
      "charge": "400V 快充约30min",
@@ -10390,7 +10445,8 @@
      "key_configs": [],
      "group": "2025款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     }
    ],
    "price_band_max": 16.0,
@@ -10428,7 +10484,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 50.4,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "国轩高科",
      "supplier_class": "undisclosed",
      "cltc_km": 450.0,
      "charge": "400V 快充约30min",
@@ -10436,7 +10492,8 @@
      "key_configs": [],
      "group": "2024款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "睿蓝7 2024款 450km 荣耀",
@@ -10444,7 +10501,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 50.4,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "国轩高科",
      "supplier_class": "undisclosed",
      "cltc_km": 450.0,
      "charge": "400V 快充约30min",
@@ -10452,7 +10509,8 @@
      "key_configs": [],
      "group": "2024款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "睿蓝7 2024款 605km 财富",
@@ -10460,7 +10518,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 68.03,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "国轩高科",
      "supplier_class": "undisclosed",
      "cltc_km": 605.0,
      "charge": "400V 快充约30min",
@@ -10468,7 +10526,8 @@
      "key_configs": [],
      "group": "2024款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "睿蓝7 2024款 605km 荣耀",
@@ -10476,7 +10535,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 68.03,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "国轩高科",
      "supplier_class": "undisclosed",
      "cltc_km": 605.0,
      "charge": "400V 快充约30min",
@@ -10484,7 +10543,8 @@
      "key_configs": [],
      "group": "2024款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "睿蓝7 2023款 605km 逐",
@@ -10492,7 +10552,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 68.03,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "国轩高科",
      "supplier_class": "undisclosed",
      "cltc_km": 605.0,
      "charge": "400V 快充约30min",
@@ -10500,7 +10560,8 @@
      "key_configs": [],
      "group": "2023款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "睿蓝7 2023款 605km 猎光",
@@ -10508,7 +10569,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 68.03,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "国轩高科",
      "supplier_class": "undisclosed",
      "cltc_km": 605.0,
      "charge": "400V 快充约30min",
@@ -10516,7 +10577,8 @@
      "key_configs": [],
      "group": "2023款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     },
     {
      "name": "睿蓝7 2024款 605km 行政荣耀",
@@ -10524,7 +10586,7 @@
      "energy_type": "纯电动",
      "battery_kwh": 68.03,
      "battery_type": null,
-     "cell_supplier": null,
+     "cell_supplier": "国轩高科",
      "supplier_class": "undisclosed",
      "cltc_km": 605.0,
      "charge": "400V 快充约30min",
@@ -10532,7 +10594,8 @@
      "key_configs": [],
      "group": "2024款",
      "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
-     "charge_source": "domain_search_20261120_suv"
+     "charge_source": "domain_search_20261120_suv",
+     "cell_source": "domain_search_20261120_suv"
     }
    ],
    "price_band_max": 16.0,

@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 9.7.32
+version: 9.7.33
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v9.7.32）
+# Car recommendation —— 可信购车榜单引擎（v9.7.33）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -45,6 +45,11 @@ author: "nanbatiannanbatian"
   确实查不到配置的车，明确标注"配置待核"并移出主榜（只进落榜/待核名单），不混进主榜充数。
 - **禁止为赶时间跳过配置采集**。宁可多花时间网查（汽车之家/易车/厂商官网配置表），
   也不许出一份缺配置的残缺榜单。新车型入池 = 8 维分 + 逐配置数据 + 证据来源，三者缺一不可。
+- **校验必须覆盖所有展示字段**（2026-11-20 用户追责"校验为何没生效"）：`trim_coverage.py`
+  除 name/price/kwh/cltc 外，还校验**电芯来源**（配置级 `cell_supplier` 或事实库车系级 `cell_brand`
+  至少一处有值，与展示回退链一致），缺失即 `no_cell` 拦截、不许"校验全绿但主榜空白"。
+  新入池车必须网查补齐电芯/电压等展示字段，不能只补4个核心字段就出榜。
+
 - 页面上每款车的主榜行、总分构成行、产品力榜行都必须有配置下拉框；
   若某车无配置数据导致下拉框缺失，视为 bug，必须修复后交付。
 - **快充能力按配置级 delta 计入三电**（2026-11-20 用户要求，v9.7.31）：`trim_annotate.charge_minutes()`
@@ -2827,3 +2832,20 @@ DeepSeek 定性："这是10款候选紧凑型纯电轿车的审计榜，不是�
   pool_meta.notes 由 pipeline 自动披露，重跑不丢。
 - 前十：AION N60/i60/领克20/MG4X/元PLUS/B10/欧拉5/宝骏云海/海狮05EV/深蓝S05；τ=0.872。
 - BUG-041 进回归（41/41），A/B 28/28 通过。
+
+---
+
+## v9.7.33 · 电芯校验补漏（2026-11-20，用户追责"校验为何没生效"）
+
+用户发现紧凑SUV榜主榜1/3/4等 11/20 款电芯为空，质疑之前加的校验为何没生效。
+
+- **根因**：`trim_coverage.REQUIRED_FIELDS` 只有 name/price/battery_kwh/cltc，
+  代码注释明写"电芯/快充缺只记 warning"，而 `report()` 根本不输出 warning——
+  所以校验显示"✅全部齐全"但主榜电芯列 11 处空白。这是我之前定的规则漏洞。
+- 修复1（数据）：网查补 12 款车电芯到 trims.json 配置级（63配置）+ 事实库车系级；
+  顺带发现并补上 AION S（轿车扩展榜也缺）。
+- 修复2（校验）：`trim_coverage.check()` 新增 `no_cell` 检测——配置级或事实库车系级有值即可
+  （与 main_cell 回退链一致），报告明确输出"✗ 无电芯来源 N 款"并阻止出榜。
+- 修复3（回归）：BUG-042 断言三榜候选池电芯零缺失 + 页面主榜电芯列零空白。
+- 教训：**校验必须覆盖所有展示字段**——"校验通过但展示空白"等于没校验。
+- 42/42 回归、A/B 28/28 通过。两榜重出，电芯列 20/20、16/16 全覆盖。

@@ -18,7 +18,11 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TRIMS = os.path.join(HERE, "categories", "trims.json")
-REQUIRED_FIELDS = ["name", "price", "battery_kwh", "cltc_km"]  # 核心4字段；电芯/快充缺只记 warning
+# v9.7.33：电芯提升为必需字段——此前"电芯缺只记warning"导致主榜11/20显示"—"却校验全绿。
+# 铁律：能在主榜展示的字段必须先校验有值，不许"校验通过但展示空白"。
+REQUIRED_FIELDS = ["name", "price", "battery_kwh", "cltc_km"]
+# v9.7.33：电芯单独校验（配置级 或 事实库车系级 有值即可，与展示回退链一致）
+CELL_FIELD = "cell_supplier"
 
 
 def load_trims(path: str | None = None) -> dict:
@@ -33,7 +37,9 @@ def check(cands_path: str, trims_path: str | None = None) -> dict:
     pool = json.load(open(cands_path, encoding="utf-8"))
     cands = pool.get("candidates", pool) if isinstance(pool, dict) else pool
     tdb = load_trims(trims_path)
-    missing, incomplete, ok = [], [], []
+    facts_path = os.path.join(os.path.dirname(TRIMS), "fact_library.json")
+    facts = json.load(open(facts_path, encoding="utf-8")) if os.path.exists(facts_path) else {}
+    missing, incomplete, ok, no_cell = [], [], [], []
     for c in cands:
         m = c.get("model")
         e = tdb.get(m)
@@ -45,9 +51,16 @@ def check(cands_path: str, trims_path: str | None = None) -> dict:
                    if all(t.get(f) not in (None, "", "—") for f in REQUIRED_FIELDS))
         if good < max(1, len(e["trims"]) // 2):
             incomplete.append((m, good, len(e["trims"])))
+            continue
+        # v9.7.33：电芯必须"配置级 或 车系事实库"至少一处有值（与 main_cell 回退链一致）
+        cell_ok = any(t.get(CELL_FIELD) not in (None, "", "—") for t in e["trims"]) or \
+                  str((facts.get(m) or {}).get("cell_brand") or "") not in ("", "—")
+        if not cell_ok:
+            no_cell.append(m)
         else:
             ok.append((m, len(e["trims"])))
-    return {"total": len(cands), "ok": ok, "missing": missing, "incomplete": incomplete}
+    return {"total": len(cands), "ok": ok, "missing": missing,
+            "incomplete": incomplete, "no_cell": no_cell}
 
 
 def report(r: dict) -> str:
@@ -56,8 +69,10 @@ def report(r: dict) -> str:
          f"  ✗ 无配置数据：{len(r['missing'])} 款 —— {', '.join(r['missing']) or '无'}",
          f"  ⚠ 字段不全：{len(r['incomplete'])} 款 —— " +
          (', '.join(f"{m}({g}/{n})" for m, g, n in r['incomplete']) or '无')]
-    if r["missing"] or r["incomplete"]:
-        L.append("  ⛔ 出榜前必须补齐上述车型配置数据（trims.json），或标注配置待核移出主榜。")
+    L.append(f"  ✗ 无电芯来源：{len(r.get('no_cell', []))} 款 —— " +
+             (', '.join(r.get('no_cell', [])) or '无'))
+    if r["missing"] or r["incomplete"] or r.get("no_cell"):
+        L.append("  ⛔ 出榜前必须补齐上述车型配置数据（trims.json / fact_library.json），或标注配置待核移出主榜。")
     else:
         L.append("  ✅ 全部车型配置齐全，可出榜。")
     return "\n".join(L)

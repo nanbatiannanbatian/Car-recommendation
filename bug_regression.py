@@ -62,6 +62,7 @@ CASES = [
     ("BUG-039", "扩展候选池只在runs未固化(下次运行丢失)", "v9.7.30"),
     ("BUG-040", "快充能力无配置级delta且口径混用会虚高", "v9.7.31"),
     ("BUG-041", "紧凑SUV榜候选池/配置未固化", "v9.7.32"),
+    ("BUG-042", "校验不覆盖电芯字段致11/20主榜空白", "v9.7.33"),
 ]
 
 
@@ -222,6 +223,31 @@ def t015():
     assert "BV.main_cell" in src, "渲染绕过了 board_view 单点"
     return "渲染复用 board_view 单点"
 
+
+def t042():
+    """校验必须覆盖展示字段——电芯缺失要被拦截，不能'校验全绿但主榜空白'。"""
+    import trim_coverage as TC
+    src = _read("trim_coverage.py")
+    assert "no_cell" in src and "无电芯来源" in src, "电芯校验未实现"
+    # 三个榜单候选池都必须电芯零缺失
+    for f in ("categories/candidates_compact_bev_extended.json",
+              "categories/candidates_compact_bev_audit.json",
+              "categories/candidates_compact_suv_bev.json"):
+        r = TC.check(os.path.join(HERE, f))
+        assert not r.get("no_cell"), f"{f} 仍有电芯缺失: {r.get('no_cell')}"
+    # 页面主榜电芯列无空
+    for out in ("compact_suv_bev_202610", "compact_bev_extended_202610"):
+        p2 = os.path.join(HERE, "runs", out, "榜单.html")
+        if os.path.exists(p2):
+            t = _read(os.path.join("runs", out, "榜单.html"))
+            m = re.search(r"<h2[^>]*>打分主榜.*?<tbody>(.*?)</tbody>", t, re.S)
+            blank = 0
+            for item in re.findall(r"<tr data-model=.*?</tr>", m.group(1), re.S) if m else []:
+                cs = re.findall(r"<td[^>]*>(.*?)</td>", item, re.S)
+                if len(cs) > 10 and re.sub(r"<[^>]+>", "", cs[10]).split("·")[0].strip() in ("—", ""):
+                    blank += 1
+            assert blank == 0, f"{out} 主榜电芯列有 {blank} 处空白"
+    return "电芯入校验，三榜主榜零空白"
 
 def t041():
     """紧凑纯电SUV榜：候选池/配置固化，未入池原因可见，20款配置齐全。"""
@@ -546,7 +572,7 @@ def t016():
 
 
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042]
 
 
 def run():

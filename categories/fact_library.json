@@ -1504,5 +1504,45 @@
   "cell_flash": "非闪充",
   "cell_gen_basis": "2021款43.2kWh弗迪一代（domain_search 2026-11-20）",
   "source": "候选池补采"
+ },
+ "AION N60": {
+  "cell_brand": "因湃电池"
+ },
+ "领克20": {
+  "cell_brand": "吉曜通行"
+ },
+ "MG 4X": {
+  "cell_brand": "宁德时代(时代一汽)"
+ },
+ "欧拉5 EV": {
+  "cell_brand": "蜂巢能源"
+ },
+ "宝骏云海": {
+  "cell_brand": "江苏正力"
+ },
+ "钛3": {
+  "cell_brand": "弗迪(第二代刀片)"
+ },
+ "AION Y": {
+  "cell_brand": "亿纬动力"
+ },
+ "睿蓝7": {
+  "cell_brand": "国轩高科"
+ },
+ "极氪X": {
+  "cell_brand": "衢州极电"
+ },
+ "MG ES5": {
+  "cell_brand": "时代上汽(宁德时代)"
+ },
+ "五菱星光S": {
+  "cell_brand": "江苏正力"
+ },
+ "悦意03": {
+  "cell_brand": "中创新航/武汉楚能(混装)"
+ },
+ "AION S": {
+  "cell_brand": "因湃/中创新航",
+  "source": "候选池 cell_brand"
  }
 }
