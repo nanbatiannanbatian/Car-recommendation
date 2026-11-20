@@ -32,17 +32,14 @@ def run():
     check("错误提示含清理指引", "请清理无引用的大文件" in src)
     # 2) 排除清单
     for f in ("trims_v61polluted.json", "trims_v60before.json", "*_regress.py",
-              "ice_crash.py", "build_midsuv_202610.py", "开源项目与数据源调研_20261120.md"):
+              "ice_crash.py", "build_midsuv_202610.py"):
         check(f"排除清单含:{f}", f'"{f}"' in src)
     # 运行必需的核心数据不得被误排（防"不是代码就删"式误伤）
     for f in ("trims.json", "master_pool.json", "ice_crash.json", "fact_library.json", "airbags.json"):
         check(f"核心数据未被排除:{f}", f'"{f}"' not in src.split("EXCLUDE_GLOBS")[1].split("]")[0])
-    # 核心数据"删了不能重生成"的依据：生成脚本依赖包外数据源（原始库/联网/runs）。
-    # 实证 facts_sync --check 在无 all_data.json 时报错 —— 证明不能当"可再生的非代码"删掉。
-    fs = subprocess.run([sys.executable, "facts_sync.py", "--check"], cwd=HERE,
-                        capture_output=True, text=True, timeout=30)
-    check("原始库不在包内(核心数据不可删依据)", "找不到原始库" in (fs.stdout + fs.stderr),
-          (fs.stdout or fs.stderr).split("\n")[0][:60])
+    # 注：核心 JSON 数据（trims/master_pool/ice_crash/fact_library 等）保留在包内。
+    # 它们虽有联网生成脚本（auto_trims/ice_crash 可 requests 抓取），但生成依赖外部输入/网络，
+    # 安装用户未必具备，故随包发布以保证离线可用——这是打包口径，不是"不可再生"的断言。
     # 3) 被排除的历史数据确实无代码引用（防止误排）
     pycode = ""
     for fn in os.listdir(HERE):

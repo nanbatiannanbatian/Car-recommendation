@@ -62,8 +62,6 @@ EXCLUDE_GLOBS = ["*.bak", "*.bak-*", "*.tmp", "*.pyc", "*.orig",
                  "ice_crash.py", "ice_funnel.py", "ice_sales.py", "ice_sensitivity.py", "verify_mcda.py",
                  # 一次性数据采集脚本：作者维护数据时用，仅文档提及、无代码调用
                  "fetch_bili.py", "fetch_cncap.py",
-                 # 作者调研笔记：纯背景报告，明确"未修改任何代码或数据"，非 skill 运行能力
-                 "开源项目与数据源调研_20261120.md",
                  # 注：lifecycle_fetch/sync_cncap/auto_levels/auto_trims 虽无 import，
                  #     但被文档命令或其他模块以文件名引用，排除会触发文档引用检查失败/运行风险，保留。
                  ]
