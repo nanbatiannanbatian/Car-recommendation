@@ -43,6 +43,8 @@ CASES = [
     ("BUG-020", "榜单缺少顶部导航目录与区块跳转锚点", "v9.7.14"),
     ("BUG-021", "配置名含激光雷达但key_configs空致智驾分失真", "v9.7.15"),
     ("BUG-022", "零跑B01智驾9.7高于小鹏6.6的倒挂(无证据基准)", "v9.7.15"),
+    ("BUG-023", "媒体通稿被当官方碰撞证据(零跑B01 B级)", "v9.7.16"),
+    ("BUG-024", "风险信息埋深(估算/营运/稳健性未在主表显性化)", "v9.7.16"),
 ]
 
 
@@ -204,6 +206,28 @@ def t015():
     return "渲染复用 board_view 单点"
 
 
+def t023():
+    """证据等级不得被媒体通稿升级：零跑B01 无官方碰撞记录必须 C。"""
+    cands = json.load(open(os.path.join(HERE, "runs", "compact_bev_202610_candidates.json"), encoding="utf-8"))["candidates"]
+    x = next(c for c in cands if c["model"] == "零跑B01")
+    assert x.get("evidence_status") == "C", f"零跑B01证据等级错误: {x.get('evidence_status')}"
+    assert "中汽测评" in str(x.get("note") or ""), "降级理由未记录"
+    return "零跑B01证据C（媒体通稿不升级）"
+
+def t024():
+    """主表必须显性化风险：估算标记、稳健性提示、同档底色、τ 展示。"""
+    src = _read("render_board_html.py")
+    for kw in ("risk_flags", "stability-tip", "flag-est", "flag-fleet", "tier-T"):
+        assert kw in src, f"缺 {kw}"
+    assert "stability" in _read("pipeline.py"), "τ 未写入 summary"
+    out = os.path.join(HERE, "runs", "compact_bev_allprice_202610", "榜单.html")
+    if os.path.exists(out):
+        t = _read("runs/compact_bev_allprice_202610/榜单.html")
+        for kw in ("估算待核", "营运为主", "同档位内各行已用底色分组", "τ 均值"):
+            assert kw in t, f"页面缺 {kw}"
+        return "风险信息主表显性化"
+    return "无榜单产物，跳过"
+
 def t021():
     """配置名里的激光雷达必须被识别（auto_trims 的 key_configs 常为空）。"""
     import trim_annotate as TA
@@ -283,7 +307,7 @@ def t016():
 
 
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024]
 
 
 def run():

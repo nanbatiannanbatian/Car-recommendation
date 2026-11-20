@@ -204,7 +204,14 @@ def main():
         parts.append("")
         parts.append(L.review_report(passed, cfg, wv)["report"])
         parts.append("")
-        parts.append(L.robust_report(passed, cfg, custom)["report"])
+        _rob = L.robust_report(passed, cfg, custom)
+        parts.append(_rob["report"])
+        # v9.7.16：把 τ 稳健性指标写进 summary，供页面顶部显示（只展示不改分）
+        summary["stability"] = {
+            "kendall_mean": round(float(_rob.get("kendall_mean") or 0), 3),
+            "n_methods": _rob.get("n_methods"), "n_schemes": _rob.get("n_schemes"),
+            "note": "10种MCDA×多套权重两两Kendall τ均值；<0.8逐名排序不可靠，≥0.9较稳定",
+        }
         parts.append("")
         parts.append(L.weight_audit(passed, cfg, wv)["report"])
         parts.append("")

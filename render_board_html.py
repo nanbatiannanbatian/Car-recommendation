@@ -67,6 +67,14 @@ font-size:11.5px;border-bottom:1px solid var(--line);white-space:nowrap}
 td{padding:10px 8px;text-align:center;border-bottom:1px solid #efece6;font-variant-numeric:tabular-nums}
 tr:last-child td{border-bottom:none}tr:hover td{background:#faf9f6}
 td.name{text-align:left;font-weight:600;white-space:nowrap}
+/* v9.7.16：同档底色分组 + 警示标签 */
+tr.tier-T1 td{background:#eef8f0}tr.tier-T2 td{background:#fffdf5}tr.tier-T3 td{background:#fdf3f2}
+.flag{display:inline-block;font-size:11px;font-weight:400;padding:1px 5px;border-radius:4px;margin-left:4px}
+.flag-warn{background:#fdf0ee;color:#b42318;border:1px solid #f3c9c3}
+.flag-est{background:#fbf3e9;color:#8a5a1f;border:1px solid #edd9bc}
+.flag-fleet{background:#fdf0ee;color:#b42318;border:1px solid #d85a30;font-weight:500}
+.stability-tip{background:#fff8e6;border-left:3px solid #BA7517;padding:10px 14px;
+border-radius:0 8px 8px 0;font-size:13px;color:#5c4518;margin:14px 0}
 .rk{display:inline-flex;width:25px;height:25px;align-items:center;justify-content:center;
 border-radius:50%;font-weight:700;background:var(--soft);color:var(--ink2)}
 .rk.g1{background:#f6e3c0;color:#8a5a00}.rk.g2{background:#e7eaed;color:#495360}
@@ -93,6 +101,31 @@ border-radius:10px;padding:14px 18px}
 
 def e(s):
     return html.escape(str(s)) if s is not None else ""
+
+
+def delta_label(d) -> str:
+    """rank_delta 通俗化：正=产品力更强但被性价比拖累，负=靠性价比抬升名次。"""
+    if not isinstance(d, int):
+        return "—"
+    if d > 0:
+        return f'<span title="rank_delta {d:+d}">被性价比拖累</span>'
+    if d < 0:
+        return f'<span title="rank_delta {d:+d}">靠性价比抬升</span>'
+    return '<span title="rank_delta 0">无明显影响</span>'
+
+
+def risk_flags(r: dict) -> str:
+    """v9.7.16：主表风险标记——估算/插补、营运车、缺官方碰撞报告。只读事实字段，不编造。"""
+    out = []
+    note = str(r.get("note") or "")
+    if any(k in note for k in ("估算", "待核", "插补")):
+        out.append('<span class="flag flag-est" title="该配置部分参数为估算/待核，得分存在不确定性">⚠估算待核</span>')
+    if any(k in note for k in ("营运", "网约", "B端", "出租", "对公")):
+        out.append('<span class="flag flag-fleet" title="营运占比高，非私人购车首选">营运为主</span>')
+    crash = str(r.get("crash") or "")
+    if not crash or any(k in crash for k in ("无", "未查到", "未披露")):
+        out.append('<span class="flag flag-warn" title="无官方碰撞报告，证据等级已降权">缺官方碰撞</span>')
+    return "".join(out)
 
 
 def num(v, digits=1):
@@ -187,6 +220,15 @@ def render(data, summary, title, as_of):
                  '证据 A=官方碰撞成绩 / B=口碑样本够 / C=新上市或样本不足。</div>')
         H.append('<div class="rule">配置下拉为<b>交互预览</b>：切换后主榜名次与分数实时重排，'
                  '但<b>档位、三榜并列、稳健性、审查边界按最高配置口径固定不变</b>（权威结论不随预览改变）。</div>')
+        _stab = (summary or {}).get("stability") or {}
+        _tau = _stab.get("kendall_mean")
+        _tau_txt = (f'本次 10 种算法两两 τ 均值 <b>{_tau:.3f}</b>'
+                    + ('（较稳定，但前几名仍看分差）' if isinstance(_tau,(int,float)) and _tau>=0.9
+                       else '（<b>方法间分歧明显，逐名排序参考价值有限</b>）')) if isinstance(_tau,(int,float)) else ''
+        H.append('<div class="stability-tip"><b>怎么读这张榜：</b>同档位内各行已用底色分组——'
+                 '<b>第二档是「按偏好取舍组」，组内名次会随算法权重变动，请勿严格按数字先后选车</b>，'
+                 '结合档位、评价与逐配置对比做决定。' + _tau_txt + '。'
+                 '「唯一名次」只在本榜 8 维规则内成立，不是购车唯一结论。</div>')
         tb_main = meta.get("trim_board") or {}
         H.append('<table id="mainBoard"><thead><tr>' + "".join(f"<th>{e(BV.MAIN_COL_LABELS[k])}</th>"
                  for k in BV.MAIN_BOARD_COLUMNS) + "</tr></thead><tbody>")
@@ -194,7 +236,9 @@ def render(data, summary, title, as_of):
             cand = r
             gmap = grades.get(r["model"], {})
             td = tb_main.get(r["model"]) or {}
-            H.append(f"<tr data-model='{e(r['model'])}' data-base-total='{r.get('total')}'>")
+            tier_cls = {"第一档": "T1", "第二档": "T2", "第三档": "T3"}.get(str(r.get("tier") or ""), "")
+            H.append(f"<tr data-model='{e(r['model'])}' data-base-total='{r.get('total')}'"
+                     f"{f' class=tier-{tier_cls}' if tier_cls else ''}>")
             for ci, k in enumerate(BV.MAIN_BOARD_COLUMNS):
                 val = BV.main_cell(k, r, cand, gmap.get("kWh/万元", ""))
                 if k == "rank":
@@ -209,7 +253,7 @@ def render(data, summary, title, as_of):
                             for i, t in enumerate(td["trims"]))
                         sel = (f'<br><select class="trimsel" data-model="{e(r["model"])}" '
                                f'style="font-size:11px;max-width:160px">{opts}</select>')
-                    H.append(f"<td class='name'>{e(val)}{sel}</td>")
+                    H.append(f"<td class='name'>{e(val)}{risk_flags(r)}{sel}</td>")
                 elif k == "total":
                     H.append(f"<td class='c-total'><span class='score'>{e(val)}</span></td>")
                 elif k == "tier":
@@ -221,7 +265,10 @@ def render(data, summary, title, as_of):
                     g = gmap.get("kWh/万元", "")
                     H.append(f'<td class="c-kwh" style="color:{BV.grade_color(g) if g else "inherit"}">{e(val)}</td>')
                 elif k == "trim":
-                    H.append(f"<td class='ref c-trim'>{e(val)}</td>")
+                    cf = (td.get("best_confidence") or "")
+                    cf_flag = ('<span class="flag flag-est" title="基准配置匹配或证据不足，分数只作相对参考">低置信</span>'
+                               if cf in ("low", "低") else "")
+                    H.append(f"<td class='ref c-trim'>{e(val)}{cf_flag}</td>")
                 elif k == "price":
                     H.append(f"<td class='c-price'>{e(val)}</td>")
                 elif k == "cell_brand":
@@ -285,6 +332,11 @@ def render(data, summary, title, as_of):
     if "score_breakdown" in ids:
         dims = meta.get("dimensions") or []
         H.append("<h2>总分构成 <span>8 维原始分 · 加权分＝Σ(维分×权重)×10 + adjust</span></h2>")
+        H.append('<div class="rule"><b>分数证据类型（v9.7.16）：</b>本榜所有维度分均为'
+                 '<b>官方参数 + 客观差异规则推算</b>（来源：配置表/碰撞成绩/销量），'
+                 '<b>不是实车实测分数</b>；配置间差异由「三电得分理由」逐条列明。'
+                 '标注 <span class="flag flag-est">低置信</span> 表示基准配置匹配或证据不足，'
+                 '该行分数只作同车配置相对参考。实车实测数据（如冬测续航达成率）目前未纳入打分。</div>')
         H.append('<table id="scoreBoard"><thead><tr><th>#</th><th>车型</th><th>评分配置</th><th>指导价(万)</th>')
         for d in dims:
             H.append(f"<th>{e(d.get('label'))}<br><small>{float(d.get('weight',0))*100:.1f}%</small></th>")
@@ -386,7 +438,8 @@ function sortPower(){
     if(mr!=null){
       var mc=r.querySelector('.c-mainrank');if(mc)mc.textContent='#'+mr;
       var d=mr-(i+1),dc=r.querySelector('.c-delta');
-      if(dc){dc.textContent=(d>0?'+':'')+d;
+      if(dc){dc.innerHTML=d>0?'<span title="rank_delta '+((d>0?'+':'')+d)+'">被性价比拖累</span>':
+        d<0?'<span title="rank_delta '+d+'">靠性价比抬升</span>':'<span title="rank_delta 0">无明显影响</span>';
         dc.className='c-delta '+(d>0?'delta-up':d<0?'delta-down':'');}
     }
   });
@@ -453,12 +506,12 @@ document.addEventListener('change',function(ev){
     if "product_power" in ids:
         H.append("<h2>纯产品力总榜 <span>辅助榜 · 剔除性价比、全池混排 · 不改主榜任何名次</span></h2>")
         H.append('<div class="rule">主榜（8 维含性价比）仍是唯一权威排序；本榜只回答「不看价格谁的产品力更强」。'
-                 '<b>rank_delta</b> 正数＝性价比拖累，负数＝靠性价比抬升了主榜名次。</div>')
+                 '<b>与性价比的关系</b>：产品力更强但价格拖累 → 标「被性价比拖累」；靠价格优势上位 → 标「靠性价比抬升」。</div>')
         tbpp = meta.get("trim_board") or {}
         H.append('<div class="rule">下拉框切换配置后，本榜产品力分（剔除性价比的 7 维）实时重算并重排；'
-                 '与主榜/总分构成联动。rank_delta 仍按主榜当前名次计算（正=性价比拖累，负=靠性价比抬升）。</div>')
+                 '与主榜/总分构成联动。标签按主榜当前名次实时重算，鼠标悬停可看原始数字。</div>')
         H.append('<table id="powerBoard"><thead><tr><th>#</th><th>车型</th><th>产品力分</th>'
-                 '<th>主榜名次</th><th>rank_delta</th><th>价格</th></tr></thead><tbody>')
+                 '<th>主榜名次</th><th>与性价比的关系</th><th>价格</th></tr></thead><tbody>')
         for it in pp.get("items") or []:
             d = it.get("rank_delta")
             dcls = "delta-up" if isinstance(d, int) and d > 0 else ("delta-down" if isinstance(d, int) and d < 0 else "")
@@ -479,7 +532,7 @@ document.addEventListener('change',function(ev){
                      f"<td class='c-power'><span class='score'>{num(it.get('power_score'), 2)}</span></td>"
                      f"<td class='c-mainrank'>#{e(it.get('main_rank'))}</td>"
                      f"<td class='{dcls} c-delta'>"
-                     f"{f'{d:+d}' if isinstance(d,int) else '—'}</td>"
+                     f"{delta_label(d)}</td>"
                      f"<td class='c-ppprice'>{e(it.get('price'))}</td></tr>")
         H.append("</tbody></table>")
 
@@ -686,7 +739,7 @@ def selftest():
         ("复现", "复现说明" in doc),
         ("价位段", "入门段" in doc),
         ("分段汇总", "分段汇总总榜" in doc),
-        ("产品力榜", "纯产品力总榜" in doc and "rank_delta" in doc),
+        ("产品力榜", "纯产品力总榜" in doc and "与性价比的关系" in doc),
         ("事实覆盖披露", "事实参考列覆盖" in doc),
     ]
     bad = [n for n, ok in checks if not ok]
