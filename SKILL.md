@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 9.7.12
+version: 9.7.13
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v9.7.12）
+# Car recommendation —— 可信购车榜单引擎（v9.7.13）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -2477,3 +2477,12 @@ MG07 845版 87.9 #1、深蓝L06 87.8 #2（分差0.1，在算法噪声内）。
   `main_cell('verdict')` 同步加标识。不改分数/排名/档位。
 - 效果：紧凑榜领汇e5/AION S、中型榜红旗E-QM5 有标识，其余车无；两榜 JS 语法通过。
 - 新增 BUG-018 进 bug_regression（18/18）；A/B 27/27 通过。
+
+---
+
+## v9.7.13 · 生命周期状态全中文（2026-11-20，用户确认后实施）
+
+用户：生命周期显示的英文变成中文。确认后实施。
+- `LIFECYCLE_STATUS_CN` 补 `steady`→在售（稳定）、`active`→在售，及 ramp_up/mature/declining/new/pending/unknown。
+- `lifecycle_line()` 字符串分支（如 info="steady"）也过 `lifecycle_status_cn()`，不再原文直出。
+- 两榜重出后页面无英文状态残留；BUG-019 进回归（19/19），A/B 27/27 通过。

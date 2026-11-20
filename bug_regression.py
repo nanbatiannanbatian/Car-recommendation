@@ -39,6 +39,7 @@ CASES = [
     ("BUG-016", "提交到错误分支/中文引号commit失败", "v9.7.2"),
     ("BUG-017", "自动补录车scored_trim匹配失败致配置分全相同", "v9.7.11"),
     ("BUG-018", "营运/网约车未在主榜评价标识,误导私人购车者", "v9.7.12"),
+    ("BUG-019", "生命周期状态英文(steady/active)直出页面", "v9.7.13"),
 ]
 
 
@@ -200,6 +201,15 @@ def t015():
     return "渲染复用 board_view 单点"
 
 
+def t019():
+    """生命周期状态必须中文化：映射表覆盖 + 字符串分支转换。"""
+    import board_view as BV
+    for st in ("steady", "active", "stable", "new_launch", "discontinued"):
+        cn = BV.lifecycle_status_cn(st)
+        assert cn != st and re.search(r"[\u4e00-\u9fff]", cn), f"{st} 未中文化: {cn}"
+    assert "在售" in BV.lifecycle_line("某车", "steady"), "字符串分支未转中文"
+    return "生命周期状态全中文"
+
 def t018():
     """营运车标识：note 有营运关键词必须在评价里显著标注，且不影响非营运车。"""
     import board_view as BV
@@ -237,7 +247,7 @@ def t016():
 
 
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019]
 
 
 def run():

@@ -236,6 +236,10 @@ LIFECYCLE_STATUS_CN = {
     "new_launch": "新车爬坡", "facelift_pending": "改款清库",
     "discontinued": "已停产", "clearance": "清库",
     "stable": "在售", "sales_collapse": "销量待确认",
+    # v9.7.13：补页面实测漏网的两个状态（原来原文直出英文）
+    "steady": "在售（稳定）", "active": "在售",
+    "ramp_up": "爬坡期", "mature": "成熟期", "declining": "销量回落",
+    "new": "新车上市", "pending": "待确认", "unknown": "状态未知",
 }
 
 
@@ -468,7 +472,7 @@ def load_fact_library(explicit_path: str | None = None) -> dict:
 def lifecycle_line(model: str, info) -> str:
     """生命周期条目 → 一句可读中文（两版共用，避免露原始 JSON）。"""
     if isinstance(info, str):
-        return f"{model}：{info}"
+        return f"{model}：{lifecycle_status_cn(info)}"  # v9.7.13：字符串状态也转中文
     if not isinstance(info, dict):
         return f"{model}：{info}"
     status = LIFECYCLE_STATUS_CN.get(str(info.get("status") or ""),
