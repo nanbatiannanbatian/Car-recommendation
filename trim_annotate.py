@@ -140,6 +140,22 @@ def annotate_all(cands: list[dict], cfg: dict) -> dict:
             continue
         ref_name = entry.get("scored_trim") or ""
         ref = find_ref(ref_name, entry["trims"])
+        # BUG-017(auto_trims补录车)：scored_trim 与配置表对不上时 find_ref 失败，
+        # 导致所有配置 delta=[]（配置分全相同、下拉无意义）。fallback 到车系评分配置价
+        # 最接近的配置作基准，保证配置差异能被算出来（基准偏差记入 confidence）。
+        ref_fallback = False
+        if ref is None:
+            price_hint = None
+            for c in cands:
+                if c.get("model") == model and isinstance(c.get("trim"), dict):
+                    price_hint = c["trim"].get("price")
+                    break
+            if price_hint:
+                ref = min(entry["trims"],
+                          key=lambda t: abs((t.get("price") or 0) - price_hint))
+            else:
+                ref = entry["trims"][0]
+            ref_fallback = True
         trims = []
         for t in entry["trims"]:
             # v9.7.4：匹配不到参考配置时不下 delta（宁可不加分，不在错基准上加分）
@@ -148,6 +164,8 @@ def annotate_all(cands: list[dict], cfg: dict) -> dict:
             for d in ds:
                 sc[d["dim"]] = round(max(0, min(10, sc.get(d["dim"], 8) + d["delta"])), 2)
             conf = min((d["conf"] for d in ds), key=lambda x: CONF_ORDER[x]) if ds else "high"
+            if ref_fallback:
+                conf = "low"  # 基准是 fallback 的，整体降置信
             # 产品力分：剔除 value 的 7 维按原权重归一化×10（与 product_power_board 同口径）
             pp_keys = [k for k in W if k != "value"]
             pp_tw = sum(W[k] for k in pp_keys)

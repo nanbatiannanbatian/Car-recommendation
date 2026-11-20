@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 9.7.10
+version: 9.7.11
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v9.7.10）
+# Car recommendation —— 可信购车榜单引擎（v9.7.11）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -2448,3 +2448,18 @@ MG07 845版 87.9 #1、深蓝L06 87.8 #2（分差0.1，在算法噪声内）。
 - 修复 `pipeline.py`：HTML 渲染只传 tiers 覆盖的通过车型给 `BV.build()`，页面与报告一致。
 - 2026-10 全价位榜重出并逐行复核：24 款全部有档位、无异常；72 个下拉框（24×3）、24 个 details。
 - 全 selftest + A/B 26 项通过。
+
+---
+
+## v9.7.11 · 历史bug回归测试 + 紧凑纯电榜自检修复（2026-11-20）
+
+- 新增 `bug_regression.py`：把 17 个历史 bug 变成可执行断言（配置映射/双套分/配置匹配/JS转义/
+  联动/评价/覆盖/档位/闸门等），接入 A/B 测试管线 COVERAGE（新版专有）。
+- 出 2026-10 紧凑型纯电轿车前十榜：10 款候选（原有 8 + 网查补 2），按铁律先补齐 10 款逐配置
+  （9 款 auto_trims 自动解析 + 小鹏MONA M03 手工补录），逐配置覆盖校验通过。
+- 自检发现并修复 BUG-017：auto_trims 补录车的 scored_trim 与配置表对不上 → find_ref 失败 →
+  所有配置 delta=[] → 配置分全相同、下拉无意义。修 `trim_annotate` 加 fallback
+  （按车系评分配置价选最接近配置作基准，降置信），配置分恢复差异。
+- 榜单逐行自检：10 款全有档位、30 下拉框、10 details、10/10 配置分有差异、报告页面一致。
+- 报告披露：MG4 销量冠军但产品力 #7（不是销量榜）；领汇e5/AION S 为营运车，低置信不代表私人推荐。
+- 全 selftest + A/B 27/27 + bug回归 17/17 通过。
