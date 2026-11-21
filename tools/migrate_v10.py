@@ -46,8 +46,9 @@ MAPPING: dict[str, list[str]] = {
         "master_pool", "monthly", "pipeline", "render_board_html", "warehouse",
     ],
     "regress": [
-        "bug_regression", "negative_regression", "energy_compare_regress",
-        "energy_router_regress", "midsuv_full_regress", "build_release_regress",
+        "bug_regression", "negative_regression", "layout_regress",
+        "energy_compare_regress", "energy_router_regress", "midsuv_full_regress",
+        "build_release_regress",
     ],
 }
 
@@ -194,13 +195,17 @@ def main() -> int:
             src = ROOT / f"{mod}.py"
             if not src.exists():
                 continue
+            # 已经是迁移后的薄壳 = 已执行过，直接跳过，否则会把 10 行壳子搬进 modules/
+            # 覆盖掉真实现（第一次 dry-run 时踩到过，会静默毁掉整个模块）。
+            if "runpy.run_module" in src.read_text(encoding="utf-8", errors="ignore"):
+                continue
             dst = dst_dir / f"{mod}.py"
             text, notes = migrate_file(src, pkg)
             if apply:
                 dst.write_text(text, encoding="utf-8")
                 src.unlink()
             moved += 1
-            print(f"  [{pkg:9s}] {mod}.py" + (f"  ({'; '.join(notes)})" if notes and not apply else ""))
+            print(f"  [{pkg:9s}] {mod}.py" + (f"  ({'; '.join(notes)})" if notes and not apply else ""), flush=True)
 
     for js in JS_TESTS:
         src = ROOT / js
