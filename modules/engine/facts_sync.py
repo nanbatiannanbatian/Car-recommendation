@@ -282,10 +282,20 @@ def backfill_crash_from_text(cars):
         ev = c.get("evidence") or {}
         ce = str(ev.get("crash_evidence") or "") if isinstance(ev, dict) else ""
         all_scores = CS.parse_all_scores_from_evidence(ce) if ce else []
+        # 同源车出口版一手成绩（v10.5.2）：如蔚来ES6=EL6 的 Euro NCAP 一手五星。
+        # 判据极严（同源映射+年份+得分率+一手权威体系），只放行确定同车的成绩，
+        # 泛泛的「宣称双五星」「按X标准设计」仍拒绝。零映射的车根本不进此分支。
+        # 注意：无论顶层是否已解析到，都要算同源成绩并入审计——否则 note 里带
+        # 同源体系名时顶层 parse_score 抓到成绩、却漏写 crash_all_scores（t088 事故）。
+        homolog = CS.parse_homolog_score(ce, c.get("model")) if ce else None
+        if homolog and not any(s["basis"] == homolog["basis"] for s in all_scores):
+            all_scores.insert(0, homolog)
+            all_scores.sort(key=lambda s: -s.get("tier", 0))
         if not parsed and all_scores:
             # 顶层三处解析不出 → 用 evidence 里证据最强的一条（严格解析，防误伤）
             parsed = all_scores[0]
-            source_tag = "evidence.crash_evidence 严格解析"
+            source_tag = ("同源车出口版一手成绩（evidence 严格解析）"
+                          if parsed is homolog else "evidence.crash_evidence 严格解析")
             quote = ce.strip()[:60]
         if not parsed:
             unresolved.append(c.get("model"))

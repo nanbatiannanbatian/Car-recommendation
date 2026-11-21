@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 10.5.1
+version: 10.5.2
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v10.5.1）
+# Car recommendation —— 可信购车榜单引擎（v10.5.2）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -62,11 +62,19 @@ paths.py       全项目路径唯一事实源（ROOT/cat()/gen()）+ 生成物�
 写生成物用 `paths.gen("xxx.json")`。**禁止再写 `os.path.join(HERE, "categories", ...)`**（重构前散落 46 处，
 文件一进 `modules/` 全指错目录）。文档里出现的 `categories/trims.json` 是逻辑数据名，实际位置以此规则解析。
 
-**打包判据只有一条：能不能用代码重建**（不是体积大小）。
-- 可重建 → 不打包（`paths.GENERATED_JSON`），用户随代码逐步生成：版本一升、口径一变，本来就该重算，
-  打包反而把过期数据发出去。新装包首跑执行 `python3 bootstrap_data.py --check` 看缺什么，
-  `--apply` 自动重建（每项都有命令、联网标记与前置说明）。
-- 不可重建（人工采集核验的气囊/物理参数/基线池，`paths.CURATED_JSON`）→ **必须随包**，否则新装包功能残缺。
+**打包判据（v10.5.2 用户新决定）：发布包零 JSON，数据全部联网补回。**
+- `build_release.EXCLUDE_ALL_JSON` 总闸门：**所有 `.json` 都不打包**（含人工事实库与品类配置，
+  包解压后从 2855KB 降到 1929KB）。用户 2026-11-21 明确："JSON 后缀的都可以不打包，数据可联网获得，
+  即便其他地方引用它们。" 新增 JSON 自动被总闸门排除，不靠手工列名。
+- **新装包首跑两步**（缺一不可，否则跑不出榜）：
+  1. `python3 -m modules.research.data_bootstrap --apply` —— 从已发布 GitHub 仓库补回 41 个 JSON
+     （走 contents API + base64；`raw.githubusercontent.com` 在大陆代理 SSL EOF 必失败，实测 0/4，故禁用）。
+     落盘前校验合法 JSON，防代理错误页污染。`--check` 可先看缺什么。
+  2. `python3 bootstrap_data.py --apply` —— 重建 3 个生成物（trims/ice_crash/cell_facts），
+     每项都有命令、联网标记与前置说明；`--check` 体检。
+- 旧判据（`paths.GENERATED_JSON` 可重建 / `CURATED_JSON` 人工事实库必须随包）保留作**数据分类**，
+  但不再决定打包：现在统一由总闸门排除、由 data_bootstrap + bootstrap_data 两条链路补回。
+  本地源码树与 GitHub 仓库仍保留全部 JSON（回归测试与补回源都靠它们）。
 
 **为什么这么分**（可独立发布性）：`research` 与 `physics` 是真正的独立 skill（取数检索 / 续航估算），
 `envscore` 依赖仅 physics、也能独立发布为「用车条件适配计算器」；`engine`+`board` 是本项目主流程，`regress` 项目专属。

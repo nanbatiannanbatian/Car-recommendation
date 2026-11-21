@@ -115,6 +115,8 @@ CASES = [
     ("BUG-090", "cncap_scores已有零跑C11 86.4%却没回流:候选池/页面显示无成绩且无展示门禁", "v10.5.0"),
     ("BUG-091", "C-IASI数字图标车新闻稿救回写死单车+固定ID:新车无法复用、出榜无自动兜底", "v10.5.0"),
     ("BUG-092", "回归专用候选池快照打进发布包:包体逼近3MB上限+无代码化排除规则", "v10.5.1"),
+    ("BUG-093", "发布包带39个JSON占944KB:用户要零JSON数据可联网获得却无补回链路", "v10.5.2"),
+    ("BUG-094", "蔚来ES6有本代EuroNCAP一手五星却判无成绩:出口版同源车成绩被一刀切降级+智驾分误抓隐患", "v10.5.2"),
 ]
 
 
@@ -2270,8 +2272,11 @@ def t086():
     assert my2.get("safety_basis") == "ciasi" and my2.get("crash") == "C-IASI G", \
         f"Model Y 字段未结构化: {my2.get('safety_basis')} / {my2.get('crash')}"
     assert my2.get("crash_ciasi_dims"), "C-IASI 三指数明细缺审计留痕"
-    for bad in ("腾势N7", "问界M5纯电版", "蔚来ES6", "小鹏G6", "比亚迪宋L EV"):
+    # v10.5.2：蔚来ES6 是有同源车一手权威成绩的合法回填（EL6=Euro NCAP 五星），
+    # 不属于「软文误伤」——从无成绩清单移除，保留其他确无成绩车。
+    for bad in ("腾势N7", "问界M5纯电版", "小鹏G6", "比亚迪宋L EV"):
         assert bad not in filled_m, f"无成绩车 {bad} 被误填成有成绩"
+    assert "蔚来ES6" in filled_m, "ES6 同源一手成绩未回填"
 
     # 4) 展示层：回填后不再标「缺权威碰撞成绩」，且徽标显示 C-IASI
     row = {"safety_basis": my2["safety_basis"], "crash": my2["crash"]}
@@ -2406,9 +2411,11 @@ def t088():
     my = by["特斯拉 Model Y"]
     assert my.get("crash_ciasi_n_tests") == 2, "Model Y 两次 C-IASI 测评次数未留痕"
 
-    # 3) 无成绩车零误伤（G6/宋L/ES6/N7/M5 旁证不当成绩）
-    for model in ("小鹏G6", "比亚迪宋L EV", "蔚来ES6", "腾势N7", "问界M5纯电版"):
+    # 3) 无成绩车零误伤（G6/宋L/N7/M5 旁证不当成绩）
+    # v10.5.2：蔚来ES6 移出——它是同源车一手权威成绩（Euro NCAP 五星），属合法纳入非误伤。
+    for model in ("小鹏G6", "比亚迪宋L EV", "腾势N7", "问界M5纯电版"):
         assert not by[model].get("crash_all_scores"), f"无成绩车 {model} 被记入成绩"
+    assert by["蔚来ES6"].get("crash_all_scores"), "ES6 同源一手成绩未记入审计"
 
     # 4) 链路内置：回填写审计字段、报告披露、summary 有审计（防退回「只取第一个就丢」）
     fs_src = open(str(paths.src("facts_sync.py")), encoding="utf-8").read()
@@ -2608,10 +2615,10 @@ def t092():
         "build_release.is_excluded_name 未消费名单"
     for name in paths.REGRESSION_FIXTURES:
         assert BR.is_excluded_name(name), f"打包白名单未排除 {name}"
-    # 人工事实库/运行依赖仍随包（不能过度排除）
-    for name in ("master_pool.json", "ciasi_decoded.json", "filings_notes.json",
-                 "SKILL.md", "requirements.txt"):
-        assert not BR.is_excluded_name(name), f"随包必需文件被误排除: {name}"
+    # v10.5.2：零 JSON 策略下所有 JSON（含曾随包的 master_pool/ciasi_decoded/filings_notes）
+    # 都预期排除，由 data_bootstrap 补回；只有非 JSON 运行文件必须保留。
+    for name in ("SKILL.md", "README.md", "requirements.txt", "pipeline.py"):
+        assert not BR.is_excluded_name(name), f"非JSON运行文件被误排除: {name}"
 
     # 5) 源码树保留（回归测试要读），发布包已重建为不含样本
     for name in paths.REGRESSION_FIXTURES:
@@ -2624,11 +2631,114 @@ def t092():
         leaked = packed & set(paths.REGRESSION_FIXTURES)
         assert not leaked, f"发布包仍含回归样本: {leaked}"
     return ("发布包回归样本代码化排除：4快照~54KB不进包+运行零引用+"
-            "运行依赖仍随包+源码树保留(+t092)")
+            "非JSON运行文件保留+源码树保留(+t092)")
+
+
+def t093():
+    """发布包零 JSON + 数据补回链路（v10.5.2 用户："JSON 都可以不打包，联网获得"）。
+
+    用户明确接受"即便其他地方引用它们也不打包"。根因修复不是删几个文件名，
+    而是：①总闸门 EXCLUDE_ALL_JSON 覆盖一切 .json（新增 JSON 自动排除）；
+    ②提供唯一联网出口 data_bootstrap 从已发布仓库补回，新装包才跑得起来；
+    ③补回内容校验合法 JSON，防代理错误页落盘污染。
+    """
+    import inspect
+    from pathlib import Path
+
+    # 1) 总闸门存在且被 is_excluded_name 消费
+    import build_release as BR
+    assert BR.EXCLUDE_ALL_JSON, "无零JSON总闸门"
+    assert "EXCLUDE_ALL_JSON" in _read("build_release.py"), "打包脚本无零JSON总闸门"
+    assert "EXCLUDE_ALL_JSON" in inspect.getsource(BR.is_excluded_name), \
+        "is_excluded_name 未消费总闸门"
+    # 覆盖根目录 JSON 与 categories JSON，含未来新增名字
+    for n in ("master_pool.json", "ciasi_decoded.json", "cncap_scores.json",
+              "official_safety_scores.json", "levels.json", "某未来新数据.json"):
+        assert BR.is_excluded_name(n), f"JSON 未被排除: {n}"
+    # 非 JSON 运行文件不得被误排
+    for n in ("SKILL.md", "README.md", "requirements.txt", "pipeline.py", "data_bootstrap.py"):
+        assert not BR.is_excluded_name(n), f"非JSON被误排: {n}"
+
+    # 2) 补回模块存在、联网只在 research 内、selftest 通过
+    from modules.research import data_bootstrap as DB
+    assert DB.selftest() == 0, "data_bootstrap 自测失败"
+    dbsrc = inspect.getsource(DB)
+    assert "api.github.com" in dbsrc and "API_CONTENTS" in dbsrc, \
+        "补回源不是已发布仓库 contents API"
+    # 正文下载必须走 fetch_json_file（contents API + base64），不能直接用 raw 域名拼 URL
+    assert "def fetch_json_file" in dbsrc and "base64.b64decode" in dbsrc, \
+        "正文下载未走 contents API base64 解码"
+    assert "urllib.request.urlopen" in dbsrc, "补回未走 research 内联网出口"
+    # 落盘前校验 JSON 合法性（防代理 HTML 污染）
+    assert "json.loads(raw.decode" in dbsrc, "补回未校验 JSON 合法性"
+
+    # 3) 实际发布包零 JSON（若已重建）
+    import glob as _glob, zipfile as _zf
+    zips = _glob.glob(str(Path(HERE) / "dist" / "*.zip"))
+    assert zips, "无发布包，请先 python build_release.py"
+    with _zf.ZipFile(sorted(zips)[-1]) as z:
+        js = [n for n in z.namelist() if n.endswith(".json")]
+    assert not js, f"发布包仍含 JSON: {js[:5]}"
+
+    # 4) 源码树数据仍在（本地/仓库运行与回归照常）
+    assert (Path(HERE) / "categories" / "master_pool.json").exists(), "源码树丢了人工事实库"
+    return ("零JSON发布策略：总闸门覆盖一切.json+仓库补回链路+合法性校验+源码树保留(+t093)")
+
+
+def t094():
+    """同源车出口版一手成绩纳入（v10.5.2 蔚来ES6）：出口名同源映射+具体年份得分放行，
+    软文/智驾分不误抓，零映射车不泛化。腾势N7 仍判无成绩（只有宣传口径）。
+    """
+    import copy
+    from modules.engine import crash_systems as CS
+    from modules.engine import facts_sync as FS
+
+    # 1) 同源映射表存在且可扩展，只放确定同车
+    assert "EXPORT_ALIASES" in _read("crash_systems.py"), "解析器无同源映射表"
+    assert "蔚来ES6" in CS.EXPORT_ALIASES and "EL6" in CS.EXPORT_ALIASES["蔚来ES6"]
+    assert CS.export_aliases_of("蔚来 ES6") == ["EL6"], "同源名归一化失败"
+
+    # 2) ES6 证据 → 一手 Euro NCAP 成绩（年份+得分率）
+    pool = json.load(open(os.path.join(HERE, "runs", "midsuv_bev_pool.json"), encoding="utf-8"))
+    cands = copy.deepcopy(pool["candidates"])
+    es6 = next(c for c in cands if c["model"] == "蔚来ES6")
+    ce = (es6.get("evidence") or {}).get("crash_evidence") or ""
+    h = CS.parse_homolog_score(ce, "蔚来ES6")
+    assert h and h["basis"] == "euro_ncap" and h["score"] == 93.95 and h["tier"] == 2, h
+    assert h["year"] == 2024, h
+
+    # 3) 端到端回填：ES6 从无成绩 → Euro NCAP 一手，且不误抓 C-ICAP 92.9% 智驾分
+    filled, _ = FS.backfill_crash_from_text(cands)
+    es6 = next(c for c in cands if c["model"] == "蔚来ES6")
+    assert CS.is_official(es6.get("safety_basis")) and es6["safety_basis"] == "euro_ncap", es6
+    assert "93.95" in es6["crash"] and "92.9" not in es6["crash"], es6
+    assert any(f[0] == "蔚来ES6" for f in filled), "ES6 未进回填清单"
+
+    # 4) 零泛化：只对有映射的车生效——全池只有 ES6 被同源解析命中
+    hits = [c["model"] for c in pool["candidates"]
+            if CS.parse_homolog_score(
+                str(((c.get("evidence") or {}).get("crash_evidence") or "")), c["model"])]
+    assert hits == ["蔚来ES6"], f"同源解析误伤其他车: {hits}"
+
+    # 5) 腾势N7 仍无成绩（只有 C-NCAP 五星车身设计宣传 + C-ICAP 智驾，无碰撞得分率）
+    n7 = next(c for c in cands if c["model"] == "腾势N7")
+    assert not CS.is_official(n7.get("safety_basis")), f"N7 被误判有成绩: {n7.get('safety_basis')}"
+    n7ce = str(((n7.get("evidence") or {}).get("crash_evidence") or ""))
+    assert not CS.parse_homolog_score(n7ce, "腾势N7") and not CS.parse_score_from_evidence(n7ce), \
+        "N7 宣传口径被误抓成成绩"
+
+    # 6) 软文拒绝：泛泛「宣称双五星」无年份得分 → 不升级
+    assert CS.parse_homolog_score(
+        "出口版获Euro NCAP五星，官网宣称中欧双五星", "蔚来ES6") is None, "无年份得分的软文被放行"
+
+    # 7) pipeline 接入同源解析
+    assert "parse_homolog_score" in _read("facts_sync.py"), "facts_sync 未接入同源解析"
+    return ("同源车出口版一手成绩：ES6=EL6 的 Euro NCAP 93.95%纳入+C-ICAP智驾不误抓+"
+            "零泛化+N7仍无成绩+软文拒绝(+t094)")
 
 
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094]
 
 
 def run():

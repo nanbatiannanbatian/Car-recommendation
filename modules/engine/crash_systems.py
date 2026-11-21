@@ -286,6 +286,92 @@ _WEAK_ANCHOR_RE = re.compile(
 _SECONDARY_REJECT = ("安全车身设计", "设计标准", "标准开发", "非第三方实测", "按C-NCAP", "按中保研",
                      "非国内", "仅作弱旁证", "仅作旁证", "非本代", "非本车", "不能当", "非实测")
 
+# ---------------------------------------------------------------- 同源车 / 出口别名
+# 为什么要有（2026-11-21 蔚来ES6 事故）：
+#   全球车型常有「国内名 + 出口名」双名（蔚来 ES6 = 出口 EL6；比亚迪 元PLUS = ATTO 3…）。
+#   同一台车、同一代、同一车身结构，出口版拿到的 Euro NCAP / ANCAP 一手实测成绩，
+#   对本国在售的同源车同样成立——这是业内通行做法（官网自己就写「中欧双五星」）。
+#   此前解析器把「出口版获<体系>」一律当弱锚点 tier0、把「非本代」整句拒收，
+#   导致 ES6 这种有明确年份+得分率的一手成绩被误判「无成绩」。
+#   判据（防止误伤）：只有【同源映射命中 + 具体年份 + 具体得分率/星级 + 一手权威体系】
+#   才升级为一手；泛泛的「宣称双五星」「按X标准设计」无数字仍一律拒绝。
+#   映射只放"确定是同一台车"的别名，不确定的不写（宁可漏，不可错配）。
+EXPORT_ALIASES = {
+    "蔚来ES6": ["EL6"],          # 蔚来官网英文站：ES6 = EL6 同代，中欧双五星
+}
+
+# 一手权威体系：出口版在这些体系的实测成绩可视为同源车一手成绩。
+# 不含 IIHS/C-IASI（这些是本国体系，出口版不会去测）；不含弱 NCAP 变体。
+_HOMOLOG_AUTHORITATIVE = {"euro_ncap", "ancap", "nhtsa", "jncap", "kncap"}
+
+
+def export_aliases_of(model) -> list[str]:
+    """取车型的出口别名（归一化匹配：忽略空格/连字符/大小写）。"""
+    if not model:
+        return []
+    key = re.sub(r"[\s\-]", "", str(model)).lower()
+    for domestic, aliases in EXPORT_ALIASES.items():
+        dkey = re.sub(r"[\s\-]", "", domestic).lower()
+        if key == dkey or key in dkey or dkey in key:
+            return list(aliases)
+    return []
+
+
+def parse_homolog_score(text, model) -> dict | None:
+    """识别【同源车出口版一手权威成绩】：有具体年份+得分率/星级的 Euro/ANCAP 等。
+
+     strict 规则（每一条都是防误伤，踩过的坑）：
+       - 必须 model 命中 EXPORT_ALIASES（没有映射的车一律不启用，防泛化误伤）
+       - 必须同句出现出口别名（如 EL6）或「出口版/海外版」+ 权威体系
+       - 必须有一手权威体系（_HOMOLOG_AUTHORITATIVE，排除智驾 C-ICAP/宣传口径）
+       - 必须有具体年份(20xx) 且 有得分率(xx.x%)或五星（泛泛"五星"无数字不算）
+       - 出现 C-ICAP/智驾/行车辅助/宣传/软文 等词 → 该句整句拒绝（防把智驾分当碰撞）
+     返回与 parse_score 同构的 dict，含 tier=2 / source_quality 字段。
+    """
+    t = str(text or "")
+    if not t or not export_aliases_of(model):
+        return None
+    reject = ("C-ICAP", "智驾", "行车辅助", "领航", "宣传", "软文", "网传", "传闻",
+              "安全车身设计", "非实测")
+    # 按分句/顿号切：让「具体成绩」与同段后面的软文（如「官网宣称中欧双五星」）分开，
+    # 否则「2024出口版获E-NCAP五星93.95%，官网宣称双五星」会因后半句"宣称"被整句拒。
+    for seg in re.split(r"[。\n；;，,、—]", t):
+        if any(k in seg for k in reject):
+            continue
+        if not any(k in seg for k in ("出口版", "海外版", "出口", "海外")) \
+                and not any(a in seg for a in export_aliases_of(model)):
+            continue
+        if not re.search(r"20\d{2}", seg):        # 必须具体年份
+            continue
+        # 找权威体系锚点（复用动态体系正则）
+        for m in _TEXT_SYS_RE.finditer(seg):
+            basis = normalize(m.group("sys"))
+            if basis not in _HOMOLOG_AUTHORITATIVE:
+                continue
+            pre = seg[max(0, m.start() - 12):m.start()]
+            if any(k in pre for k in ("无", "未", "没", "非")):
+                continue
+            clause = seg[m.end():]
+            pm = _PCT_RE.search(clause)
+            sm = _STAR_RE.search(clause)
+            score = float(pm.group(1)) if pm else None
+            stars = _CN_NUM.get(sm.group(1)) if sm else None
+            if score is None and stars is None:
+                continue
+            # 得分必须是合理碰撞得分率区间（40-100），防把 3.9s 加速等误抓
+            if score is not None and not (40 <= score <= 100):
+                continue
+            ym = re.search(r"(20\d{2})", seg)
+            sys_cn = SYSTEMS[basis]["cn"]
+            display = (f"{sys_cn} {score:g}%" + (" 五星" if stars else "")) if score \
+                else f"{sys_cn} 五星"
+            return {"basis": basis, "system_cn": sys_cn, "score": score,
+                    "stars": stars, "grade": None,
+                    "year": int(ym.group(1)) if ym else None,
+                    "display": display, "evidence": True,
+                    "tier": 2, "source_quality": "同源车出口版一手权威（年份+得分率）"}
+    return None
+
 
 def _parse_one_anchor(t: str, seg: str, m, basis: str) -> dict | None:
     """解析单个体系锚点 → 与 parse_score 同构的 dict；证据不足返回 None。

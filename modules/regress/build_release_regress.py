@@ -95,8 +95,13 @@ def run():
                                         for n in names))
         check("回归样本仍在源码树", all((Path(HERE) / "categories" / f).exists()
                                    for f in paths.REGRESSION_FIXTURES))
-        check("产物含人工事实库", all(any(n.endswith("/" + f) for n in names)
-                                  for f in paths.CURATED_JSON))
+        # v10.5.2：零 JSON 策略——发布包不含任何 .json，数据由 data_bootstrap 从仓库补回。
+        check("产物零JSON(v10.5.2)", not any(n.endswith(".json") for n in names),
+              f"仍有 {sum(n.endswith('.json') for n in names)} 个JSON")
+        check("产物含数据补回模块", any(n.endswith("/data_bootstrap.py") for n in names))
+        check("补回模块联网源是仓库", ("Car-recommendation" in
+              open(str(Path(HERE) / "modules" / "research" / "data_bootstrap.py"),
+                   encoding="utf-8").read()))
         gens = ("auto_trims.py", "build_ice_pool.py", "master_pool.py", "ice_crash.py",
                 "auto_levels.py", "facts_sync.py", "universe_build.py", "airbags.py")
         check("产物含全部生成脚本", all(any(n.endswith("/" + g) for n in names) for g in gens))

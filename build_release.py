@@ -43,6 +43,14 @@ import paths  # noqa: E402  生成物名单单一事实源
 GENERATED_JSON = paths.GENERATED_JSON
 REGRESSION_FIXTURES = paths.REGRESSION_FIXTURES
 
+# v10.5.2 用户决定（2026-11-21）：「JSON 后缀的都可以不打包，数据可联网获得」。
+# 发布包不再携带任何 .json —— 包括人工事实库与品类配置。数据在新装包首跑时由
+# modules/research/data_bootstrap.py 从已发布仓库（唯一可信联网源）补回，
+# 生成物再由 bootstrap_data.py 重建。这是一条总闸门，覆盖 categories/*.json 与
+# 根目录的 *.json（cncap_scores / official_safety_scores / levels 等），
+# 不再靠逐个文件列名（列名必漏，新增 JSON 又会被打进包）。
+EXCLUDE_ALL_JSON = True
+
 # ---- 发布规范配置（改这里即可调整规则）--------------------------------
 REQUIRED_FRONTMATTER = [
     "name", "display_name", "display_name_en", "description",
@@ -126,6 +134,8 @@ def is_excluded_name(name):
     if name in GENERATED_JSON:      # 生成物（可联网重建）一律不进包，名单见 paths.py
         return True
     if name in REGRESSION_FIXTURES:  # 回归测试专用样本：源码树/仓库保留，发布包不打包
+        return True
+    if EXCLUDE_ALL_JSON and name.lower().endswith(".json"):  # v10.5.2：零 JSON 总闸门
         return True
     for g in EXCLUDE_GLOBS:
         if name.endswith(g.lstrip("*")):

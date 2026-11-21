@@ -74,6 +74,10 @@ NEG_TARGETS = {
     "t091": ["def rescue_targets"],
     # t092：抹掉 paths.py 里的名单定义（回到「无代码化排除规则、样本混进包」），应 FAIL
     "t092": ["REGRESSION_FIXTURES"],
+    # t093：抹掉零JSON总闸门常量（回到「JSON又会混进包」），应 FAIL
+    "t093": ["EXCLUDE_ALL_JSON"],
+    # t094：抹掉同源映射表（回到「出口版同源车成绩被一刀切拒、ES6判无成绩」），应 FAIL
+    "t094": ["EXPORT_ALIASES"],
 }
 
 # 数据断言型：测试名 -> (文件路径, 车型/键, 篡改模式)
