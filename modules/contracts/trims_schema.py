@@ -25,7 +25,13 @@ SUPPLIER_CLASS_LABELS = {
 
 TRIM_FIELDS = ("name", "price", "battery_kwh", "battery_type", "cell_supplier",
                "supplier_class", "cltc_km", "charge", "motor_kw", "key_configs",
-               "group", "note")
+               "group", "note", "consumption", "charge_power_kw", "swap")
+# consumption = 官方电耗（kWh/100km），来自汽车之家参数页「百公里耗(kWh/100km)」。
+# 2026-11-21 新增：此前电耗只有人工采集的 vehicle_physics.json（51/67 覆盖），
+# 自动采集这一路一直漏采，导致能效强/弱的车在三电维上被系统性低估或高估。
+# charge_power_kw = 最大充电功率（kW），「电池/充电」组的「功率(kW)」。
+#   有一批车（特斯拉/小鹏MONA 等）参数页不给快充时间也不给电压，只有这个字段。
+# swap = 是否支持换电（蔚来/乐道等），补能方式的一种。
 
 ENTRY_FIELDS = ("model", "source", "url", "date", "source_type", "quote",
                 "note", "trim_class")
@@ -108,11 +114,11 @@ def selftest() -> None:
                 {"name": "标准版", "price": 15.0, "battery_kwh": 60, "battery_type": "磷酸铁锂",
                  "cell_supplier": "宁德时代", "supplier_class": "single_named", "cltc_km": 500,
                  "charge": [30, 80], "motor_kw": 150, "key_configs": [], "group": "2026款",
-                 "note": "—"},
+                 "consumption": 13.5, "charge_power_kw": 80.0, "swap": None, "note": "—"},
                 {"name": "长续航", "price": 17.0, "battery_kwh": 80, "battery_type": "磷酸铁锂",
                  "cell_supplier": "宁德时代", "supplier_class": "single_named", "cltc_km": 650,
                  "charge": [30, 80], "motor_kw": 170, "key_configs": [], "group": "2026款",
-                 "note": "—"},
+                 "consumption": 14.2, "charge_power_kw": 80.0, "swap": None, "note": "—"},
             ],
         }],
         "out_of_board_examples": [],

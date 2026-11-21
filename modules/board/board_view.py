@@ -369,7 +369,11 @@ def car_verdict(row: dict, cand: dict, meta: dict | None = None) -> dict:
 MAIN_COL_LABELS = {
     "rank": "#", "model": "车型", "trim": "评分配置", "price": "指导价(万)",
     "sales": "趋势月销", "total": "加权分", "tier": "档位", "evidence": "证据",
-    "period": "周期", "crash": "碰撞成绩", "kwh_per_wan": "kWh/万元", "cell_brand": "电池来源",
+    # 2026-11-21：原列名"周期"含义不清（用户问「周期-是什么意思」）——
+    # 该列装的是生命周期状态（新车爬坡/在售/已停产…），不是"保养周期"。
+    # 列名直接写成人话，值已经是中文状态词。
+    "period": "生命周期状态",
+    "crash": "碰撞成绩", "kwh_per_wan": "kWh/万元", "cell_brand": "电池来源",
     "verdict": "评价（优缺点/适合人群/建议）",
 }
 
@@ -441,7 +445,7 @@ def main_cell(key: str, row: dict, cand: dict, grade: str = "") -> str:
         elif bp.get("cell") not in (None, "—", ""):
             brand = str(bp.get("cell"))
         else:
-            brand = "—"
+            brand = "未披露"
         # v9.7.29：弗迪电芯标代际+闪充（事实库核验），二代≠都支持闪充，按事实标
         if "弗迪" in brand:
             gen = fr.get("电芯代际")
@@ -458,8 +462,15 @@ def main_cell(key: str, row: dict, cand: dict, grade: str = "") -> str:
         volt = (mv.group(1) + "V") if mv else bp.get("voltage")
         if volt and volt != "未披露":
             brand = f"{brand} · {volt}"
+        else:
+            # 无电压时也要把补能时间显示出来——蔚来ES6 这类车参数页没填电压，
+            # 但有「10–80% 约 36min」；此前这一段被整段丢掉，页面只剩一句
+            # 「联网未查到电芯品牌」，读者以为什么都没采到。
+            mc = re.search(r"(\d+)\s*[-–]\s*(\d+)%\s*(?:约|大约)?\s*(\d+)\s*min", charge)
+            if mc:
+                brand = f"{brand} · 快充{mc.group(1)}–{mc.group(2)}%约{mc.group(3)}min"
         # v10.9.0：查不到电芯时标注原因（用户确认沿用 kWh/万元 的「—（原因）」样式）。
-        if brand in (None, "", "—"):
+        if brand == "未披露":
             reason = fr.get("电芯_缺失原因")
             return f"—（{reason}）" if reason else "—"
         return brand

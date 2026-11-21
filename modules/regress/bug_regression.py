@@ -124,6 +124,7 @@ CASES = [
     ("BUG-099", "碰撞核验状态无时间戳且每次出榜重复抓取:当天无法复用、跨天不失效", "v10.8.0"),
     ("BUG-100", "极氪7X/阿维塔07电池来源空白:事实库无此车且缺联网兜底与缺失原因标注", "v10.9.0"),
     ("BUG-101", "同一车辆事实散落5处各自手写:改一处漏多处、无唯一真相源与漂移检测", "v10.10.0"),
+    ("BUG-102", "import别名碰撞:space_features的SF覆盖score_fingerprint的SF,报告段SF.skill_version()崩溃", "v10.10.1"),
 ]
 
 
@@ -3024,8 +3025,39 @@ def t101():
     return "车辆事实单一源：契约种子唯一可写+统一读取+漂移自检+电耗口径不合并(+t101)"
 
 
+def t102():
+    """import 别名碰撞门禁（v10.10.1 修 pipeline 出榜崩溃）：同一生产模块内
+    同一别名先后指向两个不同模块——space_features as SF 覆盖了
+    score_fingerprint as SF，报告段 SF.skill_version() 实际调到 space_features
+    直接 AttributeError。regress 包除外：测试函数内局部导入，跨函数不共享
+    作用域，无运行态碰撞（pipeline 的碰撞在 main 同一函数内，才是致命的）。"""
+    import re
+    from pathlib import Path
+    # 1) 修复标记：pipeline 里 space_features 已用独立别名 SPF，SF 专指 score_fingerprint
+    src = _read("pipeline.py")
+    assert "import space_features as SPF" in src, "space_features 别名未独立（仍为 SF）"
+    assert "import score_fingerprint as SF" in src, "score_fingerprint 别名丢失"
+    # 2) 通用扫描：生产模块（regress 除外）内别名碰撞零容忍
+    collided = []
+    for f in sorted(Path(paths.MODULES).glob("*/*.py")):
+        if f.parent.name == "regress":
+            continue
+        am: dict = {}
+        for m in re.finditer(r"\b(?:from\s+[\w.]+\s+)?import\s+([\w.]+)\s+as\s+(\w+)",
+                             f.read_text(encoding="utf-8")):
+            am.setdefault(m.group(2), set()).add(m.group(1))
+        for alias, mods in am.items():
+            if len(mods) > 1:
+                collided.append(f"{f.relative_to(paths.ROOT)}: {alias} -> {sorted(mods)}")
+    assert not collided, "生产模块别名碰撞: " + "; ".join(collided)
+    # 3) 运行态归属：skill_version 属于 score_fingerprint（报告段 SF.skill_version() 的调用方）
+    from modules.engine import score_fingerprint as _SF
+    assert callable(_SF.skill_version) and _SF.skill_version(), "skill_version 不可调用"
+    return "别名碰撞门禁：pipeline SF/SPF 分离 + 生产模块零碰撞扫描 + skill_version 归属(+t102)"
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102]
 
 
 def run():

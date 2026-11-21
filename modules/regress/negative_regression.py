@@ -92,6 +92,8 @@ NEG_TARGETS = {
     "t100": ["def parse_brands"],
     # t101：抹掉主链一致性门禁断言（回到「无漂移检测、静默不同步」），应 FAIL
     "t101": ["vehicle_facts_consistency"],
+    # t102：抹掉 space_features 独立别名标记（回到「SF 别名被覆盖、报告段崩溃」），应 FAIL
+    "t102": ["import space_features as SPF"],
 }
 
 # 数据断言型：测试名 -> (文件路径, 车型/键, 篡改模式)

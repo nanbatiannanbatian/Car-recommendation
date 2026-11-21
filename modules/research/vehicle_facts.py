@@ -26,7 +26,7 @@
 
 用法：
     from modules.research import vehicle_facts as VF
-    rec = VF.cell("极氪7X")          # -> {brand, kwh, tier, source, date, quote, origin}
+    rec = VF.cell("极氪7X")          # -> {brand, kwh, tier, price, source, date, quote, origin}
     VF.consistency_report()          # -> {"ok": bool, "drifts": [...]}
     python3 -m modules.research.vehicle_facts --selftest
 """
@@ -58,12 +58,12 @@ def cell(model: str) -> dict | None:
     k = canon(model)
     r = _SEED_BY_KEY.get(k)
     if r:
-        return {"brand": r[5], "kwh": r[4], "tier": r[6], "source": r[7],
-                "date": r[8], "quote": r[9], "origin": "seed"}
+        return {"brand": r[5], "kwh": r[4], "tier": r[6], "price": r[3],
+                "source": r[7], "date": r[8], "quote": r[9], "origin": "seed"}
     r = _LEGACY_BY_KEY.get(k)
     if r:
-        return {"brand": r[2], "kwh": r[1], "tier": None, "source": r[3],
-                "date": "", "quote": r[4], "origin": "legacy"}
+        return {"brand": r[2], "kwh": r[1], "tier": None, "price": None,
+                "source": r[3], "date": "", "quote": r[4], "origin": "legacy"}
     # 派生 JSON 兜底（新装包没有这些文件也无害）
     for path, is_entries in ((_CELL_FACTS, True), (_FACT_LIBRARY, False)):
         rec = _cell_from_json(path, k, is_entries)
@@ -83,7 +83,8 @@ def _cell_from_json(path: str, key: str, entries: bool) -> dict | None:
         for e in doc.get("entries") or []:
             if canon(e.get("model")) == key and e.get("cell_brand"):
                 return {"brand": e["cell_brand"], "kwh": e.get("battery_kwh"),
-                        "tier": e.get("cell_tier"), "source": e.get("source_url", ""),
+                        "tier": e.get("cell_tier"), "price": e.get("price"),
+                        "source": e.get("source_url", ""),
                         "date": e.get("verified", ""), "quote": e.get("quote", ""),
                         "origin": "json:cell_facts"}
     else:
@@ -91,7 +92,8 @@ def _cell_from_json(path: str, key: str, entries: bool) -> dict | None:
             if canon(m) == key and isinstance(v, dict) and v.get("cell_brand"):
                 src = v.get("_source") or {}
                 return {"brand": v["cell_brand"], "kwh": v.get("kwh"),
-                        "tier": None, "source": src.get("cell_src", ""),
+                        "tier": None, "price": v.get("price"),
+                        "source": src.get("cell_src", ""),
                         "date": src.get("verified", ""), "quote": src.get("cell_quote", ""),
                         "origin": "json:fact_library"}
     return None
@@ -113,10 +115,12 @@ def iter_authoritative_cells() -> list[dict]:
     out: dict[str, dict] = {}
     for r in SEED.CELL_LEGACY:            # (model, kwh, brand, source, quote)
         out[canon(r[0])] = {"model": r[0], "kwh": r[1], "cell_brand": r[2],
-                            "trim": "", "source": r[3], "origin": "legacy"}
+                            "trim": "", "price": None, "tier": None,
+                            "source": r[3], "origin": "legacy"}
     for r in SEED.CELL_SEED:              # (model, board, trim, price, kwh, brand, tier, source, date, quote)
         out[canon(r[0])] = {"model": r[0], "kwh": r[4], "cell_brand": r[5],
-                            "trim": r[2], "source": r[7], "origin": "seed"}
+                            "trim": r[2], "price": r[3], "tier": r[6],
+                            "source": r[7], "origin": "seed"}
     return list(out.values())
 
 
@@ -181,6 +185,9 @@ def selftest() -> int:
         rec = cell(name)
         assert rec and rec["brand"] == expect, (name, rec)
         assert rec["origin"] == "seed", (name, rec["origin"])
+    # price 字段（v10.10.1：ev_cell_board 度数比需要评分配置指导价）
+    assert cell("极氪7X")["price"] == 24.98, cell("极氪7X")
+    assert cell("MG4")["price"] is None, "legacy 无独立核验价格"
     # 车名归一化：带空格/纯电后缀命中同一权威
     assert cell("阿维塔07")["brand"] == cell("阿维塔07 纯电版")["brand"]
     # legacy 兜底：seed 外的车仍可查到

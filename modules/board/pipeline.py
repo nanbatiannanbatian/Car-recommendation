@@ -403,10 +403,10 @@ def main():
     # 空间要素结构化（2026-11-21 用户问「空间要考虑前备箱/下沉后备箱/储物/真实表现吗」）：
     # 从 evidence.space_evidence 提取两类——real(得房率/膝部/腿部/间距，参与上面的校验)
     # 与 storage(前备箱/后备箱/下沉储物，仅披露不进分)。只提取不打分，不碰渲染层。
-    from modules.engine import space_features as SF
-    _sf_per_car = {c["model"]: SF.extract_space_features(c) for c in cands}
+    from modules.engine import space_features as SPF
+    _sf_per_car = {c["model"]: SPF.extract_space_features(c) for c in cands}
     _sf_per_car = {m: f for m, f in _sf_per_car.items() if f}
-    _sf_sum = SF.summarize(_sf_per_car)
+    _sf_sum = SPF.summarize(_sf_per_car)
 
     if _space_adj:
         print("[空间一致性封顶] " + " / ".join(
@@ -593,13 +593,13 @@ def main():
     if _sf_per_car:
         _sf_real_lines, _sf_store_lines = [], []
         for _m, _feats in list(_sf_per_car.items())[:8]:
-            _g = SF.by_category(_feats)
-            if _g[SF.CAT_REAL]:
+            _g = SPF.by_category(_feats)
+            if _g[SPF.CAT_REAL]:
                 _sf_real_lines.append(_m + "：" + "、".join(
-                    f"{x['label']}{x['value']:g}{x['unit']}" for x in _g[SF.CAT_REAL]))
-            if _g[SF.CAT_STORAGE]:
+                    f"{x['label']}{x['value']:g}{x['unit']}" for x in _g[SPF.CAT_REAL]))
+            if _g[SPF.CAT_STORAGE]:
                 _sf_store_lines.append(_m + "：" + "、".join(
-                    f"{x['label']}{x['value']:g}{x['unit']}" for x in _g[SF.CAT_STORAGE]))
+                    f"{x['label']}{x['value']:g}{x['unit']}" for x in _g[SPF.CAT_STORAGE]))
         _parts_sf = [f"> **空间要素披露**（从 `evidence.space_evidence` 结构化，"
                      f"{_sf_sum['cars_with_features']} 款有数据；只披露/校验不直接加分）："]
         if _sf_real_lines:

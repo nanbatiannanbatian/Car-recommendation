@@ -45,9 +45,51 @@ HDR = {"User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537
                       "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"),
        "Referer": "https://car.autohome.com.cn/"}
 CONFIG_URL = "https://car.autohome.com.cn/config/series/{}.html"
+# 移动版参数页字段名**不混淆**：桌面版把「快充/慢充/高压平台」等关键词用
+# <span class='hs_kwNN_configFG'></span> 挖空，清洗后退化成同名的「电池(小时)」，
+# 快充与慢充无法区分（实测极氪7X/启源Q06 两版对比）。两版字段 id 一致，
+# 所以：优先移动版取干净字段名，桌面版作兜底（靠 id 定位）。
+CONFIG_URL_MOBILE = "https://car.autohome.com.cn/config/series/{}.html?mobile=1"
 SLEEP = 0.12
 MAX_TRIMS = 14
 TODAY = dt.date.today().isoformat()
+
+# 汽车之家参数页「电池/充电」组的关键字段 id（2026-11-21 实测极氪7X/启源Q06 确认，
+# 跨车系稳定）。用 id 定位而不是字段名——桌面版字段名被 CSS 挖空后重名，
+# 靠名字匹配必然张冠李戴。
+AH_BAT_IDS = {
+    "cell_supplier": 9015,   # 电芯品牌（很多车留空，不推断）
+    "battery_tech": 9020,    # 电池特有技术（麒麟/刀片/金钟罩…）
+    "consumption": 1290,     # 百公里耗电(kWh/100km)——官方电耗，一手数据
+    "voltage": 9027,         # 高压平台（V）——「电池来源」列的 V 电压数据来源
+    "fast_charge_h": 9028,   # 电池快充时间(小时)
+    "charge_range": 9030,    # 电池快充区间(%)，如 10-80
+    "charge_power_kw": 8459,  # 对外充电功率(kW)——超充能力；无快充时间的车靠它
+    "swap": 8456,             # 换电——补能方式（蔚来/乐道等）
+}
+
+# 官方产品名 → 电芯厂商。这是厂商自己的产品命名（刀片=弗迪、麒麟=宁德），
+# 属可核验的官方字段映射，不是推断；映射结果在 note 里标明来源字段。
+TECH_TO_SUPPLIER = {
+    "麒麟": "宁德时代", "神行": "宁德时代", "短刀": "宁德时代", "卧龙": "宁德时代",
+    "刀片": "弗迪", "金砖": "弗迪", "神盾": "弗迪",
+    "金钟罩": "中创新航", "晓光": "中创新航",
+    "蜂巢": "蜂巢能源", "无风": "蜂巢能源",
+    "因湃": "弗迪", "海豚": "弗迪",
+    "国轩": "国轩高科", "欣旺达": "欣旺达", "亿纬": "亿纬锂能",
+    "太行": "宁德时代", "驿": "宁德时代",
+}
+
+
+def supplier_from_tech(tech: str) -> str:
+    """电池特有技术 → 电芯厂商（官方产品名映射，命中多个取最长关键词）。"""
+    t = str(tech or "")
+    if not t:
+        return ""
+    hits = [(len(k), v) for k, v in TECH_TO_SUPPLIER.items() if k in t]
+    if not hits:
+        return ""
+    return max(hits)[1]
 
 
 def norm(s):
@@ -183,6 +225,34 @@ def find_sid_remote(model, index=None, timeout=25):
     return None, None, None
 
 
+def _fetch_config_json(sid) -> tuple[dict | None, str]:
+    """抓参数页的 config JSON。优先移动版（字段名不混淆），桌面版兜底。
+
+    为什么要移动版优先（2026-11-21 实测）：
+      桌面版把「快充/慢充/高压平台」等关键词用 <span class='hs_kwNN_configFG'>
+      挖空，clean() 之后「电池快充时间(小时)」和「电池慢充时间(小时)」都退化成
+      「电池(小时)」——同名字段互相覆盖，快充永远取不到。移动版字段名完整，
+      两版的字段 id 一致，所以移动版取干净名字、桌面版按 id 兜底。
+    """
+    last = ""
+    for url in (CONFIG_URL_MOBILE, CONFIG_URL):
+        try:
+            r = requests.get(url.format(sid), headers=HDR, timeout=25)
+            r.encoding = r.apparent_encoding
+        except Exception as ex:                        # noqa: BLE001
+            last = f"请求失败 {type(ex).__name__}"
+            continue
+        m = re.search(r"var config\s*=\s*(\{.*?\});\s*(?:var|\n)", r.text, re.S)
+        if not m:
+            last = "no config JSON"
+            continue
+        try:
+            return json.loads(m.group(1)), ""
+        except Exception as ex:                        # noqa: BLE001
+            last = f"config JSON 解析失败 {type(ex).__name__}"
+    return None, last or "参数页不可达"
+
+
 def parse_config(sid, pure_ev_only=True):
     """解析参数页。pure_ev_only=True 时按「能源类型」列只保留纯电动款型。
 
@@ -190,27 +260,31 @@ def parse_config(sid, pure_ev_only=True):
     纯电款型放在同一个 config 矩阵里。纯电四榜的逐配置表若不过滤，会把
     9.68 万的 DM-i 当成纯电入门配置，直接违反「销量/价格必须纯电拆分」纪律。
     """
-    r = requests.get(CONFIG_URL.format(sid), headers=HDR, timeout=25)
-    r.encoding = r.apparent_encoding
-    m = re.search(r"var config\s*=\s*(\{.*?\});\s*(?:var|\n)", r.text, re.S)
-    if not m:
-        return None, "no config JSON"
-    try:
-        cfg = json.loads(m.group(1))
-    except Exception as e:
-        return None, f"config JSON 解析失败 {type(e).__name__}"
+    cfg, err = _fetch_config_json(sid)
+    if cfg is None:
+        return None, err
     pt = (cfg.get("result") or {}).get("paramtypeitems") or []
     specs = {}
+    bat: dict[str, dict] = {}          # specid → 电池组关键字段（按 id 定位）
     price_cols = []
     for gi, grp in enumerate(pt):
+        gname = str(grp.get("groupname") or grp.get("name") or "")
+        in_bat_group = "电池" in gname
         for ii, it in enumerate(grp.get("paramitems") or []):
             nm = clean(it.get("name"))
+            fid = it.get("id")
             vals = [clean(v.get("value")) for v in (it.get("valueitems") or [])]
             ids = [v.get("specid") for v in (it.get("valueitems") or [])]
             for sid2, val in zip(ids, vals):
                 if sid2 is None:
                     continue
                 specs.setdefault(sid2, {})[nm] = val
+                if in_bat_group:
+                    slot = bat.setdefault(sid2, {})
+                    for key, want_id in AH_BAT_IDS.items():
+                        if fid == want_id:
+                            slot.setdefault(key, val)
+                    slot.setdefault("_names", {})[nm] = val
             # 按 specid 记录能源类型（同一列在基本参数/底盘两组里会重复出现）
             if nm == "能源类型":
                 for sid2, val in zip(ids, vals):
@@ -276,15 +350,115 @@ def parse_config(sid, pure_ev_only=True):
         motor = num("电动机总功率", "电机总功率", "最大功率")
         btype = next((v for k, v in fields.items()
                       if "电池类型" in k and v and v not in ("-", "—")), None)
+
+        # ---- 电池组关键字段（2026-11-21 新增）----
+        # 这些字段汽车之家参数页一直有，但此前解析时直接写死 None，等于
+        # 「采到了却没提取」：电池来源列因此永远没有 V 电压，三电分也拿不到
+        # 800V/快充加分（极氪7X 被压到低于 15 万的 T6 的根因之一）。
+        b = bat.get(sid2, {})
+        bn = b.get("_names", {})
+
+        def _bv(key, *names):
+            """电池字段取值：id 定位优先，清洗后字段名兜底。"""
+            v = b.get(key)
+            if v not in (None, "", "-", "—"):
+                return v
+            for n in names:
+                if bn.get(n) not in (None, "", "-", "—"):
+                    return bn[n]
+            return None
+
+        volt_n = None
+        v_raw = _bv("voltage", "高压平台（V）", "高压平台(V)")
+        if v_raw:
+            mv = re.search(r"(\d{3,4})", str(v_raw))
+            if mv:
+                volt_n = int(mv.group(1))
+        rng_pair = None
+        r_raw = _bv("charge_range", "电池范围(%)")
+        if r_raw:
+            mr = re.search(r"(\d+)\s*[-–]\s*(\d+)", str(r_raw))
+            if mr:
+                rng_pair = (int(mr.group(1)), int(mr.group(2)))
+        fast_min = None
+        h_raw = _bv("fast_charge_h", "电池(小时)")
+        if h_raw:
+            mf = re.search(r"(\d+(?:\.\d+)?)", str(h_raw))
+            if mf:
+                fast_min = round(float(mf.group(1)) * 60)
+        if fast_min is None:
+            m_raw = _bv("fast_charge_min", "电池(分钟)")
+            if m_raw:
+                mf = re.search(r"(\d+(?:\.\d+)?)", str(m_raw))
+                if mf:
+                    fast_min = round(float(mf.group(1)))
+        # charge 文本口径必须与 trim_board.spec_from_trim 的解析器对齐：
+        #   "800V · 10–80% 约 10min" → platform_800v=True、charge_10_80_min=10
+        cparts = []
+        if volt_n:
+            cparts.append(f"{volt_n}V")
+        if fast_min:
+            if rng_pair:
+                cparts.append(f"{rng_pair[0]}–{rng_pair[1]}% 约 {fast_min}min")
+            else:
+                cparts.append(f"约 {fast_min}min")
+        charge = " · ".join(cparts) if cparts else None
+
+        tech = _bv("battery_tech", "电池特有技术")
+        cell_raw = _bv("cell_supplier", "电芯品牌")
+        cell_supplier, cell_src = None, ""
+        if cell_raw:
+            cell_supplier, cell_src = str(cell_raw), "电芯品牌"
+        elif tech:
+            mapped = supplier_from_tech(tech)
+            if mapped:
+                cell_supplier, cell_src = mapped, f"电池特有技术（{tech}）"
+
+        cons_n = None
+        c_raw = _bv("consumption", "百公里耗(kWh/100km)", "百公里耗电量(kWh/100km)")
+        if c_raw:
+            mc = re.search(r"(\d+(?:\.\d+)?)", str(c_raw))
+            if mc:
+                cons_n = float(mc.group(1))
+
+        # 对外充电功率(kW)：「电池/充电」组的「功率(kW)」= 最大充电功率。
+        # 有一批车（特斯拉/小鹏MONA 等）参数页**不给**快充时间与电压，
+        # 只有这个功率字段——它是快充能力的唯一一手依据。
+        power_kw = None
+        p_raw = _bv("charge_power_kw", "功率(kW)")
+        if p_raw:
+            mp = re.search(r"(\d+(?:\.\d+)?)", str(p_raw))
+            if mp:
+                power_kw = float(mp.group(1))
+
+        swap = None
+        s_raw = _bv("swap", "换电")
+        if s_raw and str(s_raw).strip() not in ("-", "—"):
+            swap = str(s_raw).strip()
+
         yr = re.search(r"(20\d{2})款", name)
+        bits = ["自动解析自汽车之家参数页"]
+        if cell_src:
+            bits.append(f"电芯取自「{cell_src}」")
+        if charge:
+            bits.append("电压/快充取自「高压平台(V)」与「电池快充时间/区间」")
+        if power_kw is not None:
+            bits.append("最大充电功率取自「电池/充电」组的「功率(kW)」")
+        if cons_n is not None:
+            bits.append("官方电耗取自「百公里耗(kWh/100km)」")
+        if swap:
+            bits.append(f"补能方式取自「换电」（{swap}）")
+        bits.append("质保/上市时长/媒体配置亮点未取得，记 null")
         out.append({
             "name": name, "price": round(price, 2),
             "energy_type": energy or None,
             "battery_kwh": kwh, "battery_type": btype,
-            "cell_supplier": None, "supplier_class": "undisclosed",
-            "cltc_km": cltc, "charge": None, "motor_kw": motor,
+            "cell_supplier": cell_supplier,
+            "supplier_class": ("single_named" if cell_supplier else "undisclosed"),
+            "cltc_km": cltc, "charge": charge, "motor_kw": motor,
+            "consumption": cons_n, "charge_power_kw": power_kw, "swap": swap,
             "key_configs": [], "group": (yr.group(1) + "款") if yr else "在售",
-            "note": "自动解析自汽车之家参数页；电芯供应商/补能/质保未取得，记 null",
+            "note": "；".join(bits),
         })
     # 去重 + 按价格升序
     seen, uniq = set(), []
@@ -306,6 +480,35 @@ def board_of(c):
     if "SUV" in cls:
         return "中大型纯电SUV（≤18万）" if "中大型" in cls else "中型纯电SUV（≤16万）"
     return "中大型纯电轿车（≤18万）" if "中大型" in cls else "中型纯电轿车（≤16万）"
+
+
+def _quote_of(trims_list: list[dict]) -> str:
+    """配置表的取证引文（补录与刷新共用，保证两处口径一致）。"""
+    prices = [t["price"] for t in trims_list if t.get("price") is not None]
+    kwhs = [t["battery_kwh"] for t in trims_list if t.get("battery_kwh")]
+    cltcs = [t["cltc_km"] for t in trims_list if t.get("cltc_km")]
+    volts = sorted({int(re.match(r"(\d+)V", str(t.get("charge") or "")).group(1))
+                    for t in trims_list
+                    if t.get("charge") and re.match(r"(\d+)V", str(t["charge"]))})
+    cells = sorted({str(t["cell_supplier"]) for t in trims_list if t.get("cell_supplier")})
+    if not prices:
+        return "汽车之家参数页"
+    return (f"汽车之家参数页：{len(trims_list)} 个在售款型，指导价 {min(prices):g}–{max(prices):g} 万"
+            + (f"；电池 {min(kwhs):g}–{max(kwhs):g}kWh" if kwhs else "")
+            + (f"；CLTC {min(cltcs):.0f}–{max(cltcs):.0f}km" if cltcs else "")
+            + (f"；高压平台 {'/'.join(str(v) for v in volts)}V" if volts else "")
+            + (f"；电芯 {'/'.join(cells)}" if cells else ""))
+
+
+def _missing_fields(trims_list: list[dict]) -> list[str]:
+    """该车系配置表还缺哪些字段（partial_fields 契约）。"""
+    missing = []
+    if not any(t.get("cell_supplier") for t in trims_list):
+        missing.append("cell_supplier")
+    if not any(t.get("charge") for t in trims_list):
+        missing.append("charge")
+    missing += ["launch_date", "key_configs", "supplier_verification"]
+    return missing
 
 
 def make_entry(c, sid, ah_name, how, trims_list, pure_ev_only=True):
@@ -337,33 +540,129 @@ def make_entry(c, sid, ah_name, how, trims_list, pure_ev_only=True):
     prices = [t["price"] for t in trims_list]
     kwhs = [t["battery_kwh"] for t in trims_list if t["battery_kwh"]]
     cltcs = [t["cltc_km"] for t in trims_list if t["cltc_km"]]
-    quote = (f"汽车之家参数页：{len(trims_list)} 个在售款型，指导价 {min(prices):g}–{max(prices):g} 万"
-             + (f"；电池 {min(kwhs):g}–{max(kwhs):g}kWh" if kwhs else "")
-             + (f"；CLTC {min(cltcs):.0f}–{max(cltcs):.0f}km" if cltcs else ""))
+    quote = _quote_of(trims_list)
+    missing = _missing_fields(trims_list)
     return {
         "model": c["model"], "in_board": True, "board": board_of(c),
         "scored_trim": (tr.get("name") or "—"), "launch_date": None,
-        "source": "汽车之家车系参数页（自动解析：款型名 / 官方指导价 / 电池能量 / CLTC）",
-        "url": CONFIG_URL.format(sid), "date": TODAY,
+        "source": ("汽车之家车系参数页（自动解析：款型名 / 官方指导价 / 电池能量 / CLTC / "
+                   "电芯品牌 / 高压平台V / 快充时间与区间 / 官方电耗）"),
+        "url": CONFIG_URL_MOBILE.format(sid), "date": TODAY,
         "source_type": "official_config_page_auto",
         "quote": quote,
         "note": (f"自动补录，目标车系「{ah_name}」匹配方式 {how}。"
                  + ("已按参数页「能源类型」列只保留纯电动款型，"
                     "排除同车系 DM-i / 增程 / 燃油款型；" if pure_ev_only else "")
-                 + "只采信参数页里的结构化字段；电芯供应商、补能速度、上市时长、"
-                 "媒体口径的配置亮点均未取得，显式记 null / 空数组，不推断、不加分。"
-                 "这是部分事实条目，证据密度低于人工核验条目（source_type 可区分）。"),
+                 + "只采信参数页里的结构化字段；电芯逐配置取自「电芯品牌」，"
+                   "该字段为空时按「电池特有技术」的官方产品名映射厂商（如刀片→弗迪、"
+                   "麒麟→宁德、金钟罩→中创新航），来源写在各配置 note 里。"
+                   "电压取自「高压平台(V)」，快充取自「电池快充时间/区间」，"
+                   "官方电耗取自「百公里耗(kWh/100km)」。"
+                   "上市时长与媒体口径的配置亮点未取得，显式记 null / 空数组，不推断、不加分。"
+                   "这是部分事实条目，证据密度低于人工核验条目（source_type 可区分）。"),
         "trim_class": "undisclosed",
         "pure_ev_filtered": bool(pure_ev_only),
         "validation_note": None, "user_claim_check": None,
         "auto_parsed": True,
-        "partial_fields": ["cell_supplier", "charge", "launch_date", "key_configs",
-                           "supplier_verification"],
+        "partial_fields": missing,
         "trims": trims_list,
         "price_band_max": band_of(c),
         "scored_trim_ref": ref,
         "scored_trim_ref_basis": ref_basis,
     }
+
+
+def _fill_missing_trim_fields(entry: dict) -> int:
+    """给条目里每个配置补齐契约要求的字段（缺证据写 null）。返回补齐的字段数。"""
+    from modules.contracts.trims_schema import TRIM_FIELDS
+    n = 0
+    for t in entry.get("trims") or []:
+        for k in TRIM_FIELDS:
+            if k not in t:
+                t[k] = None
+                n += 1
+    return n
+
+
+def refresh_entries(db: dict, index: dict, cands: list[dict],
+                    out_path: str, dry_run: bool = False) -> int:
+    """刷新已在库里的**自动补录**条目（重抓参数页补齐电压/快充/电芯/官方电耗）。
+
+    为什么必须有这个入口（2026-11-21）：
+      auto_trims 原来只补新车型（`todo = 不在库里的`）。解析器修好之后，
+      库里已有的 71 款永远拿不到新字段——**改了生成器不重跑，等于没改**。
+      这正是「不许打补丁」原则要治的病：修根因必须能作用到存量产物。
+
+    纪律：
+      · 只更新**同名配置**的字段，不新增/删除配置——避免动 scored_trim_ref 引用。
+      · 人工核验条目（trims_manual）的事实一个字不改，只补齐契约新增字段的 null。
+      · 空值不覆盖已有值（宁可不填，不抹掉人工核验结果）。
+    """
+    from modules.research import trim_sources as TS
+    by_model = {e["model"]: e for e in db["entries"]}
+    updated: list[str] = []
+    skipped: list[tuple[str, str]] = []
+    for c in cands:
+        m = c.get("model")
+        e = by_model.get(m)
+        if not e:
+            continue
+        _fill_missing_trim_fields(e)
+        if not e.get("auto_parsed"):
+            continue                      # 人工条目：只补 null，不改事实
+        # ① 优先复用条目自带 url 里的 sid 直接重抓。车系匹配会漂移：
+        #    MONA L05 的 sid 8662 是远程检索来的，本地索引里没有，重新匹配必失败
+        #    ——改了生成器却作用不到存量条目，等于没改。
+        tl, how = None, "url_reuse"
+        ms = re.search(r"/series/(\d+)\.html", str(e.get("url") or ""))
+        if ms:
+            tl, _err = parse_config(ms.group(1))
+        if not tl:
+            res = TS.collect_trims(m, index, parse_config,
+                                   find_sid_local=find_sid_local,
+                                   find_sid_remote=find_sid_remote)
+            if res.get("status") != "ok":
+                skipped.append((m, TS.summarize_attempts(res.get("attempts") or [])))
+                continue
+            tl, how = res.get("trims"), res.get("source")
+        old = {t.get("name"): t for t in (e.get("trims") or [])}
+        hits = 0
+        for t in tl or []:
+            o = old.get(t.get("name"))
+            if not o:
+                continue
+            for k in ("cell_supplier", "supplier_class", "charge",
+                      "consumption", "charge_power_kw", "swap", "battery_type"):
+                nv = t.get(k)
+                if nv in (None, "", "—"):
+                    continue
+                if o.get(k) != nv:
+                    o[k] = nv
+                    hits += 1
+        e["date"] = TODAY
+        e["quote"] = _quote_of(e.get("trims") or [])
+        e["partial_fields"] = _missing_fields(e.get("trims") or [])
+        e["source"] = ("汽车之家车系参数页（自动解析：款型名 / 官方指导价 / 电池能量 / CLTC / "
+                       "电芯品牌 / 高压平台V / 快充时间与区间 / 官方电耗 / 换电）")
+        e["note"] = (f"自动补录，目标车系「{m}」匹配方式 {how}。"
+                     + "已按参数页「能源类型」列只保留纯电动款型，"
+                       "排除同车系 DM-i / 增程 / 燃油款型；"
+                     + "只采信参数页里的结构化字段；电芯逐配置取自「电芯品牌」，"
+                       "该字段为空时按「电池特有技术」的官方产品名映射厂商（如刀片→弗迪、"
+                       "麒麟→宁德、金钟罩→中创新航），来源写在各配置 note 里。"
+                       "电压取自「高压平台(V)」，快充取自「电池快充时间/区间」，"
+                       "官方电耗取自「百公里耗(kWh/100km)」。"
+                       "上市时长与媒体口径的配置亮点未取得，显式记 null / 空数组，不推断、不加分。"
+                       "这是部分事实条目，证据密度低于人工核验条目（source_type 可区分）。")
+        if hits:
+            updated.append(f"{m}({hits}字段)")
+        time.sleep(SLEEP)
+    # 契约新增字段在所有条目（含带外示例）补齐
+    for e in db.get("entries", []) + db.get("out_of_board_examples", []):
+        _fill_missing_trim_fields(e)
+    if not dry_run:
+        json.dump(db, open(out_path, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+    return len(updated)
 
 
 def main():
@@ -375,6 +674,9 @@ def main():
     ap.add_argument("--seed-only", action="store_true",
                     help="只从 categories/trims_manual.json 生成基础库（不联网、不需候选池）")
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--refresh", action="store_true",
+                    help="刷新已在库里的自动补录条目（重抓参数页补齐电压/快充/电芯/官方电耗）；"
+                         "人工核验条目不动，只补齐契约新增字段的 null")
     ap.add_argument("--no-pure-ev-filter", action="store_true",
                     help="不按能源类型过滤款型（仅用于调试，纯电榜禁止使用）")
     a = ap.parse_args()
@@ -392,6 +694,21 @@ def main():
     have = {e["model"] for e in db["entries"]}
     todo = [c for c in cands if c["model"] not in have]
     print(f"待补 {len(todo)} 款；已有 {len(have)} 款", file=sys.stderr)
+
+    if getattr(a, "refresh", False):
+        out = a.out or a.db
+        n = refresh_entries(db, index, cands, out, dry_run=a.dry_run)
+        if not a.dry_run:
+            errs = validate_trims(db)
+            if errs:
+                print("[校验失败]", file=sys.stderr)
+                for e in errs[:20]:
+                    print("  ", e, file=sys.stderr)
+                sys.exit(1)
+            print(f"\n[refresh] 已刷新 {n} 款自动条目的字段，契约校验通过 → {out}")
+        else:
+            print(f"\n[dry-run] 将刷新 {n} 款")
+        return 0
 
     from modules.research import trim_sources as TS
     added, skipped = [], []
