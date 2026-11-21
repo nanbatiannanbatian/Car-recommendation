@@ -25,6 +25,7 @@ modules/
     model_names.py           车名归一化 canon
   research/                  取数 · 检索 · 证据采集（**唯一网络出口，代码强制**）
     trim_sources.py          多源调度：索引→站点检索→存在性核对，attempts 留痕
+    fill_experience.py       证据补采：PPH/样本量回填（fill_pph 可库调用）
     researcher.py            站点画像检索（17 站点）+ 广告识别 + 博主可信度
     fetch_dcd_sales.py       懂车帝逐月销量（纯电/插混/增程拆分）
     fetch_cncap.py           C-NCAP 官方成绩

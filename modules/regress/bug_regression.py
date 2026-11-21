@@ -103,6 +103,7 @@ CASES = [
     ("BUG-078", "无碰撞成绩车安全分可高于有实锤车(MONA L05 8.6 > bZ5 8.0)", "v10.2.2"),
     ("BUG-079", "得分率→分数存在两套实现(engine cap9.3 vs research cap10/floor6)", "v10.2.3"),
     ("BUG-080", "无实测车体验维度可断层最高(MONA adas9.4 vs 有实测G6 7.6)", "v10.2.4"),
+    ("BUG-081", "维度证据门槛散落成多个特判函数,新增维度需再打补丁(quality漏网)", "v10.2.5"),
 ]
 
 
@@ -1911,13 +1912,69 @@ def t080():
     # adjust 门禁：源码必须有「非 0 必须写 reason」的拦截
     src = _read("pipeline.py")
     assert "adjust_reason" in src and "adjust 门禁" in src, "pipeline 缺 adjust 黑箱门禁"
-    assert "cap_unproven" in src, "pipeline 未接体验封顶"
-    assert "dimension_cap" in src, "summary 缺体验封顶审计"
+    # 体验封顶已并入统一证据门槛（v10.2.5），pipeline 不再单独调 cap_unproven
+    assert "evidence_gate" in src, "pipeline 未接证据门槛（体验维度在 DIM_POLICY 里）"
+    assert "dimension_cap" in src or "cap_unproven" in src, "summary 缺封顶审计"
     return "体验封顶：无依据≤有实测最低、vendor_claim 不算依据、空间不封顶、adjust 必须有 reason"
 
 
+def t081():
+    """维度证据门槛必须是一张统一的策略表，不是一个个特判函数。
+
+    2026-11-21 用户要求「其他五个维度是不是也要修改，一并修改掉」+「代码层面确保以后其他车不会一样问题」。
+    此前 safety 有 evidence_cap、体验有 cap_unproven，各自特判；quality 完全漏网
+    （0 个口碑样本的 MONA 拿 8.0，而 64 样本的零跑C11 只有 4.29）。
+    现在统一到 evidence_gate.DIM_POLICY：加维度只加一行，不用再写函数。
+    """
+    from modules.engine import evidence_gate as EG
+
+    # 1) 策略表必须覆盖 8 维，且明确区分「封顶 / 不封顶」
+    need_cap = {"safety", "adas", "cabin", "control", "quality"}
+    no_cap = {"space", "value", "powertrain"}
+    assert set(EG.DIM_POLICY) >= need_cap | no_cap, EG.DIM_POLICY.keys()
+    assert {d for d, r in EG.DIM_POLICY.items() if r.get("cap_to")} >= need_cap
+    assert set(EG.uncapped_dims()) >= no_cap, "纸面可判定维度被误纳入封顶"
+    for d in no_cap:
+        assert EG.DIM_POLICY[d]["cap_to"] is None, f"{d} 不该封顶"
+
+    # 2) quality 用中位（不是最低）：有样本的车分数低是因为问题被暴露，不是「合格线」
+    assert EG.DIM_POLICY["quality"]["cap_to"] == "median"
+    assert EG.DIM_POLICY["safety"]["cap_to"] == "min"
+
+    # 3) 行为：有证据不动、无证据封顶、全池无证据不封顶
+    cands = [
+        {"model": "有PPH", "ah_pph_usable": True, "ah_review_users": 80,
+         "scores": {"quality": 5.0, "space": 9.0}},
+        {"model": "零样本", "ah_pph_usable": False, "ah_review_users": 0,
+         "scores": {"quality": 8.0, "space": 9.3}},
+        {"model": "样本不足", "ah_pph_usable": False, "ah_review_users": 12,
+         "scores": {"quality": 7.5, "space": 8.8}},
+    ]
+    adj = EG.apply_all(cands, experience_lib={"entries": []}, only=("quality",))
+    # 只有 1 款有证据 → 中位 = 它自己的 5.0，其余封顶到 5.0
+    assert {a["model"] for a in adj} == {"零样本", "样本不足"}, adj
+    assert cands[0]["scores"]["quality"] == 5.0, "有证据的被改"
+    assert cands[1]["scores"]["quality"] == 5.0 and cands[2]["scores"]["quality"] == 5.0
+    # 空间不在 only 里 → 不被压
+    assert cands[1]["scores"]["space"] == 9.3
+    assert cands[1].get("score_cap_reasons"), "封顶未留原因"
+    # 全池无证据 → 不封顶
+    assert EG.apply_all([{"model": "甲", "scores": {"quality": 8.0}}],
+                        experience_lib={"entries": []}, only=("quality",)) == []
+
+    # 4) 补采器必须可复用（库调用），且样本门槛 30
+    from modules.research import fill_experience as FE
+    assert callable(FE.fill_pph) and FE.__dict__.get("__name__")
+    from modules.research import fetch_specs as FS
+    assert FS.PPH_MIN_SAMPLE == 30, "PPH 样本门槛被改"
+    # 5) pipeline 用统一入口
+    src = _read("pipeline.py")
+    assert "evidence_gate" in src and "apply_all" in src, "pipeline 未用统一证据门槛"
+    return "证据门槛统一：8维策略表/5封顶3不封顶/quality用中位/无证据不高于有证据/补采器可复用"
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081]
 
 
 def run():

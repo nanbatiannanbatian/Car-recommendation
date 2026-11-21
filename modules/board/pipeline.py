@@ -194,26 +194,20 @@ def main():
               + "、".join(f"{x['model']} {x['prev']}→{x['score']:g}" for x in _st_sync[:5])
               + ("…" if len(_st_sync) > 5 else "") + "）")
 
-    # 举证责任封顶（2026-11-21）：无官方碰撞成绩的车 safety 不得超过有实锤车最低分。
-    # 用户质疑 MONA L05「零碰撞成绩却 8.6、比 C-NCAP 86.7% 的 bZ5 还高」。
+    # 维度证据门槛（2026-11-21 统一）：safety 要碰撞成绩、adas/cabin/control 要实测、
+    # quality 要 PPH 样本；space/value/powertrain 纸面可判定，不封顶。
+    # 必须放在 crash 回流与安全映射之后，否则有成绩的车会被误判成「无证据」。
+    from modules.engine import evidence_gate as EG
     if getattr(a, "no_evidence_cap", False):
-        _cap_adj = []
+        _ev_adj = []
     else:
-        _cap_adj = SFC.evidence_cap(cands)
-    if _cap_adj:
-        print(f"[举证封顶] {len(_cap_adj)} 款无实锤车 safety 封顶至 "
-              f"{_cap_adj[0]['capped']:g}（锚点 {_cap_adj[0]['anchor']}）")
-
-    # 体验维度举证封顶（2026-11-21）：智驾/车机/操控这三类纸面看不出来，
-    # 无实测记录的车不得声称高于有实测的车。空间不封顶（轴距/车长是硬数据）。
-    from modules.engine import experience_score as ES
-    _dim_cap = ES.cap_unproven(cands)
-    if _dim_cap:
-        _by_model = {}
-        for x in _dim_cap:
-            _by_model.setdefault(x["model"], []).append(x["dim"])
-        print(f"[体验封顶] {len(_by_model)} 款无实测，{"、".join(f"{m}({'/'.join(d)})" for m, d in list(_by_model.items())[:5])}"
-              f" 封顶至有实测车最低分")
+        _ev_adj = EG.apply_all(cands)
+    _ev_sum = EG.summarize(_ev_adj)
+    _cap_adj = [x for x in _ev_adj if x["dim"] == "safety"]
+    _dim_cap = [x for x in _ev_adj if x["dim"] != "safety"]
+    if _ev_sum:
+        print("[证据封顶] " + " / ".join(f"{d} {v['count']}款→{v['cap']:g}"
+                                         for d, v in _ev_sum.items()))
 
     # adjust 黑箱门禁：总分加减必须留依据（此前 11 款 adjust 无 reason，不可审计）
     _adj_bad = [c.get("model") for c in cands
@@ -336,25 +330,12 @@ def main():
                  f"链路 取数→闸门→打分→稳健性→三档→审查。**全程无辩论。**")
     # v9.7.36：数据版本可追溯——读者知道分数是哪个 skill 版本/指纹生成的
     _gb = _pool_data.get("_generated_by") if isinstance(_pool_data, dict) else None
-    if _dim_cap:
-        _bm = {}
-        for x in _dim_cap:
-            _bm.setdefault(x["model"], set()).add(x["dim"])
-        parts.append(f"> **体验维度举证封顶**：{len(_bm)} 款无独立实测/车主样本，"
-                     f"智驾/车机/操控按「不超过有实测车最低分」封顶（空间不封顶，轴距车长为硬数据）。"
-                     f"涉及：{'、'.join(list(_bm)[:6])}{'…' if len(_bm) > 6 else ''}。"
-                     "纸面配置推断不能替代实车表现。")
-    if _cap_adj:
-        parts.append(f"> **安全分举证封顶**：{len(_cap_adj)} 款无官方碰撞成绩，safety 统一封顶至 "
-                     f"{_cap_adj[0]['capped']:g}（不超过有实锤车最低分，锚点 {_cap_adj[0]['anchor']}）。"
-                     "「没测过」不等于不安全，但不能被推断成「比测过的更安全」；"
-                     "该维度不用于区分这些车，差异请看其他维度。")
-    # 价格来源披露（2026-11-21）：回填了多少、哪些是真缺口，写在报告开头而不是藏在附录
-    if _p_filled:
-        parts.append(f"> **价格来源**：{len(_p_filled)} 款的指导价由 `trims.json` 官方配置页回填"
-                     f"（候选池原本缺 `price_guide`）："
-                     + "、".join(m for m, _ in _p_filled[:6])
-                     + ("…" if len(_p_filled) > 6 else "") + "。")
+    if _ev_sum:
+        _lines = "；".join(f"{d} {v['count']} 款 → {v['cap']:g}（锚点 {v['anchor']}）"
+                          for d, v in _ev_sum.items())
+        parts.append(f"> **维度证据封顶**：{_lines}。规则：无证据者不得超过有证据者，只封顶不倒扣"
+                     f"（缺数据不判劣）。**{'、'.join(EG.uncapped_dims())} 不封顶**——"
+                     "轴距/配置/三电参数是硬数据，可纸面判定。")
     if _sa:
         _chg = [x for x in _sa if x["prev"] is not None and abs(float(x["prev"]) - x["score"]) > 0.05]
         parts.append(f"> **安全分来源**：{len(_sa)} 款按官方碰撞成绩自动映射"

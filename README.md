@@ -67,6 +67,13 @@ WorkBuddy 用户级 skill。核心是「车型排行榜全链路」：按需搜�
     `universe_*`（盘点产物）、`airbags` / `vehicle_physics` / `baseline_car_ev`
   · 人工条目从 `trims.json` 分离到 `categories/trims_manual.json`，`auto_trims --seed-only`
     先用它生成基础库，再联网叠加自动条目——新装包不会再丢人工核验的配置表。
+- **维度证据门槛统一（v10.2.5）**：`engine/evidence_gate.py` 用一张 `DIM_POLICY` 策略表取代多次特判——
+  safety（碰撞成绩）、adas/cabin/control（实测/车主样本）、**quality（PPH 样本 ≥30）** 无证据则封顶；
+  **space/value/powertrain 明确不封顶**（轴距、配置价格比、三电参数都是硬数据，封顶反而是用"没实测"惩罚硬指标）。
+  加维度只需加一行，不用再写特判函数。quality 封顶用**中位**而非最低：有样本车分数低是问题被暴露，不是合格线。
+- **证据补采（v10.2.5）**：`research/fill_experience.py`（`fill_pph()` 可库调用）用 `score_series` 批量补
+  PPH/样本量，缺 `series_id` 时自动走"索引 → 站点检索"。本轮把 PPH 可用车从 4 款补到 10 款，
+  quality 被封顶的车从 11 款降到 8 款。
 - **体验维度举证封顶（v10.2.4）**：智驾 / 车机 / 操控这三类「纸面参数看不出来」的维度，
   无独立实测或车主样本的车，`scores` 封顶至「有实测车该维度最低分」（`experience_score.cap_unproven()`）。
   厂商宣传（`vendor_claim`）不算依据。**空间不封顶**——轴距/车长是硬数据，可纸面判定。

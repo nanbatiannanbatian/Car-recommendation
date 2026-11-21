@@ -146,7 +146,14 @@
         },
         "safety_basis": "cncap",
         "safety_confidence": "high",
-        "price_raw": "11.79–16.49"
+        "price_raw": "11.79–16.49",
+        "ah_series_id": "8244",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 0.0,
+        "ah_review_users": 10,
+        "ah_pph_usable": false,
+        "ah_pph_note": "样本仅 10 条，PPH 不可引用",
+        "ah_overall": 4.34
       },
       "provenance": [
         {
@@ -289,7 +296,14 @@
           "source_url": "https://www.autohome.com.cn/config/series/7692.html",
           "tier": 1
         },
-        "price_raw": "13.98–17.98"
+        "price_raw": "13.98–17.98",
+        "ah_series_id": "7692",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 0.0,
+        "ah_review_users": 15,
+        "ah_pph_usable": false,
+        "ah_pph_note": "样本仅 15 条，PPH 不可引用",
+        "ah_overall": 4.59
       },
       "provenance": [
         {
@@ -429,7 +443,14 @@
           "source_url": "https://car.m.yiche.com/fengyune05/peizhi/?from=ybm",
           "tier": 2
         },
-        "price_raw": "10.99–12.99"
+        "price_raw": "10.99–12.99",
+        "ah_series_id": "7853",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 0.0,
+        "ah_review_users": 0,
+        "ah_pph_usable": false,
+        "ah_pph_note": "样本仅 0 条，PPH 不可引用",
+        "ah_overall": 4.55
       },
       "provenance": [
         {
@@ -862,7 +883,8 @@
         "excluded": true,
         "exclude_reason": "动力闸门：逐月销量仅出现在插混榜",
         "sales_scope": "phev",
-        "price_raw": "11.99–14.99（8.99万限时起，不计入）"
+        "price_raw": "11.99–14.99（8.99万限时起，不计入）",
+        "ah_pph_note": "样本仅 0 条，PPH 不可引用"
       },
       "provenance": [
         {
@@ -987,7 +1009,7 @@
         "ah_series_id": "8563",
         "ah_matched": "MG 07",
         "ah_match_score": 100,
-        "ah_overall": 4.43,
+        "ah_overall": 4.48,
         "ah_pph": 0.0,
         "ah_pph_usable": false,
         "ah_review_users": 0,
@@ -1005,7 +1027,8 @@
           "2026-09": 13307,
           "2026-10": 11166
         },
-        "price_raw": "10.89–15.99（补贴价11.39不计入）"
+        "price_raw": "10.89–15.99（补贴价11.39不计入）",
+        "ah_pph_note": "样本仅 0 条，PPH 不可引用"
       },
       "provenance": [
         {
@@ -1148,7 +1171,14 @@
         "safety_confidence": "low",
         "safety_note": "全池中位（同榜有成绩车型 <3）；blend α=0.5·人工分 7.6 + 0.5·中位 8.6；无成绩不代表不安全，仅代表尚未被第三方验证；最终安全分 8.1",
         "price_raw": "11.98–14.58",
-        "adjust_removed_reason": "原 adjust=-1.0 无任何依据记录（不可审计）；v10.2.4 撤销，相关短板改由维度分与生命周期标注承担"
+        "adjust_removed_reason": "原 adjust=-1.0 无任何依据记录（不可审计）；v10.2.4 撤销，相关短板改由维度分与生命周期标注承担",
+        "ah_series_id": "8666",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 0.0,
+        "ah_review_users": 0,
+        "ah_pph_usable": false,
+        "ah_pph_note": "样本仅 0 条，PPH 不可引用",
+        "ah_overall": 4.5
       },
       "provenance": [
         {
@@ -1298,7 +1328,14 @@
           "tier": 1
         },
         "price_raw": "14.59–16.59",
-        "adjust_removed_reason": "原 adjust=-3.0 无任何依据记录（不可审计）；v10.2.4 撤销，相关短板改由维度分与生命周期标注承担"
+        "adjust_removed_reason": "原 adjust=-3.0 无任何依据记录（不可审计）；v10.2.4 撤销，相关短板改由维度分与生命周期标注承担",
+        "ah_series_id": "7738",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 0.0,
+        "ah_review_users": 17,
+        "ah_pph_usable": false,
+        "ah_pph_note": "样本仅 17 条，PPH 不可引用",
+        "ah_overall": 4.45
       },
       "provenance": [
         {
@@ -1446,7 +1483,14 @@
           "tier": 1
         },
         "price_raw": "12.88–14.48",
-        "adjust_removed_reason": "原 adjust=-3.0 无任何依据记录（不可审计）；v10.2.4 撤销，相关短板改由维度分与生命周期标注承担"
+        "adjust_removed_reason": "原 adjust=-3.0 无任何依据记录（不可审计）；v10.2.4 撤销，相关短板改由维度分与生命周期标注承担",
+        "ah_series_id": "7327",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 142.0,
+        "ah_review_users": 52,
+        "ah_pph_usable": true,
+        "ah_pph_note": "",
+        "ah_overall": 4.53
       },
       "provenance": [
         {
@@ -1587,7 +1631,14 @@
           "tier": 1
         },
         "price_raw": "15.98",
-        "adjust_removed_reason": "原 adjust=-3.0 无任何依据记录（不可审计）；v10.2.4 撤销，相关短板改由维度分与生命周期标注承担"
+        "adjust_removed_reason": "原 adjust=-3.0 无任何依据记录（不可审计）；v10.2.4 撤销，相关短板改由维度分与生命周期标注承担",
+        "ah_series_id": "7705",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 0.0,
+        "ah_review_users": 11,
+        "ah_pph_usable": false,
+        "ah_pph_note": "样本仅 11 条，PPH 不可引用",
+        "ah_overall": 4.51
       },
       "provenance": [
         {
@@ -1888,7 +1939,14 @@
           "tier": 1
         },
         "price_raw": "12.98–15.98",
-        "adjust_removed_reason": "原 adjust=-2.0 无任何依据记录（不可审计）；v10.2.4 撤销，相关短板改由维度分与生命周期标注承担"
+        "adjust_removed_reason": "原 adjust=-2.0 无任何依据记录（不可审计）；v10.2.4 撤销，相关短板改由维度分与生命周期标注承担",
+        "ah_series_id": "6903",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 0.0,
+        "ah_review_users": 1,
+        "ah_pph_usable": false,
+        "ah_pph_note": "样本仅 1 条，PPH 不可引用",
+        "ah_overall": 4.52
       },
       "provenance": [
         {
@@ -2030,7 +2088,14 @@
           "source_url": "https://k.sina.com.cn/article_7879996685_1d5af350d06802n70o.html",
           "tier": 1
         },
-        "price_raw": "8.48–12.58（租电5.98万不计入）"
+        "price_raw": "8.48–12.58（租电5.98万不计入）",
+        "ah_series_id": "8190",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 0.0,
+        "ah_review_users": 1,
+        "ah_pph_usable": false,
+        "ah_pph_note": "样本仅 1 条，PPH 不可引用",
+        "ah_overall": 4.47
       },
       "provenance": [
         {
@@ -2185,7 +2250,8 @@
         "safety_confidence": "low",
         "safety_note": "全池中位（同榜有成绩车型 <3）；blend α=0.5·人工分 7.6 + 0.5·中位 8.6；无成绩不代表不安全，仅代表尚未被第三方验证；最终安全分 8.1",
         "price_raw": "10.99–14.99",
-        "adjust_removed_reason": "原 adjust=-3.0 无任何依据记录（不可审计）；v10.2.4 撤销，相关短板改由维度分与生命周期标注承担"
+        "adjust_removed_reason": "原 adjust=-3.0 无任何依据记录（不可审计）；v10.2.4 撤销，相关短板改由维度分与生命周期标注承担",
+        "ah_pph_note": "样本仅 0 条，PPH 不可引用"
       },
       "provenance": [
         {
@@ -2328,7 +2394,14 @@
           "source_url": "http://car.e23.cn/content/2026-10-15/2026A1500001.html",
           "tier": 1
         },
-        "price_raw": "12.99–16.69"
+        "price_raw": "12.99–16.69",
+        "ah_series_id": "8584",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 0.0,
+        "ah_review_users": 0,
+        "ah_pph_usable": false,
+        "ah_pph_note": "样本仅 0 条，PPH 不可引用",
+        "ah_overall": 4.49
       },
       "provenance": [
         {
@@ -2624,7 +2697,14 @@
         "safety_basis": "cncap",
         "safety_confidence": "high",
         "price_raw": "11.38–15.88",
-        "adjust_removed_reason": "原 adjust=-2.0 无任何依据记录（不可审计）；v10.2.4 撤销，相关短板改由维度分与生命周期标注承担"
+        "adjust_removed_reason": "原 adjust=-2.0 无任何依据记录（不可审计）；v10.2.4 撤销，相关短板改由维度分与生命周期标注承担",
+        "ah_series_id": "7125",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 210.0,
+        "ah_review_users": 40,
+        "ah_pph_usable": true,
+        "ah_pph_note": "",
+        "ah_overall": 4.5
       },
       "provenance": [
         {
@@ -2753,7 +2833,7 @@
         "ah_series_id": "8662",
         "ah_matched": "小鹏MONA L05",
         "ah_match_score": 100,
-        "ah_overall": null,
+        "ah_overall": 3.43,
         "ah_pph": 0.0,
         "ah_pph_usable": false,
         "ah_review_users": 0,
@@ -2767,7 +2847,8 @@
           "note": "10 月 29 日上市、11 月 1 日开始交付，10 月零售 0 台属正常"
         },
         "price_raw": "限时13.98–17.18（指导14.48–17.68）",
-        "adjust_removed_reason": "原 adjust=-4.0 无任何依据记录（不可审计）；v10.2.4 撤销，相关短板改由维度分与生命周期标注承担"
+        "adjust_removed_reason": "原 adjust=-4.0 无任何依据记录（不可审计）；v10.2.4 撤销，相关短板改由维度分与生命周期标注承担",
+        "ah_pph_note": "样本仅 0 条，PPH 不可引用"
       },
       "provenance": [
         {
@@ -3221,7 +3302,14 @@
           "2026-10": 4059
         },
         "sales_upper_bound": 3912,
-        "price_raw": "15.59–17.69"
+        "price_raw": "15.59–17.69",
+        "ah_series_id": "6817",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 167.0,
+        "ah_review_users": 52,
+        "ah_pph_usable": true,
+        "ah_pph_note": "",
+        "ah_overall": 4.43
       },
       "provenance": [
         {
@@ -3524,7 +3612,14 @@
           "source_url": "https://dealer.yiche.com/100204758/news/202609/1477509485.html",
           "tier": 2
         },
-        "price_raw": "13.99–16.99"
+        "price_raw": "13.99–16.99",
+        "ah_series_id": "8589",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 0.0,
+        "ah_review_users": 0,
+        "ah_pph_usable": false,
+        "ah_pph_note": "样本仅 0 条，PPH 不可引用",
+        "ah_overall": 4.53
       },
       "provenance": [
         {
@@ -3673,7 +3768,14 @@
         "safety_basis": "cncap",
         "safety_confidence": "high",
         "price_raw": "12.98–19.98",
-        "adjust_removed_reason": "原 adjust=-2.0 无任何依据记录（不可审计）；v10.2.4 撤销，相关短板改由维度分与生命周期标注承担"
+        "adjust_removed_reason": "原 adjust=-2.0 无任何依据记录（不可审计）；v10.2.4 撤销，相关短板改由维度分与生命周期标注承担",
+        "ah_series_id": "7713",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 0.0,
+        "ah_review_users": 18,
+        "ah_pph_usable": false,
+        "ah_pph_note": "样本仅 18 条，PPH 不可引用",
+        "ah_overall": 4.57
       },
       "provenance": [
         {
@@ -3800,7 +3902,7 @@
         "ah_series_id": "8511",
         "ah_matched": "宋Ultra",
         "ah_match_score": 100,
-        "ah_overall": 4.51,
+        "ah_overall": 4.5,
         "ah_pph": 0.0,
         "ah_pph_usable": false,
         "ah_review_users": 4,
@@ -3823,7 +3925,8 @@
           "2026-10": 8436
         },
         "price_note": "指导价取官方配置页最低配 15.19 万（trims.json 2026款 EV 605KM 领先型）",
-        "adjust_removed_reason": "原 adjust=-2.0 无任何依据记录（不可审计）；v10.2.4 撤销，相关短板改由维度分与生命周期标注承担"
+        "adjust_removed_reason": "原 adjust=-2.0 无任何依据记录（不可审计）；v10.2.4 撤销，相关短板改由维度分与生命周期标注承担",
+        "ah_pph_note": "样本仅 4 条，PPH 不可引用"
       },
       "provenance": [
         {
@@ -3954,7 +4057,14 @@
         "safety_basis": "imputed_blend",
         "safety_confidence": "low",
         "safety_note": "全池中位（同榜有成绩车型 <3）；blend α=0.5·人工分 7.4 + 0.5·中位 8.6；无成绩不代表不安全，仅代表尚未被第三方验证；最终安全分 8.0",
-        "price_raw": "11.99–15.89"
+        "price_raw": "11.99–15.89",
+        "ah_series_id": "7935",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 190.0,
+        "ah_review_users": 149,
+        "ah_pph_usable": true,
+        "ah_pph_note": "",
+        "ah_overall": 4.51
       },
       "provenance": [
         {
@@ -4077,7 +4187,14 @@
         "safety_basis": "imputed_blend",
         "safety_confidence": "low",
         "safety_note": "全池中位（同榜有成绩车型 <3）；blend α=0.5·人工分 7.6 + 0.5·中位 8.6；无成绩不代表不安全，仅代表尚未被第三方验证；最终安全分 8.1",
-        "price_raw": "13.99–19.59"
+        "price_raw": "13.99–19.59",
+        "ah_series_id": "8658",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 0.0,
+        "ah_review_users": 0,
+        "ah_pph_usable": false,
+        "ah_pph_note": "样本仅 0 条，PPH 不可引用",
+        "ah_overall": 4.57
       },
       "provenance": [
         {
@@ -4206,7 +4323,14 @@
         "safety_basis": "imputed_blend",
         "safety_confidence": "low",
         "safety_note": "全池中位（同榜有成绩车型 <3）；blend α=0.5·人工分 7.2 + 0.5·中位 8.6；无成绩不代表不安全，仅代表尚未被第三方验证；最终安全分 7.9",
-        "price_raw": "10.99–15.99"
+        "price_raw": "10.99–15.99",
+        "ah_series_id": "8140",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 257.0,
+        "ah_review_users": 35,
+        "ah_pph_usable": true,
+        "ah_pph_note": "",
+        "ah_overall": 4.52
       },
       "provenance": [
         {
@@ -4334,7 +4458,14 @@
         "sales_note": "懂车帝三个动力细分榜均未收录该车系（一车多动力、未拆车系名），此处为车系合计，纯电实际 ≤ 该值",
         "safety_basis": "cncap",
         "safety_confidence": "high",
-        "price_raw": "13.99–16.59"
+        "price_raw": "13.99–16.59",
+        "ah_series_id": "7209",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 0.0,
+        "ah_review_users": 11,
+        "ah_pph_usable": false,
+        "ah_pph_note": "样本仅 11 条，PPH 不可引用",
+        "ah_overall": 4.59
       },
       "provenance": [
         {
@@ -4458,7 +4589,14 @@
           "2026-09": 2000,
           "2026-10": 1774
         },
-        "price_raw": "16.98–22.98"
+        "price_raw": "16.98–22.98",
+        "ah_series_id": "7724",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 0.0,
+        "ah_review_users": 4,
+        "ah_pph_usable": false,
+        "ah_pph_note": "样本仅 4 条，PPH 不可引用",
+        "ah_overall": 4.56
       },
       "provenance": [
         {
@@ -4577,7 +4715,14 @@
         "trend_months": {
           "2026-10": 69
         },
-        "price_raw": "17.99–24.99"
+        "price_raw": "17.99–24.99",
+        "ah_series_id": "8608",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 0.0,
+        "ah_review_users": 0,
+        "ah_pph_usable": false,
+        "ah_pph_note": "样本仅 0 条，PPH 不可引用",
+        "ah_overall": null
       },
       "provenance": [
         {
@@ -4696,7 +4841,14 @@
         "safety_basis": "imputed_blend",
         "safety_confidence": "low",
         "safety_note": "全池中位（同榜有成绩车型 <3）；blend α=0.5·人工分 7.0 + 0.5·中位 8.6；无成绩不代表不安全，仅代表尚未被第三方验证；最终安全分 7.8",
-        "price_raw": "12.38–15.38"
+        "price_raw": "12.38–15.38",
+        "ah_series_id": "8757",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 0.0,
+        "ah_review_users": 0,
+        "ah_pph_usable": false,
+        "ah_pph_note": "样本仅 0 条，PPH 不可引用",
+        "ah_overall": null
       },
       "provenance": [
         {
@@ -4822,7 +4974,14 @@
         },
         "sales_upper_bound": 6117,
         "sales_note": "懂车帝三个动力细分榜均未收录该车系（一车多动力、未拆车系名），此处为车系合计，纯电实际 ≤ 该值",
-        "price_raw": "14.58–16.98"
+        "price_raw": "14.58–16.98",
+        "ah_series_id": "7674",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 111.0,
+        "ah_review_users": 72,
+        "ah_pph_usable": true,
+        "ah_pph_note": "",
+        "ah_overall": 4.47
       },
       "provenance": [
         {
@@ -4950,7 +5109,14 @@
         "sales_note": "懂车帝三个动力细分榜均未收录该车系（一车多动力、未拆车系名），此处为车系合计，纯电实际 ≤ 该值",
         "safety_basis": "cncap",
         "safety_confidence": "high",
-        "price_raw": "15.99–20.99"
+        "price_raw": "15.99–20.99",
+        "ah_series_id": "8459",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 0.0,
+        "ah_review_users": 6,
+        "ah_pph_usable": false,
+        "ah_pph_note": "样本仅 6 条，PPH 不可引用",
+        "ah_overall": 4.52
       },
       "provenance": [
         {
@@ -5076,7 +5242,14 @@
         "safety_basis": "imputed_blend",
         "safety_confidence": "low",
         "safety_note": "全池中位（同榜有成绩车型 <3）；blend α=0.5·人工分 7.4 + 0.5·中位 8.6；无成绩不代表不安全，仅代表尚未被第三方验证；最终安全分 8.0",
-        "price_raw": "17.98–21.98"
+        "price_raw": "17.98–21.98",
+        "ah_series_id": "8609",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 0.0,
+        "ah_review_users": 0,
+        "ah_pph_usable": false,
+        "ah_pph_note": "样本仅 0 条，PPH 不可引用",
+        "ah_overall": 4.57
       },
       "provenance": [
         {
@@ -5203,7 +5376,14 @@
         "safety_basis": "imputed_blend",
         "safety_confidence": "low",
         "safety_note": "全池中位（同榜有成绩车型 <3）；blend α=0.5·人工分 7.6 + 0.5·中位 8.6；无成绩不代表不安全，仅代表尚未被第三方验证；最终安全分 8.1",
-        "price_raw": "16.99–21.19"
+        "price_raw": "16.99–21.19",
+        "ah_series_id": "7043",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 0.0,
+        "ah_review_users": 10,
+        "ah_pph_usable": false,
+        "ah_pph_note": "样本仅 10 条，PPH 不可引用",
+        "ah_overall": 4.38
       },
       "provenance": [
         {
@@ -5327,7 +5507,14 @@
         "safety_basis": "imputed_blend",
         "safety_confidence": "low",
         "safety_note": "全池中位（同榜有成绩车型 <3）；blend α=0.5·人工分 6.4 + 0.5·中位 8.6；无成绩不代表不安全，仅代表尚未被第三方验证；最终安全分 7.5",
-        "price_raw": "8.99–12.49"
+        "price_raw": "8.99–12.49",
+        "ah_series_id": "8600",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 0.0,
+        "ah_review_users": 0,
+        "ah_pph_usable": false,
+        "ah_pph_note": "样本仅 0 条，PPH 不可引用",
+        "ah_overall": 4.6
       },
       "provenance": [
         {
@@ -5455,7 +5642,14 @@
         "safety_basis": "imputed_blend",
         "safety_confidence": "low",
         "safety_note": "全池中位（同榜有成绩车型 <3）；blend α=0.5·人工分 7.4 + 0.5·中位 8.6；无成绩不代表不安全，仅代表尚未被第三方验证；最终安全分 8.0",
-        "price_raw": "13.68–17.28"
+        "price_raw": "13.68–17.28",
+        "ah_series_id": "8702",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 0.0,
+        "ah_review_users": 0,
+        "ah_pph_usable": false,
+        "ah_pph_note": "样本仅 0 条，PPH 不可引用",
+        "ah_overall": 4.45
       },
       "provenance": [
         {
@@ -5596,7 +5790,14 @@
         "evidence_note": "官方碰撞成绩（Euro NCAP 五星（2022））",
         "cell_tier": 1,
         "adjust": 0.0,
-        "price_raw": "6.88–10.28"
+        "price_raw": "6.88–10.28",
+        "ah_series_id": "6651",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 156.0,
+        "ah_review_users": 136,
+        "ah_pph_usable": true,
+        "ah_pph_note": "",
+        "ah_overall": 4.46
       },
       "provenance": [
         {
@@ -5729,7 +5930,14 @@
         "evidence_note": "官方配置表与指导价可核验；无 C-NCAP/C-IASI 成绩",
         "cell_tier": 2,
         "adjust": 0.0,
-        "price_raw": "11.98–15.18"
+        "price_raw": "11.98–15.18",
+        "ah_series_id": "6998",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 0.0,
+        "ah_review_users": 26,
+        "ah_pph_usable": false,
+        "ah_pph_note": "样本仅 26 条，PPH 不可引用",
+        "ah_overall": 4.46
       },
       "provenance": [
         {
@@ -5863,7 +6071,14 @@
         "evidence_note": "官方配置表与指导价可核验；无 C-NCAP/C-IASI 成绩",
         "cell_tier": 1,
         "adjust": 0.0,
-        "price_raw": "9.98–12.88"
+        "price_raw": "9.98–12.88",
+        "ah_series_id": "7860",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 0.0,
+        "ah_review_users": 9,
+        "ah_pph_usable": false,
+        "ah_pph_note": "样本仅 9 条，PPH 不可引用",
+        "ah_overall": 4.44
       },
       "provenance": [
         {
@@ -5996,7 +6211,14 @@
         "evidence_note": "官方配置表与指导价可核验；无 C-NCAP/C-IASI 成绩",
         "cell_tier": 1,
         "adjust": 0.0,
-        "price_raw": "9.58–14.97"
+        "price_raw": "9.58–14.97",
+        "ah_series_id": "8006",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 111.0,
+        "ah_review_users": 98,
+        "ah_pph_usable": true,
+        "ah_pph_note": "",
+        "ah_overall": 4.58
       },
       "provenance": [
         {
@@ -6129,7 +6351,14 @@
         "evidence_note": "官方配置表与指导价可核验；无 C-NCAP/C-IASI 成绩",
         "cell_tier": 1,
         "adjust": 0.0,
-        "price_raw": "9.78–12.98"
+        "price_raw": "9.78–12.98",
+        "ah_series_id": "8278",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 0.0,
+        "ah_review_users": 12,
+        "ah_pph_usable": false,
+        "ah_pph_note": "样本仅 12 条，PPH 不可引用",
+        "ah_overall": 4.53
       },
       "provenance": [
         {
@@ -6261,7 +6490,14 @@
         "evidence_note": "官方配置表与指导价可核验；无 C-NCAP/C-IASI 成绩",
         "cell_tier": 1,
         "adjust": 0.0,
-        "price_raw": "7.98–17.98"
+        "price_raw": "7.98–17.98",
+        "ah_series_id": "5964",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 136.0,
+        "ah_review_users": 39,
+        "ah_pph_usable": true,
+        "ah_pph_note": "",
+        "ah_overall": 4.62
       },
       "provenance": [
         {
@@ -6394,7 +6630,14 @@
         "evidence_note": "官方配置表与指导价可核验；无 C-NCAP/C-IASI 成绩",
         "cell_tier": 1,
         "adjust": 0.0,
-        "price_raw": "9.98–13.98"
+        "price_raw": "9.98–13.98",
+        "ah_series_id": "7980",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 0.0,
+        "ah_review_users": 4,
+        "ah_pph_usable": false,
+        "ah_pph_note": "样本仅 4 条，PPH 不可引用",
+        "ah_overall": 4.56
       },
       "provenance": [
         {
@@ -6526,7 +6769,14 @@
         "evidence_note": "官方配置表与指导价可核验；无 C-NCAP/C-IASI 成绩",
         "cell_tier": 1,
         "adjust": 0.0,
-        "price_raw": "6.98–10.18"
+        "price_raw": "6.98–10.18",
+        "ah_series_id": "7918",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 0.0,
+        "ah_review_users": 23,
+        "ah_pph_usable": false,
+        "ah_pph_note": "样本仅 23 条，PPH 不可引用",
+        "ah_overall": 4.48
       },
       "provenance": [
         {
@@ -6659,7 +6909,14 @@
         "evidence_note": "官方配置表与指导价可核验；无 C-NCAP/C-IASI 成绩",
         "cell_tier": 1,
         "adjust": 0.0,
-        "price_raw": "7.99–11.49"
+        "price_raw": "7.99–11.49",
+        "ah_series_id": "8241",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 167.0,
+        "ah_review_users": 42,
+        "ah_pph_usable": true,
+        "ah_pph_note": "",
+        "ah_overall": 4.47
       },
       "provenance": [
         {
@@ -6792,7 +7049,14 @@
         "evidence_note": "官方配置表与指导价可核验；无 C-NCAP/C-IASI 成绩",
         "cell_tier": 2,
         "adjust": 0.0,
-        "price_raw": "12.38–15.68"
+        "price_raw": "12.38–15.68",
+        "ah_series_id": "8305",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 0.0,
+        "ah_review_users": 0,
+        "ah_pph_usable": false,
+        "ah_pph_note": "样本仅 0 条，PPH 不可引用",
+        "ah_overall": 4.58
       },
       "provenance": [
         {
@@ -6926,7 +7190,14 @@
         "evidence_note": "官方配置表与指导价可核验；无 C-NCAP/C-IASI 成绩",
         "cell_tier": 2,
         "adjust": 0.0,
-        "price_raw": "10.28–14.28"
+        "price_raw": "10.28–14.28",
+        "ah_series_id": "8245",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 0.0,
+        "ah_review_users": 23,
+        "ah_pph_usable": false,
+        "ah_pph_note": "样本仅 23 条，PPH 不可引用",
+        "ah_overall": 4.51
       },
       "provenance": [
         {
@@ -7058,7 +7329,14 @@
         "evidence_note": "官方配置表与指导价可核验；无 C-NCAP/C-IASI 成绩",
         "cell_tier": 1,
         "adjust": 0.0,
-        "price_raw": "11.99–14.99"
+        "price_raw": "11.99–14.99",
+        "ah_series_id": "6298",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 0.0,
+        "ah_review_users": 14,
+        "ah_pph_usable": false,
+        "ah_pph_note": "样本仅 14 条，PPH 不可引用",
+        "ah_overall": 4.48
       },
       "provenance": [
         {
@@ -7191,7 +7469,14 @@
         "evidence_note": "官方配置表与指导价可核验；无 C-NCAP/C-IASI 成绩",
         "cell_tier": 1,
         "adjust": 0.0,
-        "price_raw": "11.99–15.19"
+        "price_raw": "11.99–15.19",
+        "ah_series_id": "7740",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 127.0,
+        "ah_review_users": 92,
+        "ah_pph_usable": true,
+        "ah_pph_note": "",
+        "ah_overall": 4.53
       },
       "provenance": [
         {
@@ -7323,7 +7608,14 @@
         "evidence_note": "官方碰撞成绩（C-NCAP（中汽测评 2025.12.02 公布））",
         "cell_tier": 2,
         "adjust": 0.0,
-        "price_raw": "10.98–15.98"
+        "price_raw": "10.98–15.98",
+        "ah_series_id": "7712",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 103.0,
+        "ah_review_users": 60,
+        "ah_pph_usable": true,
+        "ah_pph_note": "",
+        "ah_overall": 4.55
       },
       "provenance": [
         {
@@ -7455,7 +7747,14 @@
         "evidence_note": "官方配置表与指导价可核验；无 C-NCAP/C-IASI 成绩",
         "cell_tier": 1,
         "adjust": 0.0,
-        "price_raw": "11.99–14.59"
+        "price_raw": "11.99–14.59",
+        "ah_series_id": "7982",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 32.0,
+        "ah_review_users": 34,
+        "ah_pph_usable": true,
+        "ah_pph_note": "",
+        "ah_overall": 4.4
       },
       "provenance": [
         {
@@ -7588,7 +7887,14 @@
         "evidence_note": "官方配置表与指导价可核验；无 C-NCAP/C-IASI 成绩",
         "cell_tier": 2,
         "adjust": 0.0,
-        "price_raw": "9.98–12.58"
+        "price_raw": "9.98–12.58",
+        "ah_series_id": "7877",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 92.0,
+        "ah_review_users": 62,
+        "ah_pph_usable": true,
+        "ah_pph_note": "",
+        "ah_overall": 4.41
       },
       "provenance": [
         {
@@ -7722,7 +8028,14 @@
         "evidence_note": "官方配置表与指导价可核验；无 C-NCAP/C-IASI 成绩",
         "cell_tier": 2,
         "adjust": 0.0,
-        "price_raw": "10.78–14.78"
+        "price_raw": "10.78–14.78",
+        "ah_series_id": "7650",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 142.0,
+        "ah_review_users": 48,
+        "ah_pph_usable": true,
+        "ah_pph_note": "",
+        "ah_overall": 4.44
       },
       "provenance": [
         {
@@ -7838,7 +8151,14 @@
           26.35,
           36.9
         ],
-        "price_source": "trims.json 官方指导价（汽车之家参数页逐配置解析）"
+        "price_source": "trims.json 官方指导价（汽车之家参数页逐配置解析）",
+        "ah_series_id": "5769",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 53.0,
+        "ah_review_users": 87,
+        "ah_pph_usable": true,
+        "ah_pph_note": "",
+        "ah_overall": 4.45
       },
       "provenance": [
         {
@@ -7958,7 +8278,14 @@
           22.98,
           26.98
         ],
-        "price_source": "trims.json 官方指导价（汽车之家参数页逐配置解析）"
+        "price_source": "trims.json 官方指导价（汽车之家参数页逐配置解析）",
+        "ah_series_id": "7777",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 135.0,
+        "ah_review_users": 68,
+        "ah_pph_usable": true,
+        "ah_pph_note": "",
+        "ah_overall": 4.56
       },
       "provenance": [
         {
@@ -8081,7 +8408,14 @@
           19.28,
           25.18
         ],
-        "price_source": "trims.json 官方指导价（汽车之家参数页逐配置解析）"
+        "price_source": "trims.json 官方指导价（汽车之家参数页逐配置解析）",
+        "ah_series_id": "7687",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 127.0,
+        "ah_review_users": 44,
+        "ah_pph_usable": true,
+        "ah_pph_note": "",
+        "ah_overall": 4.43
       },
       "provenance": [
         {
@@ -8202,7 +8536,14 @@
           17.68,
           18.68
         ],
-        "price_source": "trims.json 官方指导价（汽车之家参数页逐配置解析）"
+        "price_source": "trims.json 官方指导价（汽车之家参数页逐配置解析）",
+        "ah_series_id": "7162",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 0.0,
+        "ah_review_users": 10,
+        "ah_pph_usable": false,
+        "ah_pph_note": "样本仅 10 条，PPH 不可引用",
+        "ah_overall": 4.29
       },
       "provenance": [
         {
@@ -8322,7 +8663,14 @@
           22.99,
           27.99
         ],
-        "price_source": "trims.json 官方指导价（汽车之家参数页逐配置解析）"
+        "price_source": "trims.json 官方指导价（汽车之家参数页逐配置解析）",
+        "ah_series_id": "7652",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 71.0,
+        "ah_review_users": 114,
+        "ah_pph_usable": true,
+        "ah_pph_note": "",
+        "ah_overall": 4.52
       },
       "provenance": [
         {
@@ -8444,7 +8792,14 @@
           33.8,
           35.0
         ],
-        "price_source": "trims.json 官方指导价（汽车之家参数页逐配置解析）"
+        "price_source": "trims.json 官方指导价（汽车之家参数页逐配置解析）",
+        "ah_series_id": "4881",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 0.0,
+        "ah_review_users": 8,
+        "ah_pph_usable": false,
+        "ah_pph_note": "样本仅 8 条，PPH 不可引用",
+        "ah_overall": 4.0
       },
       "provenance": [
         {
@@ -8567,7 +8922,14 @@
           25.98,
           28.98
         ],
-        "price_source": "trims.json 官方指导价（汽车之家参数页逐配置解析）"
+        "price_source": "trims.json 官方指导价（汽车之家参数页逐配置解析）",
+        "ah_series_id": "6898",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 0.0,
+        "ah_review_users": 0,
+        "ah_pph_usable": false,
+        "ah_pph_note": "样本仅 0 条，PPH 不可引用",
+        "ah_overall": 4.49
       },
       "provenance": [
         {
@@ -8686,7 +9048,14 @@
         ],
         "tier": "T3",
         "price_raw": "23.98万",
-        "trim_raw": "纯电Ultra 后驱"
+        "trim_raw": "纯电Ultra 后驱",
+        "ah_series_id": "6388",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 0.0,
+        "ah_review_users": 12,
+        "ah_pph_usable": false,
+        "ah_pph_note": "样本仅 12 条，PPH 不可引用",
+        "ah_overall": 4.54
       },
       "provenance": [
         {
@@ -8808,7 +9177,14 @@
           18.98,
           24.98
         ],
-        "price_source": "trims.json 官方指导价（汽车之家参数页逐配置解析）"
+        "price_source": "trims.json 官方指导价（汽车之家参数页逐配置解析）",
+        "ah_series_id": "7220",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 0.0,
+        "ah_review_users": 1,
+        "ah_pph_usable": false,
+        "ah_pph_note": "样本仅 1 条，PPH 不可引用",
+        "ah_overall": 4.52
       },
       "provenance": [
         {
@@ -8932,7 +9308,14 @@
           18.98,
           23.98
         ],
-        "price_source": "trims.json 官方指导价（汽车之家参数页逐配置解析）"
+        "price_source": "trims.json 官方指导价（汽车之家参数页逐配置解析）",
+        "ah_series_id": "6851",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 0.0,
+        "ah_review_users": 14,
+        "ah_pph_usable": false,
+        "ah_pph_note": "样本仅 14 条，PPH 不可引用",
+        "ah_overall": 4.54
       },
       "provenance": [
         {
@@ -9056,7 +9439,14 @@
           14.38,
           19.98
         ],
-        "price_source": "trims.json 官方指导价（汽车之家参数页逐配置解析）"
+        "price_source": "trims.json 官方指导价（汽车之家参数页逐配置解析）",
+        "ah_series_id": "8087",
+        "ah_series_id_source": "索引/检索补采（fill_experience）",
+        "ah_pph": 56.0,
+        "ah_review_users": 59,
+        "ah_pph_usable": true,
+        "ah_pph_note": "",
+        "ah_overall": 4.37
       },
       "provenance": [
         {
