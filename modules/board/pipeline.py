@@ -185,6 +185,13 @@ def main():
               + "、".join(f"{x['model']} {x['score']:g}" for x in _sa[:6])
               + ("…" if len(_sa) > 6 else "") + "）")
 
+    # 表分同步（2026-11-21）：映射表里的车，候选池必须对齐表分，否则「表里 8.7、榜上 8.9」两套数
+    _st_sync = SFC.sync_table_scores_to_pool(cands)
+    if _st_sync:
+        print(f"[表分同步] {len(_st_sync)} 款 safety 对齐映射表（"
+              + "、".join(f"{x['model']} {x['prev']}→{x['score']:g}" for x in _st_sync[:5])
+              + ("…" if len(_st_sync) > 5 else "") + "）")
+
     # 门禁：回填后仍「trims 有价而候选池无价」= 回流逻辑失效（canon 漂移/字段改名），必须硬拦。
     # 真缺口（trims 也没价）只披露不拦截，交给人补采集。
     if _p_still and not getattr(a, "no_backfill", False):
@@ -381,6 +388,7 @@ def main():
         "crash_backfill": {"filled": [{"model": m, "crash": d, "basis": b} for m, d, b in _c_filled],
                            "unresolved": _c_unres},
         "safety_auto": {"applied": _sa, "skipped": _ss},
+        "safety_table_sync": _st_sync,
         # v9.7.20：候选池披露同步给页面（评审反复指出报告有、页面看不到）
         "pool_disclosure": {
             "total": len(_all), "sourced": _src_named, "crash": _crash_named,

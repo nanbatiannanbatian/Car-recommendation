@@ -1,7 +1,7 @@
 # Car recommendation
 
 > 可信购车榜单引擎：口径闸门 / MCDA 稳健性检验 / 8 维打分统一榜 / 总候选池 / 多源交叉核验 / 证据分层 / 历史回测。
-> 无模型调用，同一输入必得同一输出。当前版本 **v10.1.4**（模块化重构，口径与出榜结果不变）。
+> 无模型调用，同一输入必得同一输出。当前版本 **v10.1.5**（模块化重构，口径与出榜结果不变）。
 
 ## 这是什么
 WorkBuddy 用户级 skill。核心是「车型排行榜全链路」：按需搜榜入池→取数→闸门→8 维打分→稳健性→三档→审查→报告，
@@ -50,6 +50,11 @@ WorkBuddy 用户级 skill。核心是「车型排行榜全链路」：按需搜�
   NCAP 星级无乘员分项取保守档 8.3）。表**外**有成绩的车由 `safety_check.apply_auto_scores()`
   自动算分并写进 `scores.safety`，表**内**人工分绝不覆盖；报告披露「哪些车调了多少」。
   这样「有实锤」才真正影响排名，不再停留在标签上。`--no-auto-safety` 可做 A/B 对照。
+- **映射表口径统一（v10.1.5）**：`car_scores` 里的分数必须能被 `map_spec` 复算出来，
+  手填与公式不符会被出榜门禁拦下（`formula_mismatch`）。
+  维护命令：`python3 safety_check.py --check-table` 体检、`--recompute --apply` 统一重算；
+  候选池的 `scores.safety` 由 `sync_table_scores_to_pool()` 在出榜前自动对齐表分，
+  不再出现「表里 8.7、榜上 8.9」两套数。
 - 详细契约见 `MODULES.md` 与各包 `__init__.py`。
 
 ## 安装

@@ -149,6 +149,7 @@ python3 bootstrap_data.py --apply --only trims.json --force
 **数据回流**：`facts_sync.backfill_price_guide_from_trims()`（价格）与
 `facts_sync.backfill_crash_from_text()`（碰撞成绩）是唯一实现，pipeline/board_v2 出榜前自动调用；
 成绩→分数由 `safety_check.apply_auto_scores()` 按 `official_safety_scores.json` 的 `map_spec` 复算，
+表内条目由 `recompute_table()` 统一复算、`sync_table_scores_to_pool()` 对齐候选池，
 `master_pool --sync-prices` 只是手动入口。新增「某事实库已有、候选池缺」的字段时，照这个模式做：
 自动回流 + 独立复核门禁 + 回归（t069 是样板），不要只加一个手动命令。
 

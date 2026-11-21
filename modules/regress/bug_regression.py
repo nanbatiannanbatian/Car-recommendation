@@ -95,6 +95,7 @@ CASES = [
     ("BUG-070", "碰撞披露把「已抽车未测」算成有成绩(4/21实际3款)", "v10.1.2"),
     ("BUG-071", "官方碰撞成绩只写在note文本未进字段致极氪7X进不了一档", "v10.1.3"),
     ("BUG-072", "成绩已进crash字段却未参与打分(safety仍按插补)致有实锤等于没用", "v10.1.4"),
+    ("BUG-073", "映射表人工分与公式复算不一致(同分率不同分)", "v10.1.5"),
 ]
 
 
@@ -926,6 +927,9 @@ def t054():
     # 数据级：真实池通过 + 007GT=8.8 + basis
     pool = os.path.join(HERE, "runs", "midsedan_bev_1218_202610", "candidates_allprice.json")
     d = json.load(open(pool, encoding="utf-8"))
+    # 走真实链路：表重算后候选池须先对齐表分，再跑门禁（pipeline 里就是这个顺序）。
+    # 直接对历史池跑 check 会报 mismatch —— 那是「池子比表旧」，不是门禁误判。
+    SFC.sync_table_scores_to_pool(d["candidates"], tbl)
     r = SFC.check(d["candidates"], tbl)
     assert r["passed"], f"真实池安全门禁未过: {r['issues']}"
     by = {c["model"]: c for c in d["candidates"]}
@@ -1486,8 +1490,50 @@ def t072():
     return "成绩→分数：公式可复算、老规程降权、等级/星级映射、人工分不覆盖、无成绩不编号、链路内置"
 
 
+def t073():
+    """映射表口径必须能被规则复算：表内分数 = 公式结果，禁止手填漂移。
+
+    2026-11-21 用户选 A 方案。表里 8 条人工分对不上同一公式：
+      90.8%→8.9（应 8.7）、90.6%→8.5（应 8.6）、91.3%→9.1（应 8.8）
+    → 同样得分率给了不同分。现在：全表按 map_spec 复算 + 门禁强校验 + 候选池与表自动对齐。
+    """
+    import copy
+    from modules.engine import safety_check as SC
+
+    table = SC.load_table()
+    # 1) 真表必须已经统一（若有漂移，说明没跑 --recompute）
+    ch, un = SC.recompute_table(copy.deepcopy(table), apply=False)
+    assert not ch and not un, f"映射表存在未复算条目：{[x['model'] for x in ch]} / {[x['model'] for x in un]}"
+
+    # 2) 手改一条成错误值 → 门禁必须检出 formula_mismatch
+    bad = copy.deepcopy(table)
+    victim = "马自达EZ-6" if "马自达EZ-6" in bad["car_scores"] else next(iter(bad["car_scores"]))
+    bad["car_scores"][victim]["score"] = 9.9
+    r = SC.check([], table=bad)
+    types = [x["type"] for x in r["issues"]]
+    assert "formula_mismatch" in types, f"手填错分未被检出：{r['issues']}"
+
+    # 3) 候选池旧分 → 必须被对齐到表分（否则榜上与表两套数）
+    cars = [{"model": victim, "scores": {"safety": 1.0}}]
+    fixed = SC.sync_table_scores_to_pool(cars, table=table)
+    assert fixed and cars[0]["scores"]["safety"] == table["car_scores"][victim]["score"], fixed
+    assert cars[0].get("safety_score_source"), "对齐未标来源"
+
+    # 4) 公式本身：C-NCAP 90.8% 必须是 8.7（不能被"人工印象"改）
+    spec = table["systems"]["C-NCAP"]["map_spec"]
+    s, _ = SC.score_from_record("C-NCAP", {"value": 90.8}, table)
+    assert s == 8.7, s
+    assert SC.score_from_record("C-NCAP", {"value": 92.3}, table)[0] == 8.9
+
+    # 5) 链路内置
+    src = _read("pipeline.py")
+    assert "sync_table_scores_to_pool" in src, "pipeline 未把表分同步到候选池"
+    assert "safety_table_sync" in src, "summary 缺表分同步审计"
+    return "映射表全表可复算 + 手填错分被门禁拦 + 候选池自动对齐表分 + 公式锁死"
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073]
 
 
 def run():
