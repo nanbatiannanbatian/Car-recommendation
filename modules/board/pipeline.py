@@ -490,6 +490,20 @@ def main():
                      + (f"，其中 {len(_chg)} 款较原插补值有调整：" +
                         "、".join(f"{x['model']} {x['prev']}→{x['score']:g}" for x in _chg[:5])
                         if _chg else "，与原插补值一致") + "。")
+        # 多成绩口径披露（2026-11-21）：一款车多个体系成绩时取证据最强的一条算分，
+        # 不取最高分、不跨体系叠加；被丢弃的次要成绩在此披露、进审计字段。
+        _multi = [c for c in cands if len(c.get("crash_all_scores") or []) > 1]
+        if _multi:
+            _ml = []
+            for c in _multi[:8]:
+                _scores = c["crash_all_scores"]
+                _main = next((s for s in _scores if s.get("primary")), _scores[0])
+                _rest = "、".join(s["display"] for s in _scores if not s.get("primary"))
+                _ml.append(f"{c['model']} 取 {_main['display']}、其余 {_rest} 仅留痕不叠加")
+            parts.append("> **多成绩口径**：同一车有多个权威成绩时取证据最强的一条"
+                         "（一手得分率 > 等级/星级 > 奖项），不取最高分、不跨体系叠加——"
+                         "各国 NCAP 无对应关系，取最高会偏向测试宽松的体系。"
+                         + "；".join(_ml) + "。")
     if _p_still:
         parts.append(f"> **价格缺口**：{'、'.join(_p_still[:6])}"
                      f"（共 {len(_p_still)} 款）候选池与 trims 均无官方指导价，"
@@ -560,6 +574,11 @@ def main():
                            "unresolved": _c_unres,
                            "authoritative": [{"model": m, "crash": d, "basis": b}
                                              for m, d, b in _a_filled]},
+        # 多成绩审计：全部成绩留痕 + 主成绩选择口径（取证据最强，不取最高/不叠加）
+        "crash_multi_scores": [
+            {"model": c["model"], "scores": c["crash_all_scores"]}
+            for c in cands if c.get("crash_all_scores")
+        ],
         "safety_auto": {"applied": _sa, "skipped": _ss},
         "safety_cap": _cap_adj,
         "dimension_cap": _dim_cap,

@@ -274,15 +274,19 @@ def backfill_crash_from_text(cars):
         parsed = CS.parse_score(text)
         source_tag = "crash/note 文本"
         quote = text.strip()[:60]
-        if not parsed:
-            # 顶层三处解析不出 → 再试 evidence.crash_evidence（严格解析，防误伤）
-            ev = c.get("evidence") or {}
-            ce = str(ev.get("crash_evidence") or "") if isinstance(ev, dict) else ""
-            if ce:
-                parsed = CS.parse_score_from_evidence(ce)
-                if parsed:
-                    source_tag = "evidence.crash_evidence 严格解析"
-                    quote = ce.strip()[:60]
+        # 多成绩审计（2026-11-21）：evidence 里若有多个体系成绩，全部结构化留痕，
+        # 但只取证据最强的一条算分（parse_score_from_evidence 已按 tier 排序）。
+        # 被丢弃的次要成绩不参与打分、不改页面，只进审计字段 + 报告披露。
+        # 注意：无论主成绩从哪来（note / evidence），只要 evidence 有多成绩就留痕——
+        # 极氪7X note 写了 C-NCAP、evidence 另有 Euro NCAP，两个分支都要记。
+        ev = c.get("evidence") or {}
+        ce = str(ev.get("crash_evidence") or "") if isinstance(ev, dict) else ""
+        all_scores = CS.parse_all_scores_from_evidence(ce) if ce else []
+        if not parsed and all_scores:
+            # 顶层三处解析不出 → 用 evidence 里证据最强的一条（严格解析，防误伤）
+            parsed = all_scores[0]
+            source_tag = "evidence.crash_evidence 严格解析"
+            quote = ce.strip()[:60]
         if not parsed:
             unresolved.append(c.get("model"))
             continue
@@ -295,6 +299,26 @@ def backfill_crash_from_text(cars):
             c["safety_score_value"] = parsed["score"]
         if parsed.get("ciasi_dims"):
             c["crash_ciasi_dims"] = parsed["ciasi_dims"]
+        if parsed.get("ciasi_n_tests"):
+            c["crash_ciasi_n_tests"] = parsed["ciasi_n_tests"]
+        # 主成绩之外的全部成绩（含被丢弃的次要成绩）留痕
+        if all_scores:
+            # primary 指向实际采用的成绩：主成绩来自 note 时按其 basis 对齐，
+            # 来自 evidence 时就是 tier 最高的首条（避免审计与 crash 字段两套数）。
+            primary_basis = parsed["basis"]
+            primary_idx = next((i for i, s in enumerate(all_scores)
+                                if s["basis"] == primary_basis), 0)
+            c["crash_all_scores"] = [
+                {"basis": s["basis"], "system": s["system_cn"],
+                 "display": (parsed["display"] if i == primary_idx else s["display"]),
+                 "tier": s["tier"], "quality": s["source_quality"],
+                 "primary": (i == primary_idx),
+                 **({"n_tests": s["ciasi_n_tests"]} if s.get("ciasi_n_tests") else {})}
+                for i, s in enumerate(all_scores)
+            ]
+            c["crash_secondary"] = [
+                s["display"] for i, s in enumerate(all_scores) if i != primary_idx
+            ]
         filled.append((c.get("model"), parsed["display"], parsed["basis"]))
     return filled, unresolved
 

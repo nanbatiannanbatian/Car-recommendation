@@ -110,6 +110,7 @@ CASES = [
     ("BUG-085", "人工分全量核算:8维仅safety闭环/quality/powertrain规则没接/spec_score从没跑过", "v10.3.0"),
     ("BUG-086", "ModelY有C-IASI一手成绩却标缺权威碰撞:回填只扫note漏evidence+宽松解析误抓枚举句", "v10.3.1"),
     ("BUG-087", "12碰撞体系只2个能解析+权威库从不回流+安全分文案写死C-NCAP:蔚来ET5 EuroNCAP/C-IASI取不到", "v10.3.2"),
+    ("BUG-088", "多碰撞成绩取第一个锚点(靠文本顺序既非最高非叠加)+次要成绩被静默丢弃无审计", "v10.3.3"),
 ]
 
 
@@ -2354,8 +2355,68 @@ def t087():
             "误伤防护不退化+文案按实际体系(+t087)")
 
 
+def t088():
+    """多碰撞成绩口径：取证据最强单一成绩（不取最高/不叠加），次要成绩全量留痕。
+
+    2026-11-21 用户「多个碰撞成绩是只算最高还是一起纳入？榜单所有车型对比页面有没有遗漏」。
+    全量对比发现的真问题：
+      1) parse_score_from_evidence 遇到第一个锚点就 return —— 多成绩车取哪个
+         由文本书写顺序决定，不是取最高也不是一起算（规则隐式、脆弱）；
+      2) 次要成绩（极氪7X Euro NCAP、乐道L60 C-IASI、Model Y 两次测评、
+         海狮07EV E/A-NCAP）被静默丢弃，无审计留痕。
+    用户确认口径：取证据最强（一手得分率 > 等级/星级 > 奖项），不取最高分
+    （会偏向宽松体系）、不跨体系叠加（各国 NCAP 无对应关系）；次要成绩只记
+    数据层+报告，不动榜单页面（渲染层改动需单独确认）。
+    """
+    from modules.engine import crash_systems as CS
+    from modules.engine import facts_sync as FS
+    from modules.contracts.candidate_schema import normalize_pool
+    import copy
+
+    # 1) 单元：多成绩按 tier 取最强，且与文本顺序无关
+    assert CS.selftest() == 0, "crash_systems 自测失败"
+    text = "有C-NCAP官方成绩：综合得分率90.7%，五星。另有Euro NCAP五星（媒体口径）。"
+    alls = CS.parse_all_scores_from_evidence(text)
+    assert len(alls) == 2 and alls[0]["tier"] > alls[1]["tier"], alls
+    assert CS.parse_score_from_evidence(text)["basis"] == "cncap"
+    rev = "另有Euro NCAP五星（媒体口径）。有C-NCAP官方成绩：综合得分率90.7%。"
+    assert CS.parse_score_from_evidence(rev)["basis"] == "cncap", "主成绩受文本顺序影响"
+
+    # 2) 真实池：8 款有成绩车主成绩不漂移；多成绩车次要成绩留痕
+    pool = json.load(open(str(paths.ROOT / "runs" / "midsuv_bev_pool.json"), encoding="utf-8"))
+    cands = normalize_pool(copy.deepcopy(pool["candidates"]))
+    FS.backfill_crash_from_text(cands)
+    expected = {"极氪7X": "cncap", "阿维塔07 纯电版": "cncap", "极狐阿尔法T5": "cncap",
+                "零跑C10": "cncap", "乐道L60": "cncap", "丰田bZ5": "cncap",
+                "特斯拉 Model Y": "ciasi", "比亚迪海狮07EV": "cncap"}
+    by = {c["model"]: c for c in cands}
+    for model, basis in expected.items():
+        assert by[model].get("safety_basis") == basis, f"{model} 主成绩体系漂移"
+    multi = {c["model"]: c for c in cands if len(c.get("crash_all_scores") or []) > 1}
+    assert "极氪7X" in multi and "乐道L60" in multi and "比亚迪海狮07EV" in multi, \
+        f"多成绩车次要成绩未留痕: {list(multi)}"
+    assert multi["极氪7X"]["crash_secondary"], "极氪7X 的 Euro NCAP 未记为次要成绩"
+    assert multi["乐道L60"]["crash_secondary"], "乐道L60 的 C-IASI 未记为次要成绩"
+    my = by["特斯拉 Model Y"]
+    assert my.get("crash_ciasi_n_tests") == 2, "Model Y 两次 C-IASI 测评次数未留痕"
+
+    # 3) 无成绩车零误伤（G6/宋L/ES6/N7/M5 旁证不当成绩）
+    for model in ("小鹏G6", "比亚迪宋L EV", "蔚来ES6", "腾势N7", "问界M5纯电版"):
+        assert not by[model].get("crash_all_scores"), f"无成绩车 {model} 被记入成绩"
+
+    # 4) 链路内置：回填写审计字段、报告披露、summary 有审计（防退回「只取第一个就丢」）
+    fs_src = open(str(paths.src("facts_sync.py")), encoding="utf-8").read()
+    assert "crash_all_scores" in fs_src and "parse_all_scores_from_evidence" in fs_src, \
+        "回填未写多成绩审计字段"
+    pl_src = open(str(paths.src("pipeline.py")), encoding="utf-8").read()
+    assert "多成绩口径" in pl_src and "crash_multi_scores" in pl_src, \
+        "报告/summary 未披露多成绩口径"
+    return ("多成绩口径：取证据最强(不取最高/不叠加)+次要成绩全量留痕+主成绩不漂移+"
+            "无成绩车零误伤+报告/summary披露(+t088)")
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088]
 
 
 def run():

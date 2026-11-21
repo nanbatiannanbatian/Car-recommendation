@@ -275,66 +275,153 @@ def parse_ciasi_dimensions(text) -> dict | None:
     return {"grade": grade, "dims": latest, "n_tests": len(groups)}
 
 
-def parse_score_from_evidence(text) -> dict | None:
-    """从证据长文本严格提取权威碰撞成绩；证据不足返回 None（不猜）。
+# ---------------------------------------------------------------- 多成绩：取证据最强单一成绩
+# 用户口径（2026-11-21 确认）：一款车有多个碰撞成绩时，取「证据最强」的一条算分，
+# 既不取最高分（会系统性偏向测试宽松的体系），也不把多体系分数一起算（各国 NCAP
+# 无对应关系、不可跨体系套同一得分率公式）。被丢弃的次要成绩不删，进审计字段。
+# 强度阶梯：一手得分率(3) > C-IASI 三指数/NCAP 五星(2) > 奖项(1) > 媒体/软文/旁证(0)。
+_WEAK_ANCHOR_RE = re.compile(
+    r"(?:另(?:有)?|此外|参考|海外|出口版获|据)\s*(?P<sys>" + _system_pattern() + r")", re.I)
+# 厂商「按XX五星标准设计」不是实测成绩，次级收集也要拒绝
+_SECONDARY_REJECT = ("安全车身设计", "设计标准", "标准开发", "非第三方实测", "按C-NCAP", "按中保研",
+                     "非国内", "仅作弱旁证", "仅作旁证", "非本代", "非本车", "不能当", "非实测")
 
-    与 parse_score 返回同构（basis/system_cn/score/stars/grade/year/display），
-    额外带 evidence=True 与 ciasi_dims（C-IASI 三指数明细）供审计。
+
+def _parse_one_anchor(t: str, seg: str, m, basis: str) -> dict | None:
+    """解析单个体系锚点 → 与 parse_score 同构的 dict；证据不足返回 None。
+
+    IIHS 奖项制 / C-IASI 三指数 / NCAP 星级得分率三分支，沿用严格防误伤规则。
+    """
+    if SYSTEMS[basis]["grade"] == "award":
+        if any(k in seg for k in _NEG_EVIDENCE):
+            return None
+        am = re.search(r"(TSP\+\+|TSP\+|TSP|Top Safety Pick\+?|优秀\+|优秀|Good)", seg, re.I)
+        if not am:
+            return None
+        award = am.group(1)
+        return {"basis": basis, "system_cn": cn_name(basis), "score": None,
+                "stars": None, "grade": award, "year": None,
+                "display": f"{cn_name(basis)} {award}", "evidence": True}
+    if basis == "ciasi":
+        # 从该锚点起、到「注意：」前取维度等级，覆盖多次测评
+        tail = t[t.find(m.group(0)):].split("注意：")[0]
+        dim = parse_ciasi_dimensions(tail)
+        if not dim:
+            return None
+        return {"basis": basis, "system_cn": cn_name(basis), "score": None,
+                "stars": None, "grade": dim["grade"], "year": None,
+                "display": f"{cn_name(basis)} {dim['grade']}",
+                "ciasi_dims": dim["dims"], "ciasi_n_tests": dim["n_tests"],
+                "evidence": True}
+    if SYSTEMS[basis]["grade"] == "star":
+        if any(k in seg for k in _NEG_EVIDENCE):
+            return None
+        pm = re.search(r"综合得分率\s*(\d{2,3}(?:\.\d+)?)\s*%", seg)
+        sm = _STAR_RE.search(seg)
+        score = float(pm.group(1)) if pm else None
+        stars = _CN_NUM.get(sm.group(1)) if sm else None
+        if score is None and stars is None:
+            return None
+        if score is not None:
+            display = f"{cn_name(basis)} {score:g}%"
+            if stars:
+                display += " 五星"
+        else:
+            display = f"{cn_name(basis)} 五星"
+        return {"basis": basis, "system_cn": cn_name(basis), "score": score,
+                "stars": stars, "grade": None, "year": None,
+                "display": display, "evidence": True}
+    return None
+
+
+def _score_tier(parsed: dict, seg: str, anchored: bool) -> int:
+    """单条成绩的证据强度：3 一手得分率 / 2 等级星级 / 1 奖项 / 0 媒体软文旁证。
+
+    强锚点「有<体系>官方成绩」已由 _NEG_EVIDENCE 排掉软文/宣传/否定口径，
+    本身即一手官方声明，直接按成绩类型给 tier——不能再按 seg 里出现的"媒体/
+    宣称/出口版"等词降级（那些词可能只是同句 commentary，如乐道L60"宣称首款
+    2024版五星"、Model Y"官网/媒体2025年"、海狮07EV"媒体口径"的另一体系）。
+    弱锚点（另/参考/海外/出口版获）才是次级旁证，一律 tier 0。
+    """
+    if not anchored:
+        return 0
+    if parsed.get("score") is not None:
+        return 3
+    if parsed.get("ciasi_dims") or parsed.get("stars"):
+        return 2
+    if parsed.get("grade"):
+        return 1
+    return 0
+
+
+def parse_all_scores_from_evidence(text) -> list[dict]:
+    """从证据长文本提取【全部】可识别的权威成绩，按证据强度降序。
+
+    与严格解析器共用防误伤规则，但不在第一个锚点就 return：
+      - 强锚点「有<体系>官方成绩」→ tier 按证据类型（3/2/1/0）
+      - 弱锚点「另/参考/海外/出口版获<体系>」→ tier 0（只作追溯，不参与算分）
+      - 同一体系多次测评（Model Y 2021/2025）保留一条、记 ciasi_n_tests
+    返回的首条即「证据最强的单一成绩」，是算分唯一依据。
     """
     t = str(text or "")
+    found = []
     for seg in re.split(r"[。\n]", t):
-        m = _ANCHOR_RE.search(seg)
-        if not m:
+        if any(k in seg for k in _SECONDARY_REJECT):
             continue
-        head = seg[:m.start()]
-        if any(k in head for k in ("无", "未", "没", "非")):
-            continue
-        basis = normalize(m.group("sys"))
-        if not basis:
-            continue
-        # IIHS 奖项制：TSP+ / TSP / Good 等（award 家族，非星级非得分率）
-        if SYSTEMS[basis]["grade"] == "award":
-            if any(k in seg for k in _NEG_EVIDENCE):
+        handled = set()
+        # 强锚点「有<体系>官方成绩」：一手官方，按成绩类型给 tier
+        sm = _ANCHOR_RE.search(seg)
+        if (sm and not any(k in seg[:sm.start()] for k in ("无", "未", "没", "非"))
+                and not any(k in seg for k in _NEG_EVIDENCE)):
+            basis = normalize(sm.group("sys"))
+            if basis:
+                p = _parse_one_anchor(t, seg, sm, basis)
+                if p:
+                    p["tier"] = _score_tier(p, seg, True)
+                    p["source_quality"] = "一手官方" if p["tier"] else "弱(媒体/软文/旁证)"
+                    found.append(p)
+                    handled.add(basis)
+        # 弱锚点「另/参考/海外/出口版获<体系>」：同句可有零到多个，一律 tier 0
+        for wm in _WEAK_ANCHOR_RE.finditer(seg):
+            if any(k in seg[:wm.start()] for k in ("无", "未", "没", "非")):
                 continue
-            am = re.search(r"(TSP\+\+|TSP\+|TSP|Top Safety Pick\+?|优秀\+|优秀|Good)", seg, re.I)
-            if not am:
+            basis = normalize(wm.group("sys"))
+            if not basis or basis in handled:
                 continue
-            award = am.group(1)
-            return {"basis": basis, "system_cn": cn_name(basis), "score": None,
-                    "stars": None, "grade": award, "year": None,
-                    "display": f"{cn_name(basis)} {award}", "evidence": True}
-        # C-IASI：后文（到「注意：」前）取维度等级，覆盖多次测评
-        if basis == "ciasi":
-            tail = t[t.find(m.group(0)):].split("注意：")[0]
-            dim = parse_ciasi_dimensions(tail)
-            if not dim:
+            # 弱锚点只在其自身之后取成绩，不能用同句前面强锚点的数字
+            # （海狮07EV「C-NCAP 87.3%…另有E-NCAP五星」曾把 87.3% 串给 E-NCAP）
+            wseg = seg[wm.start():]
+            p = _parse_one_anchor(t, wseg, wm, basis)
+            if not p:
                 continue
-            return {"basis": basis, "system_cn": cn_name(basis), "score": None,
-                    "stars": None, "grade": dim["grade"], "year": None,
-                    "display": f"{cn_name(basis)} {dim['grade']}",
-                    "ciasi_dims": dim["dims"], "evidence": True}
-        # NCAP 星级家族：锚点同句取「综合得分率」或「N星」，且不能是智驾 C-ICAP。
-        # 2026-11-21 全量排查：此前只认「综合得分率」，导致 Euro NCAP/ANCAP/
-        # JNCAP 等**星级制**体系全部取不到（蔚来ET5 Euro NCAP 五星即此情形）。
-        if SYSTEMS[basis]["grade"] == "star":
-            if any(k in seg for k in _NEG_EVIDENCE):
-                continue
-            pm = re.search(r"综合得分率\s*(\d{2,3}(?:\.\d+)?)\s*%", seg)
-            sm = _STAR_RE.search(seg)
-            score = float(pm.group(1)) if pm else None
-            stars = _CN_NUM.get(sm.group(1)) if sm else None
-            if score is None and stars is None:
-                continue
-            if score is not None:
-                display = f"{cn_name(basis)} {score:g}%"
-                if stars:
-                    display += " 五星"
-            else:
-                display = f"{cn_name(basis)} 五星"
-            return {"basis": basis, "system_cn": cn_name(basis), "score": score,
-                    "stars": stars, "grade": None, "year": None,
-                    "display": display, "evidence": True}
-    return None
+            p["tier"] = 0
+            p["source_quality"] = "弱(媒体/软文/旁证)"
+            found.append(p)
+            handled.add(basis)
+    # 同一体系去重：tier 高者优先；C-IASI 多次测评次数并入保留条
+    dedup = OrderedDict()
+    for p in found:
+        b = p["basis"]
+        if b not in dedup or p["tier"] > dedup[b]["tier"]:
+            dedup[b] = p
+        elif p.get("ciasi_n_tests"):
+            dedup[b]["ciasi_n_tests"] = max(dedup[b].get("ciasi_n_tests") or 0,
+                                            p["ciasi_n_tests"])
+    out = list(dedup.values())
+    out.sort(key=lambda x: -x["tier"])              # 稳定排序：同级保持文本顺序
+    return out
+
+
+def parse_score_from_evidence(text) -> dict | None:
+    """从证据长文本提取【证据最强的单一成绩】；证据不足返回 None（不猜）。
+
+    2026-11-21 修：此前遇第一个锚点就 return，多成绩车取哪个由文本书写顺序决定。
+    现在统一走 parse_all_scores_from_evidence 取首条（强度最高）。
+    与 parse_score 返回同构（basis/system_cn/score/stars/grade/year/display），
+    额外带 tier / source_quality / ciasi_dims / ciasi_n_tests 供审计。
+    """
+    scores = parse_all_scores_from_evidence(text)
+    return scores[0] if scores else None
 
 
 def selftest():
@@ -391,6 +478,27 @@ def selftest():
         hit = parse_score_from_evidence(sample)
         assert hit and hit["basis"] == code, f"体系 {code} 解析失败（正则没覆盖）: {hit}"
     assert len(_TEXT_SYS_RE.findall("有C-NCAP成绩")) == 1
+    # 多成绩口径（2026-11-21）：取证据最强单一成绩，不取最高/不按文本顺序
+    multi = ("有C-NCAP官方成绩：综合得分率90.7%，五星。另有Euro NCAP五星（媒体口径）。")
+    alls = parse_all_scores_from_evidence(multi)
+    assert len(alls) == 2, f"多成绩应全部收集: {alls}"
+    assert alls[0]["basis"] == "cncap" and alls[0]["tier"] == 3, alls
+    assert alls[1]["basis"] == "euro_ncap" and alls[1]["tier"] == 0, alls
+    main = parse_score_from_evidence(multi)
+    assert main["basis"] == "cncap", f"主成绩应取一手得分率而非文本里先出现的: {main}"
+    # 反序也取最强（防「谁写在前面取谁」复发）
+    rev = ("另有Euro NCAP五星（媒体口径）。有C-NCAP官方成绩：综合得分率90.7%。")
+    assert parse_score_from_evidence(rev)["basis"] == "cncap", "主成绩不应受文本顺序影响"
+    # C-IASI 多次测评记次数、取最新一次、三指数最低
+    my = ("有C-IASI官方成绩：①车内乘员G、车外行人G、辅助安全G；"
+          "②车内乘员G+、车外行人G+、辅助安全G。")
+    mr = parse_score_from_evidence(my)
+    assert mr["grade"] == "G" and mr["ciasi_n_tests"] == 2, mr
+    # 弱旁证不能当成绩（G6/宋L/ES6 踩过的坑）
+    for weak in ("可参考海外ANCAP 2024五星——非国内协议，仅作弱旁证",
+                 "宣称按C-NCAP五星安全车身设计（厂商口径）",
+                 "出口版获Euro NCAP五星，非本代国内一手成绩，低置信"):
+        assert parse_score_from_evidence(weak) is None, f"弱旁证误当成绩: {weak}"
     return 0
 
 
