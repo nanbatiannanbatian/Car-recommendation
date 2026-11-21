@@ -115,6 +115,8 @@ NEG_DATA = {
     "t080": ("experience_score.cap_unproven", None, "no_dim_cap"),
     # t081：关掉统一证据门槛（回到「各维度随便给分」），断言必须 FAIL
     "t081": ("evidence_gate.apply_all", None, "no_evidence_gate"),
+    # t082：关掉可复用实测提取器（回到「抓不到试驾稿麋鹿/NOA」），断言必须 FAIL
+    "t082": ("fill_experience.extract_driving_evidence", None, "no_extract"),
     # t039 断言从「源码文本含文件名」升级为「文件在同步集里」，探针改成把同步集清空
     "t039": ("sync_to_repo.collect", None, "empty_sync"),
 }
@@ -146,6 +148,7 @@ def _func_probe(name, fn, dotted, mode):
         "flat_score": lambda *a, **kw: 1.0,                                # 换算恒为1.0
         "no_dim_cap": lambda *a, **kw: [],                                 # 不做体验封顶
         "no_evidence_gate": lambda *a, **kw: [],                           # 不做任何证据封顶
+        "no_extract": lambda *a, **kw: [],                                  # 提取器失效（T6 实测又抓不到）
         "always_missing": lambda *a, **kw: {"status": "missing", "source": "", "trims": [],
                                            "attempts": [], "evidence": {}, "sid": None,
                                            "ah_name": ""},                # 调度退化为直接失败

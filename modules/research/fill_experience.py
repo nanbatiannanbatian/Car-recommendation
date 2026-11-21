@@ -15,17 +15,97 @@
   · 只写「采集到的事实」（pph / review_users / pph_usable），不改任何 scores。
   · 样本 <30 一律标 pph_usable=False（样本 4 条的 PPH=0 不是「零故障」）。
   · 拿不到就是拿不到，不猜、不填默认值。
+
+体验实测提取（2026-11-21，用户质疑「T6 麋鹿 80.02 为何没录入」根因修复）：
+  fill_pph 只能补口碑 PPH，抓不到「麋鹿 XX km/h / 城市NOA 实车」这类写在试驾稿
+  里的实测——T6 就是这样漏的：数据在外部媒体稿，候选池 note 没有、证据库也没有，
+  检测器两头都扫不到。extract_driving_evidence() 把「从任意文本提取实测」做成
+  research 层可复用能力：给它一段试驾稿（research 检索到的正文），它产出**候选
+  证据条目**（dimension/kind/数值/原文/来源/url/待核实标记）。
+  **只提取、不入库、不打分**——麋鹿数字可能是厂商宣传口径，必须由人核实来源后
+  才能写进 experience_facts.json（user_review/independent_test 的判定是人工的）。
+  这样「数据没录入」的根因（没有可复用的文本提取器）被代码消除：以后任何车入池，
+  研究流程都能用同一个函数扫试驾稿，人工据此核实补录。
 """
 from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 
 import paths
 
 HERE = str(paths.ROOT)
 sys.path.insert(0, HERE)
+
+
+# ---- 体验实测文本提取（可复用，纯函数，零网络零 IO）----
+# 正则与 cross_verify.check_experience_gaps 共用同一套模式——那边检测缺口、
+# 这边提取候选证据，必须同一口径，否则「检测到的」和「能提取的」对不上。
+_MOOSE_RE = re.compile(r"麋鹿[^0-9]{0,8}(\d{2,3}(?:\.\d+)?)\s*(?:km\s*/?\s*h|公里)")
+_NOA_RE = re.compile(r"(城市\s*NOA|城区\s*NOA)[^。；]{0,16}"
+                     r"(实测|实车|试驾|路测|表现|体验)")
+
+
+def extract_driving_evidence(text: str, model: str = "", url: str = "",
+                             source: str = "research_text") -> list[dict]:
+    """从一段试驾/实测稿正文提取候选体验证据条目（**不入库、不打分**）。
+
+    Returns: [{model, dimension, kind, value, claim, source, source_type, url, verification}]
+      - control/moose_test: 捕获麋鹿成绩 km/h，附上下文原句
+      - adas/city_noa_review: 捕获城市NOA 实测描述
+      - verification 恒为 "pending"：提醒调用方（人工/上游）核实来源与口径后才能
+        写进 experience_facts.json。厂商宣称的麋鹿应标 up_review 且降权，
+        第三方独立横评才标 independent_test——这个判断不由正则做。
+
+    与 cross_verify 的缺口检测互为镜像：检测层说「这段文本有实测但库里没有」，
+    本函数说「这段文本里实测是什么」，合起来构成「发现→提取→人工核实→入库」闭环。
+    """
+    text = str(text or "")
+    out: list[dict] = []
+    m = _MOOSE_RE.search(text)
+    if m:
+        s, e = max(0, m.start() - 12), min(len(text), m.end() + 40)
+        out.append({
+            "model": model, "dimension": "control", "kind": "moose_test",
+            "value": float(m.group(1)), "unit": "km/h",
+            "claim": text[s:e].strip(),
+            "source": source, "source_type": "pending", "url": url,
+            "verification": "pending",
+            "note": "麋鹿成绩可能是厂商公布或第三方实测，需核实来源后定 "
+                    "up_review(降权) / independent_test，再写入 experience_facts",
+        })
+    n = _NOA_RE.search(text)
+    if n:
+        s, e = max(0, n.start() - 8), min(len(text), n.end() + 60)
+        out.append({
+            "model": model, "dimension": "adas", "kind": "city_noa_review",
+            "value": None, "claim": text[s:e].strip(),
+            "source": source, "source_type": "pending", "url": url,
+            "verification": "pending",
+            "note": "城市NOA 实车描述，需核实是否有接管里程/通过率等量化数据，"
+                    "据此定方向后再写入 experience_facts",
+        })
+    return out
+
+
+def driving_evidence_selftest() -> int:
+    """T6 场景回归：从试驾稿提取麋鹿+NOA，且不自动入库/不打分的契约。"""
+    article = ("ID.AURA T6 麋鹿测试 80.02km/h 表现亮眼；"
+               "城市NOA实车路测风格谨慎保守，路口黄灯多数刹停。")
+    got = extract_driving_evidence(article, model="大众ID.AURA T6",
+                                   url="https://example.com/t6")
+    assert len(got) == 2, got
+    moose = [x for x in got if x["kind"] == "moose_test"][0]
+    assert moose["value"] == 80.02 and moose["dimension"] == "control", moose
+    assert moose["verification"] == "pending", "提取结果必须标记待核实"
+    assert all(x["source_type"] == "pending" for x in got), "不允许提取器判定来源类型"
+    # 无实测的普通文本 → 空
+    assert extract_driving_evidence("这款车空间很大，价格厚道。") == []
+    # 麋鹿正则不误伤百分比/快充（与 crash_systems 同纪律）
+    assert extract_driving_evidence("充电 10-80% 用时 22 分钟") == []
+    return 0
 
 
 _IDX = None
@@ -118,11 +198,16 @@ def report(r: dict) -> str:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="补 PPH/口碑样本证据到候选池")
+    ap.add_argument("--selftest", action="store_true", help="体验实测提取器自测")
     ap.add_argument("--pool", default=str(paths.cat("master_pool.json")))
     ap.add_argument("--models", help="只处理指定车型（逗号分隔）")
     ap.add_argument("--limit", type=int)
     ap.add_argument("--apply", action="store_true", help="写回池（默认 dry-run）")
     a = ap.parse_args(argv)
+    if a.selftest:
+        driving_evidence_selftest()
+        print("[fill_experience] 体验实测提取器自测通过")
+        return 0
 
     pool = json.load(open(a.pool, encoding="utf-8"))
     models = [x.strip() for x in a.models.split(",")] if a.models else None

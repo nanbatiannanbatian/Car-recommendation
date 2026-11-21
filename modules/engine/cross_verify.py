@@ -421,14 +421,21 @@ _MOOSE_RE = _re.compile(r"麋鹿[^0-9]{0,8}(\d{2,3}(?:\.\d+)?)\s*(?:km\s*/?\s*h|
 _NOA_RE = _re.compile(r"(城市\s*NOA|城区\s*NOA)[^。；]{0,12}(实测|实车|试驾)")
 
 
-def check_experience_gaps(cands, lib=None) -> list[dict]:
-    """候选池文本里写了可核查的实测数据，但体验证据库没有对应条目 → 缺口。
+def check_experience_gaps(cands, lib=None, external_evidence=None) -> list[dict]:
+    """实测文本有可核查数据，但体验证据库没有对应条目 → 缺口。
 
     为什么要有（2026-11-21 用户质疑「大众 T6 智驾/操控分低是否不客观」时查实）：
       T6 的麋鹿 80.02km/h 明明在多家试驾稿里，却没进 experience_facts.json，
       于是被判「零实测」封顶到 7.8——而实测只有 75.2km/h 的极氪7X 是 8.5。
       数据在、没入库 = 等于没采。这和 crash「文本有成绩但字段空」是同一种病，
       所以用同一种办法：出榜前扫一遍文本，有数字没条目就报出来。
+
+    两个文本来源（2026-11-21 二次修复，用户追问「是否在代码层面确保不出错」）：
+      1) cands 的文本字段（note/safety_note/...）—— 早期实现只扫这里，
+         T6 的麋鹿在**外部试驾稿**、候选池 note 根本没写 → 原检测器检出 0 条，形同虚设。
+      2) external_evidence: {canon(model): [试驾稿正文, ...]} —— 由 research 层
+         fill_experience.extract_driving_evidence 同一套正则从检索稿提取；
+         即使候选池没写、只要研究阶段拿到过实测稿也能查出缺口。
     只报缺口，不自动入库——麋鹿数字可能是宣传口径，要人判断来源后才录。
     """
     from modules.contracts.model_names import canon
@@ -437,24 +444,53 @@ def check_experience_gaps(cands, lib=None) -> list[dict]:
     have: dict[str, set] = {}
     for e in (lib or {}).get("entries", []):
         have.setdefault(canon(e.get("model") or ""), set()).add(e.get("dimension"))
+    ext = external_evidence or {}
     gaps = []
     for c in cands:
         k = canon(c.get("model") or "")
         own = have.get(k, set())
-        text = " ".join(str(c.get(x) or "") for x in
-                        ("note", "safety_note", "intro", "highlight", "summary"))
+        own_text = " ".join(str(c.get(x) or "") for x in
+                            ("note", "safety_note", "intro", "highlight", "summary"))
+        extra = ext.get(k) or []
+        text = own_text + " " + " ".join(str(x) for x in extra)
         m = _MOOSE_RE.search(text)
         if m and "control" not in own:
+            src = "候选池文本" if _MOOSE_RE.search(own_text) else "外部实测稿"
             gaps.append({"model": c.get("model"), "dim": "control", "kind": "moose",
-                         "value": float(m.group(1)),
-                         "fix": f"文本里有麋鹿 {m.group(1)}km/h，但 experience_facts 无 control 记录——"
+                         "value": float(m.group(1)), "source": src,
+                         "fix": f"{src}里有麋鹿 {m.group(1)}km/h，但 experience_facts 无 control 记录——"
                                 f"核实来源后补录（厂商公布标 up_review、第三方实测标 independent_test），"
                                 f"否则该车会被判「零实测」而封顶"})
-        if _NOA_RE.search(text) and "adas" not in own:
+        nm = _NOA_RE.search(text)
+        if nm and "adas" not in own:
+            src = "候选池文本" if _NOA_RE.search(own_text) else "外部实测稿"
             gaps.append({"model": c.get("model"), "dim": "adas", "kind": "noa",
-                         "value": None,
-                         "fix": "文本提到城市NOA实车/实测，但 experience_facts 无 adas 记录——核实后补录"})
+                         "value": None, "source": src,
+                         "fix": f"{src}提到城市NOA实车/实测，但 experience_facts 无 adas 记录——核实后补录"})
     return gaps
+
+
+def check_experience_gaps_selftest() -> int:
+    """T6 真实场景：候选池 note 无麋鹿、外部稿有 → 必须检出；入库后必须清零。"""
+    from modules.contracts.model_names import canon
+    lib = {"entries": []}
+    # 候选池 note 里只有充电信息，没有麋鹿/NOA —— 复刻 T6 原始 note
+    cands = [{"model": "大众ID.AURA T6", "note": "碰撞仅抽车未测；30–80%需22分钟"}]
+    # 检测器只看候选池 → 漏报（这正是原 bug）
+    assert check_experience_gaps(cands, lib=lib) == [], "基线：只看候选池确实扫不到"
+    # 外部稿（research 检索到）送来麋鹿+NOA → 必须检出
+    ext = {canon("大众ID.AURA T6"): [
+        "ID.AURA T6 麋鹿测试 80.02km/h；城市NOA实车路测风格谨慎。"]}
+    gaps = check_experience_gaps(cands, lib=lib, external_evidence=ext)
+    assert {(g["dim"], g["kind"]) for g in gaps} == {("control", "moose"), ("adas", "noa")}, gaps
+    assert all(g["source"] == "外部实测稿" for g in gaps), gaps
+    # 核实入库后 → 缺口清零（control + adas 都有条目）
+    lib2 = {"entries": [
+        {"model": "大众ID.AURA T6", "dimension": "control", "source_type": "independent_test"},
+        {"model": "大众ID.AURA T6", "dimension": "adas", "source_type": "up_review"},
+    ]}
+    assert check_experience_gaps(cands, lib=lib2, external_evidence=ext) == []
+    return 0
 
 
 def check_internal_consistency(cands: list[dict]) -> dict:
@@ -620,6 +656,9 @@ def selftest():
     assert _find_in(lib, "ID.AURA T6") is not None
     assert _find_in(lib, "阿尔法T5") is not None
     print("  [6] 跨库车名对齐 ✓")
+    # 7 体验证据缺口：T6 场景（外部稿有实测、候选池 note 无）必须检出
+    check_experience_gaps_selftest()
+    print("  [7] 体验证据缺口（含外部源）✓")
     print("全部通过 ✓")
 
 

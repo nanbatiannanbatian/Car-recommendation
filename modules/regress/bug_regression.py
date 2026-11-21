@@ -104,6 +104,7 @@ CASES = [
     ("BUG-079", "得分率→分数存在两套实现(engine cap9.3 vs research cap10/floor6)", "v10.2.3"),
     ("BUG-080", "无实测车体验维度可断层最高(MONA adas9.4 vs 有实测G6 7.6)", "v10.2.4"),
     ("BUG-081", "维度证据门槛散落成多个特判函数,新增维度需再打补丁(quality漏网)", "v10.2.5"),
+    ("BUG-082", "T6实测数据没录入:采集抓不到试驾稿麋鹿/NOA+检测器只扫候选池+缺口只print不拦", "v10.2.7"),
 ]
 
 
@@ -2019,8 +2020,57 @@ def t081():
     return "证据门槛统一：8维策略表/5封顶3不封顶/quality用中位/无证据不高于有证据/补采器可复用"
 
 
+def t082():
+    """T6 数据没录入的根因闭环：外部实测稿 → 可复用提取 → 缺口检出 → 硬门禁拦截。
+
+    2026-11-21 用户追问「大众T6数据没有录入什么原因，是否在代码层面修改确保以后不出错」。
+    查实三层漏洞：
+      ① 采集：fill_pph 只补口碑，抓不到试驾稿里的麋鹿/NOA；T6 数据只在外部媒体稿，
+         候选池 note 也没写 → 证据库天然缺条目。
+      ② 检测：check_experience_gaps 只扫候选池文本，T6 note 无麋鹿 → 检出 0 条（形同虚设）。
+      ③ 门禁：即使检出也只 print，不拦截 → 带病照常出榜。
+    修复：research.extract_driving_evidence 可复用提取（只提取待核实、不入库不打分）；
+          check_experience_gaps 支持外部文本源；pipeline 缺口升级为 sys.exit 硬拦。
+    """
+    from modules.research import fill_experience as FE
+    from modules.engine import cross_verify as XV
+    from modules.contracts.model_names import canon
+
+    # 1) 可复用提取器：从试驾稿提取麋鹿+NOA，标 pending（不判来源、不入库、不改分）
+    art = "ID.AURA T6 麋鹿测试 80.02km/h；城市NOA实车路测谨慎保守。"
+    got = FE.extract_driving_evidence(art, model="大众ID.AURA T6", url="u")
+    assert len(got) == 2, got
+    assert {x["dimension"] for x in got} == {"control", "adas"}, got
+    assert all(x["verification"] == "pending" and x["source_type"] == "pending"
+               for x in got), "提取器不得自行判定来源类型/入库"
+    assert [x for x in got if x["kind"] == "moose_test"][0]["value"] == 80.02
+    assert FE.extract_driving_evidence("10-80%快充22分钟") == [], "快充百分比不得误判麋鹿"
+
+    # 2) 缺口检测含外部源：候选池 note 没有实测（T6 原样）也必须能查出
+    cands = [{"model": "大众ID.AURA T6", "note": "碰撞仅抽车未测；30–80%需22分钟"}]
+    lib0 = {"entries": []}
+    assert XV.check_experience_gaps(cands, lib=lib0) == [], "只看候选池确实扫不到（原 bug）"
+    ext = {canon("大众ID.AURA T6"): [art]}
+    gaps = XV.check_experience_gaps(cands, lib=lib0, external_evidence=ext)
+    assert {(g["dim"], g["kind"]) for g in gaps} == {("control", "moose"), ("adas", "noa")}, gaps
+    assert all(g["source"] == "外部实测稿" for g in gaps), gaps
+    # 入库后清零
+    lib1 = {"entries": [
+        {"model": "大众ID.AURA T6", "dimension": "control", "source_type": "independent_test"},
+        {"model": "大众ID.AURA T6", "dimension": "adas", "source_type": "up_review"},
+    ]}
+    assert XV.check_experience_gaps(cands, lib=lib1, external_evidence=ext) == []
+
+    # 3) 门禁：pipeline 源码必须有硬拦 + skip 开关，不能只 print
+    src = _read("pipeline.py")
+    assert "体验证据缺口门禁" in src and "skip_experience_gap" in src, \
+        "pipeline 缺口未升级为硬门禁"
+    assert 'sys.exit("体验证据缺口门禁' in src, "缺口只 print 不拦截"
+    return "T6根因闭环：research可复用提取(待核实不入库)+外部源缺口检测+pipeline硬门禁"
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082]
 
 
 def run():

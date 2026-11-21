@@ -120,6 +120,8 @@ def main():
     ap.add_argument("--skip-sibling-gate", action="store_true", help="跳过同源车评分一致性门禁(须在报告说明为何无据差异合理)")
     ap.add_argument("--skip-safety-gate", action="store_true", help="跳过安全分严谨性门禁(须在报告说明为何成绩映射分可偏离)")
     ap.add_argument("--html-title", help="HTML 页面标题")
+    ap.add_argument("--skip-experience-gap", action="store_true",
+                    help="跳过体验证据缺口门禁(须在报告说明为何文本实测无需入库)")
     ap.add_argument("--no-evidence-cap", action="store_true",
                     help="不做安全分举证封顶（仅 A/B 对照，验证封顶确实改变分数）")
     ap.add_argument("--no-auto-safety", action="store_true",
@@ -216,13 +218,24 @@ def main():
         print("[证据封顶] " + " / ".join(f"{d} {v['count']}款→{v['cap']:g}"
                                          for d, v in _ev_sum.items()))
 
-    # 证据缺口检测（2026-11-21）：文本里有可核查实测（麋鹿 XX km/h / 城市NOA 实测）
-    # 但体验证据库没记录 → 报出来。T6 的麋鹿 80.02km/h 就这样被漏过一次，
-    # 结果被判「零实测」封顶到 7.8，而实测 75.2km/h 的车是 8.5。
+    # 证据缺口门禁（2026-11-21，用户追问「是否在代码层面确保不出错」后从 print 升级为硬拦）：
+    # 文本/外部稿里有可核查实测（麋鹿 XX km/h / 城市NOA 实测）但体验证据库没记录 → 拦截出榜。
+    # T6 的麋鹿 80.02km/h 就这样漏过一次，被判「零实测」封顶到 7.8，而实测 75.2 的车是 8.5。
+    # 只拦不自动入库——麋鹿可能是宣传口径，须人工核实来源后补录（用 research 的
+    # fill_experience.extract_driving_evidence 提取候选证据）。确认为无需入库时用
+    # --skip-experience-gap 并在报告说明。
     from modules.engine import cross_verify as XV
     _exp_gaps = XV.check_experience_gaps(cands) if not getattr(a, "no_evidence_cap", False) else []
     if _exp_gaps:
-        print(f"[证据缺口] {len(_exp_gaps)} 条文本实测未入库：" +
+        _gap_lines = [f"  - {g['model']}({g['dim']}/{g['kind']}) 来源:{g.get('source','候选池文本')}"
+                      f" — {g['fix']}" for g in _exp_gaps]
+        if not getattr(a, "skip_experience_gap", False):
+            sys.exit("体验证据缺口门禁：以下车型有实测文本但证据库无条目（会被误判零实测封顶）：\n"
+                     + "\n".join(_gap_lines[:8])
+                     + "\n→ 用 research.fill_experience.extract_driving_evidence 提取候选证据，"
+                       "人工核实来源后补录 experience_facts.json；确认为无需入库时用 "
+                       "--skip-experience-gap 并在报告说明。")
+        print(f"[证据缺口·已跳过] {len(_exp_gaps)} 条文本实测未入库（--skip-experience-gap）：" +
               "、".join(f"{g['model']}({g['dim']})" for g in _exp_gaps[:5]))
 
     # adjust 黑箱门禁：总分加减必须留依据（此前 11 款 adjust 无 reason，不可审计）
