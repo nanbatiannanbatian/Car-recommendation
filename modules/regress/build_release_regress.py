@@ -42,7 +42,7 @@ def run():
     check("错误提示含清理指引", "请清理无引用的大文件" in src)
     # 2) 排除清单
     for f in ("trims_v61polluted.json", "trims_v60before.json", "*_regress.py",
-              "build_midsuv_202610.py"):
+              "*_regression.py", "build_midsuv_202610.py"):
         check(f"排除清单含:{f}", f'"{f}"' in src)
     # 判据只有「能不能重建」：可重建的生成物不打包，人工事实库必须打包。
     # 名单不再在本文件复制一份（复制必分叉），直接取 paths 的单一事实源。
@@ -86,7 +86,7 @@ def run():
             names = set(z.namelist())
         check("实际产物解压后<3MB", total < MAX, f"{total/1024:.1f}KB")
         check("产物无历史污染数据", not any("v61polluted" in n or "v60before" in n for n in names))
-        check("产物无回归测试脚本", not any(n.endswith("_regress.py") for n in names))
+        check("产物无回归测试脚本", not any(n.endswith(("_regress.py", "_regression.py")) for n in names))
         check("产物含核心模块", "car-recommendation/build_midsuv_full.py" in names and "car-recommendation/SKILL.md" in names)
         # 可重建的生成物不进包；人工事实库（气囊/物理参数/基线池）必须在包里
         check("产物无生成物缓存", not any(any(f in n for f in paths.GENERATED_JSON) for n in names))

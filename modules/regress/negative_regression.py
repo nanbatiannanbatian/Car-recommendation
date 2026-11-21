@@ -68,6 +68,10 @@ NEG_TARGETS = {
     "t065": ["rank_mean_by_model"],
     "t066": ["稳定地排第5左右"],
     "t067": [".strong-main"],
+    # t090：抹掉 C-NCAP 回流/展示门禁断言依赖（回到「表里有成绩、页面空白无人拦」），应 FAIL
+    "t090": ["backfill_crash_from_cncap_table"],
+    # t091：抹掉新闻稿救回入口定义（回到「救回只存在手动操作」），应 FAIL
+    "t091": ["def rescue_targets"],
 }
 
 # 数据断言型：测试名 -> (文件路径, 车型/键, 篡改模式)

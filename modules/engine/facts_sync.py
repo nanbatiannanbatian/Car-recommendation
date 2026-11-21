@@ -386,3 +386,91 @@ def backfill_crash_from_authoritative(cars, table_path=None):
             c["safety_score_value"] = value
         filled.append((c.get("model"), display, basis))
     return filled
+
+
+# ---------------------------------------------------------------- C-NCAP 成绩表回流
+def _model_key(s) -> str:
+    """精确归一：只去格式符，不去掉「纯电/四驱」等限定词，防止跨动力外推。"""
+    return re.sub(r"[\s\-_·（）()＋+／/．.、,，]", "", str(s or "")).lower()
+
+
+def backfill_crash_from_cncap_table(cars, table_path=None):
+    """把 cncap_scores.json 的官方综合得分率回流进候选池（v10.5.0）。
+
+    为什么必须有这条（2026-11-21 全量核对发现）：
+      cncap_scores.json 已抓到「零跑C11 86.4%」，但候选池 crash/note/evidence 都没写，
+      权威库 official_safety_scores.json 也没有 → 页面碰撞成绩列显示「—」。
+      这是「数据源有测试、页面不显示」的典型漏回填，不是渲染问题。
+
+    规则：只填空，不覆盖候选池/权威库已有的更权威成绩；不外推到配置或年款。
+    """
+    from modules.engine import crash_systems as CS
+
+    tp = table_path or os.path.join(HERE, "cncap_scores.json")
+    if not os.path.exists(tp):
+        return []
+    table = json.load(open(tp, encoding="utf-8"))
+    scores = table.get("scores") or {}
+    by = {_model_key(k): (k, v) for k, v in scores.items()}
+    filled = []
+    for c in cars:
+        if CS.is_official(c.get("safety_basis")):
+            continue
+        rec = by.get(_model_key(c.get("model") or ""))
+        if not rec:
+            continue
+        key, value = rec
+        try:
+            value = float(value)
+        except (TypeError, ValueError):
+            continue
+        display = f"C-NCAP {value:g}%"
+        c["safety_basis"] = "cncap"
+        if not CS.has_score(c.get("crash")):
+            c["crash"] = display
+        c["crash_source"] = (f"C-NCAP 官方成绩表 cncap_scores.json 回流"
+                             f"（{key}：综合得分率 {value:g}%）")
+        c["safety_score_value"] = value
+        filled.append((c.get("model"), display, "cncap"))
+    return filled
+
+
+def crash_display_leaks(cars, decoded=None):
+    """出榜前门禁：有可核验成绩来源但 crash 字段仍无成绩 → 页面必然漏显。
+
+    只统计「有具体成绩」的来源（一手文字 / C-IASI 新闻稿文字等级 / 权威库 /
+    C-NCAP 官方表）；只有「存在测评记录但图标未解码」的车不误报，避免把
+    「查到旧测评但无官方文字等级」硬塞进页面。
+    """
+    from modules.contracts.model_names import canon
+    from modules.engine import crash_systems as CS
+    from modules.engine import multi_evidence_score as MES
+
+    dec = MES.decoded_by_canon(decoded)
+    off_path = os.path.join(HERE, "official_safety_scores.json")
+    off = json.load(open(off_path, encoding="utf-8")) if os.path.exists(off_path) else {}
+    off_cars = {canon(k) for k in (off.get("car_scores") or {})}
+    cn_path = os.path.join(HERE, "cncap_scores.json")
+    cn = json.load(open(cn_path, encoding="utf-8")) if os.path.exists(cn_path) else {}
+    cn_scores = {_model_key(k) for k in (cn.get("scores") or {})}
+
+    leaks = []
+    for c in cars:
+        if CS.parse_score(c.get("crash")):
+            continue
+        model = c.get("model")
+        k, mk = canon(model), _model_key(model)
+        sources = []
+        ev = c.get("evidence") if isinstance(c.get("evidence"), dict) else {}
+        ce = str(ev.get("crash_evidence") or "")
+        if any(s.get("tier", 0) >= 2 for s in CS.parse_all_scores_from_evidence(ce)):
+            sources.append("候选池一手成绩文字")
+        if k in dec and any(v.get("grade") for v in (dec[k].get("dims") or {}).values()):
+            sources.append("C-IASI 新闻稿文字等级")
+        if k in off_cars:
+            sources.append("official_safety_scores")
+        if mk in cn_scores:
+            sources.append("cncap_scores")
+        if sources:
+            leaks.append({"model": model, "sources": sources})
+    return leaks

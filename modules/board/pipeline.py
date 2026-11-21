@@ -133,6 +133,10 @@ def main():
                     help="不按官方成绩自动映射 safety 分（仅 A/B 对照；正常出榜不要关）")
     ap.add_argument("--no-backfill", action="store_true",
                     help="不回填 trims 官方指导价到候选池（仅 A/B 对照用；正常出榜不要关）")
+    ap.add_argument("--no-ciasi-rescue", action="store_true",
+                    help="不从 C-IASI 新闻稿联网救回数字图标车（仅 A/B 对照；正常出榜不要关）")
+    ap.add_argument("--force-ciasi-rescue", action="store_true",
+                    help="强制重扫已缓存车型的新闻稿（人工刷新时用）")
     ap.add_argument("--force-stale", action="store_true",
                     help="强制使用旧指纹候选池出榜（仅调试/回测用，报告会标注数据过期）")
     a = ap.parse_args()
@@ -160,6 +164,38 @@ def main():
     # 这是契约层的事，不归一化会在 trim_annotate / auto_trims 里 TypeError。
     from modules.contracts.candidate_schema import normalize_pool
     cands = normalize_pool(cands)
+
+    # C-IASI 数字图标车联网救回（v10.5.0）：候选池里出现「数字图标/等级未文字化」且
+    # 随包事实库还没有该车文字等级时，调用 research 唯一网络出口解析官网结果发布稿，
+    # 合并回 categories/ciasi_decoded.json。已缓存车型不联网；失败只告警不阻断。
+    _ciasi_rescue = {"status": "skipped", "targets": [], "matched": {}}
+    if not getattr(a, "no_ciasi_rescue", False):
+        from modules.research import ciasi_text_decode as CTD
+        _rescue_targets = CTD.targets_from_candidates(cands)
+        if _rescue_targets:
+            _decoded_file = str(paths.cat("ciasi_decoded.json"))
+            _start = 100
+            if getattr(a, "force_ciasi_rescue", False):
+                _start = 100
+            elif os.path.exists(_decoded_file):
+                try:
+                    _cached = json.load(open(_decoded_file, encoding="utf-8"))
+                    _start = int((_cached.get("scan_range") or [100, 100])[1]) + 1
+                except Exception:
+                    _start = 100
+            try:
+                _ciasi_rescue = CTD.rescue_targets(
+                    _rescue_targets, out_path=_decoded_file, start=_start,
+                    end=None, sleep=0.05, max_misses=12,
+                    force=getattr(a, "force_ciasi_rescue", False))
+                if _ciasi_rescue.get("matched"):
+                    print(f"[新闻稿救回] {len(_ciasi_rescue['matched'])} 款数字图标车已从 C-IASI 官网"
+                          "结果发布稿文字等级救回：" +
+                          "、".join(_ciasi_rescue["matched"]))
+            except Exception as _ex:                       # 网络抖动不阻断本地出榜
+                _ciasi_rescue = {"status": "error", "targets": _rescue_targets,
+                                 "matched": {}, "error": f"{type(_ex).__name__}: {_ex}"}
+                print(f"[新闻稿救回] 联网失败，沿用已缓存文字等级：{_ciasi_rescue['error']}")
 
     # 价格回流（2026-11-21 事故根因修复）：trims.json 里已核验的官方指导价必须回流到
     # 候选池 price_guide。闸门只认 price_guide，不回流就会把数据齐全的车判成
@@ -190,6 +226,14 @@ def main():
         print(f"[权威库回流] official_safety_scores → crash/safety_basis：{len(_a_filled)} 款（"
               + "、".join(f"{m}({d})" for m, d, _ in _a_filled[:6]) + "）")
 
+    # C-NCAP 官方成绩表回流（v10.5.0）：cncap_scores.json 已经抓到 86.4% 的零跑C11，
+    # 但候选池 note/crash 都没写、权威库也没有 → 页面显示「—」，属于「有测试没显示」。
+    # 与价格/权威库同一纪律：出榜前自动回流，只填空不覆盖。
+    _n_filled = FS.backfill_crash_from_cncap_table(cands)
+    if _n_filled:
+        print(f"[C-NCAP库回流] cncap_scores → crash/safety_basis：{len(_n_filled)} 款（"
+              + "、".join(f"{m}({d})" for m, d, _ in _n_filled[:6]) + "）")
+
     # 多测评融合（v10.4.0，2026-11-21）：用户要求「有评测就要纳入，按业内原则重新设计」。
     # 同体系多维度按木桶取最低（Euro NCAP/C-NCAP 官方口径）；跨体系按严格度选主分、
     # 其余列示不叠加（各国 NCAP 无对应关系）。一手来源含 C-IASI 官网新闻稿纯文字等级
@@ -204,6 +248,15 @@ def main():
     if _fused_n:
         print(f"[多测评融合] {_fused_n} 款有一手评测纳入（同体系木桶取最低/跨体系取最严格主分）；"
               + "、".join(f"{x['model']}={x['primary']}" for x in _fusion if x.get("primary"))[:180])
+
+    # 碰撞展示门禁（v10.5.0）：有权威成绩来源却仍显示「—/在测」= 回流链路失效
+    # （车名归一化漂移/字段改名/新数据源没接），必须硬拦，不许只在报告里写「有成绩」。
+    _display_leaks = FS.crash_display_leaks(cands)
+    if _display_leaks:
+        sys.exit("碰撞展示门禁：以下车型有可核验权威碰撞成绩，但页面仍无成绩显示：\n"
+                 + "\n".join(f"  - {x['model']}：{x['sources']}" for x in _display_leaks)
+                 + "\n→ 查 facts_sync 的成绩回流与 model_names.canon，不许改渲染层绕过。")
+    print(f"[碰撞展示门禁] 全池 {len(cands)} 款，有成绩来源但未显示 0 款")
 
     # 成绩→分数自动映射（2026-11-21）：表外但有碰撞成绩的车，按 official_safety_scores.json
     # 的 map_spec 算出 safety 分。不映射等于成绩白采（safety 仍按无成绩车插补）。
@@ -596,7 +649,12 @@ def main():
         "crash_backfill": {"filled": [{"model": m, "crash": d, "basis": b} for m, d, b in _c_filled],
                            "unresolved": _c_unres,
                            "authoritative": [{"model": m, "crash": d, "basis": b}
-                                             for m, d, b in _a_filled]},
+                                             for m, d, b in _a_filled],
+                           "cncap_table": [{"model": m, "crash": d, "basis": b}
+                                           for m, d, b in _n_filled]},
+        # v10.5.0：C-IASI 数字图标车联网救回审计 + 展示覆盖门禁审计
+        "ciasi_rescue": _ciasi_rescue,
+        "crash_display_audit": {"leaks": _display_leaks},
         # 多成绩审计：全部成绩留痕 + 主成绩选择口径（取证据最强，不取最高/不叠加）
         "crash_multi_scores": [
             {"model": c["model"], "scores": c["crash_all_scores"]}

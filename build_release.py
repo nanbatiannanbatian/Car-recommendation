@@ -62,7 +62,9 @@ EXCLUDE_GLOBS = ["*.bak", "*.bak-*", "*.tmp", "*.pyc", "*.orig",
                  # v6.0/v6.1 配置快照遗留，无任何代码/文档引用（已核实）；解压后共 223KB
                  "trims_v61polluted.json", "trims_v60before.json",
                  # 回归测试脚本：开发者用，不属于 skill 运行能力（SKILL.md 约定一次性/测试脚本不进发布包）
-                 "*_regress.py",
+                 # v10.5.0：补上 *_regression.py——bug/negative 两份历史回归 154KB+ 一直混进发布包，
+                 # 是 3MB 超限的真实根因（不是把新功能砍掉）。
+                 "*_regress.py", "*_regression.py",
                  # 一次性榜单生成脚本：仅产出某月某价位的一次性 run 页面，非通用能力
                  "build_midsedan_202609.py", "build_midsuv_202610.py",
                  # v9.7.54：大 JSON 数据不随包发布，靠包内生成脚本联网重建（用户决定，已实测链路可通）。

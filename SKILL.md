@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 10.4.0
+version: 10.5.0
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v10.4.0）
+# Car recommendation —— 可信购车榜单引擎（v10.5.0）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -1740,9 +1740,15 @@ python3 ev_battery_board.py --candidates <候选池.json> --out <目录>
 
 手册旧标「等级图标未解码」是误解：C-IASI 结果发布稿（`ciasi.org.cn/news/show-N.html`）是**纯文字** G/G+/A/M/P。零依赖解码 5 分指数；「耐撞性与维修经济性」=官方可维修性事实列。
 ```bash
-python3 ciasi_text_decode.py --start 100 --end 130 --out <目录>/ciasi_decoded.json
+python3 ciasi_text_decode.py --out categories/ciasi_decoded.json          # 全量刷新，自动向上探测新稿ID
+python3 ciasi_text_decode.py --cars "未来车A,未来车B" --merge              # 只救指定车（任意车型，不硬编码）
+python3 ciasi_text_decode.py --targets-from runs/xxx_pool.json --merge    # 自动找候选池数字图标车
 python3 ciasi_text_decode.py --selftest
 ```
+v10.5.0 起救回链路写进代码：出榜前若候选池有「数字图标/等级未文字化」且随包事实库没有该车文字等级，
+pipeline 自动调用本模块联网解码并合并回 `categories/ciasi_decoded.json`；已缓存车型不联网，失败只告警不阻断。
+出榜后还有展示门禁：任何有可核验成绩来源（候选池一手文字 / 新闻稿文字等级 / 权威库 / `cncap_scores.json`）
+但 `crash` 仍显示「—/在测」的车，直接拦下，不许只改文案绕过。
 实测 8 篇/30 款；早期稿只给分布不给逐车对应时标 `aggregate_only`（不猜）。只作事实列，**不进加权分**。
 
 ### swoiow/autohome 参数补全探针 `swoiow_probe.py`

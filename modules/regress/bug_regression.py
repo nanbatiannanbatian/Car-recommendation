@@ -112,6 +112,8 @@ CASES = [
     ("BUG-087", "12碰撞体系只2个能解析+权威库从不回流+安全分文案写死C-NCAP:蔚来ET5 EuroNCAP/C-IASI取不到", "v10.3.2"),
     ("BUG-088", "多碰撞成绩取第一个锚点(靠文本顺序既非最高非叠加)+次要成绩被静默丢弃无审计", "v10.3.3"),
     ("BUG-089", "多测评只取单一成绩不满足全纳入:数字图标车无成绩+C-IASI多维度未木桶取最低+跨体系无主分规则", "v10.4.0"),
+    ("BUG-090", "cncap_scores已有零跑C11 86.4%却没回流:候选池/页面显示无成绩且无展示门禁", "v10.5.0"),
+    ("BUG-091", "C-IASI数字图标车新闻稿救回写死单车+固定ID:新车无法复用、出榜无自动兜底", "v10.5.0"),
 ]
 
 
@@ -2483,8 +2485,87 @@ def t089():
             "旁证不计分+无成绩零误伤+报告/summary披露(+t089)")
 
 
+def t090():
+    """C-NCAP 官方成绩表回流 + 展示门禁：有测试但页面不能空白。
+
+    2026-11-21 全量核对发现 cncap_scores.json 有「零跑C11 86.4%」，候选池
+    crash/note/evidence 全空，页面碰撞成绩列显示「—」。不是渲染问题，是回流缺链路。
+    """
+    import copy
+    from modules.engine import facts_sync as FS
+    from modules.engine import crash_systems as CS
+
+    pool = json.load(open(str(paths.ROOT / "runs" / "midsuv_bev_pool.json"), encoding="utf-8"))
+    cands = copy.deepcopy(pool["candidates"])
+    c11 = next(c for c in cands if c["model"] == "零跑C11")
+    assert not CS.is_official(c11.get("safety_basis")), "测试前置失败：C11 已有权威 basis"
+
+    # 与主链同序：先回填 note 文本成绩，再回填 C-NCAP 官方表
+    FS.backfill_crash_from_text(cands)
+    filled = FS.backfill_crash_from_cncap_table(cands)
+    assert any(m == "零跑C11" and d.startswith("C-NCAP 86.4%") and b == "cncap"
+               for m, d, b in filled), f"C-NCAP 表未回流: {filled}"
+    c11 = next(c for c in cands if c["model"] == "零跑C11")
+    assert c11["crash"].startswith("C-NCAP 86.4%") and c11["safety_basis"] == "cncap", c11
+    assert FS.crash_display_leaks(cands) == [], "回流后仍报漏显"
+
+    # 失败注入：回流链断开后，门禁必须检出「表里有成绩、页面却是 —」
+    broken = copy.deepcopy(cands)
+    b11 = next(c for c in broken if c["model"] == "零跑C11")
+    b11["crash"], b11["safety_basis"] = "—", None
+    leaks = FS.crash_display_leaks(broken)
+    assert any(x["model"] == "零跑C11" and "cncap_scores" in x["sources"]
+               for x in leaks), f"展示门禁漏检: {leaks}"
+    for m in ("小鹏G6", "蔚来ES6", "腾势N7"):
+        assert not any(x["model"] == m for x in leaks), f"无成绩车被误报漏显: {m}"
+
+    pl = _read("pipeline.py")
+    assert "backfill_crash_from_cncap_table" in pl and "crash_display_leaks" in pl, \
+        "pipeline 未接入 C-NCAP 回流/展示门禁"
+    return ("C-NCAP官方表回流+页面展示门禁：C11 86.4%不再空白+无成绩零误报(+t090)")
+
+
+def t091():
+    """C-IASI 新闻稿救回通用化：任意新车可复用、自动找新 ID、不硬编码。"""
+    import inspect
+    from modules.research import ciasi_text_decode as CTD
+
+    assert CTD.selftest() == 0, "ciasi_text_decode 自测失败"
+    newer = """
+    <html><head><title>C-IASI 2026年测评车型第100次结果发布</title></head>
+    <body>发布时间： 2026-11-21
+    本次结果发布共涉及2款车型，分别为：未来甲EV、未来乙EV。
+    车内乘员安全分指数，2款车型的评价结果均为良好（A）。
+    车外行人安全分指数，2款车型的评价结果均为优秀（G）。
+    车辆辅助安全分指数，未来甲EV的评价结果为优秀（G），未来乙EV车型的评价结果为一般（M）。
+    </body></html>
+    """
+    def fake(sid):
+        return newer if sid == 777 else None
+
+    rep = CTD.rescue_targets(["未来甲EV", "未来乙EV"], decoded={}, start=777,
+                             end=779, sleep=0, fetcher=fake)
+    assert set(rep["matched"]) == {"未来甲EV", "未来乙EV"}, rep
+    assert rep["matched"]["未来乙EV"]["dims"]["assist"]["grade"] == "M", rep
+    assert rep["unmatched"] == [], rep
+
+    base = {"models": {"旧车型": {"dims": {"occupant": {"grade": "G", "scope": "all"}},
+                                 "source": "old", "published": "2026-01-01"}},
+            "releases": [], "scan_range": [1, 776]}
+    merged = CTD.merge_decoded(base, {"models": rep["matched"], "scan_range": [777, 779]})
+    assert "旧车型" in merged["models"] and "未来甲EV" in merged["models"], "合并丢失旧车型"
+
+    src = inspect.getsource(CTD.rescue_targets)
+    assert "特斯拉Model Y" not in src and "丰田bZ5" not in src, "救回逻辑硬编码具体车型"
+    assert "def rescue_targets" in _read("ciasi_text_decode.py"), "救回入口不在随包代码里"
+    pl = _read("pipeline.py")
+    assert "rescue_targets" in pl and "targets_from_candidates" in pl and "ciasi_rescue" in pl, \
+        "pipeline 未接入新闻稿自动救回"
+    return ("新闻稿救回通用化：任意车型可解析+自动探测新稿ID+合并不丢旧车+无硬编码(+t091)")
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091]
 
 
 def run():

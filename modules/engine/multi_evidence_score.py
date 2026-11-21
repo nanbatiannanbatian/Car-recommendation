@@ -39,15 +39,17 @@ import json
 import os
 import sys
 
-# 零 paths 依赖：路径由调用方传入（与 space_features 等纯函数模块一致）。
-# pipeline 从 paths.ROOT 拼好后传进来；selftest 用 __file__ 反推仓库根。
+# 路径走 paths 唯一事实源（layout 回归会拦硬编码 categories 拼接）。
+# pipeline 从 paths.ROOT 拼好后传进来；selftest 用 __file__ 反推仓库根只为 sys.path。
+import paths
+
 _ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # 随包事实库优先（categories/，随 skill 与 GitHub 仓库分发），其次才是联网产物缓存（data/gen）。
 # ciasi_decoded.json 是 C-IASI 官网结果发布稿的纯文字等级解码——有官方来源、可核验，
 # 等同 ice_crash.json 属随包事实；research 的 ciasi_text_decode.py 可联网刷新它。
-DECODED_PACKAGED = os.path.join(_ROOT, "categories", "ciasi_decoded.json")
-DECODED_CACHE = os.path.join(_ROOT, "data", "gen", "ciasi_decoded.json")
-OFFICIAL = os.path.join(_ROOT, "official_safety_scores.json")
+DECODED_PACKAGED = str(paths.cat("ciasi_decoded.json"))
+DECODED_CACHE = str(paths.GEN_DIR / "ciasi_decoded.json")
+OFFICIAL = str(paths.ROOT / "official_safety_scores.json")
 
 
 def decoded_path():
