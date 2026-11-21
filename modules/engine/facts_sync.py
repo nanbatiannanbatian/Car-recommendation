@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 
 import paths
@@ -296,3 +297,68 @@ def backfill_crash_from_text(cars):
             c["crash_ciasi_dims"] = parsed["ciasi_dims"]
         filled.append((c.get("model"), parsed["display"], parsed["basis"]))
     return filled, unresolved
+
+
+# ---------------------------------------------------------------- 权威成绩库回流
+def backfill_crash_from_authoritative(cars, table_path=None):
+    """把 official_safety_scores.json 里已人工核验的成绩回流进候选池字段。
+
+    为什么要有这条（2026-11-21 全量排查）：
+      文本回填（backfill_crash_from_text）只能解析「候选池里写了成绩文本」的车。
+      但权威成绩库 official_safety_scores.json 有 8 款人工核验的一手成绩
+      （如蔚来ET5 C-IASI A、特斯拉Model 3 Euro NCAP 五星、极氪007GT Euro NCAP 五星），
+      这条链路此前从不读该库——车只要没在候选池文本里写成绩，即便库里有也白采。
+      本次中型SUV池 21 款恰好 0 命中，但机制必须接上：以后任何车入池，库里有成绩
+      就自动回流，不再靠人记得手动补（与价格回流同一纪律）。
+
+    规则：
+      - 只填 safety_basis 为空的车，不覆盖已核验的候选池值
+      - car_scores 的 system 归一到标准 basis；score 是权威分，直接对齐
+      - 成绩展示 display 从 grade/value/stars 生成，写进 crash
+      - 不碰 scores.safety（那是 safety_check.sync_table_scores_to_pool 的职责）
+    返回 filled = [(车型, display, basis), ...]
+    """
+    from modules.contracts.model_names import canon
+    from modules.engine import crash_systems as CS
+
+    tp = table_path or os.path.join(HERE, "official_safety_scores.json")
+    if not os.path.exists(tp):
+        return []
+    table = json.load(open(tp, encoding="utf-8"))
+    car_scores = table.get("car_scores", {})
+    by = {canon(k): (k, v) for k, v in car_scores.items()}
+    filled = []
+    for c in cars:
+        if CS.is_official(c.get("safety_basis")):
+            continue
+        rec = by.get(canon(c.get("model") or ""))
+        if not rec:
+            continue
+        model_key, r = rec
+        basis = CS.normalize(r.get("system"))
+        if not basis:
+            continue
+        # 构造与 parse_score 同构的事实（不参与打分，只回填事实列）
+        grade, value, stars = r.get("grade"), r.get("value"), r.get("stars")
+        sys_cn = CS.cn_name(basis)
+        if value is not None:
+            display = f"{sys_cn} {value:g}%"
+        elif stars:
+            display = f"{sys_cn} {stars}星"
+        elif grade and re.match(r"^[GAMP]\+?$", str(grade)):
+            display = f"{sys_cn} {grade}"                    # C-IASI 等级 A/G/...
+        elif grade and str(grade).startswith("5star"):
+            display = f"{sys_cn} 五星（乘员分项达标）"         # Euro NCAP 星级口径
+        elif grade:
+            display = f"{sys_cn} {grade}"
+        else:
+            display = sys_cn
+        c["safety_basis"] = basis
+        if not CS.has_score(c.get("crash")):
+            c["crash"] = display
+        c["crash_source"] = (f"权威成绩库 official_safety_scores.json 回流"
+                             f"（{model_key}：{r.get('source') or sys_cn}）")
+        if value is not None:
+            c["safety_score_value"] = value
+        filled.append((c.get("model"), display, basis))
+    return filled

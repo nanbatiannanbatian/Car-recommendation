@@ -182,6 +182,14 @@ def main():
               + "、".join(f"{m}({d})" for m, d, _ in _c_filled[:6])
               + ("…" if len(_c_filled) > 6 else "") + "）")
 
+    # 权威成绩库回流（2026-11-21 全量排查）：official_safety_scores.json 里人工核验的
+    # 一手成绩（蔚来ET5 C-IASI A / 特斯拉Model 3 Euro NCAP 五星等）此前从不回流——
+    # 候选池文本没写成绩的车，库里即便有也白采。现在与价格回流同一纪律：出榜前自动执行。
+    _a_filled = FS.backfill_crash_from_authoritative(cands)
+    if _a_filled:
+        print(f"[权威库回流] official_safety_scores → crash/safety_basis：{len(_a_filled)} 款（"
+              + "、".join(f"{m}({d})" for m, d, _ in _a_filled[:6]) + "）")
+
     # 成绩→分数自动映射（2026-11-21）：表外但有碰撞成绩的车，按 official_safety_scores.json
     # 的 map_spec 算出 safety 分。不映射等于成绩白采（safety 仍按无成绩车插补）。
     from modules.engine import safety_check as SFC
@@ -467,8 +475,18 @@ def main():
                      "按「零实测」封顶——核实来源后补录 `categories/experience_facts.json`。")
     if _sa:
         _chg = [x for x in _sa if x["prev"] is not None and abs(float(x["prev"]) - x["score"]) > 0.05]
-        parts.append(f"> **安全分来源**：{len(_sa)} 款按官方碰撞成绩自动映射"
-                     f"（`C-NCAP pct → 7.0+(pct-80)×0.155` 封顶 9.3）"
+        # 文案按每车实际映射规则显示，不再写死 C-NCAP 得分率公式——
+        # Model Y 走 C-IASI 等级映射、Model 3 走 Euro NCAP 星级，写死 C-NCAP 会误导。
+        from modules.engine import crash_systems as _CSdoc
+        _sys_counts = {}
+        for x in _sa:
+            _basis = _CSdoc.normalize((x.get("crash") or "").split()[0]) if x.get("crash") else None
+            _sys_counts[_CSdoc.cn_name(_basis) if _basis else "官方碰撞成绩"] = \
+                _sys_counts.get(_CSdoc.cn_name(_basis) if _basis else "官方碰撞成绩", 0) + 1
+        _sys_text = "、".join(f"{k} {v}款" for k, v in sorted(_sys_counts.items(), key=lambda t: -t[1]))
+        parts.append(f"> **安全分来源**：{len(_sa)} 款按官方碰撞成绩自动映射（{_sys_text}；"
+                     f"各体系按 `official_safety_scores.json` 的映射规则换算，"
+                     f"得分率/等级/星级各用对应口径，不跨体系套用）"
                      + (f"，其中 {len(_chg)} 款较原插补值有调整：" +
                         "、".join(f"{x['model']} {x['prev']}→{x['score']:g}" for x in _chg[:5])
                         if _chg else "，与原插补值一致") + "。")
@@ -539,7 +557,9 @@ def main():
         "price_backfill": {"filled": [{"model": m, "price_guide": pg} for m, pg in _p_filled],
                            "still_missing": _p_still},
         "crash_backfill": {"filled": [{"model": m, "crash": d, "basis": b} for m, d, b in _c_filled],
-                           "unresolved": _c_unres},
+                           "unresolved": _c_unres,
+                           "authoritative": [{"model": m, "crash": d, "basis": b}
+                                             for m, d, b in _a_filled]},
         "safety_auto": {"applied": _sa, "skipped": _ss},
         "safety_cap": _cap_adj,
         "dimension_cap": _dim_cap,

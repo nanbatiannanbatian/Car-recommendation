@@ -109,6 +109,7 @@ CASES = [
     ("BUG-084", "空间要素(前备箱/下沉后备箱/储物/真实表现)记在evidence却没用:得房率64%的N7拿8.5", "v10.2.9"),
     ("BUG-085", "人工分全量核算:8维仅safety闭环/quality/powertrain规则没接/spec_score从没跑过", "v10.3.0"),
     ("BUG-086", "ModelY有C-IASI一手成绩却标缺权威碰撞:回填只扫note漏evidence+宽松解析误抓枚举句", "v10.3.1"),
+    ("BUG-087", "12碰撞体系只2个能解析+权威库从不回流+安全分文案写死C-NCAP:蔚来ET5 EuroNCAP/C-IASI取不到", "v10.3.2"),
 ]
 
 
@@ -2281,8 +2282,80 @@ def t086():
             "误标消失+徽标显示(+t086)")
 
 
+def t087():
+    """全量碰撞体系覆盖 + 权威库回流 + 安全分文案按实际体系（不是只改 Model Y 一处）。
+
+    2026-11-21 用户「之前安全方面很多碰撞实验都纳入了，全部验证是否都可以取到。
+    蔚来应该也有成绩，不要单个改，用代码改所有情况」。
+    盘点出三层系统性问题：
+      1) crash_systems 定义了 12 个体系，但两个解析器手写只覆盖 8 个（严格版只 2 个），
+         Euro NCAP/ANCAP/IIHS/JNCAP/KNCAP/ASEAN/Latin/Bharat/Global 的成绩文本取不到；
+      2) official_safety_scores.json（8款人工核验成绩，含蔚来ET5 C-IASI A）从不回流进候选池；
+      3) 报告「安全分来源」写死 C-NCAP 公式，Model Y 走 C-IASI 等级映射，口径矛盾。
+    修法：体系名从 SYSTEMS 表动态生成（加体系只改一处）+ award/星级分支补齐 +
+    权威库自动回流 + 文案按每车实际体系显示。
+    """
+    from modules.engine import crash_systems as CS
+    from modules.engine import facts_sync as FS
+    from modules.board import pipeline as PL
+
+    # 1) SYSTEMS 全覆盖：定义数 == 解析器能识别数（防以后加体系忘了进正则）
+    assert len(CS.SYSTEMS) >= 12, "体系清单不完整"
+    for code, sample in (
+        ("cncap", "有C-NCAP官方成绩：综合得分率90.7%"),
+        ("ciasi", "有C-IASI官方成绩：车内乘员G+、车外行人G+、辅助安全G"),
+        ("euro_ncap", "有Euro NCAP官方成绩：五星，成人91%"),  # 蔚来ET5 体系
+        ("ancap", "有ANCAP官方成绩：五星"),
+        ("iihs", "有IIHS官方成绩：TSP+评价"),
+        ("nhtsa", "有NHTSA官方成绩：五星"),
+        ("jncap", "有JNCAP官方成绩：五星"),
+        ("kncap", "有KNCAP官方成绩：五星"),
+        ("asean_ncap", "有ASEAN NCAP官方成绩：五星"),
+        ("latin_ncap", "有Latin NCAP官方成绩：五星"),
+        ("bharat_ncap", "有Bharat NCAP官方成绩：五星"),
+        ("global_ncap", "有Global NCAP官方成绩：五星"),
+    ):
+        r = CS.parse_score_from_evidence(sample)
+        assert r and r["basis"] == code, f"体系 {code} 成绩取不到: {r}"
+    # 星级制（Euro NCAP 无得分率只有星级）必须能解析——蔚来ET5 的真实情形
+    euro = CS.parse_score_from_evidence("有Euro NCAP官方成绩：五星，成人乘员96%")
+    assert euro and euro["stars"] == 5, f"Euro NCAP 星级没解析出来: {euro}"
+
+    # 2) 误伤防护不退化（全体系扩展后仍不能把宣传/他车/智驾分当成绩）
+    for bad in (
+        "无C-NCAP成绩；宣称按C-NCAP五星安全车身设计（厂商软文口径）",
+        "无官方成绩；有问界M7 2025（95.0%）但无M5",
+        "C-NCAP基础行车辅助92.9%实为C-ICAP智驾测评",
+        "蔚来ES6出口版获Euro NCAP五星，非本代国内一手成绩，低置信",
+    ):
+        assert CS.parse_score_from_evidence(bad) is None, f"误伤无成绩车: {bad}"
+
+    # 3) 权威库回流：库里有的车（蔚来ET5 C-IASI A）必须能回填，且不改 scores.safety
+    cands = [
+        {"model": "蔚来ET5", "crash": None, "safety_basis": None, "scores": {"safety": 8.0}},
+        {"model": "不存在车型XYZ", "crash": None, "safety_basis": None, "scores": {"safety": 8.0}},
+    ]
+    filled = FS.backfill_crash_from_authoritative(cands)
+    assert any(m == "蔚来ET5" and b == "ciasi" for m, _, b in filled), f"蔚来ET5 权威成绩没回流: {filled}"
+    et5 = cands[0]
+    assert et5["safety_basis"] == "ciasi" and "C-IASI" in et5["crash"], et5
+    assert et5["scores"]["safety"] == 8.0, "权威库回填不该改分数（那是映射表的职责）"
+    assert cands[1]["safety_basis"] is None, "库里没有的车被错误回填"
+
+    # 4) 链路内置：pipeline 必须调权威库回流（防退回「只靠文本」）
+    src = str(paths.src("pipeline.py"))
+    assert "backfill_crash_from_authoritative" in open(src, encoding="utf-8").read(), \
+        "pipeline 未接入权威库回流"
+    # 5) 文案不写死 C-NCAP 公式
+    src = str(paths.src("pipeline.py"))
+    text = open(src, encoding="utf-8").read()
+    assert "7.0+(pct-80)×0.155" not in text, "安全分来源文案仍写死 C-NCAP 公式"
+    return ("碰撞体系全覆盖：12体系都能解析+星级/奖项分支+蔚来ET5权威库回流+"
+            "误伤防护不退化+文案按实际体系(+t087)")
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087]
 
 
 def run():

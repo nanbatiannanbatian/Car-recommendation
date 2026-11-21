@@ -122,9 +122,31 @@ def has_score(crash_text) -> bool:
 
 
 # ---------------------------------------------------------------- 文本 → 结构化
-_TEXT_SYS_RE = re.compile(
-    r"(?P<sys>C\s*-?\s*NCAP|CNCAP|C\s*-?\s*IASI|CIASI|Euro\s*NCAP|E\s*-?\s*NCAP|ANCAP|IIHS|NHTSA)",
-    re.I)
+def _system_pattern():
+    """从 SYSTEMS 表动态生成体系名正则——单一真相源。
+
+    为什么（2026-11-21 全量排查）：此前这里和 _ANCHOR_RE 都是手写 8 个体系，
+    SYSTEMS 却定义了 12 个，导致 Euro NCAP/ANCAP/IIHS/JNCAP/KNCAP/ASEAN/
+    Latin/Bharat/Global 的成绩文本全都解析不出来（实测 10/12 FAIL）。
+    蔚来 ET5 在权威库是 Euro NCAP 五星 + C-IASI A，就因为体系没进正则而取不到。
+    现在体系名只从 SYSTEMS 生成：以后加体系只改 SYSTEMS 一处，两个解析器自动覆盖。
+    """
+    names = []
+    for code, d in SYSTEMS.items():
+        for n in [code, d.get("cn", "")] + list(d.get("aliases") or []):
+            # 先归一成纯字母数字串（去掉下划线/连字符/空格），再逐字符插可选分隔符。
+            # 关键：不能把 code 里的 "_" 用 re.escape 当字面量，否则 euro_ncap 要求
+            # 文本里必须有下划线，匹配不了 "Euro NCAP"（空格）/ "euroncap"（无分隔）。
+            bare = re.sub(r"[^A-Za-z0-9]", "", str(n))
+            if not bare:
+                continue
+            names.append(r"\s*[-_]?\s*".join(re.escape(ch) for ch in bare))
+    # 长的排前面，避免 "ANCAP" 抢先截走 "Euro NCAP"/"ASEAN NCAP" 里的 NCAP
+    names.sort(key=len, reverse=True)
+    return "|".join(names)
+
+
+_TEXT_SYS_RE = re.compile(r"(?P<sys>" + _system_pattern() + r")", re.I)
 _PCT_RE = re.compile(r"(\d{2,3}(?:\.\d+)?)\s*%")
 _STAR_RE = re.compile(r"([五五四四三三]|[3-5])\s*星")
 _GRADE_RE = re.compile(r"(?:^|[^A-Za-z])(G\+{0,2}|A|M|P)(?![A-Za-z])")
@@ -218,7 +240,7 @@ def parse_score(text) -> dict | None:
 #     3) 官方口径：三指数取最低档，耐撞维修经济性仅参考不主导；
 #     4) 同一车多次测评取最新（与 ciasi_text_decode 纪律一致）。
 _ANCHOR_RE = re.compile(
-    r"有\s*(?P<sys>C-IASI|C-NCAP|Euro\s*NCAP|ANCAP|IIHS|NHTSA|JNCAP|KNCAP)\s*"
+    r"有\s*(?P<sys>" + _system_pattern() + r")\s*"
     r"(?:官方|碰撞|测评)?\s*(?:碰撞)?成绩", re.I)
 # 出现这些词说明该句不是「本车碰撞实测成绩」的肯定陈述
 _NEG_EVIDENCE = ("无官方", "未取得", "未查到", "未见", "软文", "宣传口径",
@@ -270,6 +292,17 @@ def parse_score_from_evidence(text) -> dict | None:
         basis = normalize(m.group("sys"))
         if not basis:
             continue
+        # IIHS 奖项制：TSP+ / TSP / Good 等（award 家族，非星级非得分率）
+        if SYSTEMS[basis]["grade"] == "award":
+            if any(k in seg for k in _NEG_EVIDENCE):
+                continue
+            am = re.search(r"(TSP\+\+|TSP\+|TSP|Top Safety Pick\+?|优秀\+|优秀|Good)", seg, re.I)
+            if not am:
+                continue
+            award = am.group(1)
+            return {"basis": basis, "system_cn": cn_name(basis), "score": None,
+                    "stars": None, "grade": award, "year": None,
+                    "display": f"{cn_name(basis)} {award}", "evidence": True}
         # C-IASI：后文（到「注意：」前）取维度等级，覆盖多次测评
         if basis == "ciasi":
             tail = t[t.find(m.group(0)):].split("注意：")[0]
@@ -280,17 +313,27 @@ def parse_score_from_evidence(text) -> dict | None:
                     "stars": None, "grade": dim["grade"], "year": None,
                     "display": f"{cn_name(basis)} {dim['grade']}",
                     "ciasi_dims": dim["dims"], "evidence": True}
-        # 得分率体系：锚点同句必须有「综合得分率」，且不能是智驾C-ICAP
+        # NCAP 星级家族：锚点同句取「综合得分率」或「N星」，且不能是智驾 C-ICAP。
+        # 2026-11-21 全量排查：此前只认「综合得分率」，导致 Euro NCAP/ANCAP/
+        # JNCAP 等**星级制**体系全部取不到（蔚来ET5 Euro NCAP 五星即此情形）。
         if SYSTEMS[basis]["grade"] == "star":
             if any(k in seg for k in _NEG_EVIDENCE):
                 continue
             pm = re.search(r"综合得分率\s*(\d{2,3}(?:\.\d+)?)\s*%", seg)
-            if not pm:
+            sm = _STAR_RE.search(seg)
+            score = float(pm.group(1)) if pm else None
+            stars = _CN_NUM.get(sm.group(1)) if sm else None
+            if score is None and stars is None:
                 continue
-            score = float(pm.group(1))
+            if score is not None:
+                display = f"{cn_name(basis)} {score:g}%"
+                if stars:
+                    display += " 五星"
+            else:
+                display = f"{cn_name(basis)} 五星"
             return {"basis": basis, "system_cn": cn_name(basis), "score": score,
-                    "stars": None, "grade": None, "year": None,
-                    "display": f"{cn_name(basis)} {score:g}%", "evidence": True}
+                    "stars": stars, "grade": None, "year": None,
+                    "display": display, "evidence": True}
     return None
 
 
@@ -329,6 +372,25 @@ def selftest():
     r2 = parse_score_from_evidence(
         "有C-NCAP官方成绩：C-NCAP（2024年版规程），测评年份2025，综合得分率90.7%，五星。来源：中汽测评官网")
     assert r2 and r2["basis"] == "cncap" and r2["score"] == 90.7, r2
+    # 12 体系全覆盖（2026-11-21：此前只覆盖 C-NCAP/C-IASI，Euro NCAP 等 10 个取不到）
+    # 体系名从 SYSTEMS 动态生成，这里逐体系验证；以后 SYSTEMS 加体系必须同步补一条。
+    for code, sample in (
+        ("cncap",       "有C-NCAP官方成绩：综合得分率90.7%"),
+        ("ciasi",       "有C-IASI官方成绩：车内乘员G+、车外行人G+、辅助安全G"),
+        ("euro_ncap",   "有Euro NCAP官方成绩：五星，成人91%"),
+        ("ancap",       "有ANCAP官方成绩：五星"),
+        ("iihs",        "有IIHS官方成绩：TSP+评价"),
+        ("nhtsa",       "有NHTSA官方成绩：五星"),
+        ("jncap",       "有JNCAP官方成绩：五星"),
+        ("kncap",       "有KNCAP官方成绩：五星"),
+        ("asean_ncap",  "有ASEAN NCAP官方成绩：五星"),
+        ("latin_ncap",  "有Latin NCAP官方成绩：五星"),
+        ("bharat_ncap", "有Bharat NCAP官方成绩：五星"),
+        ("global_ncap", "有Global NCAP官方成绩：五星"),
+    ):
+        hit = parse_score_from_evidence(sample)
+        assert hit and hit["basis"] == code, f"体系 {code} 解析失败（正则没覆盖）: {hit}"
+    assert len(_TEXT_SYS_RE.findall("有C-NCAP成绩")) == 1
     return 0
 
 
