@@ -113,7 +113,7 @@ def seed_from_manual(out_path):
     return len(db.get("entries") or [])
 
 
-def find_sid(model, index):
+def find_sid_local(model, index):
     nidx = {norm(k): (k, v) for k, v in index.items()}
     # 别名优先：候选池带品牌前缀，索引不带；走显式白名单，不做模糊匹配
     alias = {norm(k): v for k, v in ALIASES.items()}.get(norm(model))
@@ -133,12 +133,17 @@ def find_sid(model, index):
         hit = nidx.get(norm(cand))
         if hit:
             return hit[1]["sid"], hit[0], f"variant:{cand}"
-    # 索引兜底（2026-11-21）：A-Z 在售索引会漏新车系，但车系页已存在。
-    # 只在本地索引全部 miss 时才走远程检索，失败返回 None，不猜。
-    sid, name, how = find_sid_remote(model, index)
+    return None, None, None
+
+
+def find_sid(model, index):
+    """本地索引 → 远程检索 的两级寻址（多源调度的兼容入口）。"""
+    sid, name, how = find_sid_local(model, index)
     if sid:
         return sid, name, how
-    return None, None, None
+    # 索引兜底（2026-11-21）：A-Z 在售索引会漏新车系，但车系页已存在。
+    # 只在本地索引全部 miss 时才走远程检索，失败返回 None，不猜。
+    return find_sid_remote(model, index)
 
 
 def find_sid_remote(model, index=None, timeout=25):
@@ -388,20 +393,27 @@ def main():
     todo = [c for c in cands if c["model"] not in have]
     print(f"待补 {len(todo)} 款；已有 {len(have)} 款", file=sys.stderr)
 
+    from modules.research import trim_sources as TS
     added, skipped = [], []
     for i, c in enumerate(todo):
-        sid, ah_name, how = find_sid(c["model"], index)
-        if not sid:
-            skipped.append((c["model"], "名称未匹配到汽车之家车系"))
-            continue
-        try:
-            tl, err = parse_config(sid, pure_ev_only=not a.no_pure_ev_filter)
-        except Exception as e:
-            tl, err = None, type(e).__name__
-        if err or not tl or len(tl) < 2:
-            skipped.append((c["model"], err or f"有效款型不足 2 个（{len(tl) if tl else 0}）"))
+        # 多源调度：本地索引 → 站点检索 → 存在性核对；每步留痕写进待补清单
+        res = TS.collect_trims(c["model"], index, parse_config,
+                               find_sid_local=find_sid_local,
+                               find_sid_remote=find_sid_remote)
+        if res["status"] != "ok":
+            why = TS.summarize_attempts(res["attempts"])
+            ev = res.get("evidence") or {}
+            if ev.get("exists"):
+                why += f"；多站内容页确认该车在售，指导价区间 {ev.get('price_range')}"
+            skipped.append((c["model"], why))
             time.sleep(SLEEP)
             continue
+        sid, ah_name, tl = res["sid"], res["ah_name"], res["trims"]
+        how = res["source"]
+        if a.no_pure_ev_filter:
+            tl2, err = parse_config(sid, pure_ev_only=False)
+            if tl2:
+                tl = tl2
         # 别名/变体匹配额外过一道价格一致性，防止把同名前缀的另一款车系配进来。
         # 候选池 price_guide 是官方指导价上下界；参数页常只列最新年款，故只比起售价。
         if how != "exact":

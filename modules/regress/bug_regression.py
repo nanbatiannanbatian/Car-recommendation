@@ -98,6 +98,7 @@ CASES = [
     ("BUG-073", "映射表人工分与公式复算不一致(同分率不同分)", "v10.1.5"),
     ("BUG-074", "缺逐配置数据的车静默无下拉框(大众T6),读者分不清是缺失还是无差异", "v10.1.6"),
     ("BUG-075", "采集只有单源单点:索引miss就放弃(索引漏新车但车系页已存在)", "v10.1.7"),
+    ("BUG-076", "多源采集无调度层/失败无留痕(待补清单只写「未匹配」)", "v10.1.9"),
 ]
 
 
@@ -235,8 +236,21 @@ def t009():
         assert r["missing"] == ["绝不存在的测试车XYZ"], f"缺配置未被检出: {r}"
     finally:
         os.remove(f.name)
+    # 随包的人工库必须真的齐全（这是数据契约，不能只报不拦）——
+    # 生成物可以缺（可重建），随包的人工条目缺了就是发出去坏包。
+    manual = json.load(open(str(paths.cat("trims_manual.json")), encoding="utf-8"))["entries"]
+    assert len(manual) >= 10, f"随包人工条目过少：{len(manual)}"
+    bad = []
+    for e in manual:
+        tr = e.get("trims") or []
+        if len(tr) < 2:
+            bad.append(f"{e.get('model')} 配置不足 2 档")
+        for f in ("name", "price", "cltc_km"):
+            if any(t.get(f) in (None, "", "—") for t in tr):
+                bad.append(f"{e.get('model')} 有配置缺 {f}")
+    assert not bad, "随包人工库不完整：" + "；".join(bad[:5])
     real = TC.check(os.path.join(HERE, "runs", "midsedan_bev_1218_202610", "candidates_allprice.json"))
-    return (f"覆盖校验可检出缺失；历史池 {real['total']} 款：完整 {len(real['ok'])} / "
+    return (f"覆盖校验可检出缺失；人工库 {len(manual)} 款齐全；历史池 {real['total']} 款：完整 {len(real['ok'])} / "
             f"缺 {len(real['missing'])} / 不完整 {len(real['incomplete'])} / 无电芯 {len(real['no_cell'])}（数据状态不拦截）")
 
 
@@ -1657,8 +1671,69 @@ def t075():
     return "采集兜底：索引 miss → 站点检索取 series id → 正常解析；失败不猜 + 源码锁定"
 
 
+def t076():
+    """逐配置采集必须走多源有序调度，且每次尝试留痕（失败也能看出试过哪些源）。
+
+    2026-11-21 用户追问「不能多源查吗」：原实现只有汽车之家索引一条路，
+    miss 就 skip，待补清单只写「名称未匹配」，看不出到底试过什么。
+    现在 trim_sources.collect_trims 按 索引 → 站点检索 → 存在性核对 依次尝试，
+    结果与 attempts 一起返回；结构化源能出配置，存在性源只出证据（防编造）。
+    """
+    from modules.research import trim_sources as TS
+    from modules.research import researcher as R
+
+    # 1) 源链：结构化在前、存在性兜底
+    ids = [s["id"] for s in TS.SOURCES]
+    assert ids[0] == "autohome_index" and "autohome_search" in ids, ids
+    assert TS.SOURCES[-1]["kind"] == "existence", "存在性核对应在最后（只出证据）"
+
+    two = [{"name": "低配", "price": 10.0}, {"name": "高配", "price": 12.0}]
+
+    # 2) 本地索引命中 → 直接用，不再打远程
+    calls = {"remote": 0}
+    def local_hit(m, idx):
+        return "111", "测试车", "exact"
+    def remote_spy(m, idx=None):
+        calls["remote"] += 1
+        return None, None, None
+    r1 = TS.collect_trims("测试车", {}, lambda sid: (two, None),
+                          find_sid_local=local_hit, find_sid_remote=remote_spy,
+                          content_probe=False)
+    assert r1["status"] == "ok" and r1["source"] == "autohome_index", r1
+    assert calls["remote"] == 0, "本地命中却仍打了远程"
+
+    # 3) 本地 miss → 远程命中 → source 必须记成 autohome_search
+    def local_miss(m, idx):
+        return None, None, None
+    def remote_hit(m, idx=None):
+        return "222", "测试车", "remote_search:222"
+    r2 = TS.collect_trims("测试车", {}, lambda sid: (two, None),
+                          find_sid_local=local_miss, find_sid_remote=remote_hit,
+                          content_probe=False)
+    assert r2["status"] == "ok" and r2["source"] == "autohome_search", r2
+
+    # 4) 全 miss → missing + 每次尝试都留痕 + 不编造 trims
+    orig = R.search
+    R.search = lambda *a, **kw: []
+    try:
+        r3 = TS.collect_trims("绝对不存在的测试车ZZZ", {}, lambda sid: (two, None),
+                              find_sid_local=local_miss, find_sid_remote=remote_spy,
+                              content_probe=True)
+    finally:
+        R.search = orig
+    assert r3["status"] == "missing" and not r3["trims"], "miss 却产出了配置"
+    sources = [a["source"] for a in r3["attempts"]]
+    assert sources[:2] == ["autohome_index", "autohome_search"], sources
+    assert all(a["ok"] is False for a in r3["attempts"]), r3["attempts"]
+    assert "autohome_index" in TS.summarize_attempts(r3["attempts"])
+
+    # 5) 存在性核对只出证据、不出结构化数据
+    assert all(s["kind"] == "structured" for s in TS.SOURCES[:-1])
+    return "多源调度：索引→检索→存在性核对；本地命中不打远程；miss 留痕且不编造"
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076]
 
 
 def run():

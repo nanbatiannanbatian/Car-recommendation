@@ -37,6 +37,7 @@ modules/
     lifecycle_detect.py      销量变点检测（停产/清库/爬坡）
     build_ice_pool.py        汽车之家车系索引建池
     auto_trims.py            逐配置阶梯自动补录（含索引 miss 的站点检索兜底）
+    trim_sources.py          多源调度：索引→站点检索→内容页存在性核对，每步留痕
     trim_ingest.py           外部配置表规范化导入
     discover.py              漏车发现
     universe_build.py        权威清单盘点

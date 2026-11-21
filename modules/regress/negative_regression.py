@@ -103,6 +103,8 @@ NEG_DATA = {
     "t074": ("render_board_html.trim_selector", None, "silent_trim"),
     # t075：把远程兜底关掉（回到"索引 miss 就放弃"），断言必须 FAIL
     "t075": ("auto_trims.find_sid_remote", None, "no_remote_sid"),
+    # t076：让多源调度永远返回 missing（等于没有调度层），断言必须 FAIL
+    "t076": ("trim_sources.collect_trims", None, "always_missing"),
     # t039 断言从「源码文本含文件名」升级为「文件在同步集里」，探针改成把同步集清空
     "t039": ("sync_to_repo.collect", None, "empty_sync"),
 }
@@ -129,6 +131,9 @@ def _func_probe(name, fn, dotted, mode):
         "no_formula": lambda *a, **kw: (None, ""),                         # 公式失效（校验形同虚设）
         "silent_trim": lambda *a, **kw: "",                                # 静默：无配置时不标注
         "no_remote_sid": lambda *a, **kw: (None, None, None),              # 不做远程兜底
+        "always_missing": lambda *a, **kw: {"status": "missing", "source": "", "trims": [],
+                                           "attempts": [], "evidence": {}, "sid": None,
+                                           "ah_name": ""},                # 调度退化为直接失败
     }.get(mode)
     if wrong is None:
         return False, False

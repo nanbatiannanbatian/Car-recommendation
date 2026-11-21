@@ -85,6 +85,9 @@ MAX_ZIP_BYTES = 3 * 1024 * 1024                      # 官方压缩 zip 体积�
 # 官方实际校验的是「解压后」总大小 <= 3MB；此前只查压缩后体积导致上传被拒。
 # 该常量把口径代码化，打包时第二个检查会用解压后总字节数比较。
 MAX_UNCOMPRESSED_BYTES = 3 * 1024 * 1024
+# 预警线：离 3MB 只剩不到 200KB 时提醒。随包数据（master_pool/trims_manual/fact_library…）
+# 只会越加越多，等真超了再回滚很麻烦（2026-11-21 已到 2799.9KB / 3072KB）。
+WARN_UNCOMPRESSED_BYTES = int(MAX_UNCOMPRESSED_BYTES * 0.92)
 
 # 敏感信息特征：本机绝对路径 / 用户名 / 常见密钥形态
 SENSITIVE_PATTERNS = [
@@ -288,6 +291,10 @@ def build_zip(files):
         fail(f"解压后总大小 {uncompressed/1024:.1f}KB 超过官方 3MB 限制（超出 {over/1024:.1f}KB）；"
              f"请清理无引用的大文件或从 EXCLUDE_GLOBS 排除")
     info(f"打包完成：{out.name}（压缩 {size/1048576:.2f}MB / 解压后 {uncompressed/1024:.1f}KB，{len(files)} 文件）")
+    if uncompressed > WARN_UNCOMPRESSED_BYTES:
+        left = (MAX_UNCOMPRESSED_BYTES - uncompressed) / 1024
+        print(f"[warn] 解压后距 3MB 上限只剩 {left:.0f}KB —— 下次再加随包数据就会超；"
+              f"先看 paths.CURATED_JSON 里哪些能转成可重建生成物", file=sys.stderr)
     return out
 
 
