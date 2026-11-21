@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 10.0.0
+version: 10.1.0
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v10.0.0）
+# Car recommendation —— 可信购车榜单引擎（v10.1.0）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -32,32 +32,41 @@ author: "nanbatiannanbatian"
 >     python3 filings.py --list
 >     python3 pipeline.py --category car_ev --candidates 候选池.json --out runs/x
 
-## 代码结构（v10.0 模块化，改代码前先看这里）
+## 代码结构（v10.1 模块化，改代码前先看这里）
 
 根目录 81 个平铺脚本已按职责收进 `modules/`，**根目录只剩薄壳入口**（`python3 monthly.py` 这类命令照旧可用，
 薄壳只做 `runpy` 转发，不含业务逻辑）。
 
 ```
 modules/
+  contracts/   数据契约层（零依赖零 IO）：trims 字段/枚举/校验、车名归一化
   research/    取数与证据采集：所有对外网络调用的唯一出口（25 个采集器 + researcher 检索）
   physics/     电动车实际续航物理模型（零依赖；物理常量单一事实源）
   envscore/    跨能源环境分引擎：engine.js（唯一事实源）+ 页面生成器
   engine/      打分口径 / 闸门 / 事实注入（纯计算，无 IO）
-  board/       出榜编排与渲染（pipeline / monthly / board_v2 / master_pool / 渲染）
-  regress/     回归测试：bug 67 项 + 失败回测 63 条 + 专项回归 + node 测试
-data/gen/      机器生成的大 JSON（trims/master_pool/ice_crash…），可重建，**不打包**
-categories/    人工维护的口径配置与事实库（随包发布）
+  board/       出榜编排与渲染（pipeline / monthly / board_v2 / master_pool / bootstrap）
+  regress/     回归测试：结构 15 项 + bug 67 项 + 失败回测 63 条 + 专项回归 + node 测试
+data/gen/      可重建的生成物（trims/master_pool/ice_crash…），**不打包**，用 bootstrap_data.py 生成
+categories/    人工维护的口径配置 + 不可重建的事实库（气囊/物理参数/基线池），随包发布
 runs/ dist/    跑批产物与发行 zip，**不打包**
-paths.py       全项目路径唯一事实源（ROOT/cat()/gen()）
+paths.py       全项目路径唯一事实源（ROOT/cat()/gen()）+ 生成物名单与重建规格
 ```
 
-**依赖只能向下**：`research`、`physics` 不依赖任何本项目包；`envscore → physics`；`board → engine/research/envscore`。
-`engine` 不许反向 import `board`（车名归一化已下沉到 `modules/engine/model_names.py`，正是这条倒挂的修复）。
-违规由 `layout_regress.py` 拦截（开发者回归，不随包发布）（含根目录薄壳、依赖方向、生成物位置、路径硬编码、文档 CLI 五类检查）。
+**依赖只能向下**：`contracts`（最底层，零依赖）← `research`/`physics` ← `envscore` ← `engine` ← `board`。
+两处倒挂已消解：车名归一化 `canon` 下沉到 `contracts/model_names.py`（原 `engine→board`）；
+逐配置校验 `validate` 下沉到 `contracts/trims_schema.py`（原 `research→engine`，采集方不该依赖打分引擎）。
+违规由 `layout_regress.py` 拦截（开发者回归，不随包发布）：薄壳、依赖方向、契约层纯净度、
+生成物位置与**可重建性**、路径硬编码、文档 CLI 共六类。
 
 **数据落盘规则**：读数据一律 `paths.cat("xxx.json")`——生成物自动指向 `data/gen/`，人工配置指向 `categories/`；
 写生成物用 `paths.gen("xxx.json")`。**禁止再写 `os.path.join(HERE, "categories", ...)`**（重构前散落 46 处，
 文件一进 `modules/` 全指错目录）。文档里出现的 `categories/trims.json` 是逻辑数据名，实际位置以此规则解析。
+
+**打包判据只有一条：能不能用代码重建**（不是体积大小）。
+- 可重建 → 不打包（`paths.GENERATED_JSON`），用户随代码逐步生成：版本一升、口径一变，本来就该重算，
+  打包反而把过期数据发出去。新装包首跑执行 `python3 bootstrap_data.py --check` 看缺什么，
+  `--apply` 自动重建（每项都有命令、联网标记与前置说明）。
+- 不可重建（人工采集核验的气囊/物理参数/基线池，`paths.CURATED_JSON`）→ **必须随包**，否则新装包功能残缺。
 
 **为什么这么分**（可独立发布性）：`research` 与 `physics` 是真正的独立 skill（取数检索 / 续航估算），
 `envscore` 依赖仅 physics、也能独立发布为「用车条件适配计算器」；`engine`+`board` 是本项目主流程，`regress` 项目专属。

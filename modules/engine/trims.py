@@ -49,6 +49,12 @@ import sys
 
 import paths
 
+# 数据契约（字段/枚举/校验）在 contracts 层：采集方(research)与消费方(engine)共用一套，
+# 避免出现 research -> engine 的向上依赖。
+from modules.contracts.trims_schema import (  # noqa: E402
+    SUPPLIER_CLASS_LABELS, TRIM_FIELDS, validate,
+)
+
 HERE = str(paths.ROOT)
 DEFAULT_DB = str(paths.cat("trims.json"))
 
@@ -58,85 +64,11 @@ MAX_STEP_PRICE = 3.0             # 跨级换技术路线上限（万元），只
 MIN_KWH_PER_10K = 10.0           # J2：每万元至少 10kWh
 MIN_KM_PER_10K = 100.0           # J2：或每万元至少 100km CLTC
 
-SUPPLIER_CLASS_LABELS = {
-    "single_named": "单一供应商（逐配置列明）",
-    "multi_batch": "同配置多供应商混装（选配置无法规避）",
-    "trim_split": "按配置固定分层（选配置可选择）",
-    "new_tech_route": "新技术路线（另记上市时长）",
-    "conflict": "两源冲突 / 已记 null",
-    "undisclosed": "未披露",
-}
-
-TRIM_FIELDS = ("name", "price", "battery_kwh", "battery_type", "cell_supplier",
-               "supplier_class", "cltc_km", "charge", "motor_kw", "key_configs",
-               "group", "note")
-
 
 def load_db(path: str = DEFAULT_DB) -> dict:
     if not os.path.exists(path):
         return {"entries": [], "out_of_board_examples": []}
     return json.load(open(path, encoding="utf-8"))
-
-
-def validate(db: dict) -> list[str]:
-    errs: list[str] = []
-    if db.get("scoring_enabled") is not False:
-        errs.append("scoring_enabled 必须为 false（配置阶梯不得产生分数）")
-    seen: set[str] = set()
-
-    def check_entry(e: dict, w: str, need_in_board: bool):
-        for k in ("model", "source", "url", "date", "source_type", "quote",
-                  "note", "trim_class"):
-            if not e.get(k):
-                errs.append(f"{w}: 缺 {k}（可核验要求必填）")
-        if not str(e.get("url") or "").startswith(("http://", "https://")):
-            errs.append(f"{w}: url 不是 http(s) 链接")
-        if e.get("model") in seen:
-            errs.append(f"{w}: 车型重复 {e.get('model')}")
-        seen.add(e.get("model"))
-        if e.get("trim_class") not in SUPPLIER_CLASS_LABELS:
-            errs.append(f"{w}: trim_class 非法 {e.get('trim_class')}")
-        trims = e.get("trims") or []
-        if len(trims) < 2:
-            errs.append(f"{w}: 阶梯至少 2 个配置")
-        names = [t.get("name") for t in trims]
-        if len(set(names)) != len(names):
-            errs.append(f"{w}: 配置名重复")
-        for i, t in enumerate(trims):
-            tw = f"{w}.trims[{i}]"
-            for f in TRIM_FIELDS:
-                if f not in t:
-                    errs.append(f"{tw}: 缺字段 {f}（无证据必须显式写 null）")
-            if not isinstance(t.get("price"), (int, float)):
-                errs.append(f"{tw}: price 必须为数值（指导价，禁用促销价）")
-            if t.get("battery_kwh") is not None and not isinstance(
-                    t.get("battery_kwh"), (int, float)):
-                errs.append(f"{tw}: battery_kwh 必须为数值或 null")
-            if not t.get("group"):
-                errs.append(f"{tw}: 缺 group（跃迁只在同年款内比较，必须显式标年款）")
-            if t.get("supplier_class") not in SUPPLIER_CLASS_LABELS:
-                errs.append(f"{tw}: supplier_class 非法 {t.get('supplier_class')}")
-            if t.get("supplier_class") == "conflict" and t.get("cell_supplier"):
-                errs.append(f"{tw}: 标 conflict 时 cell_supplier 必须记 null")
-        if need_in_board:
-            if e.get("in_board") is not True:
-                errs.append(f"{w}: 在榜条目 in_board 必须为 true")
-            if not isinstance(e.get("price_band_max"), (int, float)):
-                errs.append(f"{w}: 缺 price_band_max（J3 判带内需要）")
-            ref = e.get("scored_trim_ref")
-            if not ref or ref not in names:
-                errs.append(f"{w}: scored_trim_ref 必须指向 trims 里存在的配置名")
-        else:
-            if e.get("in_board") is not False:
-                errs.append(f"{w}: 带外示例 in_board 必须为 false")
-            if e.get("scored_trim_ref") is not None:
-                errs.append(f"{w}: 带外示例不应有 scored_trim_ref")
-
-    for i, e in enumerate(db.get("entries", [])):
-        check_entry(e, f"entries[{i}]", True)
-    for i, e in enumerate(db.get("out_of_board_examples", [])):
-        check_entry(e, f"out_of_board_examples[{i}]", False)
-    return errs
 
 
 def months_on_market(entry: dict, as_of: str | None = None) -> float | None:

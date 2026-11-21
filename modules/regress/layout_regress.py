@@ -29,26 +29,26 @@ import paths
 HERE = str(paths.ROOT)
 sys.path.insert(0, HERE)
 
-PKGS = ("research", "physics", "envscore", "engine", "board", "regress")
+PKGS = ("contracts", "research", "physics", "envscore", "engine", "board", "regress")
 ROOT_INFRA = {"paths", "build_release", "sync_to_repo"}
 THIN_MAX_LINES = 25
 
 # 允许的包间依赖（只准向下）。未列出的边 = 违规。
 ALLOWED = {
-    "research": set(),
-    "physics": set(),
-    "envscore": {"physics"},
-    "engine": set(),
-    "board": {"engine", "research", "envscore", "physics"},
+    "contracts": set(),                                  # 契约层：零依赖，谁都别依赖它之外的东西
+    "research": {"contracts"},
+    "physics": {"contracts"},
+    "envscore": {"physics", "contracts"},
+    "engine": {"contracts"},
+    "board": {"engine", "research", "envscore", "physics", "contracts"},
     "regress": set(PKGS),
 }
 
 # 已知且已确认的例外：模块 -> (目标包, 原因)
-EXCEPTIONS = {
-    ("research", "auto_trims", "engine"):
-        "auto_trims 采集完配置阶梯要调 engine.trims.validate 做入库前 schema 校验；"
-        "校验规则属数据契约，暂时无法下沉。新增此类依赖必须在此登记。",
-}
+# v10.1 起为空：唯一的例外 research/auto_trims -> engine.trims.validate 已通过
+# 契约层（modules/contracts/trims_schema.py）消解，不再需要登记。
+# 新增例外必须在此写原因，否则 layout_regress 会报依赖违规。
+EXCEPTIONS: dict[tuple[str, str, str], str] = {}
 
 PASS: list[str] = []
 FAIL: list[tuple[str, str]] = []
@@ -100,6 +100,39 @@ def check_direction() -> None:
     unknown = [k for k in EXCEPTIONS if f"{k[0]}/{k[1]}->{k[2]}" not in exc_used]
     check("例外表无僵尸条目", not unknown,
           "已不再需要的例外应删除：" + "、".join(f"{a}/{b}->{c}" for a, b, c in unknown))
+
+
+def check_contracts_pure() -> None:
+    """契约层必须纯净：零 IO、零联网、不 import 其他本项目包。"""
+    bad = []
+    for f in sorted((paths.MODULES / "contracts").glob("*.py")):
+        if f.name == "__init__.py":
+            continue
+        text = f.read_text(encoding="utf-8")
+        for i, line in enumerate(text.splitlines(), 1):
+            s = line.strip()
+            if s.startswith("#"):
+                continue
+            if re.search(r"\b(open|requests\.|urlopen)\s*\(", s):
+                bad.append(f"{f.name}:{i} 有 IO/网络调用")
+            if re.search(r"^\s*(?:from|import)\s+modules\.", s):
+                bad.append(f"{f.name}:{i} 依赖了其他项目包")
+    check("契约层零 IO / 零依赖", not bad, "；".join(bad[:6]))
+
+
+def check_rebuildable() -> None:
+    """不打包的生成物必须都能重建：每个 GENERATED_JSON 都要有重建规格。"""
+    missing = [n for n in paths.GENERATED_JSON if n not in paths.GENERATED_SPEC]
+    check("每个生成物都有重建规格", not missing, "缺规格（会在新装包永久缺失）：" + "、".join(sorted(missing)))
+    bad_cmd = []
+    for name, spec in paths.GENERATED_SPEC.items():
+        m = re.search(r"([\w/\-]+\.py)", spec.get("cmd", ""))
+        script = m.group(1) if m else ""
+        if not script or not (Path(HERE) / script).exists():
+            bad_cmd.append(f"{name}->{script or '未写命令'}")
+    check("重建命令指向真实入口", not bad_cmd, "；".join(bad_cmd))
+    absent = [n for n in paths.CURATED_JSON if not (paths.CAT_DIR / n).exists()]
+    check("人工事实库随包存在", not absent, "缺文件（应随包，不重建）：" + "、".join(sorted(absent)))
 
 
 def check_generated_placement() -> None:
@@ -156,6 +189,8 @@ def main() -> int:
     print("=" * 60)
     check_root_thin()
     check_direction()
+    check_contracts_pure()
+    check_rebuildable()
     check_generated_placement()
     check_no_hardcoded_paths()
     check_doc_cli()

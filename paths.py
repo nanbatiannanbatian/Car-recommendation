@@ -15,7 +15,8 @@
   dist/       发行 zip，打包排除
 
 生成物读写规则：
-  - 生成物一律落在 data/gen/（gen()）。
+  - 判据只有「能不能重建」：GENERATED_JSON 可重建 → 不打包；CURATED_JSON 人工核验 → 必须随包。
+  - 生成物一律落在 data/gen/（gen()），用 bootstrap_data.py 重建（规格见 GENERATED_SPEC）。
   - 读生成物用 cat()：生成物名自动指向 data/gen/，人工配置指向 categories/。
     data/gen/ 里缺文件时（新装包）回退 categories/，再缺就由调用方报错或重建。
 """
@@ -35,18 +36,59 @@ GEN_DIR = DATA_DIR / "gen"
 RUNS_DIR = ROOT / "runs"
 DIST_DIR = ROOT / "dist"
 
-# 机器生成、可重建的大 JSON：写 data/gen/，不随包发布。
-# 这份名单同时被 build_release.py 用来判「不进 zip」，单一事实源。
+# 判据只有一条：**能不能用代码重新生成**。不是体积。
+#   能重建 → 不打包，让用户随代码逐步生成（版本一变本来就该重算）；
+#   不能重建（人工采集/核验的事实库）→ 必须随包，否则新装包功能残缺。
 GENERATED_JSON = {
-    "trims.json",
-    "master_pool.json",
-    "ice_crash.json",
-    "baseline_car_ev.json",
-    "fact_library.json",
-    "universe_car_midsedan_allprice.json",
-    "airbags.json",
-    "vehicle_physics.json",
-    "cell_facts.json",
+    "trims.json",                            # auto_trims.py（联网采集逐配置阶梯）
+    "master_pool.json",                      # master_pool.py --intake（联网销量建池）
+    "ice_crash.json",                        # ice_crash.py（联网碰撞证据）
+    "cell_facts.json",                       # build_cell_facts.py（联网电芯事实）
+    "universe_car_midsedan_allprice.json",   # universe_build.py（半自动：需先 discover）
+    "fact_library.json",                     # facts_sync.py --apply（半自动：需原始库）
+}
+
+# 人工采集/核验的事实库：无法用代码重建，必须随包发布（合计约 143KB，在 3MB 限额内）
+CURATED_JSON = {
+    "baseline_car_ev.json",     # 纯电基线候选池（214 款，一次性数据集）
+    "airbags.json",             # 被动安全气囊配置核验表（逐车带 url+quote）
+    "vehicle_physics.json",     # 整备质量/风阻/电压/换电参数（汽车之家逐车采集）
+}
+
+# 每个不打包的生成物都必须有重建规格——否则新装包里它永远缺，功能静默降级。
+# cmd: 一条可执行的命令（在项目根目录跑）；needs_net: 是否必须联网；
+# semi: 需要前置输入（不能一条命令跑完），见 note。
+GENERATED_SPEC: dict[str, dict] = {
+    "trims.json": {
+        "cmd": "python3 auto_trims.py --apply",
+        "needs_net": True, "semi": False,
+        "note": "从汽车之家逐配置页补录阶梯；耗时较长，可只补指定车型",
+    },
+    "master_pool.json": {
+        "cmd": "python3 master_pool.py --intake --month <YYYYMM> --apply",
+        "needs_net": True, "semi": False,
+        "note": "按销量榜建总池；月份换成当期，数据随版本重算",
+    },
+    "ice_crash.json": {
+        "cmd": "python3 ice_crash.py",
+        "needs_net": True, "semi": False,
+        "note": "C-IASI/C-NCAP 官方碰撞记录",
+    },
+    "cell_facts.json": {
+        "cmd": "python3 build_cell_facts.py",
+        "needs_net": True, "semi": False,
+        "note": "电芯品牌/容量核验事实表",
+    },
+    "universe_car_midsedan_allprice.json": {
+        "cmd": "python3 universe_build.py --discover <discover输出.json> --out <目标.json>",
+        "needs_net": True, "semi": True,
+        "note": "前置：先跑 discover.py 拿联网销量榜 JSON",
+    },
+    "fact_library.json": {
+        "cmd": "python3 facts_sync.py --apply",
+        "needs_net": False, "semi": True,
+        "note": "前置：需 car_all 原始库（环境变量 CAR_ALL_DATA 指向）",
+    },
 }
 
 
@@ -67,6 +109,11 @@ def cat(name: str) -> Path:
             return CAT_DIR / name
         return p
     return CAT_DIR / name
+
+
+def spec(name: str) -> dict:
+    """生成物的重建规格；不在名单里返回空 dict（人工事实库无需重建）。"""
+    return GENERATED_SPEC.get(name, {})
 
 
 def gen(name: str) -> Path:

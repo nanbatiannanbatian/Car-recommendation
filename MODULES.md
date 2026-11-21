@@ -19,6 +19,9 @@
 ```
 paths.py                     路径唯一事实源：ROOT / cat() / gen() / src() / module()
 modules/
+  contracts/                 数据契约层（零依赖零 IO）
+    trims_schema.py          逐配置阶梯 trims.json 的字段/枚举/校验
+    model_names.py           车名归一化 canon
   research/                  取数 · 检索 · 证据采集（唯一网络出口）
     researcher.py            站点画像检索（17 站点）+ 广告识别 + 博主可信度
     fetch_dcd_sales.py       懂车帝逐月销量（纯电/插混/增程拆分）
@@ -65,6 +68,7 @@ modules/
     board_view.py            页面区块注册表（展示层唯一事实源）
     render_board_html.py     HTML 渲染
     master_pool.py           总候选池（单一事实源）
+    bootstrap.py             生成物一键重建（新装包首跑）
     warehouse.py / forecast.py / backfill.py   仓库/预测/回填
     ice_board.py / ice_funnel.py / ice_sensitivity.py
     ev_battery_board.py / ev_cell_board.py
@@ -85,32 +89,66 @@ runs/ dist/ tools/           产物 / 发行 zip / 一次性迁移脚本（均�
 ## 3. 依赖方向（硬约束）
 
 ```
-research ─┐
-physics ──┼─→ envscore ─→ engine ─→ board
-          └──────────────→ engine ─→ board
-regress ──────────────────────────→ 任意（测试可读全部）
+contracts（零依赖、零 IO）
+   ↑
+research ─┬─ physics
+          └─ envscore ─→ engine ─→ board
+regress ────────────────────────→ 任意（测试可读全部）
 ```
 
-- `research` / `physics` **不得** import 本项目任何其他包。
-- `engine` 不得 import `board`（历史倒挂：`cross_verify` 曾 import `board.master_pool.canon`，已下沉到 `engine/model_names.py`）。
-- 唯一登记在案的例外：`research/auto_trims.py → engine.trims.validate`（入库前 schema 校验，规则暂未下沉），
-  写在 `layout_regress.py` 的 `EXCEPTIONS` 里，新增例外必须登记并写原因。
+- `contracts` 在最底层：不放业务逻辑，只放「谁写谁读都要认同一套」的规则，且不得 import 任何本项目包、不得 IO。
+- `research` / `physics` 只允许依赖 `contracts`。
+- `engine` 不得 import `board`；`research` 不得 import `engine`。
+- 两处历史倒挂已消解：
+  - `engine/cross_verify → board/master_pool.canon`：下沉到 `contracts/model_names.py`；
+  - `research/auto_trims → engine/trims.validate`：下沉到 `contracts/trims_schema.py`（采集方不该依赖打分引擎）。
+- `layout_regress.EXCEPTIONS` 现为空。新增例外必须登记并写原因，否则结构回归报违规。
 
 ## 4. 数据落盘
 
+**判据只有一条：能不能用代码重新生成。不是体积。**
+
 | 类别 | 位置 | 打包 | 举例 |
 |---|---|---|---|
-| 人工口径配置 / 事实库 | `categories/` | 随包 | `rank_v2_policy.json`、`experience_facts.json`、`residual_values.json` |
-| 机器生成的大 JSON | `data/gen/` | 排除 | `trims.json`、`master_pool.json`、`ice_crash.json`、`fact_library.json` |
+| 可重建的生成物 | `data/gen/` | 排除 | `trims.json`、`master_pool.json`、`ice_crash.json`、`cell_facts.json` |
+| 人工事实库（不可重建） | `categories/` | **随包** | `airbags.json`、`vehicle_physics.json`、`baseline_car_ev.json` |
+| 人工口径配置 | `categories/` | 随包 | `rank_v2_policy.json`、`experience_facts.json` |
 | 跑批产物 | `runs/` | 排除 | 榜单 HTML、summary.json |
 | 发行 zip | `dist/` | 排除 | `car-recommendation-vX.Y.Z.zip` |
 
-名单单一事实源：`paths.GENERATED_JSON`（`build_release.py` 直接复用，不再各维护一份）。
+为什么这么切：生成物带口径与版本指纹，版本一升、口径一变本来就该重算；
+把它们打进包，等于把**过期数据**发给用户，还会让新装包看上去"有数据"却算不对。
+反过来，气囊/物理参数/基线池是逐车核验出来的事实库，没有代码能重造，不随包就是功能残缺。
+
+名单单一事实源：`paths.GENERATED_JSON` / `paths.CURATED_JSON`，
+重建规格 `paths.GENERATED_SPEC`（`build_release` 与 `layout_regress` 都直接复用，不各自维护）。
 
 读写：`paths.cat("trims.json")` 读（生成物自动指向 `data/gen/`，缺文件回退 `categories/`）；
 `paths.gen("trims.json")` 写。**禁止手拼 `categories` 路径**（`layout_regress` 会拦）。
 
-## 5. 根目录薄壳
+## 5. 生成物重建（新装包首跑）
+
+```bash
+python3 bootstrap_data.py --check                  # 体检：缺什么 / 怎么建 / 是否联网 / 指纹是否过期
+python3 bootstrap_data.py --apply                  # 只建缺失的全自动项
+python3 bootstrap_data.py --apply --include-semi    # 连需前置输入的也试
+python3 bootstrap_data.py --apply --all --force     # 版本升级后全部重算
+python3 bootstrap_data.py --apply --only trims.json --force
+```
+
+| 生成物 | 重建命令 | 联网 | 前置 |
+|---|---|---|---|
+| `cell_facts.json` | `build_cell_facts.py` | 是 | — |
+| `ice_crash.json` | `ice_crash.py` | 是 | — |
+| `trims.json` | `auto_trims.py --apply` | 是 | — |
+| `master_pool.json` | `master_pool.py --intake --month <YYYYMM> --apply` | 是 | — |
+| `universe_car_midsedan_allprice.json` | `universe_build.py --discover <json> --out <json>` | 是 | 先跑 `discover.py` |
+| `fact_library.json` | `facts_sync.py --apply` | 否 | 需 car_all 原始库 |
+
+**约束**：新增任何不打包的生成物，必须同时在 `paths.GENERATED_SPEC` 写重建命令，
+否则 `layout_regress` 报「每个生成物都有重建规格」失败——防止产出「永远缺、也没人知道怎么建」的文件。
+
+## 6. 根目录薄壳
 
 根目录保留的 `.py` 只有两类：基础设施（`paths.py` / `build_release.py` / `sync_to_repo.py`）
 与**薄壳**（≤25 行，`runpy.run_module` 转发）。薄壳存在只为两件事：
@@ -120,14 +158,14 @@ regress ────────────────────────
 
 薄壳里**不许写业务逻辑**——逻辑在 `modules/`，否则又变成两处真相。
 
-## 6. 回归怎么跑
+## 7. 回归怎么跑
 
 回归脚本是**开发者自用、不随包发布**（`build_release.py` 的 `EXCLUDE_GLOBS` 排除 `*_regress.py`）。
 在源码目录（含 `modules/` 全树）执行：
 
 | 脚本 | 守什么 | 项数 |
 |---|---|---|
-| `layout_regress.py` | 结构：薄壳 / 依赖方向 / 生成物位置 / 路径硬编码 / 文档 CLI | 11 |
+| `layout_regress.py` | 结构：薄壳 / 依赖方向 / 契约层纯净 / 生成物可重建 / 路径硬编码 / 文档 CLI | 15 |
 | `bug_regression.py` | 口径：历史 bug 断言 + 反向注入回测 | 67（含 63 条注入） |
 | `energy_router_regress.py` | A/B 榜型自动判定 | 32 |
 | `energy_compare_regress.py` | 比较器与环境分引擎 | 20 |

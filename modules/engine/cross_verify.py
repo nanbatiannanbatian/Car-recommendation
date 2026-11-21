@@ -47,7 +47,7 @@ CAT = str(paths.CAT_DIR)
 
 # 车名归一化：单一事实源在 engine/model_names（v10 修依赖倒挂——
 # 之前 import board.master_pool，失败时回退到不等价的 lambda，规则会静默分叉）
-from modules.engine.model_names import canon
+from modules.contracts.model_names import canon
 
 # 跨库车名对齐：内联 filings.py 的纯函数逻辑（那套函数本身不依赖 requests，
 # 但 filings 模块顶层 import requests，在无 requests 环境会失败，故直接内联零依赖版）。

@@ -1,7 +1,7 @@
 # Car recommendation
 
 > 可信购车榜单引擎：口径闸门 / MCDA 稳健性检验 / 8 维打分统一榜 / 总候选池 / 多源交叉核验 / 证据分层 / 历史回测。
-> 无模型调用，同一输入必得同一输出。当前版本 **v10.0.0**（模块化重构，口径与出榜结果不变）。
+> 无模型调用，同一输入必得同一输出。当前版本 **v10.1.0**（模块化重构，口径与出榜结果不变）。
 
 ## 这是什么
 WorkBuddy 用户级 skill。核心是「车型排行榜全链路」：按需搜榜入池→取数→闸门→8 维打分→稳健性→三档→审查→报告，
@@ -23,6 +23,7 @@ WorkBuddy 用户级 skill。核心是「车型排行榜全链路」：按需搜�
 
 | 模块 | 职责 | 规模 | 可独立发布 |
 |---|---|---|---|
+| `modules/contracts/` | 数据契约层：trims 字段/校验、车名归一化（零依赖零 IO） | 2 | ✅ 契约库 |
 | `modules/research/` | 取数与证据采集，**所有对外网络调用的唯一出口** | 25 个采集器 + researcher | ✅ 检索取数 skill |
 | `modules/physics/` | 电动车实际续航物理模型（零依赖） | 1 | ✅ 续航估算 skill |
 | `modules/envscore/` | 跨能源环境分引擎（`engine.js` 唯一事实源 + 页面生成） | 2 | ✅ 用车条件适配计算器 |
@@ -30,8 +31,10 @@ WorkBuddy 用户级 skill。核心是「车型排行榜全链路」：按需搜�
 | `modules/board/` | 出榜编排与渲染 | 19 | 主流程 |
 | `modules/regress/` | 回归测试与失败回测 | 7 + 4 js | 项目专属 |
 
-- **依赖只能向下**：`research`/`physics` 零依赖 → `envscore` → `engine` → `board`。反向 import 由 `layout_regress.py` 拦截。
-- **数据落盘**：`data/gen/` 放生成的大 JSON（可重建、不打包），`categories/` 只留人工配置（随包）。
+- **依赖只能向下**：`contracts` ← `research`/`physics` ← `envscore` ← `engine` ← `board`。反向 import 由 `layout_regress.py` 拦截。
+- **数据落盘**：判据只有「能不能重建」——
+  可重建的生成物放 `data/gen/`（不打包，用 `bootstrap_data.py` 生成）；
+  人工采集核验的气囊/物理参数/基线池放 `categories/`（不可重建，必须随包）。
   读写一律走 `paths.cat()` / `paths.gen()`，不再手拼 `categories` 路径。
 - **回归**：`layout_regress.py` 守结构、`bug_regression.py` 守口径，另有 4 个专项回归（回归脚本开发者自用，不随包发布）。
 - 详细契约见 `MODULES.md` 与各包 `__init__.py`。
@@ -73,6 +76,22 @@ Python 3.10+。依赖没有打包进 zip，是标准的 Python 包管理方式�
     python3 trims.py --validate             # 校验具体配置阶梯库（url/quote/年款分组完整性）
     python3 trims.py --todo --candidates <候选池.json>   # 列待补逐配置表的车型
     python3 pipeline.py --category car_ev --candidates <候选池.json> --out runs/x
+
+## 生成物重建（新装包首跑必看）
+
+发布包不含 `data/gen/`（可重建的生成物），首跑先体检再生成：
+
+```bash
+python3 bootstrap_data.py --check     # 缺哪些、怎么建、要不要联网、指纹是否过期
+python3 bootstrap_data.py --apply     # 自动重建缺失项（每项一个命令，失败逐条报告）
+python3 bootstrap_data.py --apply --all --force   # 版本升级后全部重算
+```
+
+6 个可重建生成物：`trims.json`（逐配置阶梯）、`master_pool.json`（总池）、`ice_crash.json`（碰撞）、
+`cell_facts.json`（电芯）、`universe_car_midsedan_allprice.json`、`fact_library.json`；
+后两个需前置输入（先跑 discover / 需 car_all 原始库），`--check` 会写明。
+
+3 个人工事实库随包：`airbags.json`、`vehicle_physics.json`、`baseline_car_ev.json`——这些无法用代码重建。
 
 ## 里面对电动车榜硬编码的东西（换品类要改）
 - `categories/car_ev.json`：纯电中型/中大型四榜的口径配置

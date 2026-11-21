@@ -73,7 +73,7 @@ except ImportError:  # pragma: no cover
 
 # ---------------------------------------------------------------- 工具
 # 车名归一化单一事实源（v10：原先写在本文件，cross_verify 反向 import 造成依赖倒挂）
-from modules.engine.model_names import canon  # noqa: E402
+from modules.contracts.model_names import canon  # noqa: E402
 
 
 def body_from_cls(cls: str) -> str:

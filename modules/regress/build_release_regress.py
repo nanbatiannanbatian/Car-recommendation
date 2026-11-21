@@ -44,13 +44,13 @@ def run():
     for f in ("trims_v61polluted.json", "trims_v60before.json", "*_regress.py",
               "build_midsuv_202610.py"):
         check(f"排除清单含:{f}", f'"{f}"' in src)
-    # v9.7.54 用户决定：大 JSON 不随包发布，联网重建。断言它们确实被排除。
-    big_json = ("trims.json", "master_pool.json", "ice_crash.json", "baseline_car_ev.json",
-                "fact_library.json", "universe_car_midsedan_allprice.json", "airbags.json",
-                "vehicle_physics.json")
+    # 判据只有「能不能重建」：可重建的生成物不打包，人工事实库必须打包。
+    # 名单不再在本文件复制一份（复制必分叉），直接取 paths 的单一事实源。
     excl_block = src.split("EXCLUDE_GLOBS")[1].split("]")[0]
-    for f in big_json:
-        check(f"大JSON已排除:{f}", f'"{f}"' in excl_block)
+    for f in sorted(paths.GENERATED_JSON):
+        check(f"可重建生成物不打包:{f}", f in paths.GENERATED_JSON and "GENERATED_JSON" in src)
+    for f in sorted(paths.CURATED_JSON):
+        check(f"人工事实库随包:{f}", f not in paths.GENERATED_JSON)
     # 生成脚本必须在包内，否则数据删了无法重建（尤其 ice_crash.py 曾误排，已加回）
     check("ice_crash.py未被排除(生成脚本)", '"ice_crash.py"' not in excl_block)
     # 3) 被排除的历史数据确实无代码引用（防止误排）
@@ -88,10 +88,10 @@ def run():
         check("产物无历史污染数据", not any("v61polluted" in n or "v60before" in n for n in names))
         check("产物无回归测试脚本", not any(n.endswith("_regress.py") for n in names))
         check("产物含核心模块", "car-recommendation/build_midsuv_full.py" in names and "car-recommendation/SKILL.md" in names)
-        # v9.7.54：大JSON已排除 + 生成脚本在包内
-        bigs = ("trims.json", "master_pool.json", "ice_crash.json", "baseline_car_ev.json",
-                "fact_library.json", "universe_car_midsedan_allprice.json", "airbags.json", "vehicle_physics.json")
-        check("产物无大JSON", not any(any(f in n for f in bigs) for n in names))
+        # 可重建的生成物不进包；人工事实库（气囊/物理参数/基线池）必须在包里
+        check("产物无生成物缓存", not any(any(f in n for f in paths.GENERATED_JSON) for n in names))
+        check("产物含人工事实库", all(any(n.endswith("/" + f) for n in names)
+                                  for f in paths.CURATED_JSON))
         gens = ("auto_trims.py", "build_ice_pool.py", "master_pool.py", "ice_crash.py",
                 "auto_levels.py", "facts_sync.py", "universe_build.py", "airbags.py")
         check("产物含全部生成脚本", all(any(n.endswith("/" + g) for n in names) for g in gens))

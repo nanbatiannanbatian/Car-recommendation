@@ -132,7 +132,9 @@ def main() -> int:
                      and (_src(base).exists()
                           or any(MODULES.glob(f"*/{base}"))))
             generated = r.replace(os.sep, "/").startswith("categories/") and base in GENERATED_JSON
-            if moved or generated:
+            # modules/ 整棵树归源码所有：源码里没有就是删过/挪走了（如 model_names 迁到 contracts）
+            in_modules = r.replace(os.sep, "/").startswith("modules/")
+            if moved or generated or in_modules:
                 os.remove(os.path.join(a.repo, r))
                 pruned.append(r)
             else:

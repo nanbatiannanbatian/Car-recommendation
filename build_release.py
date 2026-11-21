@@ -69,12 +69,10 @@ EXCLUDE_GLOBS = ["*.bak", "*.bak-*", "*.tmp", "*.pyc", "*.orig",
                  # 故生成脚本必须在包内——ice_crash.py 从排除清单移除，其余生成脚本本就在包内。
                  # 采集/验证脚本（0 import，产出数据已不随包或为历史）：
                  "ice_funnel.py", "ice_sales.py", "ice_sensitivity.py", "verify_mcda.py",
-                 # v9.7.54 用户决定：大 JSON（>=30KB，约1.1MB）不随包发布，联网重建。
-                 # 生成脚本均在包内：auto_trims/build_ice_pool/master_pool/auto_levels/facts_sync/
-                 # universe_build/airbags/ice_crash；实测 build_index 可无 key 联网生成 5375 条映射。
-                 "trims.json", "master_pool.json", "ice_crash.json", "baseline_car_ev.json",
-                 "fact_library.json", "universe_car_midsedan_allprice.json", "airbags.json",
-                 "vehicle_physics.json",
+                 # v10.1 判据改为「能不能重建」（名单在 paths.GENERATED_JSON，这里不再手抄）：
+                 #   可重建 → is_excluded_name() 依 GENERATED_JSON 排除，用户用 bootstrap_data.py 生成
+                 #   人工事实库（airbags / vehicle_physics / baseline_car_ev）→ 无法重建，必须随包
+                 # 下面仅保留历史快照：无任何代码引用，纯留给作者回溯
                  # 一次性数据采集脚本：作者维护数据时用，仅文档提及、无代码调用
                  "fetch_bili.py", "fetch_cncap.py",
                  # 注：lifecycle_fetch/sync_cncap/auto_levels/auto_trims 虽无 import，

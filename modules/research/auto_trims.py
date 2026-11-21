@@ -38,7 +38,8 @@ import paths
 
 HERE = str(paths.ROOT)
 sys.path.insert(0, HERE)
-from modules.engine import trims as T
+# 只依赖数据契约（不 import engine）：写库前自检字段是否合规
+from modules.contracts.trims_schema import validate as validate_trims
 
 HDR = {"User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
                       "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"),
@@ -325,7 +326,7 @@ def main():
                       "证据密度低于人工核验条目，不产生任何分数）。")
         out = a.out or a.db
         json.dump(db, open(out, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
-        errs = T.validate(db)
+        errs = validate_trims(db)
         if errs:
             print("[校验失败]", file=sys.stderr)
             for e in errs[:20]:
