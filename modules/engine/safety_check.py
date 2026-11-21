@@ -64,15 +64,19 @@ def check(cands, table=None):
     # （90.8%→8.9、90.6%→8.5、91.3%→9.1），说明还叠加了分项/年款口径的人工判断；
     # 用公式硬算会造出与既有表不一致的假分。所以：成绩进字段（事实），分数等人定。
     from modules.engine import crash_systems as _CS
-    unmapped = []
+    unmapped, auto_mapped = [], []
     has_score_n = 0
     for c in cands:
         if not _CS.parse_score(c.get("crash")):
             continue
         has_score_n += 1
-        if c["model"] not in car_scores:
-            unmapped.append({"model": c["model"], "crash": c.get("crash"),
-                             "basis": c.get("safety_basis")})
+        if c["model"] in car_scores:
+            continue
+        rec = {"model": c["model"], "crash": c.get("crash"),
+               "basis": c.get("safety_basis"),
+               "score": (c.get("scores") or {}).get("safety"),
+               "source": c.get("safety_score_source") or ""}
+        (auto_mapped if rec["source"] else unmapped).append(rec)
 
     # B. 单调性：有成绩车最低 >= 无成绩车中位
     no_score_vals = []
@@ -92,7 +96,8 @@ def check(cands, table=None):
                            "fix": "有官方碰撞成绩的车安全分不应低于无成绩车中位——检查是否被误降权"})
     return {"checked": checked, "official_min": min(official_vals) if official_vals else None,
             "no_score_median": round(statistics.median(no_score_vals), 1) if no_score_vals else None,
-            "has_score": has_score_n, "mapped": checked, "unmapped": unmapped,
+            "has_score": has_score_n, "mapped": checked,
+            "auto_mapped": auto_mapped, "unmapped": unmapped,
             "issues": issues, "passed": not issues}
 
 
@@ -137,3 +142,78 @@ if __name__ == "__main__":
         for x in r["issues"]:
             print(f"  - [{x['type']}] {x['model']}: {x['actual']} → 应 {x['expected']}")
         raise SystemExit(0 if r["passed"] else 1)
+
+
+# ---------------------------------------------------------------- 成绩 → 分数（自动映射）
+def score_from_crash(spec: dict, parsed: dict) -> tuple:
+    """按 official_safety_scores.json 的 map_spec 把成绩转成 0-10 安全分。
+
+    返回 (score|None, rule_text)。spec 是该体系的机器可读规则：
+      kind=pct   : base + (pct-ref)*slope，cap 封顶；2021 及更早 -older_penalty
+      kind=grade : grades[grade]（C-IASI / IIHS）
+      kind=star  : five/four/three（NCAP 家族；无乘员分项时取保守档）
+
+    为什么要有：2026-11-21 出中型纯电SUV榜，7 款车的 C-NCAP 成绩已经回流进 crash 字段，
+    但 official_safety_scores.json 里没有它们 → safety 分仍按「无成绩车插补」，
+    成绩等于没参与打分。这里把「成绩→分数」变成可复算的代码，不再靠人手填表。
+    """
+    if not spec:
+        return None, ""
+    kind = spec.get("kind")
+    if kind == "pct":
+        pct = parsed.get("score")
+        if pct is None:
+            return None, ""
+        sc = spec["base"] + (float(pct) - spec["ref"]) * spec["slope"]
+        sc = min(sc, spec.get("cap", 10.0))
+        year = parsed.get("year")
+        if year and year <= spec.get("older_before", 0):
+            sc -= spec.get("older_penalty", 0.0)
+        sc = round(max(0.0, min(10.0, sc)), 1)
+        return sc, f"C-NCAP {pct:g}% → {spec['base']}+({pct:g}-{spec['ref']})×{spec['slope']} 封顶{spec.get('cap')}"
+    if kind == "grade":
+        g = parsed.get("grade")
+        sc = (spec.get("grades") or {}).get(g)
+        return (sc, f"{parsed.get('system_cn')} {g} → {sc}") if sc is not None else (None, "")
+    if kind == "star":
+        stars = parsed.get("stars")
+        m = {5: "five", 4: "four", 3: "three"}
+        key = m.get(stars)
+        sc = spec.get(key) if key else None
+        return (sc, f"{parsed.get('system_cn')} {stars}星 → {sc}（无乘员分项取保守档）") if sc is not None else (None, "")
+    return None, ""
+
+
+def apply_auto_scores(cands, table=None, apply=True):
+    """表外但有成绩的车 → 自动映射 safety 分（表内人工分不动）。
+
+    返回 (applied, skipped)：
+      applied: [{"model","score","prev","rule","crash"}]
+      skipped: [车型]（有成绩但规则/分项不足，无法映射）
+    """
+    from modules.engine import crash_systems as CS
+    table = table or load_table()
+    car_scores = table.get("car_scores", {})
+    systems = table.get("systems", {})
+    applied, skipped = [], []
+    for c in cands:
+        if c["model"] in car_scores:
+            continue                      # 表内人工分优先，绝不覆盖
+        parsed = CS.parse_score(c.get("crash"))
+        if not parsed:
+            skipped.append(c["model"])
+            continue
+        spec = (systems.get(parsed["system_cn"]) or {}).get("map_spec")
+        score, rule = score_from_crash(spec, parsed)
+        if score is None:
+            skipped.append(c["model"])
+            continue
+        prev = (c.get("scores") or {}).get("safety")
+        if apply:
+            c.setdefault("scores", {})["safety"] = score
+            c["safety_score_source"] = rule
+            if prev is not None and abs(float(prev) - score) > 0.05:
+                c["safety_score_prev"] = prev
+        applied.append({"model": c["model"], "score": score, "prev": prev,
+                        "rule": rule, "crash": parsed["display"]})
+    return applied, skipped

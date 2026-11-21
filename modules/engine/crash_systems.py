@@ -191,6 +191,8 @@ def parse_score(text) -> dict | None:
             grade = gm.group(1)
         else:
             continue
+        ym = re.search(r"(20\d{2})\s*版?", clause)
+        year = int(ym.group(1)) if ym else None
         sys_cn = SYSTEMS[basis]["cn"]
         if score is not None:
             display = f"{sys_cn} {score:g}%"
@@ -201,7 +203,7 @@ def parse_score(text) -> dict | None:
         else:
             display = f"{sys_cn} {grade}"
         return {"basis": basis, "system_cn": sys_cn, "score": score,
-                "stars": stars, "grade": grade, "display": display}
+                "stars": stars, "grade": grade, "year": year, "display": display}
     return None
 
 

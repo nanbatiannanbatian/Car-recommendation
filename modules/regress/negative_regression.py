@@ -95,6 +95,8 @@ NEG_DATA = {
     "t070": ("crash_systems.has_score", None, "always_score"),
     # t071：把成绩回流改成 no-op（文本成绩进不了字段），回填断言必须 FAIL
     "t071": ("facts_sync.backfill_crash_from_text", None, "no_crash_backfill"),
+    # t072：把成绩→分数映射改成空操作（成绩进不了打分），断言必须 FAIL
+    "t072": ("safety_check.apply_auto_scores", None, "no_auto_safety"),
     # t039 断言从「源码文本含文件名」升级为「文件在同步集里」，探针改成把同步集清空
     "t039": ("sync_to_repo.collect", None, "empty_sync"),
 }
@@ -117,6 +119,7 @@ def _func_probe(name, fn, dotted, mode):
         "no_backfill": lambda *a, **kw: ([], []),                        # 不回流，什么都不填
         "always_score": lambda *a, **kw: True,                            # 虚报：什么都算有成绩
         "no_crash_backfill": lambda *a, **kw: ([], []),                    # 不回流成绩
+        "no_auto_safety": lambda *a, **kw: ([], []),                       # 不映射安全分
     }.get(mode)
     if wrong is None:
         return False, False

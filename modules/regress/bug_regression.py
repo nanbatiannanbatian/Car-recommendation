@@ -94,6 +94,7 @@ CASES = [
     ("BUG-069", "trims已核验官方价未回流候选池致11款price_unknown落榜", "v10.1.2"),
     ("BUG-070", "碰撞披露把「已抽车未测」算成有成绩(4/21实际3款)", "v10.1.2"),
     ("BUG-071", "官方碰撞成绩只写在note文本未进字段致极氪7X进不了一档", "v10.1.3"),
+    ("BUG-072", "成绩已进crash字段却未参与打分(safety仍按插补)致有实锤等于没用", "v10.1.4"),
 ]
 
 
@@ -1439,8 +1440,54 @@ def t071():
     return "碰撞成绩：文本解析→字段回填（不覆盖已有/不编造）+ 反向门禁 + 链路内置 + 审计"
 
 
+def t072():
+    """碰撞成绩必须真正参与打分：表外有成绩的车按映射规则自动算 safety 分。
+
+    2026-11-21 第二段断链：crash 里已有 C-NCAP 成绩，但 official_safety_scores.json
+    没有对应条目 → safety 仍按「无成绩车插补」，成绩等于白采。
+    这里锁死：规则机器可读（map_spec）、公式可复算、人工分不被覆盖、无成绩不编号。
+    """
+    from modules.engine import safety_check as SC
+    table = {
+        "car_scores": {"已有车": {"system": "C-NCAP", "value": 90.0, "score": 8.8, "source": "人工核验"}},
+        "systems": {
+            "C-NCAP": {"map_spec": {"kind": "pct", "base": 7.0, "ref": 80, "slope": 0.155,
+                                    "cap": 9.3, "older_penalty": 0.2, "older_before": 2021}},
+            "C-IASI": {"map_spec": {"kind": "grade", "grades": {"G+": 9.3, "G": 9.0}}},
+            "Euro NCAP": {"map_spec": {"kind": "star", "five": 8.3, "four": 7.8, "three": 7.0}},
+        },
+    }
+    cars = [
+        {"model": "极氪7X", "crash": "C-NCAP 2024版90.7%", "scores": {"safety": 8.7}},
+        {"model": "老规程车", "crash": "C-NCAP 2019版92%", "scores": {"safety": 8.9}},
+        {"model": "中保研车", "crash": "C-IASI G+", "scores": {"safety": 8.0}},
+        {"model": "欧标车", "crash": "Euro NCAP 五星", "scores": {"safety": 8.0}},
+        {"model": "已有车", "crash": "C-NCAP 90%", "scores": {"safety": 8.8}},
+        {"model": "无成绩车", "crash": "无官方成绩", "scores": {"safety": 8.4}},
+    ]
+    applied, skipped = SC.apply_auto_scores(cars, table=table)
+    got = {a["model"]: a["score"] for a in applied}
+    # 公式：7.0+(90.7-80)*0.155 = 8.66 → 8.7
+    assert got.get("极氪7X") == 8.7, got
+    # 2021 及更早要降 0.2：7.0+12*0.155=8.86→8.9，再 -0.2 = 8.7
+    assert got.get("老规程车") == 8.7, got
+    assert got.get("中保研车") == 9.3, got
+    assert got.get("欧标车") == 8.3, "NCAP 星级无乘员分项应取保守档 8.3"
+    assert "已有车" not in got, "覆盖了表内人工分"
+    assert cars[4]["scores"]["safety"] == 8.8, "人工分被改动"
+    assert "无成绩车" in skipped, "无成绩车被编号"
+    # 真正写进了 scores（否则等于没参与打分）
+    assert cars[0]["scores"]["safety"] == 8.7 and cars[0].get("safety_score_source")
+    # 链路内置 + 审计
+    src = _read("pipeline.py")
+    assert "apply_auto_scores" in src, "pipeline 未接成绩→分数映射"
+    assert "safety_auto" in src, "summary 缺安全分映射审计"
+    assert "--no-auto-safety" in src, "缺 A/B 开关"
+    return "成绩→分数：公式可复算、老规程降权、等级/星级映射、人工分不覆盖、无成绩不编号、链路内置"
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072]
 
 
 def run():

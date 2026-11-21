@@ -120,6 +120,8 @@ def main():
     ap.add_argument("--skip-sibling-gate", action="store_true", help="跳过同源车评分一致性门禁(须在报告说明为何无据差异合理)")
     ap.add_argument("--skip-safety-gate", action="store_true", help="跳过安全分严谨性门禁(须在报告说明为何成绩映射分可偏离)")
     ap.add_argument("--html-title", help="HTML 页面标题")
+    ap.add_argument("--no-auto-safety", action="store_true",
+                    help="不按官方成绩自动映射 safety 分（仅 A/B 对照；正常出榜不要关）")
     ap.add_argument("--no-backfill", action="store_true",
                     help="不回填 trims 官方指导价到候选池（仅 A/B 对照用；正常出榜不要关）")
     ap.add_argument("--force-stale", action="store_true",
@@ -170,6 +172,18 @@ def main():
         print(f"[碰撞回流] 文本成绩 → crash/safety_basis：{len(_c_filled)} 款（"
               + "、".join(f"{m}({d})" for m, d, _ in _c_filled[:6])
               + ("…" if len(_c_filled) > 6 else "") + "）")
+
+    # 成绩→分数自动映射（2026-11-21）：表外但有碰撞成绩的车，按 official_safety_scores.json
+    # 的 map_spec 算出 safety 分。不映射等于成绩白采（safety 仍按无成绩车插补）。
+    from modules.engine import safety_check as SFC
+    if getattr(a, "no_auto_safety", False):
+        _sa, _ss = [], []
+    else:
+        _sa, _ss = SFC.apply_auto_scores(cands)
+    if _sa:
+        print(f"[安全映射] 按官方映射规则给 {len(_sa)} 款算出 safety 分（"
+              + "、".join(f"{x['model']} {x['score']:g}" for x in _sa[:6])
+              + ("…" if len(_sa) > 6 else "") + "）")
 
     # 门禁：回填后仍「trims 有价而候选池无价」= 回流逻辑失效（canon 漂移/字段改名），必须硬拦。
     # 真缺口（trims 也没价）只披露不拦截，交给人补采集。
@@ -232,10 +246,12 @@ def main():
                  "\n→ 按 official_safety_scores.json 映射表统一有成绩车的安全分与 basis。"
                  "\n→ 确认合理用 --skip-safety-gate（须在报告说明）。")
     _um = _sc.get("unmapped") or []
+    _am = _sc.get("auto_mapped") or []
     print(f"[安全分门禁] 池内有碰撞成绩 {_sc.get('has_score', _sc['checked'])} 款 / "
-          f"已映射 {_sc.get('mapped', _sc['checked'])} 款 / 待映射 {len(_um)} 款 / 问题 0"
-          + (("（待映射：" + "、".join(x["model"] for x in _um[:5])
-              + ("…" if len(_um) > 5 else "") + "，分数仍按无成绩插补）") if _um else ""))
+          f"表内人工 {_sc.get('mapped', _sc['checked'])} 款 / 自动映射 {len(_am)} 款 / "
+          f"无来源 {len(_um)} 款 / 问题 0"
+          + (("（无来源：" + "、".join(x["model"] for x in _um[:5])
+              + ("…" if len(_um) > 5 else "") + "，仍按无成绩插补）") if _um else ""))
 
     # v9.7.43：生命周期中文化门禁——所有状态值必须有中文映射，
     # 防止 on_sale 这类漏映射导致页面直出英文（特斯拉曾中招）。
@@ -289,6 +305,13 @@ def main():
                      f"（候选池原本缺 `price_guide`）："
                      + "、".join(m for m, _ in _p_filled[:6])
                      + ("…" if len(_p_filled) > 6 else "") + "。")
+    if _sa:
+        _chg = [x for x in _sa if x["prev"] is not None and abs(float(x["prev"]) - x["score"]) > 0.05]
+        parts.append(f"> **安全分来源**：{len(_sa)} 款按官方碰撞成绩自动映射"
+                     f"（`C-NCAP pct → 7.0+(pct-80)×0.155` 封顶 9.3）"
+                     + (f"，其中 {len(_chg)} 款较原插补值有调整：" +
+                        "、".join(f"{x['model']} {x['prev']}→{x['score']:g}" for x in _chg[:5])
+                        if _chg else "，与原插补值一致") + "。")
     if _p_still:
         parts.append(f"> **价格缺口**：{'、'.join(_p_still[:6])}"
                      f"（共 {len(_p_still)} 款）候选池与 trims 均无官方指导价，"
@@ -357,6 +380,7 @@ def main():
                            "still_missing": _p_still},
         "crash_backfill": {"filled": [{"model": m, "crash": d, "basis": b} for m, d, b in _c_filled],
                            "unresolved": _c_unres},
+        "safety_auto": {"applied": _sa, "skipped": _ss},
         # v9.7.20：候选池披露同步给页面（评审反复指出报告有、页面看不到）
         "pool_disclosure": {
             "total": len(_all), "sourced": _src_named, "crash": _crash_named,
