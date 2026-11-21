@@ -67,6 +67,10 @@ WorkBuddy 用户级 skill。核心是「车型排行榜全链路」：按需搜�
     `universe_*`（盘点产物）、`airbags` / `vehicle_physics` / `baseline_car_ev`
   · 人工条目从 `trims.json` 分离到 `categories/trims_manual.json`，`auto_trims --seed-only`
     先用它生成基础库，再联网叠加自动条目——新装包不会再丢人工核验的配置表。
+- **体验维度举证封顶（v10.2.4）**：智驾 / 车机 / 操控这三类「纸面参数看不出来」的维度，
+  无独立实测或车主样本的车，`scores` 封顶至「有实测车该维度最低分」（`experience_score.cap_unproven()`）。
+  厂商宣传（`vendor_claim`）不算依据。**空间不封顶**——轴距/车长是硬数据，可纸面判定。
+  同时撤销 11 款无 `adjust_reason` 的总分加减（含 MONA -4），并加门禁：`adjust` 非 0 必须写依据。
 - **安全分换算单一入口（v10.2.3）**：`contracts/safety_score.py` 是「得分率/等级/星级 → 0-10 分」
   的唯一实现（cap 9.3）。此前 `engine/safety_check` 与 `research/sync_cncap` 各写一套
   （cap 10.0/floor 6.0），95%+ 高分段会给出不同分；research 不能反向依赖 engine，故下沉到契约层。

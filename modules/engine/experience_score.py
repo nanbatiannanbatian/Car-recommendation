@@ -238,3 +238,53 @@ if __name__ == "__main__":
     else:
         lib = load_library()
         print(f"证据库 {len(lib['entries'])} 条 / 更新 {lib.get('updated')}")
+
+
+# ---------------------------------------------------------------- 体验维度举证封顶
+def cap_unproven(cands: list[dict], lib: dict | None = None,
+                 dims=("adas", "cabin", "control")) -> list[dict]:
+    """无实测依据的车，体验类维度封顶至「有依据车该维度的最低分」。
+
+    2026-11-21 用户质疑「小鹏 MONA L05 智驾/车机/空间分数断层高，有没有参考实测」：
+    查实它零交付、零实测、零车主样本，experience_facts.json / thirdparty_tests.json
+    里都没有它，但 adas 9.4（全场最高），而同品牌有实测的小鹏 G6 只有 7.6。
+    这些维度是**纸面参数看不出来**的（算法调校、车机流畅度、底盘质感），
+    拿配置推断值去压实测值，等于用宣传口径压实测证据。
+
+    规则（与 safety 的举证封顶同构）：
+      - 依据 = experience_facts 里该车该维度有非 vendor_claim 的记录
+        （independent_test 实测 / owner_report 车主样本 / up_review 大V实车）
+      - 无依据 → 该维度封顶至有依据车的最低分；只封顶不倒扣（缺数据不判劣）
+      - 某维度全池都无依据 → 不封顶（没有可校准的锚）
+    返回 [{"model","dim","prev","capped","anchor"}]
+    """
+    lib = lib if lib is not None else load_library()
+    have: dict[str, dict[str, set]] = {}
+    for e in lib.get("entries", []):
+        m, d, st = e.get("model"), e.get("dimension"), e.get("source_type")
+        if d in dims and st != "vendor_claim":
+            have.setdefault(m, {}).setdefault(d, set()).add(st)
+
+    out = []
+    for dim in dims:
+        proven = [(c["model"], float(c["scores"][dim]))
+                  for c in cands
+                  if dim in have.get(c.get("model"), {})
+                  and isinstance((c.get("scores") or {}).get(dim), (int, float))]
+        if not proven:
+            continue
+        floor = min(v for _, v in proven)
+        anchor = min(proven, key=lambda x: x[1])[0]
+        for c in cands:
+            if dim in have.get(c.get("model"), {}):
+                continue
+            s = (c.get("scores") or {}).get(dim)
+            if not isinstance(s, (int, float)) or float(s) <= floor + 1e-9:
+                continue
+            prev = float(s)
+            c["scores"][dim] = floor
+            c.setdefault("score_cap_reasons", []).append(
+                f"{dim} 无实测依据，封顶至 {floor:g}（锚点 {anchor}）")
+            out.append({"model": c["model"], "dim": dim, "prev": prev,
+                        "capped": floor, "anchor": anchor})
+    return out

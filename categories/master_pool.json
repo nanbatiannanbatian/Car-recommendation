@@ -1112,7 +1112,7 @@
           "cabin": 7.8,
           "quality": 5.48
         },
-        "adjust": -1.0,
+        "adjust": 0.0,
         "price": 11.98,
         "cls_prev": "中型车",
         "price_prev": "11.98–14.58",
@@ -1147,7 +1147,8 @@
         "safety_basis": "imputed_blend",
         "safety_confidence": "low",
         "safety_note": "全池中位（同榜有成绩车型 <3）；blend α=0.5·人工分 7.6 + 0.5·中位 8.6；无成绩不代表不安全，仅代表尚未被第三方验证；最终安全分 8.1",
-        "price_raw": "11.98–14.58"
+        "price_raw": "11.98–14.58",
+        "adjust_removed_reason": "原 adjust=-1.0 无任何依据记录（不可审计）；v10.2.4 撤销，相关短板改由维度分与生命周期标注承担"
       },
       "provenance": [
         {
@@ -1257,7 +1258,7 @@
           "cabin": 8.3,
           "quality": 8.0
         },
-        "adjust": -3.0,
+        "adjust": 0.0,
         "price": 14.59,
         "cls_prev": "中型车",
         "price_prev": "14.59–16.59",
@@ -1296,7 +1297,8 @@
           "source_url": "https://www.autohome.com.cn/config/series/7738.html",
           "tier": 1
         },
-        "price_raw": "14.59–16.59"
+        "price_raw": "14.59–16.59",
+        "adjust_removed_reason": "原 adjust=-3.0 无任何依据记录（不可审计）；v10.2.4 撤销，相关短板改由维度分与生命周期标注承担"
       },
       "provenance": [
         {
@@ -1404,7 +1406,7 @@
           "cabin": 8.0,
           "quality": 5.9
         },
-        "adjust": -3.0,
+        "adjust": 0.0,
         "price": 12.88,
         "cls_prev": "中型车",
         "price_prev": "12.88–14.48",
@@ -1443,7 +1445,8 @@
           "source_url": "https://www.autohome.com.cn/config/series/7327.html",
           "tier": 1
         },
-        "price_raw": "12.88–14.48"
+        "price_raw": "12.88–14.48",
+        "adjust_removed_reason": "原 adjust=-3.0 无任何依据记录（不可审计）；v10.2.4 撤销，相关短板改由维度分与生命周期标注承担"
       },
       "provenance": [
         {
@@ -1551,7 +1554,7 @@
           "cabin": 8.0,
           "quality": 8.0
         },
-        "adjust": -3.0,
+        "adjust": 0.0,
         "price": 15.98,
         "cls_prev": "中型车",
         "price_prev": "15.98",
@@ -1583,7 +1586,8 @@
           "source_url": "https://www.autohome.com.cn/config/series/7705.html",
           "tier": 1
         },
-        "price_raw": "15.98"
+        "price_raw": "15.98",
+        "adjust_removed_reason": "原 adjust=-3.0 无任何依据记录（不可审计）；v10.2.4 撤销，相关短板改由维度分与生命周期标注承担"
       },
       "provenance": [
         {
@@ -1691,7 +1695,7 @@
           "cabin": 7.6,
           "quality": 4.04
         },
-        "adjust": -2.0,
+        "adjust": 0.0,
         "price": 12.98,
         "cls_prev": "中型车",
         "price_prev": "11.98–15.58",
@@ -1741,7 +1745,8 @@
           "source_url": "https://www.autohome.com.cn/config/series/7588.html",
           "tier": 1
         },
-        "price_raw": "11.98–15.58"
+        "price_raw": "11.98–15.58",
+        "adjust_removed_reason": "原 adjust=-2.0 无任何依据记录（不可审计）；v10.2.4 撤销，相关短板改由维度分与生命周期标注承担"
       },
       "provenance": [
         {
@@ -1850,7 +1855,7 @@
           "cabin": 7.4,
           "quality": 8.0
         },
-        "adjust": -2.0,
+        "adjust": 0.0,
         "price": 13.98,
         "cls_prev": "中型车",
         "price_prev": "12.98–15.98",
@@ -1882,7 +1887,8 @@
           "source_url": "https://car.m.yiche.com/yiqifengtianbz3/peizhi/?from=ybm",
           "tier": 1
         },
-        "price_raw": "12.98–15.98"
+        "price_raw": "12.98–15.98",
+        "adjust_removed_reason": "原 adjust=-2.0 无任何依据记录（不可审计）；v10.2.4 撤销，相关短板改由维度分与生命周期标注承担"
       },
       "provenance": [
         {
@@ -2133,7 +2139,7 @@
           "cabin": 5.8,
           "quality": 8.0
         },
-        "adjust": -3.0,
+        "adjust": 0.0,
         "price": 10.99,
         "cls_prev": "中型车",
         "price_prev": "10.99–14.99",
@@ -2178,7 +2184,8 @@
         "safety_basis": "imputed_blend",
         "safety_confidence": "low",
         "safety_note": "全池中位（同榜有成绩车型 <3）；blend α=0.5·人工分 7.6 + 0.5·中位 8.6；无成绩不代表不安全，仅代表尚未被第三方验证；最终安全分 8.1",
-        "price_raw": "10.99–14.99"
+        "price_raw": "10.99–14.99",
+        "adjust_removed_reason": "原 adjust=-3.0 无任何依据记录（不可审计）；v10.2.4 撤销，相关短板改由维度分与生命周期标注承担"
       },
       "provenance": [
         {
@@ -2581,7 +2588,7 @@
           "cabin": 7.8,
           "quality": 4.99
         },
-        "adjust": -2.0,
+        "adjust": 0.0,
         "price": 13.5,
         "cls_prev": "中型SUV",
         "price_prev": "11.38–15.88",
@@ -2616,7 +2623,8 @@
         },
         "safety_basis": "cncap",
         "safety_confidence": "high",
-        "price_raw": "11.38–15.88"
+        "price_raw": "11.38–15.88",
+        "adjust_removed_reason": "原 adjust=-2.0 无任何依据记录（不可审计）；v10.2.4 撤销，相关短板改由维度分与生命周期标注承担"
       },
       "provenance": [
         {
@@ -2729,7 +2737,7 @@
           "cabin": 9.0,
           "quality": 8.0
         },
-        "adjust": -4.0,
+        "adjust": 0.0,
         "price": 15.98,
         "cls_prev": "中型SUV（大五座，车长近4.9m）",
         "price_prev": "限时13.98–17.18（指导14.48–17.68）",
@@ -2758,7 +2766,8 @@
           "date": "2026-10-29",
           "note": "10 月 29 日上市、11 月 1 日开始交付，10 月零售 0 台属正常"
         },
-        "price_raw": "限时13.98–17.18（指导14.48–17.68）"
+        "price_raw": "限时13.98–17.18（指导14.48–17.68）",
+        "adjust_removed_reason": "原 adjust=-4.0 无任何依据记录（不可审计）；v10.2.4 撤销，相关短板改由维度分与生命周期标注承担"
       },
       "provenance": [
         {
@@ -3629,7 +3638,7 @@
           "cabin": 7.8,
           "quality": 8.0
         },
-        "adjust": -2.0,
+        "adjust": 0.0,
         "price": 13.98,
         "cls_prev": "中型SUV",
         "price_prev": "12.98–19.98",
@@ -3663,7 +3672,8 @@
         },
         "safety_basis": "cncap",
         "safety_confidence": "high",
-        "price_raw": "12.98–19.98"
+        "price_raw": "12.98–19.98",
+        "adjust_removed_reason": "原 adjust=-2.0 无任何依据记录（不可审计）；v10.2.4 撤销，相关短板改由维度分与生命周期标注承担"
       },
       "provenance": [
         {
@@ -3774,7 +3784,7 @@
           "cabin": 8.0,
           "quality": 5.96
         },
-        "adjust": -2.0,
+        "adjust": 0.0,
         "price": 15.19,
         "cls_prev": "中型SUV",
         "price_prev": "指导价未核实",
@@ -3812,7 +3822,8 @@
           "2026-09": 8785,
           "2026-10": 8436
         },
-        "price_note": "指导价取官方配置页最低配 15.19 万（trims.json 2026款 EV 605KM 领先型）"
+        "price_note": "指导价取官方配置页最低配 15.19 万（trims.json 2026款 EV 605KM 领先型）",
+        "adjust_removed_reason": "原 adjust=-2.0 无任何依据记录（不可审计）；v10.2.4 撤销，相关短板改由维度分与生命周期标注承担"
       },
       "provenance": [
         {

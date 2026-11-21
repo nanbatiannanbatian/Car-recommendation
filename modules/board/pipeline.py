@@ -204,6 +204,24 @@ def main():
         print(f"[举证封顶] {len(_cap_adj)} 款无实锤车 safety 封顶至 "
               f"{_cap_adj[0]['capped']:g}（锚点 {_cap_adj[0]['anchor']}）")
 
+    # 体验维度举证封顶（2026-11-21）：智驾/车机/操控这三类纸面看不出来，
+    # 无实测记录的车不得声称高于有实测的车。空间不封顶（轴距/车长是硬数据）。
+    from modules.engine import experience_score as ES
+    _dim_cap = ES.cap_unproven(cands)
+    if _dim_cap:
+        _by_model = {}
+        for x in _dim_cap:
+            _by_model.setdefault(x["model"], []).append(x["dim"])
+        print(f"[体验封顶] {len(_by_model)} 款无实测，{"、".join(f"{m}({'/'.join(d)})" for m, d in list(_by_model.items())[:5])}"
+              f" 封顶至有实测车最低分")
+
+    # adjust 黑箱门禁：总分加减必须留依据（此前 11 款 adjust 无 reason，不可审计）
+    _adj_bad = [c.get("model") for c in cands
+                if (c.get("adjust") or 0) and not c.get("adjust_reason")]
+    if _adj_bad:
+        sys.exit("adjust 门禁：以下车型有总分加减但没写 adjust_reason（不可审计）："
+                 + "、".join(_adj_bad[:8]) + "\n→ 要么补依据，要么置 0 让短板由维度分承担。")
+
     # 门禁：回填后仍「trims 有价而候选池无价」= 回流逻辑失效（canon 漂移/字段改名），必须硬拦。
     # 真缺口（trims 也没价）只披露不拦截，交给人补采集。
     if _p_still and not getattr(a, "no_backfill", False):
@@ -318,6 +336,14 @@ def main():
                  f"链路 取数→闸门→打分→稳健性→三档→审查。**全程无辩论。**")
     # v9.7.36：数据版本可追溯——读者知道分数是哪个 skill 版本/指纹生成的
     _gb = _pool_data.get("_generated_by") if isinstance(_pool_data, dict) else None
+    if _dim_cap:
+        _bm = {}
+        for x in _dim_cap:
+            _bm.setdefault(x["model"], set()).add(x["dim"])
+        parts.append(f"> **体验维度举证封顶**：{len(_bm)} 款无独立实测/车主样本，"
+                     f"智驾/车机/操控按「不超过有实测车最低分」封顶（空间不封顶，轴距车长为硬数据）。"
+                     f"涉及：{'、'.join(list(_bm)[:6])}{'…' if len(_bm) > 6 else ''}。"
+                     "纸面配置推断不能替代实车表现。")
     if _cap_adj:
         parts.append(f"> **安全分举证封顶**：{len(_cap_adj)} 款无官方碰撞成绩，safety 统一封顶至 "
                      f"{_cap_adj[0]['capped']:g}（不超过有实锤车最低分，锚点 {_cap_adj[0]['anchor']}）。"
@@ -406,6 +432,7 @@ def main():
                            "unresolved": _c_unres},
         "safety_auto": {"applied": _sa, "skipped": _ss},
         "safety_cap": _cap_adj,
+        "dimension_cap": _dim_cap,
         "safety_table_sync": _st_sync,
         # v9.7.20：候选池披露同步给页面（评审反复指出报告有、页面看不到）
         "pool_disclosure": {

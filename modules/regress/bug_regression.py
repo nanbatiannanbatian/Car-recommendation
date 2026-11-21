@@ -102,6 +102,7 @@ CASES = [
     ("BUG-077", "联网取数未强制走research(业务模块可自行requests抓页面)", "v10.2.0"),
     ("BUG-078", "无碰撞成绩车安全分可高于有实锤车(MONA L05 8.6 > bZ5 8.0)", "v10.2.2"),
     ("BUG-079", "得分率→分数存在两套实现(engine cap9.3 vs research cap10/floor6)", "v10.2.3"),
+    ("BUG-080", "无实测车体验维度可断层最高(MONA adas9.4 vs 有实测G6 7.6)", "v10.2.4"),
 ]
 
 
@@ -1876,8 +1877,47 @@ def t079():
     return "安全分换算：契约层单一实现（cap 9.3）、两侧逐点一致、源码无本地公式"
 
 
+def t080():
+    """体验类维度（智驾/车机/操控）无实测不得高于有实测车；空间不封顶。
+
+    2026-11-21 用户质疑：「MONA L05 智驾、车机、空间分数断层高是否合理，有没有参考实测」。
+    查实：它零交付零实测，experience_facts / thirdparty_tests 里都没有它，
+    adas 却 9.4（全场最高），同品牌有实测的小鹏 G6 只有 7.6。
+    这三类维度纸面参数看不出来，拿配置推断压实测值＝用宣传口径压实测证据。
+    另：11 款车的 adjust 加减分没有 reason，属不可审计的总分黑箱。
+    """
+    from modules.engine import experience_score as ES
+
+    lib = {"entries": [
+        {"model": "有实测A", "dimension": "adas", "source_type": "independent_test"},
+        {"model": "有实测B", "dimension": "adas", "source_type": "owner_report"},
+        {"model": "仅宣传C", "dimension": "adas", "source_type": "vendor_claim"},
+    ]}
+    def mk(m, adas, space=8.0):
+        return {"model": m, "scores": {"adas": adas, "space": space}}
+
+    cands = [mk("有实测A", 9.0), mk("有实测B", 7.6), mk("仅宣传C", 9.4), mk("零依据D", 9.2)]
+    adj = ES.cap_unproven(cands, lib=lib)
+    got = {a["model"]: a["capped"] for a in adj}
+    # vendor_claim 不算依据 → 与零依据一样封顶到 7.6
+    assert got == {"仅宣传C": 7.6, "零依据D": 7.6}, got
+    assert cands[0]["scores"]["adas"] == 9.0 and cands[1]["scores"]["adas"] == 7.6, "有实测的被改"
+    assert cands[3].get("score_cap_reasons"), "封顶未留原因"
+    # 空间不在封顶维度内（轴距/车长是硬数据，不该因无实测被压）
+    assert "space" not in ES.cap_unproven.__defaults__[1], "space 不该纳入体验封顶"
+    # 某维度全池无依据 → 不封顶
+    assert ES.cap_unproven([mk("甲", 9.0)], lib={"entries": []}) == []
+
+    # adjust 门禁：源码必须有「非 0 必须写 reason」的拦截
+    src = _read("pipeline.py")
+    assert "adjust_reason" in src and "adjust 门禁" in src, "pipeline 缺 adjust 黑箱门禁"
+    assert "cap_unproven" in src, "pipeline 未接体验封顶"
+    assert "dimension_cap" in src, "summary 缺体验封顶审计"
+    return "体验封顶：无依据≤有实测最低、vendor_claim 不算依据、空间不封顶、adjust 必须有 reason"
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080]
 
 
 def run():
