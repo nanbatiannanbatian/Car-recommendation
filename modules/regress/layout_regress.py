@@ -132,7 +132,9 @@ def check_rebuildable() -> None:
     for name, spec in paths.GENERATED_SPEC.items():
         m = re.search(r"([\w/\-]+\.py)", spec.get("cmd", ""))
         script = m.group(1) if m else ""
-        if not script or not (Path(HERE) / script).exists():
+        # 用 paths.src 解析（支持 modules/<pkg>/x.py 的模块化路径，
+        # 也支持根目录入口）；只查根目录会漏掉模块化后的脚本。
+        if not script or not (paths.src(script).exists() or (Path(HERE) / script).exists()):
             bad_cmd.append(f"{name}->{script or '未写命令'}")
     check("重建命令指向真实入口", not bad_cmd, "；".join(bad_cmd))
     absent = [n for n in paths.CURATED_JSON if not (paths.CAT_DIR / n).exists()]

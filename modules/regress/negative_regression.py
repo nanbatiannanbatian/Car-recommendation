@@ -69,7 +69,8 @@ NEG_TARGETS = {
     "t066": ["稳定地排第5左右"],
     "t067": [".strong-main"],
     # t090：抹掉 C-NCAP 回流/展示门禁断言依赖（回到「表里有成绩、页面空白无人拦」），应 FAIL
-    "t090": ["backfill_crash_from_cncap_table"],
+    # v10.14.0：三段回流合并为唯一同步器后，t090 断言的标记随之改变
+    "t090": ["sync_safety_scores"],
     # t091：抹掉新闻稿救回入口定义（回到「救回只存在手动操作」），应 FAIL
     "t091": ["def rescue_targets"],
     # t092：抹掉 paths.py 里的名单定义（回到「无代码化排除规则、样本混进包」），应 FAIL

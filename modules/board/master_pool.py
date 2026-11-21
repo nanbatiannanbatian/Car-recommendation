@@ -157,6 +157,44 @@ def save_pool(pool: dict, path=DEFAULT_POOL):
     json.dump(pool, open(path, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
 
 
+def save_pool_split(pool: dict, membership_path: str | None = None,
+                    generated_path: str | None = None) -> dict:
+    """**按来源分流写池**（2026-11-22 P3）：人工层写 membership，派生层写生成物。
+
+    为什么分两处写（一个 owner + 一条写路径）：
+      原来 master_pool.json 一个文件里混着人工判断（谁入池/别名/人工基准分/
+      人工调整额）与派生事实（算出来的分/电芯/销量），两边都能写 →
+      人工改一个字段，build 一跑就被覆盖；build 写回又把人工值冲掉。
+
+    分流后：
+      · categories/pool_membership.json  人工层（唯一可写，随包）
+      · data/gen/master_pool.json        生成层（只读派生，可重建，不随包）
+    """
+    from modules.board import pool_split as PS
+    mem_cars, gen_cars = [], []
+    for c in pool.get("cars", []):
+        m = {k: c.get(k) for k in PS.MANUAL_FIELDS if k in c}
+        m["key"] = c.get("key")
+        mem_cars.append(m)
+        g = {k: c.get(k) for k in PS.GENERATED_FIELDS if k in c}
+        g["model"] = c.get("model")
+        g["key"] = c.get("key")
+        gen_cars.append(g)
+    mp = membership_path or PS.MEMBERSHIP
+    gp = generated_path or PS.GENERATED
+    meta = pool.get("meta") or {}
+    PS._write(mp, {"note": "候选池人工层（唯一可写）：谁入池/别名/标签/人工基准分/"
+                          "评分配置/生命周期/人工调整额。派生事实在 data/gen/master_pool.json。",
+                   "version": "1.0.0", "updated": "2026-11-22",
+                   "meta": meta, "cars": mem_cars})
+    PS._write(gp, {"note": "候选池生成层（只读派生，可重建）：由 pool_membership + 事实库合成，"
+                          "不要手改。",
+                   "version": "1.0.0", "updated": "2026-11-22",
+                   "meta": meta, "cars": gen_cars})
+    return {"membership": mp, "generated": gp,
+            "n_membership": len(mem_cars), "n_generated": len(gen_cars)}
+
+
 def index_by_key(pool: dict) -> dict[str, dict]:
     return {canon(c.get("model")): c for c in pool["cars"]}
 
@@ -309,7 +347,7 @@ def cmd_init(args):
         "dim_keys": sorted(d.get("key") for d in cfg["dimensions"]),
         "weight_map": {d["key"]: d["weight"] for d in cfg["dimensions"]},
     }
-    save_pool(pool, args.out)
+    save_pool_split(pool)
     print(f"总池已就绪：{args.out}（{len(pool['cars'])} 款，指纹 {config_fingerprint(cfg)}）")
     return 0
 
@@ -352,7 +390,7 @@ def cmd_ingest(args):
         car["candidate"]["scores"] = dict(car["scores"])
         car["candidate"]["adjust"] = car["adjust"]
     pool["meta"]["as_of"] = "2026-11-19"
-    save_pool(pool, args.out)
+    save_pool_split(pool)
     print(f"吸收完成：新增 {added}，更新 {updated}，总池 {len(pool['cars'])} 款")
     if all_conflicts:
         print(f"冲突 {len(all_conflicts)} 条（均保留原值，需人工裁决）：")
@@ -391,7 +429,7 @@ def cmd_discover_in(args):
             pool["cars"].append(car)
             idx[k] = car
             added += 1
-    save_pool(pool, args.out)
+    save_pool_split(pool)
     print(f"销量榜清单吸收：刷新 {refreshed}，新建待采集 {added}，总池 {len(pool['cars'])} 款")
     return 0
 
@@ -568,7 +606,7 @@ def cmd_intake(args):
             car["candidate"]["scores"] = dict(car["scores"])
             car["candidate"]["adjust"] = car["adjust"]
         pool["meta"]["as_of"] = "2026-11-19"
-        save_pool(pool, args.pool)
+        save_pool_split(pool)
 
     # 报告：待采集清单（池外新建）+ 可直接出榜子集（池内 ready）
     report = {
@@ -622,7 +660,7 @@ def cmd_verify(args):
                     "verified_fields": [f for f, a in ff.items() if a.get("verified")],
                 }
                 written += 1
-        save_pool(pool, args.pool)
+        save_pool_split(pool)
         print(f"  核验摘要已写回 {written} 款（仅 verify 字段，scores/adjust 未动）")
 
     print(f"多源交叉核验（{'已写回' if args.apply else 'dry-run 未写回'}）")
@@ -762,7 +800,7 @@ def cmd_rescore(args):
             "weight_map": {d["key"]: d["weight"] for d in cfg["dimensions"]},
         }
         pool["meta"]["as_of"] = "2026-11-19"
-        save_pool(pool, args.pool if hasattr(args, "pool") else DEFAULT_POOL)
+        save_pool_split(pool)
         print(f"已写回：{regraded} 款标记新指纹，{len(flagged)} 款待重采集")
     else:
         print("（dry-run，未写回；加 --apply 生效）")
@@ -913,7 +951,7 @@ def main():
         for m, pg in fixed:
             print(f"  + {m:<18} price_guide = {pg[0]:g}–{pg[1]:g} 万")
         if fixed and a.apply:
-            save_pool(pool, a.out)
+            save_pool_split(pool)
             print(f"已回填 {len(fixed)} 款 → {a.out}")
         elif fixed:
             print(f"dry-run：将回填 {len(fixed)} 款（加 --apply 写入）")

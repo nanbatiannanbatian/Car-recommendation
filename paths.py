@@ -48,6 +48,10 @@ GENERATED_JSON = {
     # 它由 ciasi_text_decode.py 从 C-IASI 官网发布稿解码生成，可重建 → 归生成物，
     # 唯一位置 data/gen/，categories/ 那份删除。
     "ciasi_decoded.json",
+    # 2026-11-22（P3）：master_pool 降级为生成物——人工层（pool_membership.json）
+    # 随包，生成层在 data/gen/。这是「一个 owner + 一条写路径」：
+    # 人工只写 membership，派生事实由 build 写生成物。
+    "master_pool.json",
 }
 
 # 回归测试专用样本：只被 tests/regress 读、发布包运行链路不碰的一次性候选池快照。
@@ -72,15 +76,24 @@ CURATED_JSON = {
     "trims_manual.json",        # 人工核验的逐配置条目（auto_trims 生成时会合并）
     "fact_library.json",        # 真实电耗/电池事实库（从 car_all 提炼，源库不在项目内）
     "universe_car_midsedan_allprice.json",  # 中型轿车全价位权威清单（盘点产物，手工维护）
-    # 2026-11-21 实测后追加：master_pool 用 --intake 能"跑通"，但产出 291 车 / 0 车有分数
-    # （纯骨架）。它靠逐车采集+打分累积而来，不是一条命令能还原的 → 判据上是"数据仓库"而非"缓存"。
-    "master_pool.json",         # 总候选池（累积型，随包；新增车型用 --intake 增量摄入）
+    # 2026-11-22（P3）：master_pool 降级为**生成物**，人工层单独随包。
+    # 原判定「靠逐车采集+打分累积而来，不是一条命令能还原的 → 数据仓库而非缓存」，
+    # 是把**人工判断**（谁入池/别名/人工基准分）与**派生事实**（算出来的分/电芯/销量）
+    # 混在一个文件里的必然结果。现在拆成两层：
+    "pool_membership.json",     # 候选池**人工层**：谁入池/别名/标签/人工基准分/评分配置/生命周期
 }
 
 # 每个不打包的生成物都必须有重建规格——否则新装包里它永远缺，功能静默降级。
 # cmd: 一条可执行的命令（在项目根目录跑）；needs_net: 是否必须联网；
 # semi: 需要前置输入（不能一条命令跑完），见 note。
 GENERATED_SPEC: dict[str, dict] = {
+    "master_pool.json": {
+        "cmd": "python3 pool_split.py --compose",
+        "needs_net": False, "semi": False,
+        "note": "由随包的 categories/pool_membership.json（人工层）+ data/gen/master_pool.json"
+                "（生成层）合成。人工层是唯一可写的事实源；生成层由 build 写，"
+                "不要手改——手改会在下一次 compose 时被覆盖。",
+    },
     "trims.json": {
         "cmd": "python3 auto_trims.py --seed-only",
         "needs_net": False, "semi": False,

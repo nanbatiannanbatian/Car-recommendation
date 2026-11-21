@@ -464,7 +464,10 @@ def main_cell(key: str, row: dict, cand: dict, grade: str = "") -> str:
         # 电压：优先配置 charge，其次 battery_detail
         charge = str((bd or {}).get("charge") or "")
         import re
-        mv = re.search(r"(900|800|400)\s*V", charge)
+        # 2026-11-22：不再硬编码 (900|800|400)——写死三个值意味着以后出现
+        # 500V/600V 等新平台就会**静默漏显**（与「参数页字段漏提取」同一类病：
+        # 缺口被伪装成「数据源没有」）。改成通用匹配任意 V 数值。
+        mv = re.search(r"(\d{3,4})\s*V", charge)
         volt = (mv.group(1) + "V") if mv else bp.get("voltage")
         if volt and volt != "未披露":
             brand = f"{brand} · {volt}"

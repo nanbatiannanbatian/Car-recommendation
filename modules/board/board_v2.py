@@ -471,10 +471,12 @@ def build(cands: list[dict], cfg: dict, policy: dict,
     _bf, _bs = FS.backfill_price_guide_from_trims(cands)
     if _bf:
         print(f"[价格回流] {len(_bf)} 款 price_guide 由 trims 官方指导价回填")
-    # 碰撞成绩回流：note 里有成绩就结构化进 crash/safety_basis（与 pipeline 同一份实现）
-    _cf, _cu = FS.backfill_crash_from_text(cands)
+    # 碰撞成绩回流：走安全成绩域唯一事实源（与 pipeline 同一份实现）
+    # 2026-11-22：文本抽取降级为非权威描述，统一由 safety_scores SSOT 裁决。
+    from modules.engine import sync_safety_scores as _SSS
+    _cf, _cu = _SSS.sync(cands)
     if _cf:
-        print(f"[碰撞回流] {len(_cf)} 款 crash/safety_basis 由文本成绩回填")
+        print(f"[安全成绩回流] {len(_cf)} 款 crash/safety_basis 来自 safety_scores SSOT")
     # v9.6.1：电压/封装事实库（按评分配置）；调用方可覆盖
     if battery_platform is None:
         _bp_path = str(paths.cat("battery_platform.json"))

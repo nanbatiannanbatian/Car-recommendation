@@ -1460,19 +1460,29 @@ def t069():
         {"model": "测试车A", "trims": [{"name": "低配", "price": 10.0},
                                      {"name": "高配", "price": 14.0}]},
         {"model": "测试车B", "trims": []},
+        # v10.14.0：用于测「官方价覆盖候选池已有值」（用户 2026-11-22 拍板）
+        {"model": "测试车A2", "trims": [{"name": "低配", "price": 10.0},
+                                     {"name": "高配", "price": 14.0}]},
     ]}, tmp, ensure_ascii=False)
     tmp.close()
     try:
         cars = [
             {"model": "测试车A", "price_guide": None},          # 应回填
-            {"model": "测试车A2", "price_guide": [9.9, 13.9]},  # 已有值不许覆盖
+            {"model": "测试车A2", "price_guide": [9.9, 13.9]},  # 官方价覆盖（用户 2026-11-22 拍板）
             {"model": "测试车C", "price_guide": None},          # trims 也没有 → 真缺口
         ]
         filled, still = FS.backfill_price_guide_from_trims(cars, tmp.name)
         assert ("测试车A", [10.0, 14.0]) in filled, f"未回填：{filled}"
         assert cars[0].get("price_source", "").startswith("trims.json"), "回填未标来源"
-        assert cars[1]["price_guide"] == [9.9, 13.9], "覆盖了已有 price_guide"
+        # v10.14.0：价格口径改为「**官方价为准，覆盖**候选池已有值」
+        # （用户 2026-11-22 拍板：价格冲突以官方价为准）。
+        # 原值必须存档可追溯（price_prev + price_overwritten_by_official）。
+        assert cars[1]["price_guide"] == [10.0, 14.0], \
+            f"官方价未覆盖候选池值：{cars[1]['price_guide']}"
+        assert cars[1].get("price_prev") == [9.9, 13.9], "原值未存档（不可追溯）"
+        assert cars[1].get("price_overwritten_by_official") is True, "未标记覆盖审计"
         assert still == ["测试车C"], f"真缺口判定错：{still}"
+        # trims 里没有的车（如测试车B）不产生覆盖，也不算真缺口（它本来就没官方价可对）
         # 独立复核用索引：门禁靠它判断「trims 有价却没回流」
         pm = FS.trims_price_map(tmp.name)
         assert pm, "价格索引为空，门禁无法复核"
@@ -1550,8 +1560,13 @@ def t071():
     assert not r["passed"] and r["conflicts"][0]["field"] == "safety_basis", r
 
     # 4) 链路必须内置
+    # v10.14.0：回流入口改为安全成绩域**唯一同步器**
+    # （modules/engine/sync_safety_scores.py，读 categories/safety_scores.json）。
+    # 原来三套裁决逻辑（文本抽取 / official_safety_scores / cncap_scores）
+    # 互相覆盖，冲突只能靠「谁后跑谁赢」——同一车出现过不同成绩。
     for f in ("pipeline.py", "board_v2.py"):
-        assert "backfill_crash_from_text" in _read(f), f"{f} 未接碰撞成绩回流"
+        assert "sync_safety_scores" in _read(f), f"{f} 未接安全成绩同步器"
+        assert "SSS.sync(" in _read(f), f"{f} 未调用同步器"
     assert "crash_backfill" in _read("pipeline.py"), "summary 缺碰撞回填审计"
     return "碰撞成绩：文本解析→字段回填（不覆盖已有/不编造）+ 反向门禁 + 链路内置 + 审计"
 
@@ -2408,8 +2423,11 @@ def t087():
 
     # 4) 链路内置：pipeline 必须调权威库回流（防退回「只靠文本」）
     src = str(paths.src("pipeline.py"))
-    assert "backfill_crash_from_authoritative" in open(src, encoding="utf-8").read(), \
-        "pipeline 未接入权威库回流"
+    # v10.14.0：权威库回流并入唯一同步器（SSOT 内含 official_safety_scores）
+    assert "sync_safety_scores" in open(src, encoding="utf-8").read(), \
+        "pipeline 未接入安全成绩同步器（权威库成绩会白采）"
+    assert "SSS.sync(" in open(src, encoding="utf-8").read(), \
+        "pipeline 未调用同步器"
     # 5) 文案不写死 C-NCAP 公式
     src = str(paths.src("pipeline.py"))
     text = open(src, encoding="utf-8").read()
@@ -2564,13 +2582,13 @@ def t090():
 
     # 与主链同序：先回填 note 文本成绩，再回填 C-NCAP 官方表 + authoritative 库。
     # v10.6.0 起库里新增深蓝S07(C-NCAP)/宋L EV(C-IASI)，不跑权威回填也会报漏显。
-    FS.backfill_crash_from_text(cands)
-    FS.backfill_crash_from_authoritative(cands)
-    filled = FS.backfill_crash_from_cncap_table(cands)
-    assert any(m == "零跑C11" and d.startswith("C-NCAP 86.4%") and b == "cncap"
+    # v10.14.0：三段回流合并为唯一同步器（读 categories/safety_scores.json）
+    from modules.engine import sync_safety_scores as SSS
+    filled, _unres = SSS.sync(cands)
+    assert any(m == "零跑C11" and d.startswith("C-NCAP 86.4%") and b == "C-NCAP"
                for m, d, b in filled), f"C-NCAP 表未回流: {filled}"
     c11 = next(c for c in cands if c["model"] == "零跑C11")
-    assert c11["crash"].startswith("C-NCAP 86.4%") and c11["safety_basis"] == "cncap", c11
+    assert c11["crash"].startswith("C-NCAP 86.4%") and c11["safety_basis"] == "C-NCAP", c11
     assert FS.crash_display_leaks(cands) == [], "回流后仍报漏显"
 
     # 失败注入：回流链断开后，门禁必须检出「表里有成绩、页面却是 —」
@@ -2578,14 +2596,17 @@ def t090():
     b11 = next(c for c in broken if c["model"] == "零跑C11")
     b11["crash"], b11["safety_basis"] = "—", None
     leaks = FS.crash_display_leaks(broken)
-    assert any(x["model"] == "零跑C11" and "cncap_scores" in x["sources"]
+    # v10.14.0：来源名从 "cncap_scores" 改为 "safety_scores SSOT"
+    # （安全成绩域唯一事实源，C-NCAP 表已并入其中）
+    assert any(x["model"] == "零跑C11" and "safety_scores SSOT" in x["sources"]
                for x in leaks), f"展示门禁漏检: {leaks}"
     for m in ("小鹏G6", "蔚来ES6", "腾势N7"):
         assert not any(x["model"] == m for x in leaks), f"无成绩车被误报漏显: {m}"
 
     pl = _read("pipeline.py")
-    assert "backfill_crash_from_cncap_table" in pl and "crash_display_leaks" in pl, \
-        "pipeline 未接入 C-NCAP 回流/展示门禁"
+    # v10.14.0：三段回流合并为唯一同步器（sync_safety_scores）
+    assert "sync_safety_scores" in pl and "SSS.sync(" in pl and "crash_display_leaks" in pl, \
+        "pipeline 未接入安全成绩同步器/展示门禁"
     return ("C-NCAP官方表回流+页面展示门禁：C11 86.4%不再空白+无成绩零误报(+t090)")
 
 
@@ -2737,7 +2758,11 @@ def t093():
     assert not js, f"发布包仍含 JSON: {js[:5]}"
 
     # 4) 源码树数据仍在（本地/仓库运行与回归照常）
-    assert (Path(HERE) / "categories" / "master_pool.json").exists(), "源码树丢了人工事实库"
+    # v10.14.0（P3）：master_pool 降级为生成物，人工层单独随包
+    assert (Path(HERE) / "categories" / "pool_membership.json").exists(), \
+        "源码树丢了候选池人工层（pool_membership.json）"
+    assert not (Path(HERE) / "categories" / "master_pool.json").exists(), \
+        "master_pool 仍在 categories/ —— 人工层与生成层未分离（双副本）"
     return ("零JSON发布策略：总闸门覆盖一切.json+仓库补回链路+合法性校验+源码树保留(+t093)")
 
 
@@ -3300,6 +3325,17 @@ def t106():
     ts = _read("modules/data/trims_store.py")
     assert "def load(" in ts and "def load_db(" in ts, "trims_store 缺统一读取入口"
 
+    # ④-c 派生一致性回归必须全绿（2026-11-22 P4）：
+    #     重跑合成/回流 → 逐字段比对产物 vs 源，0 差异才算过。
+    #     这是验证「消除副本」成果的**唯一手段**——没有它，
+    #     下次谁在某个环节加回一个副本，又是「改了不知道有没有生效」。
+    from modules.regress import derive_consistency_regress as DCR
+    for name, fn in (("候选池层", DCR.check_pool_layers),
+                     ("安全成绩", DCR.check_safety_scores),
+                     ("价格口径", DCR.check_price_official),
+                     ("逐配置合流", DCR.check_trims_merge)):
+        bad = fn()
+        assert not bad, f"派生一致性[{name}] 差异 {len(bad)} 处: {bad[:5]}"
     # ⑤ 下游不得再直接 json.load trims.json（防止新副本再生）
     for rel in ("modules/engine/trim_board.py", "modules/engine/trim_annotate.py",
                 "modules/engine/trim_coverage.py", "modules/engine/facts_sync.py",

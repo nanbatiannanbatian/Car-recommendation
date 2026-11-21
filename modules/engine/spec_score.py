@@ -24,10 +24,126 @@
 import argparse
 import json
 import os
+import re
 import statistics
 import sys
 
 DIMS = ["adas", "powertrain", "space", "control", "safety", "value", "cabin"]
+
+# ---------------------------------------------------------------- 电芯能力分级
+# 2026-11-22：电芯加分不再用硬编码三品牌白名单（宁德/弗迪/比亚迪 = 一线 +0.7，
+# 其余一律二线 +0.2）。白名单把亿纬锂能这类头部企业系统性低估——
+# 亿纬 2025 年圆柱电池出货量全国第一、大圆柱累计装车超 9 万台、宝马新世代首发
+# 供应商；而宁德在大圆柱路线上布局相对滞后。「圆柱产线比宁德强」在圆柱路线上成立，
+# 不能被一个静态白名单判死。
+#
+# 改法：判「电芯企业能力档位」+「该条技术路线上的档位」，取两者更高。
+# 依据与来源全在 categories/cell_tier.json（可核验、可质疑）。
+_CELL_TIER_CACHE: dict | None = None
+
+TIER_ORDER = {"unknown": 0, "tier3": 1, "tier2": 2, "tier1": 3}
+
+
+def _load_cell_tier() -> dict:
+    global _CELL_TIER_CACHE
+    if _CELL_TIER_CACHE is None:
+        import paths
+        p = str(paths.cat("cell_tier.json"))
+        try:
+            with open(p, encoding="utf-8") as f:
+                _CELL_TIER_CACHE = json.load(f)
+        except (OSError, ValueError):
+            _CELL_TIER_CACHE = {"company_tier": {}, "route_rules": {},
+                                "tier_points": {}, "form_hints": {}, "alias": {}}
+    return _CELL_TIER_CACHE
+
+
+def _norm_cell(s: str) -> str:
+    return str(s or "").replace("（", "(").replace("）", ")").strip()
+
+
+def cell_tier_of(cell_brand: str, route_hint: str | None = None) -> dict:
+    """按「电芯企业能力 + 技术路线能力」判档位。
+
+    cell_brand : 电芯品牌原文（可能是混装多家的组合，如「国轩高科/亿纬动力/中创新航」）
+    route_hint : 已知的电池形态/体系线索（如「大圆柱」「磷酸铁锂」），可为空
+
+    返回 {tier, points, text, brand, route}：
+      tier   tier1 / tier2 / tier3 / unknown
+      points 加分值（unknown = 0，且该车在该项不参与打分）
+      text   展示文本（写明按哪条依据判的，可复核）
+    """
+    lib = _load_cell_tier()
+    raw = _norm_cell(cell_brand)
+    if not raw or "未披露" in raw or "待核" in raw:
+        return {"tier": "unknown", "points": 0.0, "text": "", "brand": "", "route": ""}
+
+    alias = lib.get("alias") or {}
+    company = lib.get("company_tier") or {}
+    # 混装（multi_batch）时取**各品牌中最高档**——混装不等于差，
+    # 但也不能因为其中一家是头部就把整车当头部（取最高而非平均，见下）
+    names = [n.strip() for n in re.split(r"[/、,，;；+＋\s]+", raw) if n.strip()]
+    best_tier = "unknown"
+    best_name = ""
+    for n in names:
+        key = n
+        for a, target in alias.items():
+            if a in n:
+                key = target
+                break
+        rec = company.get(key)
+        if not rec:
+            # 别名兜底：品牌名里含已知企业名
+            for cname in company:
+                if cname in n:
+                    rec = company[cname]
+                    key = cname
+                    break
+        if not rec:
+            continue
+        t = rec.get("tier") or "unknown"
+        if TIER_ORDER.get(t, 0) > TIER_ORDER.get(best_tier, 0):
+            best_tier, best_name = t, key
+    if best_tier == "unknown":
+        # 有品牌但不在能力表里（小厂/新势力自研）→ unknown：不加分也不扣分
+        return {"tier": "unknown", "points": 0.0,
+                "text": f"电芯「{raw}」不在能力分级表内，不加分不扣分",
+                "brand": raw, "route": ""}
+
+    # 技术路线判定：显式 hint 优先，否则从品牌原文里的形态词推断
+    route = ""
+    rr = lib.get("route_rules") or {}
+    hints = lib.get("form_hints") or {}
+    probe = f"{route_hint or ''} {raw}"
+    for word, r in hints.items():
+        if word in probe and r in rr:
+            route = r
+            break
+    # 路线档位：该路线第一梯队里有没有本车实际用的品牌
+    route_tier = "unknown"
+    if route:
+        first = set((rr.get(route) or {}).get("tier1_brands") or [])
+        for n in names:
+            key = n
+            for a, target in alias.items():
+                if a in n:
+                    key = target
+                    break
+            if key in first or n in first:
+                route_tier = "tier1"
+                break
+    final = best_tier
+    basis = f"{best_name} 企业档位 {best_tier}"
+    if route and route_tier == "tier1" and TIER_ORDER[route_tier] > TIER_ORDER[best_tier]:
+        final = route_tier
+        basis = f"{best_name} 在「{route}」路线为头部（路线档位优先）"
+    elif route:
+        basis += f"（{route} 路线）"
+    pts = (lib.get("tier_points") or {}).get(final, 0.0)
+    label = {"tier1": "头部", "tier2": "主流", "tier3": "追赶"}.get(final, "")
+    return {"tier": final, "points": float(pts),
+            "text": f"{label}电芯 {basis} +{pts:g}",
+            "brand": best_name, "route": route}
 
 
 def _n(x, default=None):
@@ -92,10 +208,9 @@ def powertrain_parts(s):
         else:
             parts.append(("快充", -0.4, f"10–80% {t:g}min −0.4"))
     cell = str(s.get("cell_brand") or "")
-    if any(k in cell for k in ("宁德", "弗迪", "比亚迪")):
-        parts.append(("电芯", 0.7, "一线电芯 +0.7"))
-    elif cell and "未披露" not in cell:
-        parts.append(("电芯", 0.2, "二线电芯 +0.2"))
+    ct = cell_tier_of(cell, s.get("cell_route"))
+    if ct["tier"] != "unknown":
+        parts.append(("电芯", ct["points"], ct["text"]))
     rg = _n(s.get("range_km"))
     if rg is not None:
         if rg >= 700:
@@ -126,18 +241,33 @@ def score_powertrain(s):
 
 
 def control_parts(s):
-    """操控各加减项的分解（规则唯一出处，见 powertrain_parts 的同口径说明）。"""
+    """操控各加减项的分解（规则唯一出处，见 powertrain_parts 的同口径说明）。
+
+    2026-11-22 重大口径修正（用户举证：宝马 i3 用弹簧悬架，操控却比很多空气悬架车好）：
+      原规则把「悬架形式」当**操控好坏**的证据——前双叉臂 +1.0、后多连杆 +0.5、
+      后扭力梁 −0.6。问题是**悬架形式是结构配置，不是操控结论**：
+        · 悬架形式好 ≠ 调校好（同一副双叉臂可以调成很软也可以很硬）
+        · 悬架形式普通 ≠ 操控差（i3 前双球节弹簧减振支柱 + 后五连杆，
+          麋鹿 75.7km/h；iX3 麋鹿 71km/h，与燃油 X3 仅差 1km/h，转向虚位 0.05rad）
+      所以悬架形式**不再加分**，只保留「明显短板」的单向约束。
+
+    改后的分工：
+      · **悬架形式 = 结构上限约束**：只对明确短板减分（后扭力梁 −0.3，减半），
+        好结构不再加分——这是「不因没查到就判差，也不因配置好就判好」；
+      · **实测证据 = 操控维主证据**：麋鹿/侧倾/制动等可核验实测走
+        experience_facts（independent_test 权重最高），由 experience_score 调整；
+      · **驱动形式与零百 = 硬件口径**：保留（后驱/四驱、零百是明确的动力特性）。
+    """
     parts = []
     fs = str(s.get("susp_front") or "")
-    if "双叉臂" in fs or "双横臂" in fs:
-        parts.append(("前悬架", 1.0, "前双叉臂 +1.0"))
-    elif "麦弗逊" in fs:
-        parts.append(("前悬架", 0.0, "前麦弗逊 +0"))
+    # 前悬架：好结构不加分（调校才是结论）；只在明显短板时提示
+    if "扭力梁" in fs:
+        parts.append(("前悬架", -0.3, "前扭力梁 −0.3（结构短板，非操控结论）"))
     rs = str(s.get("susp_rear") or "")
-    if any(k in rs for k in ("五连杆", "多连杆")):
-        parts.append(("后悬架", 0.5, "后多连杆 +0.5"))
-    elif "扭力梁" in rs:
-        parts.append(("后悬架", -0.6, "后扭力梁 −0.6"))
+    if "扭力梁" in rs:
+        # 后扭力梁是真实短板（后轴侧倾与循迹确实受影响），但只减半：
+        # 调校得当仍可救回来，不能仅凭结构判差
+        parts.append(("后悬架", -0.3, "后扭力梁 −0.3（结构短板，非操控结论）"))
     dr = str(s.get("drive") or "")
     if "四驱" in dr:
         parts.append(("驱动", 0.7, "四驱 +0.7"))
@@ -155,7 +285,12 @@ def control_parts(s):
 
 
 def score_control(s):
-    """操控：悬架形式与驱动形式是硬信息，零百是软信息。"""
+    """操控：实测证据为主（走 experience_facts），硬件口径只给参考。
+
+    诚实边界：**悬架形式不构成绩控结论**——同一副悬架调校差异巨大，
+    更好的结构不等于更好的操控（宝马 i3/iX3 用弹簧悬架，麋鹿成绩与同级
+    空气悬架车相当甚至更好）。操控维的加分依据是**可核验实测**。
+    """
     base, why = 6.8, []
     for _name, v, desc in control_parts(s):
         base += v
@@ -313,13 +448,55 @@ def score_car(spec, price, peer_prices):
     return out, reasons, sorted(set(imputed))
 
 
+def selftest() -> int:
+    """锁死两条口径（2026-11-22）：
+      ① 电芯按「企业能力 × 技术路线」分级，不是品牌白名单；
+      ② 悬架形式不加分（结构约束），好结构与普通结构同分。
+    """
+    # ① 电芯分级
+    t1 = cell_tier_of("宁德时代")
+    t2 = cell_tier_of("亿纬锂能", "大圆柱")
+    t3 = cell_tier_of("苏州清陶")            # 不在表内 → unknown
+    t4 = cell_tier_of("国轩高科/亿纬动力/中创新航")   # 混装取最高
+    assert t1["tier"] == "tier1", f"宁德应 tier1: {t1}"
+    assert t2["tier"] == "tier1", f"亿纬(圆柱)应 tier1: {t2}"
+    assert t3["tier"] == "unknown", f"表外电芯应 unknown: {t3}"
+    assert t3["points"] == 0.0, "表外电芯不应加分"
+    assert t4["tier"] == "tier1", f"混装取最高应 tier1: {t4}"
+    # 路线优先：非圆柱的亿纬仍是 tier1（企业档位），但文本要写明路线
+    assert "圆柱" in t2["text"] or "亿纬" in t2["text"], f"路线信息应写进依据: {t2['text']}"
+    # ② 悬架不加分：好结构 vs 普通结构，规则分必须相同
+    good = control_parts({"susp_front": "前双叉臂", "susp_rear": "后五连杆",
+                          "drive": "后置后驱", "zero_to_100_s": 5.1})
+    normal = control_parts({"susp_front": "前麦弗逊", "susp_rear": "后多连杆",
+                            "drive": "后置后驱", "zero_to_100_s": 5.1})
+    assert sum(v for _, v, _ in good) == sum(v for _, v, _ in normal), \
+        "悬架形式不应影响操控规则分（结构约束，不是操控结论）"
+    # 真短板仍减分（减半）
+    weak = control_parts({"susp_rear": "后扭力梁", "drive": "前置前驱"})
+    w = sum(v for _, v, _ in weak)
+    assert w < 0, "后扭力梁是真实短板，应减分"
+    assert w >= -0.5, f"后扭力梁减分应减半（-0.3），实际 {w}"
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--specs", required=True, help="配置参数 json：{车型: {参数}}")
-    ap.add_argument("--candidates", required=True)
+    ap.add_argument("--selftest", action="store_true")
+    ap.add_argument("--specs", help="配置参数 json：{车型: {参数}}")
+    ap.add_argument("--candidates")
+    ap.add_argument("--selftest-only", dest="_selftest_only", action="store_true")
     ap.add_argument("--out")
     ap.add_argument("--only", help="只比对这些车型（逗号分隔）")
     a = ap.parse_args()
+    if a.selftest:
+        try:
+            selftest()
+            print("spec_score selftest OK")
+            return 0
+        except AssertionError as e:
+            print(f"[FAIL] {e}")
+            return 1
 
     specs = json.load(open(a.specs, encoding="utf-8"))
     cands = json.load(open(a.candidates, encoding="utf-8"))["candidates"]

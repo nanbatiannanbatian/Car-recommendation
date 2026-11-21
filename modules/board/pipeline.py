@@ -223,29 +223,20 @@ def main():
     if _p_filled:
         print(f"[价格回流] trims 官方指导价 → 候选池 price_guide：{len(_p_filled)} 款（"
               + "、".join(m for m, _ in _p_filled[:8]) + ("…" if len(_p_filled) > 8 else "") + "）")
-    # 碰撞成绩回流（2026-11-21）：note 文本里写了 C-NCAP/C-IASI 成绩但 crash/safety_basis
-    # 是空的 → 自动解析进字段。极氪7X 曾因这一条进不了一档（家族 6/6、全情景 98%）。
-    _c_filled, _c_unres = FS.backfill_crash_from_text(cands)
-    if _c_filled:
-        print(f"[碰撞回流] 文本成绩 → crash/safety_basis：{len(_c_filled)} 款（"
-              + "、".join(f"{m}({d})" for m, d, _ in _c_filled[:6])
-              + ("…" if len(_c_filled) > 6 else "") + "）")
-
-    # 权威成绩库回流（2026-11-21 全量排查）：official_safety_scores.json 里人工核验的
-    # 一手成绩（蔚来ET5 C-IASI A / 特斯拉Model 3 Euro NCAP 五星等）此前从不回流——
-    # 候选池文本没写成绩的车，库里即便有也白采。现在与价格回流同一纪律：出榜前自动执行。
-    _a_filled = FS.backfill_crash_from_authoritative(cands)
-    if _a_filled:
-        print(f"[权威库回流] official_safety_scores → crash/safety_basis：{len(_a_filled)} 款（"
-              + "、".join(f"{m}({d})" for m, d, _ in _a_filled[:6]) + "）")
-
-    # C-NCAP 官方成绩表回流（v10.5.0）：cncap_scores.json 已经抓到 86.4% 的零跑C11，
-    # 但候选池 note/crash 都没写、权威库也没有 → 页面显示「—」，属于「有测试没显示」。
-    # 与价格/权威库同一纪律：出榜前自动回流，只填空不覆盖。
-    _n_filled = FS.backfill_crash_from_cncap_table(cands)
-    if _n_filled:
-        print(f"[C-NCAP库回流] cncap_scores → crash/safety_basis：{len(_n_filled)} 款（"
-              + "、".join(f"{m}({d})" for m, d, _ in _n_filled[:6]) + "）")
+    # 碰撞成绩回流（2026-11-22 改为单一同步器）：
+    #   原来这里是**三段**独立回流——文本抽取 / official_safety_scores /
+    #   cncap_scores，各自一套裁决逻辑、互相覆盖，冲突只能靠「谁后跑谁赢」。
+    #   现在统一走 categories/safety_scores.json（安全成绩域唯一事实源），
+    #   裁决规则只有一个（tier 高者为主），不同体系不合并、不平均。
+    #   note 里的自由文本成绩**降级为非权威描述**（用户 2026-11-22 拍板），
+    #   不再单独回填 crash 列。
+    from modules.engine import sync_safety_scores as SSS
+    _s_filled, _s_unres = SSS.sync(cands)
+    if _s_filled:
+        print(f"[安全成绩回流] safety_scores SSOT → crash/safety_basis：{len(_s_filled)} 款（"
+              + "、".join(f"{m}({d})" for m, d, _ in _s_filled[:6])
+              + ("…" if len(_s_filled) > 6 else "") + "）")
+    _c_filled, _c_unres = _s_filled, _s_unres
 
     # 逐车碰撞成绩联网核验 + 出榜门禁（v10.7.0）：对每一款入池车产出明确核验状态。
     # 必须在三条回流之后——ES6 这类成绩只在 evidence 文本里，回流前 crash 字段为空
@@ -748,12 +739,11 @@ def main():
         # 2026-11-21：价格回流审计（回填了哪些、哪些 trims 也没价）
         "price_backfill": {"filled": [{"model": m, "price_guide": pg} for m, pg in _p_filled],
                            "still_missing": _p_still},
+        # v10.14.0：三段回流合并为唯一同步器（sync_safety_scores），
+        # 审计字段同步收敛为一份（source = safety_scores SSOT）。
         "crash_backfill": {"filled": [{"model": m, "crash": d, "basis": b} for m, d, b in _c_filled],
                            "unresolved": _c_unres,
-                           "authoritative": [{"model": m, "crash": d, "basis": b}
-                                             for m, d, b in _a_filled],
-                           "cncap_table": [{"model": m, "crash": d, "basis": b}
-                                           for m, d, b in _n_filled]},
+                           "source": "categories/safety_scores.json（唯一事实源）"},
         # v10.5.0：C-IASI 数字图标车联网救回审计 + 展示覆盖门禁审计
         "ciasi_rescue": _ciasi_rescue,
         "crash_auto_verify": _crash_verify,

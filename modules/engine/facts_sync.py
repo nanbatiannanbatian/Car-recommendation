@@ -213,10 +213,15 @@ def backfill_price_guide_from_trims(cars, trims_path=None):
     当时的补救是一个手动命令（master_pool --sync-prices），靠人记得跑——
     那就是「规则只存在人的记忆里」。现在改成出榜前自动执行，并保留手动入口。
 
-    规则：
-      - 只填空值，不覆盖候选池已有的 price_guide（已有值可能来自更权威的官网逐个核对）
-      - 依据是 trims.json 的 price 字段，契约强制为数值且禁用促销价（见 trims_schema）
-      - 来源写进 price_source，可追溯
+    规则（2026-11-22 用户拍板「价格冲突以官方价为准」）：
+      - **以 trims.json 的官方指导价为准，覆盖**候选池已有的 price_guide。
+        原来只填空：候选池里 14 款车的 price_guide 与官方价不一致时，
+        页面显示的是「非官方」的那一份——同一个价格两个值，读者无从判断。
+        trims.json 的价格来自汽车之家参数页**官方指导价**（契约强制数值、
+        禁用促销价），且带 url + 引文；候选池的 price_guide 是人工填的区间，
+        没有可核验来源。**有官方一手价就用官方一手价**。
+      - 来源写进 price_source，可追溯（含「官方价覆盖原值」的审计）。
+      - 覆盖后仍把原值记进 price_prev，供追溯。
 
     返回 (filled, still_missing)：
       filled        [(车型, [最低价, 最高价]), ...] 已回填
@@ -237,22 +242,31 @@ def backfill_price_guide_from_trims(cars, trims_path=None):
 
     filled, still = [], []
     for c in cars:
-        g = c.get("price_guide")
-        if isinstance(g, (list, tuple)) and g and g[0]:
-            continue
         e = by.get(canon(c.get("model") or ""))
         prices = [x.get("price") for x in (e or {}).get("trims", [])
                   if isinstance(x.get("price"), (int, float))]
         if not prices:
             still.append(c.get("model"))
             continue
+        prev = c.get("price_guide")
         c["price_guide"] = [min(prices), max(prices)]
         c["price_source"] = "trims.json 官方指导价（汽车之家参数页逐配置解析，已核验非促销价）"
+        # 覆盖审计：原值存进 price_prev，可追溯「原来是人工填的区间」
+        if isinstance(prev, (list, tuple)) and prev and list(prev) != c["price_guide"]:
+            c["price_prev"] = list(prev)
+            c["price_overwritten_by_official"] = True
         filled.append((c.get("model"), c["price_guide"]))
     return filled, still
 
 
 # ---------------------------------------------------------------- 碰撞成绩回流
+# 【已废弃 2026-11-22 / v10.14.0】下面三个函数由
+# modules/engine/sync_safety_scores.py 取代（安全成绩域唯一同步器）。
+# 保留它们是为了不破坏外部引用，但**出榜链路不再调用**：
+#   · 原来三套裁决逻辑（文本抽取 / official_safety_scores / cncap_scores）
+#     互相覆盖，冲突只能靠「谁后跑谁赢」，页面上出现过同一车不同成绩；
+#   · 现在统一读 categories/safety_scores.json（唯一事实源），裁决规则只有一个。
+# 若要改碰撞成绩口径，改 SSOT 与 sync_safety_scores，不要改这三个。
 def backfill_crash_from_text(cars):
     """把 crash / note 自由文本里的官方碰撞成绩，结构化进 crash + safety_basis。
 
@@ -467,12 +481,15 @@ def crash_display_leaks(cars, decoded=None):
     from modules.engine import multi_evidence_score as MES
 
     dec = MES.decoded_by_canon(decoded)
-    off_path = os.path.join(HERE, "official_safety_scores.json")
-    off = json.load(open(off_path, encoding="utf-8")) if os.path.exists(off_path) else {}
-    off_cars = {canon(k) for k in (off.get("car_scores") or {})}
-    cn_path = os.path.join(HERE, "cncap_scores.json")
-    cn = json.load(open(cn_path, encoding="utf-8")) if os.path.exists(cn_path) else {}
-    cn_scores = {_model_key(k) for k in (cn.get("scores") or {})}
+    # v10.14.0：改读安全成绩域唯一事实源（categories/safety_scores.json）。
+    # 原来这里自己读 official_safety_scores + cncap_scores 两份——同一事实的
+    # 第二、三份读法，与同步器的裁决口径可能不一致（实测漏显门禁误报）。
+    from modules.engine.sync_safety_scores import load_ssot, _index, _lookup
+    ssot = load_ssot()
+    ssot_idx = _index(ssot)
+    # SSOT 里已收录该车（有可核验成绩）即视为「有来源但字段漏了」
+    # 用 _lookup 走同一套别名兜底（品牌前缀缺失的情况，如「海狮07」vs「比亚迪海狮07EV」）
+    ssot_cars = set(ssot_idx.keys())
 
     leaks = []
     for c in cars:
@@ -487,10 +504,8 @@ def crash_display_leaks(cars, decoded=None):
             sources.append("候选池一手成绩文字")
         if k in dec and any(v.get("grade") for v in (dec[k].get("dims") or {}).values()):
             sources.append("C-IASI 新闻稿文字等级")
-        if k in off_cars:
-            sources.append("official_safety_scores")
-        if mk in cn_scores:
-            sources.append("cncap_scores")
+        if k in ssot_cars or _lookup(ssot_idx, k) is not None:
+            sources.append("safety_scores SSOT")
         if sources:
             leaks.append({"model": model, "sources": sources})
     return leaks
