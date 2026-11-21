@@ -111,6 +111,7 @@ CASES = [
     ("BUG-086", "ModelY有C-IASI一手成绩却标缺权威碰撞:回填只扫note漏evidence+宽松解析误抓枚举句", "v10.3.1"),
     ("BUG-087", "12碰撞体系只2个能解析+权威库从不回流+安全分文案写死C-NCAP:蔚来ET5 EuroNCAP/C-IASI取不到", "v10.3.2"),
     ("BUG-088", "多碰撞成绩取第一个锚点(靠文本顺序既非最高非叠加)+次要成绩被静默丢弃无审计", "v10.3.3"),
+    ("BUG-089", "多测评只取单一成绩不满足全纳入:数字图标车无成绩+C-IASI多维度未木桶取最低+跨体系无主分规则", "v10.4.0"),
 ]
 
 
@@ -2386,6 +2387,8 @@ def t088():
     pool = json.load(open(str(paths.ROOT / "runs" / "midsuv_bev_pool.json"), encoding="utf-8"))
     cands = normalize_pool(copy.deepcopy(pool["candidates"]))
     FS.backfill_crash_from_text(cands)
+    # 注意：t088 只跑文本回填、不跑 v10.4.0 融合；bZ5 的文本主成绩仍是 cncap，
+    # 新闻稿救回后升级为 ciasi 由 t089 测（两个口径分层，别混在一起）。
     expected = {"极氪7X": "cncap", "阿维塔07 纯电版": "cncap", "极狐阿尔法T5": "cncap",
                 "零跑C10": "cncap", "乐道L60": "cncap", "丰田bZ5": "cncap",
                 "特斯拉 Model Y": "ciasi", "比亚迪海狮07EV": "cncap"}
@@ -2409,14 +2412,79 @@ def t088():
     assert "crash_all_scores" in fs_src and "parse_all_scores_from_evidence" in fs_src, \
         "回填未写多成绩审计字段"
     pl_src = open(str(paths.src("pipeline.py")), encoding="utf-8").read()
-    assert "多成绩口径" in pl_src and "crash_multi_scores" in pl_src, \
+    # v10.4.0：报告段由「多成绩口径」升级为「多测评纳入」（全纳入口径），两者都代表披露存在
+    assert ("多成绩口径" in pl_src or "多测评纳入" in pl_src) and "crash_multi_scores" in pl_src, \
         "报告/summary 未披露多成绩口径"
     return ("多成绩口径：取证据最强(不取最高/不叠加)+次要成绩全量留痕+主成绩不漂移+"
             "无成绩车零误伤+报告/summary披露(+t088)")
 
 
+def t089():
+    """多测评全纳入融合口径（v10.4.0）：同体系木桶取最低 + 跨体系取最严格主分 +
+    C-IASI 新闻稿文字等级救回数字图标车。
+
+    2026-11-21 用户「有评测就要纳入，按业内原则以及管理重新设计，所有测评都纳入才准确」。
+    业内原则：Euro NCAP/ANCAP 官网与 C-NCAP 规则均明确「总评级由最低分项决定」（木桶）；
+    跨体系无对应关系，不能套同一公式（项目早期调研结论）。
+    """
+    from modules.engine import multi_evidence_score as MES
+    import copy
+
+    # 1) 模块自测（木桶取最低/跨体系取主分/旁证不计分）
+    assert MES.selftest() == 0, "multi_evidence_score 自测失败"
+
+    # 2) 新闻稿产物必须存在且解出可核验文字等级（不是数字图标猜测）
+    from modules.engine import multi_evidence_score as _MES
+    dec = json.load(open(_MES.decoded_path(), encoding="utf-8"))
+    assert dec.get("n_releases", 0) >= 8 and dec.get("n_models", 0) >= 30, "新闻稿未落盘完整产物"
+    assert "method" in dec and "新闻稿" in dec["method"], "解码方法不是新闻稿纯文字"
+    my = dec["models"]["特斯拉Model Y"]["dims"]
+    assert my["occupant"]["grade"] == "G+" and my["assist"]["grade"] == "G", "Model Y 文字等级错"
+    # aggregate_only 不猜
+    l60 = dec["models"]["乐道L60"]["dims"]
+    assert all((v.get("grade") is None and v.get("scope") == "aggregate_only") for v in l60.values()), \
+        "乐道L60 稿件未点名维度被错误猜等级"
+
+    # 3) 木桶：三指数取最低档（Model Y G+/G+/G → G；耐撞维修 M 不进安全分）
+    rec = {"dims": {"occupant": {"grade": "G+", "scope": "all"},
+                    "pedestrian": {"grade": "G+", "scope": "all"},
+                    "assist": {"grade": "G", "scope": "all"},
+                    "crash_repair": {"grade": "M", "scope": "all"}},
+           "source": "test", "published": "2026-01-01"}
+    table = json.load(open(str(paths.ROOT / "official_safety_scores.json"), encoding="utf-8"))
+    b = MES._ciasi_bucket(rec, table)
+    assert b["grade"] == "G" and b["score"] == 9.0, f"木桶取最低失败: {b}"
+    assert any(x["dim"] == "耐撞维修(仅披露)" and not x["counted"] for x in b["dims"]), \
+        "耐撞维修不应进安全分木桶"
+
+    # 4) 真实池：新闻稿救回 bZ5（cncap 86.7%→C-IASI G+ 主分）、Model Y 仍 C-IASI G
+    from modules.contracts.candidate_schema import normalize_pool
+    pool = json.load(open(str(paths.ROOT / "runs" / "midsuv_bev_pool.json"), encoding="utf-8"))
+    cands = normalize_pool(copy.deepcopy(pool["candidates"]))
+    r = MES.fuse(cands)
+    by = {x["model"]: x for x in r}
+    assert by["丰田bZ5"]["primary"].startswith("C-IASI G+"), by["丰田bZ5"]
+    assert by["特斯拉 Model Y"]["primary"].startswith("C-IASI G（"), by["特斯拉 Model Y"]
+    assert "C-NCAP 86.7%" in [s["display"] for s in by["丰田bZ5"]["all_scores"]], "bZ5 次要成绩未列示"
+    # 旁证不计分：极氪7X Euro NCAP 只在 excluded
+    j7 = by["极氪7X"]
+    assert all("Euro NCAP" not in s["display"] for s in j7["all_scores"]), "旁证被计入"
+    assert any("Euro NCAP" in str(e) for e in j7["excluded"]), "旁证未披露"
+
+    # 5) 链路内置：pipeline 调融合 + 报告/summary 披露（防退回单一成绩）
+    pl = open(str(paths.src("pipeline.py")), encoding="utf-8").read()
+    assert "multi_evidence_score" in pl and "crash_fusion" in pl and "多测评纳入" in pl, \
+        "pipeline 未接入融合/未披露"
+
+    # 6) 无一手成绩车零误伤
+    for m in ("小鹏MONA L05", "蔚来ES6", "小鹏G6", "比亚迪宋L EV"):
+        assert by[m]["primary"] is None, f"无成绩车 {m} 被误纳入"
+    return ("多测评全纳入：同体系木桶取最低+跨体系取最严格主分+C-IASI新闻稿文字救回+"
+            "旁证不计分+无成绩零误伤+报告/summary披露(+t089)")
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089]
 
 
 def run():

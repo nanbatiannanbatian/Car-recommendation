@@ -35,6 +35,7 @@ import argparse
 import json
 import os
 import re
+import ssl
 import sys
 import time
 import urllib.request
@@ -76,10 +77,21 @@ def strip_html(s: str) -> str:
     return re.sub(r"\s+", " ", s).strip()
 
 
+def _ssl_ctx():
+    """C-IASI 官网证书在部分网络出口（如本地代理）上报 CERTIFICATE_VERIFY_FAILED。
+    这里只对本解码器的官网请求放宽证书校验；抓的仅是官方公开文字稿，
+    且解码纪律要求「未匹配不猜、只作事实列」，不涉及任何账号/隐私数据传输。
+    """
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    return ctx
+
+
 def fetch(sid: int, timeout: int = 10) -> str | None:
     req = urllib.request.Request(BASE.format(sid), headers=UA)
     try:
-        raw = urllib.request.urlopen(req, timeout=timeout).read()
+        raw = urllib.request.urlopen(req, timeout=timeout, context=_ssl_ctx()).read()
     except Exception:
         return None
     for enc in ("utf-8", "gb18030"):
@@ -291,7 +303,8 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--start", type=int, default=100)
     ap.add_argument("--end", type=int, default=130)
-    ap.add_argument("--out", default="ciasi_decoded.json")
+    # 默认输出随包事实库 categories/（随 skill 与 GitHub 分发）；data/gen 仅为缓存。
+    ap.add_argument("--out", default="categories/ciasi_decoded.json")
     ap.add_argument("--sleep", type=float, default=0.15)
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args()

@@ -129,6 +129,8 @@ NEG_DATA = {
     "t087": ("facts_sync.backfill_crash_from_authoritative", None, "no_authoritative_fill"),
     # t088：关掉全量成绩收集（回到「只取第一个锚点、次要成绩静默丢弃」），断言必须 FAIL
     "t088": ("crash_systems.parse_all_scores_from_evidence", None, "no_multi_scores"),
+    # t089：关掉多测评融合（回到「数字图标车无成绩、C-IASI 不木桶取最低」），断言必须 FAIL
+    "t089": ("multi_evidence_score.fuse", None, "no_fusion"),
     # t039 断言从「源码文本含文件名」升级为「文件在同步集里」，探针改成把同步集清空
     "t039": ("sync_to_repo.collect", None, "empty_sync"),
 }
@@ -167,6 +169,7 @@ def _func_probe(name, fn, dotted, mode):
         "no_evidence_crash": lambda *a, **kw: None,                         # 严格证据解析失效（Model Y C-IASI 又白采）
         "no_authoritative_fill": lambda *a, **kw: [],                       # 权威库回流失效（蔚来ET5 C-IASI 又取不到）
         "no_multi_scores": lambda *a, **kw: [],                             # 多成绩收集失效（又变成只取第一个+次要成绩丢失）
+        "no_fusion": lambda *a, **kw: [],                                    # 多测评融合失效（数字图标车又无成绩、木桶不生效）
         "always_missing": lambda *a, **kw: {"status": "missing", "source": "", "trims": [],
                                            "attempts": [], "evidence": {}, "sid": None,
                                            "ah_name": ""},                # 调度退化为直接失败

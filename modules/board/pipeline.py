@@ -190,6 +190,21 @@ def main():
         print(f"[权威库回流] official_safety_scores → crash/safety_basis：{len(_a_filled)} 款（"
               + "、".join(f"{m}({d})" for m, d, _ in _a_filled[:6]) + "）")
 
+    # 多测评融合（v10.4.0，2026-11-21）：用户要求「有评测就要纳入，按业内原则重新设计」。
+    # 同体系多维度按木桶取最低（Euro NCAP/C-NCAP 官方口径）；跨体系按严格度选主分、
+    # 其余列示不叠加（各国 NCAP 无对应关系）。一手来源含 C-IASI 官网新闻稿纯文字等级
+    # （research 模块 data/gen/ciasi_decoded.json），救回数字图标不可解码的车。
+    # 必须在 crash 回流之后、apply_auto_scores 之前——融合改写 crash 字段后才走既有映射。
+    from modules.engine import multi_evidence_score as MES
+    if getattr(a, "no_fusion", False):
+        _fusion = []
+    else:
+        _fusion = MES.fuse(cands)
+    _fused_n = sum(1 for x in _fusion if x.get("primary"))
+    if _fused_n:
+        print(f"[多测评融合] {_fused_n} 款有一手评测纳入（同体系木桶取最低/跨体系取最严格主分）；"
+              + "、".join(f"{x['model']}={x['primary']}" for x in _fusion if x.get("primary"))[:180])
+
     # 成绩→分数自动映射（2026-11-21）：表外但有碰撞成绩的车，按 official_safety_scores.json
     # 的 map_spec 算出 safety 分。不映射等于成绩白采（safety 仍按无成绩车插补）。
     from modules.engine import safety_check as SFC
@@ -490,20 +505,28 @@ def main():
                      + (f"，其中 {len(_chg)} 款较原插补值有调整：" +
                         "、".join(f"{x['model']} {x['prev']}→{x['score']:g}" for x in _chg[:5])
                         if _chg else "，与原插补值一致") + "。")
-        # 多成绩口径披露（2026-11-21）：一款车多个体系成绩时取证据最强的一条算分，
-        # 不取最高分、不跨体系叠加；被丢弃的次要成绩在此披露、进审计字段。
-        _multi = [c for c in cands if len(c.get("crash_all_scores") or []) > 1]
-        if _multi:
-            _ml = []
-            for c in _multi[:8]:
-                _scores = c["crash_all_scores"]
-                _main = next((s for s in _scores if s.get("primary")), _scores[0])
-                _rest = "、".join(s["display"] for s in _scores if not s.get("primary"))
-                _ml.append(f"{c['model']} 取 {_main['display']}、其余 {_rest} 仅留痕不叠加")
-            parts.append("> **多成绩口径**：同一车有多个权威成绩时取证据最强的一条"
-                         "（一手得分率 > 等级/星级 > 奖项），不取最高分、不跨体系叠加——"
-                         "各国 NCAP 无对应关系，取最高会偏向测试宽松的体系。"
-                         + "；".join(_ml) + "。")
+        # 多测评融合口径披露（v10.4.0，2026-11-21 用户要求「有评测就要纳入」）：
+        # 同体系多维度按木桶取最低（Euro NCAP/C-NCAP 官方口径），跨体系按严格度取主分、
+        # 其余列示不叠加；C-IASI 数字图标车以官网新闻稿纯文字等级救回。
+        if _fusion:
+            _fl = []
+            for x in _fusion[:8]:
+                if not x.get("primary"):
+                    continue
+                _all = [s["display"] for s in x.get("all_scores", [])]
+                _fl.append(f"{x['model']} 纳入 {' + '.join(_all)} → 主分 {x['primary']}")
+            parts.append("> **多测评纳入**：同一体系内多维度按木桶取最低档（Euro NCAP/"
+                         "C-NCAP 官方口径，总评级由最低分项决定），不同体系并存时全部列入、"
+                         "取最严格体系作主分（C-IASI > Euro NCAP/C-NCAP），其余不叠加——"
+                         "各国 NCAP 无对应关系，不套同一公式。C-IASI 数字图标无官方文字"
+                         "对照不解码，改由官网结果发布稿的纯文字等级核验纳入。"
+                         + ("；".join(_fl) + "。" if _fl else ""))
+            _fused_docs = [x for x in _fusion if any(s.get("via") == "C-IASI新闻稿文字"
+                                                      for s in x.get("all_scores", []))]
+            if _fused_docs:
+                parts.append("> **新闻稿核回**：" + "、".join(
+                    f"{x['model']} 官方文字稿 {x['primary']}" for x in _fused_docs)
+                    + "（稿件仅给等级分布、未点名车型的维度一律不猜、不计分）。")
     if _p_still:
         parts.append(f"> **价格缺口**：{'、'.join(_p_still[:6])}"
                      f"（共 {len(_p_still)} 款）候选池与 trims 均无官方指导价，"
@@ -578,6 +601,15 @@ def main():
         "crash_multi_scores": [
             {"model": c["model"], "scores": c["crash_all_scores"]}
             for c in cands if c.get("crash_all_scores")
+        ],
+        # v10.4.0：多测评融合审计（同体系木桶取最低/跨体系取最严格主分/新闻稿一手等级）
+        "crash_fusion": [
+            {"model": x["model"], "primary": x.get("primary"), "rule": x.get("rule"),
+             "all_scores": [{"display": s.get("display"), "score": s.get("score"),
+                             "basis": s.get("basis"), "via": s.get("via")}
+                            for s in x.get("all_scores", [])],
+             "excluded": x.get("excluded", [])}
+            for x in _fusion if x.get("primary")
         ],
         "safety_auto": {"applied": _sa, "skipped": _ss},
         "safety_cap": _cap_adj,
