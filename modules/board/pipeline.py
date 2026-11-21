@@ -104,6 +104,8 @@ def main():
                     help="跳过三电能耗效率修正（默认启用，全榜统一±0.4封顶；仅 A/B 对照用）")
     ap.add_argument("--no-crash-verify", action="store_true",
                     help="跳过出榜前的逐车联网碰撞核验（默认启用；仅 A/B/断网对照用）")
+    ap.add_argument("--no-crash-cache", action="store_true",
+                    help="忽略当天核验缓存、强制全部重新联网抓取（默认当天命中复用，跨天自动失效）")
     ap.add_argument("--allow-degraded-network", action="store_true",
                     help="仅当联网主通道失败时允许降级出榜（标记 degraded；"
                          "官网有本地无/数值冲突永远阻断，此开关不适用）")
@@ -260,15 +262,23 @@ def main():
                     _pool_parsed[_c.get("model")] = _p
             _crash_verify = CAV.verify_all(
                 cands, pool_parsed=_pool_parsed,
-                ciasi_fresh=list((_ciasi_rescue.get("matched") or {}).keys()))
+                ciasi_fresh=list((_ciasi_rescue.get("matched") or {}).keys()),
+                # v10.8.0：当天核验状态带时间戳缓存复用；--no-crash-cache 强制重抓。
+                # 缓存落 runs/（不进 GitHub/发布包），跨天或权威库变更自动失效。
+                use_cache=not getattr(a, "no_crash_cache", False))
             _gate = CAV.coverage_gate(
                 _crash_verify, allow_degraded=getattr(a, "allow_degraded_network", False))
             _crash_verify["gate"] = _gate
             _cnt: dict[str, int] = {}
             for _r in _crash_verify["per_car"].values():
                 _cnt[_r["status"]] = _cnt.get(_r["status"], 0) + 1
+            _cc = _crash_verify.get("cache") or {}
             print("[碰撞核验] 逐车状态：" + "、".join(
                 f"{k} {v}" for k, v in sorted(_cnt.items())))
+            print(f"[碰撞核验] 缓存：核验日 {_cc.get('date')} / "
+                  f"当天复用 {_cc.get('hits', 0)} / 重新联网 {_cc.get('misses', 0)}"
+                  + ("（--no-crash-cache 强制全量重抓）"
+                     if getattr(a, "no_crash_cache", False) else ""))
             if not _gate["ok"]:
                 sys.exit("碰撞联网核验门禁：" + _gate["reason"] +
                          "\n→ 数据问题先补权威库/人工核验后重跑；断网重跑或加"

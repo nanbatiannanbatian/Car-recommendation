@@ -181,6 +181,61 @@ STATUS_NOTE = {
 BLOCKING_STATUSES = {"new_found", "conflict", "network_error"}
 
 
+# ---------------------------------------------------------------------------
+# v10.8.0：核验状态带时间戳 + 按天缓存
+# ---------------------------------------------------------------------------
+# 用户要求：「有经联网确认的核验状态需要加上时间一起确认，当天的可以不重复抓取，
+# 不是当天的核验状态失效」。实现要点：
+#   · 每条逐车记录带 verified_at（核验时刻）+ verified_date（核验日期）；
+#   · 缓存只落本地 runs/（sync_to_repo 不收 runs、build_release 排除所有 JSON），
+#     绝不进 GitHub / 发布包；
+#   · verified_date == 今天 且数据指纹未变 → 复用，不重复联网抓取；
+#   · 跨天 / 权威库被补录修正（指纹变）→ 缓存失效，强制重新联网核验；
+#   · network_error 不是「已核验」，永不缓存（否则断网会被当成当天已确认）；
+#   · 全榜当天命中时连 C-NCAP 首页都不抓（真正不重复抓取）。
+CACHE = str(paths.runs("crash_verify_cache.json"))
+UNCACHEABLE = {"network_error"}
+
+
+def _today() -> str:
+    return datetime.now().strftime("%Y-%m-%d")
+
+
+def load_cache(cache_path: str | None = None) -> dict:
+    """读取本地核验缓存（不存在/损坏返回空，绝不因缓存坏掉阻断出榜）。"""
+    return _load(cache_path or CACHE)
+
+
+def save_cache(cache: dict, cache_path: str | None = None) -> None:
+    p = cache_path or CACHE
+    try:
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        with open(p, "w", encoding="utf-8") as f:
+            json.dump(cache, f, ensure_ascii=False, indent=2)
+    except Exception as ex:                                  # noqa: BLE001
+        print(f"[crash_verify] 缓存写入失败（不影响出榜）：{type(ex).__name__}: {ex}",
+              file=sys.stderr)
+
+
+def _fingerprint(local: dict | None) -> str:
+    """本地成绩指纹：补录/修正权威库后指纹变，旧缓存当天也失效重核。"""
+    return json.dumps(local or {}, sort_keys=True, ensure_ascii=False, default=str)
+
+
+def _cache_valid(entry, today: str, fingerprint: str, *,
+                 ciasi_fresh: bool = False) -> bool:
+    """当天 + 数据未变 + 非不可缓存状态 + 非本次新救回 → 命中。"""
+    if not isinstance(entry, dict) or entry.get("verified_date") != today:
+        return False
+    if entry.get("fingerprint") != fingerprint:
+        return False
+    if (entry.get("record") or {}).get("status") in UNCACHEABLE:
+        return False
+    if ciasi_fresh:                      # 本次新闻稿救回命中 → 强制重核保新鲜
+        return False
+    return True
+
+
 def fetch_url(url: str, timeout: int = 12) -> str | None:
     """回访官方来源页（research 唯一网络出口；与 fetch_home 同一 SSL 容错）。"""
     if not str(url or "").startswith("https://"):
@@ -294,12 +349,20 @@ def verify_all(cands: list[dict], *, official: list[dict] | None = None,
                table: dict | None = None, decoded: dict | None = None,
                authoritative: dict | None = None, pool_parsed: dict | None = None,
                home_fetcher=None, url_fetcher=None,
-               ciasi_fresh=None, skip_revisit: bool = False) -> dict:
+               ciasi_fresh=None, skip_revisit: bool = False,
+               use_cache: bool = False, cache: dict | None = None,
+               cache_path: str | None = None,
+               today: str | None = None) -> dict:
     """逐车联网核验（出榜门禁唯一事实源）。
 
     official=None 时联网抓 C-NCAP 首页；home_fetcher 返回 None 视为联网失败，
     全榜标 network_error（不静默沿用本地库）。url_fetcher 用于历史来源回访。
     ciasi_fresh：本次 rescue 新命中的车型集合（有则为 live_confirmed）。
+
+    v10.8.0 时间戳+按天缓存：use_cache=True 时读 runs/crash_verify_cache.json，
+    当天（verified_date==today）且数据指纹未变的车直接复用、不重复联网；
+    跨天或数据变更则失效重抓。today/cache 可注入做确定性测试。默认
+    use_cache=False 保持旧调用方（含 selftest）行为不变。
     """
     table = table if table is not None else _load(CNCAP)
     decoded = decoded if decoded is not None else _load(DECODED)
@@ -308,27 +371,56 @@ def verify_all(cands: list[dict], *, official: list[dict] | None = None,
     home_fetcher = home_fetcher or fetch_home
     url_fetcher = url_fetcher or fetch_url
     ciasi_fresh = {_key(m) for m in (ciasi_fresh or [])}
+    today = today or _today()
+    cache_given = cache is not None                  # 注入内存缓存（测试用，不落盘）
+    if cache is None:
+        cache = load_cache(cache_path) if use_cache else {}
 
-    net_error = False
-    if official is None:
-        html = home_fetcher()
-        net_error = html is None
-        official = parse_home(html) if html else []
-    live_cn = {_key(r["model"]): r for r in official}
-
-    checked_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    per_car: dict[str, dict] = {}
+    # 预取每车本地成绩：缓存指纹与核验判定共用，避免两处口径漂移。
+    prepared: list[tuple[str, str, dict | None]] = []
     for c in cands:
         name = c.get("model") if isinstance(c, dict) else str(c)
-        k = _key(name)
         local = local_record(
             name, table, decoded, authoritative,
             pool_parsed=(pool_parsed or {}).get(name)
             if isinstance(pool_parsed, dict) else None)
+        prepared.append((name, _key(name), local))
+
+    _cache_on = use_cache or cache_given
+    stale = [(n, k, loc) for n, k, loc in prepared
+             if not (_cache_on and _cache_valid(cache.get(n), today, _fingerprint(loc),
+                                                ciasi_fresh=(k in ciasi_fresh)))]
+
+    net_error = False
+    if official is None:
+        if not stale:                    # 全榜当天已核验 → 连首页都不抓
+            official = []
+        else:
+            html = home_fetcher()
+            net_error = html is None
+            official = parse_home(html) if html else []
+    live_cn = {_key(r["model"]): r for r in official}
+
+    checked_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    per_car: dict[str, dict] = {}
+    cache_hits = 0
+    for name, k, local in prepared:
+        rec_cached = cache.get(name) if _cache_on else None
+        if _cache_valid(rec_cached, today, _fingerprint(local),
+                        ciasi_fresh=(k in ciasi_fresh)):
+            rec = dict(rec_cached["record"])  # type: ignore[index]
+            rec["from_cache"] = True
+            cache_hits += 1
+            per_car[name] = rec
+            continue
+
         hit = live_cn.get(k)
         rec: dict = {
             "model": name,
             "status": None,
+            "verified_at": checked_at,
+            "verified_date": today,
+            "from_cache": False,
             "local": ({"basis": local["basis"], "value": local.get("value"),
                        "grade": local.get("grade"), "source": local["source"]}
                       if local else None),
@@ -361,12 +453,24 @@ def verify_all(cands: list[dict], *, official: list[dict] | None = None,
         else:
             rec["status"] = "no_score"
         rec["note"] = STATUS_NOTE[rec["status"]]
+        # 网络失败不是「已核验」，绝不写缓存；其余当天结果落缓存。
+        if _cache_on and rec["status"] not in UNCACHEABLE:
+            saved = dict(rec)
+            saved.pop("from_cache", None)
+            cache[name] = {"verified_date": today,
+                           "fingerprint": _fingerprint(local), "record": saved}
         per_car[name] = rec
 
+    if use_cache and not cache_given:              # 注入内存缓存时不落盘
+        save_cache(cache, cache_path)
     blocking = [{"model": n, "status": r["status"], "note": r["note"]}
                 for n, r in per_car.items() if r["status"] in BLOCKING_STATUSES]
     return {
         "checked_at": checked_at,
+        "verified_date": today,
+        "cache": {"used": _cache_on, "date": today, "hits": cache_hits,
+                  "misses": len(prepared) - cache_hits,
+                  "path": cache_path or CACHE},
         "source": HOME,
         "official_n": len(official),
         "pool_n": len(cands),
@@ -452,6 +556,82 @@ def selftest_all() -> int:
     assert rep4["per_car"]["历史车H"]["status"] == "source_stale", rep4
     assert coverage_gate(rep4)["ok"], "历史链接失效不应阻断（成绩仍采信缓存）"
     print("SELFTEST PASS · 逐车核验状态 + 分级门禁（冲突/新成绩/断网阻断，历史来源回访披露）")
+    return selftest_cache()
+
+
+def selftest_cache() -> int:
+    """v10.8.0 按天缓存确定性自测（内存 cache + 注入 today，不联网）。"""
+    cands = [{"model": "缓存车A"}, {"model": "缓存车B"}]
+    table = {"scores": {"缓存车A": 93.9, "缓存车B": 91.0},
+             "sources": {}}
+    home = """
+    alt="缓存车A" class="cncap-swiper__car-image"
+    <span class="cncap-swiper__year">2026</span>
+    <p class="cncap-swiper__score-value">93.9%</p>
+    alt="缓存车B" class="cncap-swiper__car-image"
+    <span class="cncap-swiper__year">2026</span>
+    <p class="cncap-swiper__score-value">91.0%</p>
+    """
+    official = parse_home(home)
+    calls = {"home": 0}
+
+    def counting_home():
+        calls["home"] += 1
+        return home
+
+    # 1) 首次核验（2026-11-21）：联网抓首页，落缓存，逐车带时间戳
+    cache: dict = {}
+    r1 = verify_all(cands, home_fetcher=counting_home, table=table,
+                    decoded={}, authoritative={}, cache=cache,
+                    today="2026-11-21")
+    assert calls["home"] == 1, "首次必须抓首页"
+    assert r1["cache"]["misses"] == 2 and r1["cache"]["hits"] == 0, r1["cache"]
+    for rec in r1["per_car"].values():
+        assert rec["verified_date"] == "2026-11-21", rec
+        assert re.match(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}", rec["verified_at"]), rec
+    # 2) 当天重跑：全命中，首页不抓、来源不回访
+    calls["home"] = 0
+    r2 = verify_all(cands, home_fetcher=counting_home, table=table,
+                    decoded={}, authoritative={}, cache=cache,
+                    today="2026-11-21")
+    assert calls["home"] == 0, "当天全命中不该抓首页"
+    assert r2["cache"]["hits"] == 2 and r2["network_error"] is False, r2["cache"]
+    assert all(r["from_cache"] for r in r2["per_car"].values()), r2["per_car"]
+    # 3) 跨天（2026-11-22）：缓存失效，重新抓首页并刷新日期
+    calls["home"] = 0
+    r3 = verify_all(cands, home_fetcher=counting_home, table=table,
+                    decoded={}, authoritative={}, cache=cache,
+                    today="2026-11-22")
+    assert calls["home"] == 1, "跨天必须重新抓首页"
+    assert r3["cache"]["misses"] == 2, r3["cache"]
+    assert all(r["verified_date"] == "2026-11-22" and not r["from_cache"]
+               for r in r3["per_car"].values()), r3["per_car"]
+    # 4) 数据变更（权威库补录）：指纹变，当天也失效重抓
+    calls["home"] = 0
+    table2 = json.loads(json.dumps(table))
+    table2["scores"]["缓存车A"] = 90.0                    # 本地值被修正
+    r4 = verify_all(cands, home_fetcher=counting_home, table=table2,
+                    decoded={}, authoritative={}, cache=cache,
+                    today="2026-11-22")
+    assert calls["home"] == 1, "权威库变更后当天也必须重抓"
+    # 只有成绩被改的车A失效，车B指纹未变当天仍命中（精确到车，不整榜失效）
+    assert r4["cache"]["misses"] == 1 and r4["cache"]["hits"] == 1, r4["cache"]
+    assert not r4["per_car"]["缓存车A"]["from_cache"], "变更车必须重核"
+    assert r4["per_car"]["缓存车A"]["status"] == "conflict", "改后与官网冲突应被识别"
+    # 5) 断网失败不写缓存：失败状态次日仍会重核，不会被当成已确认
+    cache2: dict = {}
+    r5 = verify_all([{"model": "断网车"}], home_fetcher=lambda: None,
+                    table={"scores": {"断网车": 88.0}}, decoded={},
+                    authoritative={}, cache=cache2, today="2026-11-21")
+    assert r5["per_car"]["断网车"]["status"] == "network_error", r5
+    assert "断网车" not in cache2, "network_error 绝不能进缓存"
+    # 6) ciasi 本次新救回车强制重核（即使当天缓存命中）
+    calls["home"] = 0
+    r6 = verify_all([{"model": "缓存车A"}], home_fetcher=counting_home,
+                    table=table, decoded={}, authoritative={}, cache=cache,
+                    ciasi_fresh=["缓存车A"], today="2026-11-22")
+    assert calls["home"] == 1 and not r6["per_car"]["缓存车A"]["from_cache"], r6
+    print("SELFTEST PASS · 核验状态带时间戳 + 当天复用/跨天失效/数据变更重核/断网不缓存")
     return 0
 
 

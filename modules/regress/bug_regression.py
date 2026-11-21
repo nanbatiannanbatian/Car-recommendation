@@ -121,6 +121,7 @@ CASES = [
     ("BUG-096", "特斯拉三电7.3垫底但电耗全榜最低:三电维度只看车端硬件、系统能效从未纳入", "v10.6.0"),
     ("BUG-097", "GitHub仓库存43个JSON违背数据代码分离:同步脚本无.json排除规则", "v10.6.0"),
     ("BUG-098", "碰撞核验只扫官网首页且断网只告警:无法证明每车都联网确认过", "v10.7.0"),
+    ("BUG-099", "碰撞核验状态无时间戳且每次出榜重复抓取:当天无法复用、跨天不失效", "v10.8.0"),
 ]
 
 
@@ -2888,8 +2889,58 @@ def t098():
     return "逐车联网核验：每车有状态+三类硬阻断+历史回访披露，断网不再静默沿用(+t098)"
 
 
+def t099():
+    """核验状态带时间戳 + 按天缓存（v10.8.0）：旧版每次出榜都重新联网、
+    状态无时间，用户要求「当天的可不重复抓取，不是当天的核验状态失效」。
+
+    修复：research verify_all 逐车写 verified_at/verified_date；当天命中复用
+    （连首页都不抓），跨天/权威库变更使指纹变则失效重抓；network_error 不缓存；
+    pipeline 加 --no-crash-cache 强制重抓并输出缓存统计。
+    """
+    from modules.research import crash_auto_verify as CAV
+    # 1) 模块确定性自测（当天复用/跨天失效/数据变更/断网不缓存/救回强制重核）
+    assert CAV.selftest_cache() == 0, "按天缓存自测失败"
+    # 2) 源码契约：时间戳/缓存函数/指纹/主链开关都在（防只改产物）
+    src = _read("crash_auto_verify.py")
+    for token in ("verified_at", "verified_date", "def load_cache",
+                  "def save_cache", "def _fingerprint", "def _cache_valid",
+                  "UNCACHEABLE", '"from_cache"'):
+        assert token in src, f"crash_auto_verify 缺 {token}"
+    pl = _read("pipeline.py")
+    assert "--no-crash-cache" in pl and "use_cache=" in pl, "pipeline 未接缓存开关"
+    assert "当天复用" in pl, "缓存统计未输出"
+    # 3) 缓存文件必须在 runs/（零 JSON 进 GitHub/发布包的铁律）
+    assert "runs" in CAV.CACHE.replace("\\", "/") and CAV.CACHE.endswith(".json"), CAV.CACHE
+    # 4) 端到端内存注入：当天二次调用零首页抓取，逐车带时间
+    home = """
+    alt="缓存车A" class="cncap-swiper__car-image"
+    <span class="cncap-swiper__year">2026</span>
+    <p class="cncap-swiper__score-value">93.9%</p>
+    """
+    rows = CAV.parse_home(home)
+    cache: dict = {}
+    calls = {"n": 0}
+
+    def home_fetch():
+        calls["n"] += 1
+        return home
+
+    cands = [{"model": "缓存车A"}]
+    table = {"scores": {"缓存车A": 93.9}, "sources": {}}
+    r1 = CAV.verify_all(cands, home_fetcher=home_fetch, table=table,
+                        decoded={}, authoritative={}, cache=cache, today="2026-12-01")
+    assert calls["n"] == 1 and r1["per_car"]["缓存车A"]["verified_at"], r1
+    r2 = CAV.verify_all(cands, home_fetcher=home_fetch, table=table,
+                        decoded={}, authoritative={}, cache=cache, today="2026-12-01")
+    assert calls["n"] == 1 and r2["per_car"]["缓存车A"]["from_cache"], "当天不得重抓"
+    r3 = CAV.verify_all(cands, home_fetcher=home_fetch, table=table,
+                        decoded={}, authoritative={}, cache=cache, today="2026-12-02")
+    assert calls["n"] == 2 and not r3["per_car"]["缓存车A"]["from_cache"], "跨天必须失效"
+    return "核验状态带时间戳 + 当天复用/跨天失效/数据变更重核/断网不缓存(+t099)"
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099]
 
 
 def run():
