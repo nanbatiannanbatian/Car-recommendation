@@ -101,6 +101,7 @@ CASES = [
     ("BUG-076", "多源采集无调度层/失败无留痕(待补清单只写「未匹配」)", "v10.1.9"),
     ("BUG-077", "联网取数未强制走research(业务模块可自行requests抓页面)", "v10.2.0"),
     ("BUG-078", "无碰撞成绩车安全分可高于有实锤车(MONA L05 8.6 > bZ5 8.0)", "v10.2.2"),
+    ("BUG-079", "得分率→分数存在两套实现(engine cap9.3 vs research cap10/floor6)", "v10.2.3"),
 ]
 
 
@@ -1839,8 +1840,44 @@ def t078():
     return "举证封顶：无实锤不高于实锤最低、全池无实锤不封顶、漏网被门禁拦、链路+审计+披露"
 
 
+def t079():
+    """碰撞得分率→分数只能有一个算法（contracts/safety_score），两侧不得各写一套。
+
+    2026-11-21 查证「无实锤车安全分过高」时顺带发现：
+    engine/safety_check 按 map_spec（cap 9.3）算，research/sync_cncap 自己写了
+    safety_from_pct（cap 10.0 / floor 6.0）——95%+ 高分段两边结果不同
+    （96% → 9.3 vs 9.65）。research 不能反向依赖 engine，于是各写一套，这正是
+    「同一事实两套算法」的温床。现在算法下沉到契约层，两侧都向下依赖。
+    """
+    from modules.contracts.safety_score import score_from_pct, score_from_grade, score_from_stars
+    from modules.research import sync_cncap as SYNC
+    import importlib
+    importlib.reload(SYNC)   # 防其它测试 patch 过
+
+    # 1) 标定锁死
+    assert score_from_pct(90.7) == 8.7
+    assert score_from_pct(92.7) == 9.0
+    assert score_from_pct(100) == 9.3, "cap 必须是 9.3（不是 10）"
+    assert score_from_pct(86.7) == 8.0
+    assert score_from_pct(92, year=2019, older_before=2021, older_penalty=0.2) == 8.7
+    assert score_from_grade("G+", {"G+": 9.3}) == 9.3
+    assert score_from_stars(5, {"five": 8.3}) == 8.3
+
+    # 2) research 侧必须与契约层逐点一致（含高分段）
+    for pct in (80.0, 86.7, 90.7, 92.7, 95.0, 96.0, 100.0):
+        assert SYNC.safety_from_pct(pct) == score_from_pct(pct), f"{pct}% 两侧不一致"
+
+    # 3) 源码：两侧都不得再有本地公式
+    src_sync = _read("sync_cncap.py")
+    assert "score_from_pct" in src_sync, "sync_cncap 未走契约层"
+    assert "* 0.155" not in src_sync and "*0.155" not in src_sync, "sync_cncap 仍有本地斜率公式"
+    src_sc = _read("safety_check.py")
+    assert "from modules.contracts.safety_score import" in src_sc, "safety_check 未走契约层"
+    return "安全分换算：契约层单一实现（cap 9.3）、两侧逐点一致、源码无本地公式"
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079]
 
 
 def run():

@@ -120,6 +120,8 @@ def main():
     ap.add_argument("--skip-sibling-gate", action="store_true", help="跳过同源车评分一致性门禁(须在报告说明为何无据差异合理)")
     ap.add_argument("--skip-safety-gate", action="store_true", help="跳过安全分严谨性门禁(须在报告说明为何成绩映射分可偏离)")
     ap.add_argument("--html-title", help="HTML 页面标题")
+    ap.add_argument("--no-evidence-cap", action="store_true",
+                    help="不做安全分举证封顶（仅 A/B 对照，验证封顶确实改变分数）")
     ap.add_argument("--no-auto-safety", action="store_true",
                     help="不按官方成绩自动映射 safety 分（仅 A/B 对照；正常出榜不要关）")
     ap.add_argument("--no-backfill", action="store_true",
@@ -194,7 +196,10 @@ def main():
 
     # 举证责任封顶（2026-11-21）：无官方碰撞成绩的车 safety 不得超过有实锤车最低分。
     # 用户质疑 MONA L05「零碰撞成绩却 8.6、比 C-NCAP 86.7% 的 bZ5 还高」。
-    _cap_adj = SFC.evidence_cap(cands)
+    if getattr(a, "no_evidence_cap", False):
+        _cap_adj = []
+    else:
+        _cap_adj = SFC.evidence_cap(cands)
     if _cap_adj:
         print(f"[举证封顶] {len(_cap_adj)} 款无实锤车 safety 封顶至 "
               f"{_cap_adj[0]['capped']:g}（锚点 {_cap_adj[0]['anchor']}）")

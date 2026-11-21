@@ -109,6 +109,8 @@ NEG_DATA = {
     "t077": ("layout_regress.scan_network_egress", None, "clean_egress"),
     # t078：关掉举证封顶（回到「零实锤也能 8.6」），断言必须 FAIL
     "t078": ("safety_check.evidence_cap", None, "no_cap"),
+    # t079：把换算改成恒返回 1.0（等于标定失效），断言必须 FAIL
+    "t079": ("safety_score.score_from_pct", None, "flat_score"),
     # t039 断言从「源码文本含文件名」升级为「文件在同步集里」，探针改成把同步集清空
     "t039": ("sync_to_repo.collect", None, "empty_sync"),
 }
@@ -137,6 +139,7 @@ def _func_probe(name, fn, dotted, mode):
         "no_remote_sid": lambda *a, **kw: (None, None, None),              # 不做远程兜底
         "clean_egress": lambda *a, **kw: [],                               # 越界扫描恒为空
         "no_cap": lambda *a, **kw: [],                                     # 不做举证封顶
+        "flat_score": lambda *a, **kw: 1.0,                                # 换算恒为1.0
         "always_missing": lambda *a, **kw: {"status": "missing", "source": "", "trims": [],
                                            "attempts": [], "evidence": {}, "sid": None,
                                            "ah_name": ""},                # 调度退化为直接失败

@@ -67,6 +67,9 @@ WorkBuddy 用户级 skill。核心是「车型排行榜全链路」：按需搜�
     `universe_*`（盘点产物）、`airbags` / `vehicle_physics` / `baseline_car_ev`
   · 人工条目从 `trims.json` 分离到 `categories/trims_manual.json`，`auto_trims --seed-only`
     先用它生成基础库，再联网叠加自动条目——新装包不会再丢人工核验的配置表。
+- **安全分换算单一入口（v10.2.3）**：`contracts/safety_score.py` 是「得分率/等级/星级 → 0-10 分」
+  的唯一实现（cap 9.3）。此前 `engine/safety_check` 与 `research/sync_cncap` 各写一套
+  （cap 10.0/floor 6.0），95%+ 高分段会给出不同分；research 不能反向依赖 engine，故下沉到契约层。
 - **安全分举证封顶（v10.2.2）**：无官方碰撞成绩的车，`safety` 不得超过「有实锤车里的最低分」
   （`safety_check.evidence_cap()` 出榜前自动执行）。「没测过」不等于不安全，但不能被推断成
   「比测过的更安全」——这是举证责任，不是判劣。全池无实锤时不封顶（没有可校准的锚）。

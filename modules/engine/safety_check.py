@@ -164,26 +164,26 @@ def score_from_crash(spec: dict, parsed: dict) -> tuple:
     if not spec:
         return None, ""
     kind = spec.get("kind")
+    # 换算算法统一在 contracts/safety_score（research 侧也用同一份，避免两套公式）
+    from modules.contracts.safety_score import (
+        score_from_grade, score_from_pct, score_from_stars)
     if kind == "pct":
         pct = parsed.get("score")
         if pct is None:
             return None, ""
-        sc = spec["base"] + (float(pct) - spec["ref"]) * spec["slope"]
-        sc = min(sc, spec.get("cap", 10.0))
-        year = parsed.get("year")
-        if year and year <= spec.get("older_before", 0):
-            sc -= spec.get("older_penalty", 0.0)
-        sc = round(max(0.0, min(10.0, sc)), 1)
+        sc = score_from_pct(pct, base=spec["base"], ref=spec["ref"], slope=spec["slope"],
+                            cap=spec.get("cap", 9.3), floor=spec.get("floor", 0.0),
+                            older_penalty=spec.get("older_penalty", 0.0),
+                            older_before=spec.get("older_before", 0),
+                            year=parsed.get("year"))
         return sc, f"C-NCAP {pct:g}% → {spec['base']}+({pct:g}-{spec['ref']})×{spec['slope']} 封顶{spec.get('cap')}"
     if kind == "grade":
         g = parsed.get("grade")
-        sc = (spec.get("grades") or {}).get(g)
+        sc = score_from_grade(g, spec.get("grades") or {})
         return (sc, f"{parsed.get('system_cn')} {g} → {sc}") if sc is not None else (None, "")
     if kind == "star":
         stars = parsed.get("stars")
-        m = {5: "five", 4: "four", 3: "three"}
-        key = m.get(stars)
-        sc = spec.get(key) if key else None
+        sc = score_from_stars(stars, spec)
         return (sc, f"{parsed.get('system_cn')} {stars}星 → {sc}（无乘员分项取保守档）") if sc is not None else (None, "")
     return None, ""
 

@@ -32,13 +32,12 @@ import sys
 
 
 def safety_from_pct(pct):
-    """综合得分率 → 0–10 分。
-
-    标定：80% → 7.0，90% → 8.55，95% → 9.33。
-    斜率 0.155/百分点，是照着「C-NCAP 五星门槛 83%、五星+ 92%」这组公开门槛定的：
-    刚过五星约 7.5，五星+ 约 8.9。
+    """综合得分率 → 0–10 分。**统一走契约层**（原实现自带一套 cap 10/floor 6，
+    与 official_safety_scores.json 的 cap 9.3 不一致，95%+ 高分段会给出不同分）。
+    保留本函数名只为向后兼容，逻辑不再本地维护。
     """
-    return round(max(6.0, min(10.0, 7.0 + (float(pct) - 80.0) * 0.155)), 1)
+    from modules.contracts.safety_score import score_from_pct
+    return score_from_pct(pct)
 
 
 def main():
