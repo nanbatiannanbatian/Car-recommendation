@@ -66,7 +66,43 @@ AH_BAT_IDS = {
     "charge_range": 9030,    # 电池快充区间(%)，如 10-80
     "charge_power_kw": 8459,  # 对外充电功率(kW)——超充能力；无快充时间的车靠它
     "swap": 8456,             # 换电——补能方式（蔚来/乐道等）
+    "cooling": 8458,          # 电池冷却方式（液冷/直冷）——影响快充与热管理
 }
+
+# ── v10.12.1：第二批提取（车身组 + 基本参数组）────────────────────────────
+# 起因（2026-11-22 用户追问「为什么没被提取」时的全字段盘点）：
+#   parse_config 原来只认「电池/充电」组（in_bat_group 判断），
+#   其余 5 个组的字段**解析进了内存却被整体丢弃**。实测极氪7X/启源Q06 两页：
+#   「车身」组有轴距 2925mm、后备厢 905–1978L、前备箱 38L、风阻 0.247、车身结构；
+#   「基本参数」组有官方零百 5.4s、整备质量 2280kg、上市 2025.10、最大功率 370kW。
+#   这些正是空间维封顶、储物披露、操控规则、生命周期**已经在用**的概念——
+#   规则接不上不是规则缺失，是数据没接进来。
+# 字段名普遍被 CSS 混淆（「(mm)」「备厢(L)」「阻系数(Cd)」这类还算好认，
+# 「(kg)」「(mm)」这类则完全认不出），所以一律**按 id + 组名定位**，不靠名字。
+AH_BODY_IDS = {          # 「车身」组
+    "wheelbase_mm": 1169,     # 轴距 —— 空间维封顶的首选代理（原覆盖率 0%）
+    "length_mm": 5886,
+    "width_mm": 5887,
+    "height_mm": 5888,
+    "trunk_l": 1175,          # 后备厢容积(L)，值形如 "905-1978"（常规-放倒）
+    "frunk_l": 9009,          # 前备箱容积(L)
+    "cd": 1370,               # 风阻系数
+    "body_structure": 1147,   # 车身结构（5门5座SUV / SUV）
+}
+AH_BASE_IDS = {          # 「基本参数」组
+    "zero_to_100_s": 1250,    # 官方 0-100km/h 加速(s) —— 操控规则用
+    "max_power_kw": 1185,
+    "max_torque_nm": 9167,
+    "curb_weight_kg": 1171,   # 整备质量
+    "max_loaded_kg": 8445,
+    "launch_month": 8453,     # 上市时间（生命周期缺的那一项）
+    "dims_mm": 1148,          # 长*宽*高(mm) 合并字段（车身组分列缺失时的兜底）
+}
+
+# 「底盘转向」「车轮制动」两组对**纯电车整组为空**（实测极氪7X/启源Q06：
+# 有值数均为 0）——汽车之家给燃油车填「前/后悬架类型、驱动方式」，
+# 纯电车不填。所以操控规则里的悬架/驱动**拿不到官方值**，
+# 只能靠各车取证文本提取（score_audit._EXTRACT）。这条写进已知边界，不假装能采到。
 
 # 官方产品名 → 电芯厂商。这是厂商自己的产品命名（刀片=弗迪、麒麟=宁德），
 # 属可核验的官方字段映射，不是推断；映射结果在 note 里标明来源字段。
@@ -265,11 +301,28 @@ def parse_config(sid, pure_ev_only=True):
         return None, err
     pt = (cfg.get("result") or {}).get("paramtypeitems") or []
     specs = {}
-    bat: dict[str, dict] = {}          # specid → 电池组关键字段（按 id 定位）
+    bat: dict[str, dict] = {}          # specid → 关键字段（按 id 定位）
     price_cols = []
+    # v10.12.1：不再只认「电池/充电」组——原来 in_bat_group 的判断让其余 5 个组
+    # 的字段解析进内存后被整体丢弃。组优先级解决少数 id 跨组冲突：
+    #   id=1147 车身结构：基本参数组「5门5座SUV」比车身组「SUV」信息更全 → 取前者
+    #   id=1185 最大功率：基本参数组是电机总功率，发动机组是同车系燃油款 → 取前者
+    _GROUP_PRIORITY = ("基本参数", "电池", "车身")
+    def _prio(g):
+        gn = str(g.get("groupname") or g.get("name") or "")
+        for i, p in enumerate(_GROUP_PRIORITY):
+            if p in gn:
+                return i
+        return len(_GROUP_PRIORITY)
+    # id → 字段名 的反向表（合并三张 id 表；同 id 冲突时先到先得：
+    # 基本参数 优先于 电池 优先于 车身，与 _GROUP_PRIORITY 一致）
+    _ALL_IDS: dict[int, str] = {}
+    for _d in (AH_BASE_IDS, AH_BODY_IDS, AH_BAT_IDS):
+        for _k, _v in _d.items():
+            _ALL_IDS.setdefault(_v, _k)
+    pt = sorted(pt, key=_prio)
     for gi, grp in enumerate(pt):
         gname = str(grp.get("groupname") or grp.get("name") or "")
-        in_bat_group = "电池" in gname
         for ii, it in enumerate(grp.get("paramitems") or []):
             nm = clean(it.get("name"))
             fid = it.get("id")
@@ -279,12 +332,14 @@ def parse_config(sid, pure_ev_only=True):
                 if sid2 is None:
                     continue
                 specs.setdefault(sid2, {})[nm] = val
-                if in_bat_group:
-                    slot = bat.setdefault(sid2, {})
-                    for key, want_id in AH_BAT_IDS.items():
-                        if fid == want_id:
-                            slot.setdefault(key, val)
-                    slot.setdefault("_names", {})[nm] = val
+                slot = bat.setdefault(sid2, {})
+                key = _ALL_IDS.get(fid)
+                # id 不可靠的少数字段（「电池(分钟)」id=-1）按「电池组 + 骨架名」定位
+                if key is None and "电池" in gname and nm == "电池(分钟)":
+                    key = "fast_charge_min"
+                if key and slot.get(key) in (None, "", "-", "—"):
+                    slot[key] = val
+                    slot.setdefault("_names", {})[key] = val
             # 按 specid 记录能源类型（同一列在基本参数/底盘两组里会重复出现）
             if nm == "能源类型":
                 for sid2, val in zip(ids, vals):
@@ -358,36 +413,31 @@ def parse_config(sid, pure_ev_only=True):
         b = bat.get(sid2, {})
         bn = b.get("_names", {})
 
-        def _bv(key, *names):
-            """电池字段取值：id 定位优先，清洗后字段名兜底。"""
+        def _bv(key):
+            """字段取值：按 id（或电池组骨架名）定位后的值；无值 → None。"""
             v = b.get(key)
-            if v not in (None, "", "-", "—"):
-                return v
-            for n in names:
-                if bn.get(n) not in (None, "", "-", "—"):
-                    return bn[n]
-            return None
+            return None if v in (None, "", "-", "—") else v
 
         volt_n = None
-        v_raw = _bv("voltage", "高压平台（V）", "高压平台(V)")
+        v_raw = _bv("voltage")
         if v_raw:
             mv = re.search(r"(\d{3,4})", str(v_raw))
             if mv:
                 volt_n = int(mv.group(1))
         rng_pair = None
-        r_raw = _bv("charge_range", "电池范围(%)")
+        r_raw = _bv("charge_range")
         if r_raw:
             mr = re.search(r"(\d+)\s*[-–]\s*(\d+)", str(r_raw))
             if mr:
                 rng_pair = (int(mr.group(1)), int(mr.group(2)))
         fast_min = None
-        h_raw = _bv("fast_charge_h", "电池(小时)")
+        h_raw = _bv("fast_charge_h")
         if h_raw:
             mf = re.search(r"(\d+(?:\.\d+)?)", str(h_raw))
             if mf:
                 fast_min = round(float(mf.group(1)) * 60)
         if fast_min is None:
-            m_raw = _bv("fast_charge_min", "电池(分钟)")
+            m_raw = _bv("fast_charge_min")
             if m_raw:
                 mf = re.search(r"(\d+(?:\.\d+)?)", str(m_raw))
                 if mf:
@@ -404,8 +454,8 @@ def parse_config(sid, pure_ev_only=True):
                 cparts.append(f"约 {fast_min}min")
         charge = " · ".join(cparts) if cparts else None
 
-        tech = _bv("battery_tech", "电池特有技术")
-        cell_raw = _bv("cell_supplier", "电芯品牌")
+        tech = _bv("battery_tech")
+        cell_raw = _bv("cell_supplier")
         cell_supplier, cell_src = None, ""
         if cell_raw:
             cell_supplier, cell_src = str(cell_raw), "电芯品牌"
@@ -415,7 +465,7 @@ def parse_config(sid, pure_ev_only=True):
                 cell_supplier, cell_src = mapped, f"电池特有技术（{tech}）"
 
         cons_n = None
-        c_raw = _bv("consumption", "百公里耗(kWh/100km)", "百公里耗电量(kWh/100km)")
+        c_raw = _bv("consumption")
         if c_raw:
             mc = re.search(r"(\d+(?:\.\d+)?)", str(c_raw))
             if mc:
@@ -430,16 +480,49 @@ def parse_config(sid, pure_ev_only=True):
         # 有一批车（特斯拉/小鹏MONA 等）参数页**不给**快充时间与电压，
         # 只有这个功率字段——它是快充能力的唯一一手依据。
         power_kw = None
-        p_raw = _bv("charge_power_kw", "功率(kW)")
+        p_raw = _bv("charge_power_kw")
         if p_raw:
             mp = re.search(r"(\d+(?:\.\d+)?)", str(p_raw))
             if mp:
                 power_kw = float(mp.group(1))
 
+        cooling = _bv("cooling")   # 液冷 / 直冷：影响快充与热管理
+
         swap = None
-        s_raw = _bv("swap", "换电")
+        s_raw = _bv("swap")
         if s_raw and str(s_raw).strip() not in ("-", "—"):
             swap = str(s_raw).strip()
+
+        # ── 第二批：车身组 / 基本参数组（v10.12.1）──
+        def _num_of(key):
+            v = _bv(key)
+            if v is None:
+                return None
+            m = re.search(r"-?\d+(?:\.\d+)?", str(v))
+            return float(m.group(0)) if m else None
+
+        wheelbase_mm = _num_of("wheelbase_mm")
+        length_mm = _num_of("length_mm")
+        width_mm = _num_of("width_mm")
+        height_mm = _num_of("height_mm")
+        if None in (length_mm, width_mm, height_mm):
+            dims = _bv("dims_mm")          # "4825*1930*1666" 兜底
+            if dims:
+                mm = re.findall(r"\d+(?:\.\d+)?", str(dims))
+                if len(mm) >= 3:
+                    length_mm = length_mm or float(mm[0])
+                    width_mm = width_mm or float(mm[1])
+                    height_mm = height_mm or float(mm[2])
+        trunk_l = _num_of("trunk_l")       # "905-1978" → 常规容积 905
+        frunk_l = _num_of("frunk_l")
+        cd = _num_of("cd")
+        body_structure = _bv("body_structure")
+        zero_to_100_s = _num_of("zero_to_100_s")
+        max_power_kw = _num_of("max_power_kw")
+        max_torque_nm = _num_of("max_torque_nm")
+        curb_weight_kg = _num_of("curb_weight_kg")
+        max_loaded_kg = _num_of("max_loaded_kg")
+        launch_month = _bv("launch_month")
 
         yr = re.search(r"(20\d{2})款", name)
         bits = ["自动解析自汽车之家参数页"]
@@ -462,7 +545,15 @@ def parse_config(sid, pure_ev_only=True):
             "supplier_class": ("single_named" if cell_supplier else "undisclosed"),
             "cltc_km": cltc, "charge": charge, "motor_kw": motor,
             "consumption": cons_n, "charge_power_kw": power_kw, "swap": swap,
-            "voltage_v": voltage_v,
+            "voltage_v": voltage_v, "battery_cooling": cooling,
+            # v10.12.1：车身 / 基本参数组字段（官方一手值）
+            "wheelbase_mm": wheelbase_mm, "length_mm": length_mm,
+            "width_mm": width_mm, "height_mm": height_mm,
+            "trunk_l": trunk_l, "frunk_l": frunk_l, "cd": cd,
+            "body_structure": body_structure,
+            "zero_to_100_s": zero_to_100_s, "max_power_kw": max_power_kw,
+            "max_torque_nm": max_torque_nm, "curb_weight_kg": curb_weight_kg,
+            "max_loaded_kg": max_loaded_kg, "launch_month": launch_month,
             "key_configs": [], "group": (yr.group(1) + "款") if yr else "在售",
             "note": "；".join(bits),
         })
@@ -647,7 +738,12 @@ def refresh_entries(db: dict, index: dict, cands: list[dict],
                 continue
             for k in ("cell_supplier", "supplier_class", "charge",
                       "consumption", "charge_power_kw", "swap", "voltage_v",
-                      "battery_type"):
+                      "battery_type", "battery_cooling",
+                      # v10.12.1：车身 / 基本参数组
+                      "wheelbase_mm", "length_mm", "width_mm", "height_mm",
+                      "trunk_l", "frunk_l", "cd", "body_structure",
+                      "zero_to_100_s", "max_power_kw", "max_torque_nm",
+                      "curb_weight_kg", "max_loaded_kg", "launch_month"):
                 nv = t.get(k)
                 if nv in (None, "", "—"):
                     continue

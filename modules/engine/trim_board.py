@@ -74,6 +74,11 @@ def spec_from_trim(trim: dict, base_spec: dict | None = None) -> dict:
     _equiv, _why = _TA.charge_minutes(trim)
     if _equiv is not None:
         s["charge_10_80_min"] = _equiv
+    # v10.12.1：官方 0-100km/h 加速（汽车之家参数页「基本参数」组 id=1250）。
+    # 操控规则的零百项原先只能从各车取证文本正则提取，覆盖极低；
+    # 现在有官方值就以官方值为准（官方值优先于媒体/车主口述）。
+    if trim.get("zero_to_100_s") is not None:
+        s["zero_to_100_s"] = trim["zero_to_100_s"]
     kcs = [str(x) for x in (trim.get("key_configs") or [])]
     if any("激光雷达" in x for x in kcs):
         s["adas_lidar"] = True

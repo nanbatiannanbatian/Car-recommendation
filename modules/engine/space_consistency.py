@@ -87,11 +87,73 @@ def _load_physics():
     return {canon(x.get("model") or ""): x for x in d.get("cars", [])}
 
 
+_TRIM_WB_CACHE: dict | None = None
+
+
+def _load_trim_wheelbase() -> dict:
+    """trims.json 里的**官方轴距**：{canon(车型): wheelbase_mm}。
+
+    2026-11-22：汽车之家参数页「车身」组（id=1169）有官方轴距，实测覆盖 382/427 配置；
+    而 `vehicle_physics.json` 的 `wheelbase_mm` 覆盖率**一直是 0%** —— 空间维封顶因此
+    长期只能用车身三维体积做代理。官方轴距更准（它就是轴距，不是体积近似）。
+    """
+    global _TRIM_WB_CACHE
+    if _TRIM_WB_CACHE is not None:
+        return _TRIM_WB_CACHE
+    out: dict = {}
+    try:
+        import os
+        import paths
+        from modules.contracts.model_names import canon
+        p = str(paths.cat("trims.json"))
+        if os.path.exists(p):
+            d = json.load(open(p, encoding="utf-8"))
+            for e in d.get("entries", []):
+                m = e.get("model")
+                if not m:
+                    continue
+                vals = [t.get("wheelbase_mm") for t in (e.get("trims") or [])
+                        if isinstance(t.get("wheelbase_mm"), (int, float)) and t.get("wheelbase_mm")]
+                if vals:
+                    vals.sort()
+                    out[canon(m)] = float(vals[len(vals) // 2])
+    except (ImportError, OSError, ValueError):
+        out = {}
+    _TRIM_WB_CACHE = out
+    return out
+
+
 def size_of(c, physics=None):
-    """返回 (size, basis)：优先轴距(mm)，否则长×宽×高体积(m³)；无数据返回 (None, None)。"""
+    """返回 (size, basis)：优先官方轴距(mm)，否则长×宽×高体积(m³)；无数据返回 (None, None)。
+
+    数据源优先级：
+      · **显式传入 physics** → 只用这份数据（测试隔离/调用方指定口径），
+        它没有轴距才退官方轴距。传了 physics 却混进全局 trims 的真车轴距，
+        会让 selftest 的构造样本被真实数据盖掉（t083/t084 曾因此失效）。
+      · 默认 → 官方轴距（trims.json 汽车之家参数页「车身」组）→ 人工库轴距 → 人工库体积。
+    """
     from modules.contracts.model_names import canon
-    phys = physics if physics is not None else _load_physics()
-    rec = phys.get(canon(c.get("model") or ""))
+    key = canon(c.get("model") or "")
+    if physics is not None:
+        rec = physics.get(key)
+        wb = (rec or {}).get("wheelbase_mm")
+        if isinstance(wb, (int, float)) and wb > 0:
+            return float(wb), "wheelbase_mm"
+        # 官方轴距比体积更准（它就是轴距，不是外廓近似）——放在体积之前。
+        # 顺序反了的话，vehicle_physics 有长宽高就永远走体积，官方轴距白接。
+        tb = _load_trim_wheelbase().get(key)
+        if isinstance(tb, (int, float)) and tb > 0:
+            return float(tb), "wheelbase_mm(官方)"
+        if rec:
+            L, W, H = rec.get("length_mm"), rec.get("width_mm"), rec.get("height_mm")
+            if all(isinstance(x, (int, float)) and x > 0 for x in (L, W, H)):
+                return round(L * W * H / 1e9, 3), "volume_m3"
+        return None, None
+    tb = _load_trim_wheelbase().get(key)
+    if isinstance(tb, (int, float)) and tb > 0:
+        return float(tb), "wheelbase_mm(官方)"
+    phys = _load_physics()
+    rec = phys.get(key)
     if not rec:
         return None, None
     wb = rec.get("wheelbase_mm")
@@ -169,7 +231,10 @@ def calibrate_space(cands, physics=None, tol=TOL, min_peers=MIN_PEERS,
         capped_models.add(c.get("model"))
 
     # ── 信号 2：得房率真实性封顶（低得房率却高分）──
-    # 锚点群体 = 同尺寸(>=本车) 且 得房率 >= EFF_NORMAL_MIN 的车。
+    # v10.12.1：锚点群体**不再限定同尺寸** —— 得房率是「套内/车长」的**比例**，
+    # 与车长无关，跨尺寸可比；而轴距/体积是绝对尺寸，跨尺寸不可比。
+    # 之前把锚点绑在「同尺寸」上，接了官方轴距后对照组骤减（腾势N7 的同轴距
+    # 得房率正常车只剩 0 个）→ 样本不足 → 低得房率虚高反而抓不到了（机制被削弱）。
     # 双条件防噪声：本车得房率 < 锚点群体下沿 - eff_gap，且 space > 锚点中位 + tol。
     for c, space, size, basis, eff in scored:
         if c.get("model") in capped_models:
@@ -180,8 +245,7 @@ def calibrate_space(cands, physics=None, tol=TOL, min_peers=MIN_PEERS,
             continue
         normal = [(c2.get("model"), sp2, eff2) for c2, sp2, sz2, _, eff2 in scored
                   if sp2 is not None and eff2 is not None
-                  and eff2 >= EFF_NORMAL_MIN
-                  and sz2 is not None and sz2 >= size - 1e-9]
+                  and eff2 >= EFF_NORMAL_MIN]
         if len(normal) < min_eff_peers:
             continue
         eff_values = [e for _, _, e in normal]
@@ -194,7 +258,7 @@ def calibrate_space(cands, physics=None, tol=TOL, min_peers=MIN_PEERS,
             continue
         prev = space
         _apply_cap(c, anchor, prev,
-                   f"得房率仅 {eff:g}%，明显低于同尺寸正常车（{len(normal)}款，最低 {normal_floor:g}%）"
+                   f"得房率仅 {eff:g}%，明显低于得房率正常车（{len(normal)}款，最低 {normal_floor:g}%）"
                    f"的 space 中位 {anchor:g}",
                    out, "efficiency", eff_tol, len(normal), "efficiency")
         capped_models.add(c.get("model"))
@@ -245,24 +309,26 @@ def summarize(adjustments, uncalibrated=None):
 def selftest() -> int:
     """空间一致性封顶的单元回归（MONA 场景 + 小样本 + 容忍带 + 不倒扣）。"""
     # 构造体积（m³）与 space，模拟真实分布：MONA 体积中上却给全场最高
+    # v10.12.1：车名用**假名**（真车名会被 trims.json 里的真实官方轴距盖掉，
+    # 构造样本就失效了——2026-11-22 首次接官方轴距时踩过）。
     physics = {
-        "小鹏monal05": {"length_mm": 4870, "width_mm": 1930, "height_mm": 1636},  # 15.38
-        "蔚来es6": {"length_mm": 4854, "width_mm": 1995, "height_mm": 1703},       # 16.49
-        "长安启源q06": {"length_mm": 4837, "width_mm": 1970, "height_mm": 1670},   # 15.91
-        "零跑c11": {"length_mm": 4780, "width_mm": 1905, "height_mm": 1658},       # 15.10
-        "小鹏g6": {"length_mm": 4758, "width_mm": 1920, "height_mm": 1650},        # 15.07
-        "问界m5": {"length_mm": 4785, "width_mm": 1930, "height_mm": 1620},        # 14.96
+        "尺寸车a": {"length_mm": 4870, "width_mm": 1930, "height_mm": 1636},  # 15.38
+        "尺寸车b": {"length_mm": 4854, "width_mm": 1995, "height_mm": 1703},   # 16.49
+        "尺寸车c": {"length_mm": 4837, "width_mm": 1970, "height_mm": 1670},   # 15.91
+        "尺寸车d": {"length_mm": 4780, "width_mm": 1905, "height_mm": 1658},   # 15.10
+        "尺寸车e": {"length_mm": 4758, "width_mm": 1920, "height_mm": 1650},    # 15.07
+        "尺寸车f": {"length_mm": 4785, "width_mm": 1930, "height_mm": 1620},    # 14.96
     }
     def mk(m, sp):
         return {"model": m, "scores": {"space": sp}}
-    cands = [mk("小鹏MONA L05", 9.3), mk("蔚来ES6", 8.3), mk("长安启源Q06", 8.8),
-             mk("零跑C11", 9.2), mk("小鹏G6", 8.0), mk("问界M5纯电版", 7.6)]
+    cands = [mk("尺寸车A", 9.3), mk("尺寸车B", 8.3), mk("尺寸车C", 8.8),
+             mk("尺寸车D", 9.2), mk("尺寸车E", 8.0), mk("尺寸车F", 7.6)]
     adj, uncal = calibrate_space(cands, physics=physics)
     got = {a["model"]: a["capped"] for a in adj}
-    assert "小鹏MONA L05" in got, f"MONA 虚高未被抓出: {got}"
-    assert got["小鹏MONA L05"] < 9.3, "MONA 未被封顶"
-    assert "蔚来ES6" not in got, "体积最大且分最低的车不该被封顶"
-    assert cands[1]["scores"]["space"] == 8.3, "不倒扣：ES6 原分保持"
+    assert "尺寸车A" in got, f"虚高样本未被抓出: {got}"
+    assert got["尺寸车A"] < 9.3, "虚高样本未被封顶"
+    assert "尺寸车B" not in got, "体积最大且分最低的车不该被封顶"
+    assert cands[1]["scores"]["space"] == 8.3, "不倒扣：原分保持"
     assert all(c.get("score_cap_reasons") for c in cands if c["model"] in got), "封顶未留审计"
     assert uncal == [], f"6 款都有尺寸，不该有 uncalibrated: {uncal}"
 

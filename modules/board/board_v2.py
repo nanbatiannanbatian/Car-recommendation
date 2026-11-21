@@ -99,15 +99,19 @@ def energy_facts(rows: list[dict], trim_data: dict | None) -> dict:
 
 
 def space_facts(rows: list[dict], cands: list[dict]) -> dict:
-    """逐车空间与储物事实：车身尺寸（vehicle_physics）+ 容积/得房率（evidence 提取）。
+    """逐车空间与储物事实：车身尺寸（官方优先）+ 容积/得房率（官方优先，evidence 兜底）。
 
     2026-11-21 新增：后备箱/前备箱容积此前被 space_features 标成「仅披露不进分」，
     而页面连披露都没有——用户问「极氪7X 后备箱好像大一点」时页面给不出答案。
+    2026-11-22 补：汽车之家参数页「车身」组有**官方**后备厢容积（id=1175）与前备箱（9009）、
+    轴距（1169）、风阻（1370），覆盖 356/177/382 个配置——官方值优先，
+    evidence 文本提取只在官方缺失时兜底。
     本区块只做**披露**：后备箱大不等于乘坐空间好（容积装东西、空间坐人），
     绝不据此加分，只作为「空间一致性封顶」的旁证与读者判断依据。
     """
     from modules.contracts.model_names import canon
     from modules.engine.space_features import extract_space_features
+    from modules.engine import trim_board as TB
     phys: dict[str, dict] = {}
     p = str(paths.cat("vehicle_physics.json"))
     if os.path.exists(p):
@@ -116,20 +120,39 @@ def space_facts(rows: list[dict], cands: list[dict]) -> dict:
                 phys[canon(x.get("model"))] = x
         except (OSError, ValueError):
             pass
+    trims_db = TB.load_trims()
     by_model = {c.get("model"): c for c in cands}
     out: dict[str, dict] = {}
     for r in rows:
         m = r.get("model")
         c = by_model.get(m) or {}
         rec = phys.get(canon(m)) or {}
-        d = {
-            "wheelbase_mm": rec.get("wheelbase_mm"),
-            "length_mm": rec.get("length_mm"),
-            "width_mm": rec.get("width_mm"),
-            "height_mm": rec.get("height_mm"),
-        }
+        d: dict = {}
+        # ① 官方（trims.json 汽车之家参数页）优先
+        entry = trims_db.get(m) or {}
+        tl = entry.get("trims") or []
+        ref = entry.get("scored_trim_ref")
+        pick = next((t for t in tl if ref and t.get("name") == ref), None)
+        if pick is None and tl:
+            pick = max(tl, key=lambda t: t.get("price") or 0)
+        if pick:
+            for k_out, k_in in (("wheelbase_mm", "wheelbase_mm"),
+                                ("length_mm", "length_mm"),
+                                ("width_mm", "width_mm"),
+                                ("height_mm", "height_mm"),
+                                ("trunk", "trunk_l"), ("frunk", "frunk_l"),
+                                ("cd", "cd")):
+                v = pick.get(k_in)
+                if v is not None:
+                    d[k_out] = v
+        # ② 人工采集的 vehicle_physics 兜底
+        for k in ("wheelbase_mm", "length_mm", "width_mm", "height_mm"):
+            if d.get(k) is None and rec.get(k) is not None:
+                d[k] = rec.get(k)
+        # ③ evidence 文本提取兜底（容积/得房率/后排空间）
         for f in extract_space_features(c):
-            d[f["key"]] = f["value"]
+            if d.get(f["key"]) in (None, ""):
+                d[f["key"]] = f["value"]
         out[m] = d
     return out
 

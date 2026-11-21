@@ -126,6 +126,7 @@ CASES = [
     ("BUG-101", "同一车辆事实散落5处各自手写:改一处漏多处、无唯一真相源与漂移检测", "v10.10.0"),
     ("BUG-102", "import别名碰撞:space_features的SF覆盖score_fingerprint的SF,报告段SF.skill_version()崩溃", "v10.10.1"),
     ("BUG-103", "配置驱动规则从未进主榜:极氪7X三电拿不到900V/快充加分反低于T6,后备箱容积页面零披露", "v10.11.0"),
+    ("BUG-104", "参数页字段大量未提取(只认电池组),缺口被伪装成数据源没有:轴距/后备厢/零百全丢且无门禁", "v10.12.1"),
 ]
 
 
@@ -2141,20 +2142,28 @@ def t083():
     by_sig = {}
     for a in adj:
         by_sig.setdefault(a.get("signal", "size"), {})[a["model"]] = a["capped"]
-    assert by_sig.get("size") == {"小鹏MONA L05": 8.8}, f"体积信号应只命中 MONA→8.8: {by_sig}"
+    # v10.12.1：尺寸口径从「车身三维体积」换成**官方轴距**（汽车之家参数页「车身」组
+    # id=1169，覆盖 382/427 配置；此前 vehicle_physics 的轴距覆盖率一直是 0%）。
+    # 轴距是直接量，比外廓体积近似更准。命中面随之变化：
+    #   MONA L05 9.3→8.7、零跑C11 9.2→8.6（官方轴距口径）
+    assert by_sig.get("size") == {"小鹏MONA L05": 8.7, "零跑C11": 8.6}, \
+        f"官方轴距信号应命中 MONA→8.7 / C11→8.6: {by_sig}"
     assert by_sig.get("efficiency") == {"腾势N7": 8.3}, f"得房率信号应只命中 N7→8.3: {by_sig}"
     assert uncal == [], f"本榜 21 款都有尺寸: {uncal}"
-    touched = {"小鹏MONA L05", "腾势N7"}
+    touched = {"小鹏MONA L05", "零跑C11", "腾势N7"}
     assert all(before.get(c["model"]) == (c.get("scores") or {}).get("space")
                for c in cands if c["model"] not in touched), "不得误伤其他车"
     mona = [c for c in cands if c["model"] == "小鹏MONA L05"][0]
     assert mona.get("score_cap_reasons"), "封顶未留审计理由"
     assert adj[0]["peers"] >= SP.MIN_PEERS, "锚点样本不足"
 
-    # 3) 标定唯一性：TOL 放宽到 0.5 会漏掉 MONA（证明 0.4 是必要的，不是随意取）
+    # 3) 标定唯一性：TOL 放宽到 0.6 会漏掉 MONA/C11（证明 0.4 不是随意取）
+    #    v10.12.1：官方轴距口径下超出量变大（MONA 超中位 0.6），阈值须卡在 0.4~0.5
     c2 = copy.deepcopy(pool["candidates"])
-    a2, _ = SP.calibrate_space(c2, tol=0.5)
-    assert "小鹏MONA L05" not in {a["model"] for a in a2}, "tol 必须卡在 0.4"
+    a2, _ = SP.calibrate_space(c2, tol=0.6)
+    assert "小鹏MONA L05" not in {a["model"] for a in a2}, "tol 必须卡在 0.4~0.5"
+    a3, _ = SP.calibrate_space(copy.deepcopy(pool["candidates"]), tol=0.4)
+    assert "小鹏MONA L05" in {a["model"] for a in a3}, "tol=0.4 必须仍能抓住 MONA"
 
     # 4) research 补硬数据的可复用提取器：只提取待核实、不误伤
     dims = FE.extract_dimensions("车身尺寸 4870×1930×1636mm，轴距 2900mm", model="X")
@@ -2167,7 +2176,7 @@ def t083():
     assert "space_consistency" in src and "calibrate_space" in src, "pipeline 未接空间校准"
     assert '"space_calibration"' in src, "summary 缺 space 校准审计"
     assert "no_space_cap" in src, "缺 A/B 对照开关"
-    return "空间虚高根治：硬数据一致性封顶(只命中MONA9.3→8.8)+不倒扣+research补尺寸"
+    return ("空间虚高根治：官方轴距一致性封顶(MONA9.3→8.7/C11 9.2→8.6)+得房率封顶(N7 8.5→8.3，锚点跨尺寸因为得房率是比例)+不倒扣+research补尺寸")
 
 
 def t084():
@@ -3128,8 +3137,49 @@ def t103():
             "T6缺电压不参与高压项 + 三电补能与空间储物区块已披露(+t103)")
 
 
+def t104():
+    """参数页字段台账自洽 + 车身/基本参数组字段已接入（v10.12.1）。
+
+    用户 2026-11-22 追问：「高压平台(V)、快充时间+区间、百公里耗电、电芯品牌
+    全都躺在参数页里没被提取，为什么没被提取？以后还会不会出现这样的问题？」
+
+    根因：`auto_trims.parse_config` 原来只认「电池/充电」组，其余 5 个组的字段
+    解析进内存后被整体丢弃；且写的是硬编码 None + partial_fields 标记，
+    **缺口被伪装成「数据源没有」**，既不报错也没有回归能发现。
+
+    本条锁住「以后不再出现」的机制：
+      ① 台账自洽——参数页每个已知字段都必须要么被提取、要么写明跳过理由；
+      ② 车身/基本参数组的关键字段确实接进来了（轴距/后备厢/零百/风阻/上市时间）；
+      ③ 空间维已改用官方轴距（此前覆盖率 0%，长期只能用体积代理）。
+    """
+    from modules.research import param_field_audit as PFA
+    assert PFA.selftest() == 0, "参数页字段台账自检失败"
+    # ① 台账完整性：既没提取也没解释的字段 = 0
+    assert not PFA.unassigned_fields(), f"有字段既没提取也没解释: {PFA.unassigned_fields()}"
+    assert not PFA.orphan_skips(), f"跳过理由指向台账外 id: {PFA.orphan_skips()}"
+    # ② 提取清单含车身/基本参数组（原来只有电池组）
+    at = _read("modules/research/auto_trims.py")
+    for token in ("AH_BODY_IDS", "AH_BASE_IDS"):
+        assert token in at, f"auto_trims 缺 {token}（车身/基本参数组未纳入提取）"
+    for fid in ('"wheelbase_mm": 1169', '"trunk_l": 1175', '"zero_to_100_s": 1250'):
+        assert fid in at, f"auto_trims 未按 id 提取 {fid}"
+    # ③ 空间维已优先用官方轴距
+    sc = _read("modules/engine/space_consistency.py")
+    assert "_load_trim_wheelbase" in sc, "空间维未接官方轴距"
+    assert "wheelbase_mm(官方)" in sc, "官方轴距未作为首选尺寸口径"
+    # ④ 官方零百已进操控规则入参
+    tb = _read("modules/engine/trim_board.py")
+    assert 'trim.get("zero_to_100_s")' in tb, "官方零百未接进 spec 入参"
+    # ⑤ 契约里有这批新字段（缺字段会被契约校验拒）
+    ts = _read("modules/contracts/trims_schema.py")
+    for f in ("wheelbase_mm", "trunk_l", "zero_to_100_s", "launch_month"):
+        assert f in ts, f"契约缺字段 {f}"
+    return ("参数页字段台账自洽(81项:已提取29/已解释跳过52/无归属0) + 车身与基本参数组"
+            "按id提取(轴距/后备厢/零百/风阻/上市) + 空间维改用官方轴距(+t104)")
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104]
 
 
 def run():

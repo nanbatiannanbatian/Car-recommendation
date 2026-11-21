@@ -25,7 +25,16 @@ SUPPLIER_CLASS_LABELS = {
 
 TRIM_FIELDS = ("name", "price", "battery_kwh", "battery_type", "cell_supplier",
                "supplier_class", "cltc_km", "charge", "motor_kw", "key_configs",
-               "group", "note", "consumption", "charge_power_kw", "swap", "voltage_v")
+               "group", "note", "consumption", "charge_power_kw", "swap", "voltage_v",
+               # v10.12.1：第二批——「车身」「基本参数」组补提取。
+               # 起因：盘点发现汽车之家参数页的可用字段**远多于**原先提取的 6 项，
+               # 轴距/后备厢/零百/风阻/整备质量/上市时间全部躺在内存里被丢弃，
+               # 而空间维（轴距封顶）、储物披露、操控规则、生命周期**都已经在用这些概念**。
+               # 字段名常被 CSS 混淆成「(mm)」「备厢(L)」之类，只能靠 id 定位。
+               "wheelbase_mm", "length_mm", "width_mm", "height_mm",
+               "trunk_l", "frunk_l", "cd", "body_structure",
+               "zero_to_100_s", "max_power_kw", "max_torque_nm",
+               "curb_weight_kg", "launch_month", "max_loaded_kg", "battery_cooling")
 # consumption = 官方电耗（kWh/100km），来自汽车之家参数页「百公里耗(kWh/100km)」。
 # 2026-11-21 新增：此前电耗只有人工采集的 vehicle_physics.json（51/67 覆盖），
 # 自动采集这一路一直漏采，导致能效强/弱的车在三电维上被系统性低估或高估。
