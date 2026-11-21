@@ -1,0 +1,140 @@
+{
+  "note": "数据源注册表：记录所有体验数据的候选渠道、接入状态、接入条件与限制。目的：避免'以为数据都有其实只接了一部分'，也给未来扩展留明确清单。状态定义：integrated=已接入并入库；partial=部分接入(仅网搜公开结论，未走API)；available_needs_auth=有官方通道但需企业资质/商务/凭据；ugc_needs_credentials=UGC平台需用户凭据；third_party_paid=需第三方付费接口；legal_risk=合规风险高不建议采集。",
+  "updated": "2026-11-19",
+  "principles": [
+    "R1 可核验：每条入库证据必须有 platform + url + date + claim（投资或口碑类url可为空但须标候选池来源）",
+    "R2 分口径：independent_test > up_review > owner_report > vendor_claim；跨口径不混算",
+    "R3 不打分红线：拆车/单样本/网帖个例只作置信因子或附注，不进分数",
+    "R4 合规：不绕反爬、不采个人信息、只留聚合与趋势；UGC原文不长期存档"
+  ],
+  "sources": [
+    {
+      "id": "dongchedi_web",
+      "name": "懂车帝（公开网页/网搜转载）",
+      "status": "partial",
+      "data_types": ["懂车帝实测(麋鹿/制动/高速续航)", "36车城市NOA通过率", "懂车分"],
+      "used_for": ["control", "powertrain", "adas"],
+      "evidence_count_current": 9,
+      "access": "WebFetch/WebSearch 公开结果",
+      "limitations": "无结构化API、需人工判定转载可靠性、版本/配置常不齐"
+    },
+    {
+      "id": "dongchedi_open",
+      "name": "懂车帝开放平台 op.dongchedi.com",
+      "status": "available_needs_auth",
+      "data_types": ["懂车帝实测", "懂车分", "全网舆情", "用户画像", "车型库/销量"],
+      "access": "巨量引擎商业账号 + 实名 + 对公验证 + CA签章 + 接入咨询",
+      "priority": "high",
+      "limitations": "字段样例/更新频率/是否含智驾科目需商务确认"
+    },
+    {
+      "id": "yiche_open",
+      "name": "易车开放平台 open.yiche.com",
+      "status": "available_needs_auth",
+      "data_types": ["获取实测的基础测评数据", "实测车款列表", "新能源车主续航(车系+城市)", "中保研/中汽研安全榜(列表+明细+得分率)", "车型库/参配"],
+      "access": "企业开发者向商务申请，HMAC-SHA256签名，域名 api-open.yiche.com",
+      "priority": "highest",
+      "limitations": "公开文档未说明实测覆盖科目，智驾是否在接口内需商务确认；实测四大项20+科目(加速/制动/麋鹿/噪音/空间/越野/智驾)"
+    },
+    {
+      "id": "autohome_web",
+      "name": "汽车之家（公开网页/口碑）",
+      "status": "partial",
+      "data_types": ["车主口碑分项评分", "AH-100测试标准(公开)", "超测59车四大温区续航", "汽车之家口碑(极氪7X城区等)"],
+      "used_for": ["adas", "cabin"],
+      "evidence_count_current": 1,
+      "access": "WebFetch 公开页面",
+      "limitations": "无官方开放平台；超测结论是发布文本非API字段；部分评测联合厂商"
+    },
+    {
+      "id": "autohome_thirdparty",
+      "name": "汽车之家结构化口碑第三方接口(Anysite/Apify/Carapis)",
+      "status": "third_party_paid",
+      "data_types": ["口碑分项评分", "battery_consumption", "四季续航(spring/summer/winter/routine)", "购买价/里程"],
+      "access": "按量付费(Anysite约5 credits/10条，Apify约$2/1000行)",
+      "priority": "medium",
+      "limitations": "无官方SLA、字段稳定性不保证；合规性取决于第三方；需去标识化"
+    },
+    {
+      "id": "yiche_web",
+      "name": "易车公开网页(AutoLab/LAB测试/易车摘要)",
+      "status": "partial",
+      "data_types": ["CLTC/续航引文", "AutoLab自建基地实测", "易车摘要频道"],
+      "used_for": ["powertrain"],
+      "evidence_count_current": 0,
+      "access": "WebFetch 公开页面",
+      "limitations": "栏目制产出、覆盖有限、多为转述"
+    },
+    {
+      "id": "zhihu_open",
+      "name": "知乎数据开放平台 developer.zhihu.com",
+      "status": "ugc_needs_credentials",
+      "data_types": ["知乎搜索(问题/回答/文章标题+摘要)", "全网搜索", "热榜", "直答"],
+      "access": "知乎账号实名认证后申请 Access Secret；每日约5000次免费(邀测)",
+      "priority": "medium",
+      "limitations": "单次返回≤10条、只给摘要不给全文、HasMore固定false；只能做声量/话题层，做不了定量评分；需用户提供Secret"
+    },
+    {
+      "id": "bilibili",
+      "name": "B站开放平台 openhome.bilibili.com",
+      "status": "legal_risk",
+      "data_types": ["仅授权UP主自己的视频数据(播放/弹幕/评论计数)"],
+      "access": "企业营业执照+盖章承诺函；无全站关键词搜索、无任意视频评论/弹幕",
+      "priority": "low",
+      "limitations": "官方通道拿不到第三方车型评测内容；UP主删除数据须同步删除且不留匿名副本"
+    },
+    {
+      "id": "douyin",
+      "name": "抖音开放平台 open.douyin.com",
+      "status": "legal_risk",
+      "data_types": ["关键词视频搜索(能力改造中暂不开放)", "授权用户自己的视频/评论数据"],
+      "access": "企业/个体工商户等；关键词须与自身业务相关、不得申请通用品类词或竞品品牌词、结果仅最近1天",
+      "priority": "low",
+      "limitations": "本场景实际不可用；用户协议禁止自动化批量抓取"
+    },
+    {
+      "id": "xiaohongshu",
+      "name": "小红书开放平台",
+      "status": "legal_risk",
+      "data_types": ["仅 basic_info(昵称头像)；读笔记/粉丝在规划中"],
+      "access": "电商开放平台仅商家/服务商；聚光Marketing API仅广告主；分享平台暂停接入",
+      "priority": "low",
+      "limitations": "2025年两起爬虫判例赔偿110万/490万；用户著作权+PIPL合规风险最高；不采集"
+    },
+    {
+      "id": "caeri_indices",
+      "name": "中国汽研三大指数(IVISTA/C-NCAP/C-IASI)",
+      "status": "partial",
+      "data_types": ["智能安全/行车/泊车/交互评级", "碰撞得分率"],
+      "used_for": ["safety", "adas"],
+      "evidence_count_current": 0,
+      "access": "官网公开归档页可抓；SIP平台面向企业",
+      "limitations": "当前21款中型纯电SUV零覆盖(只测新旗舰)；无证据不插补"
+    },
+    {
+      "id": "sina_smzdm_netease_tencent",
+      "name": "新浪汽车/什么值得买/网易/腾讯新闻(媒体评测与车主长测)",
+      "status": "partial",
+      "data_types": ["智驾实测口碑", "车机横评", "续航达成率汇总", "底盘滤震口碑"],
+      "used_for": ["adas", "control", "cabin", "powertrain"],
+      "evidence_count_current": 11,
+      "access": "WebFetch/WebSearch 公开文章",
+      "limitations": "软文比例不一、需按 source_type 降权；跨篇数据不可直接混算"
+    },
+    {
+      "id": "master_pool_evidence",
+      "name": "本项目候选池自带 evidence 字段",
+      "status": "integrated",
+      "data_types": ["crash_evidence", "adas_evidence", "control_evidence", "cabin_evidence", "score_note"],
+      "used_for": ["all"],
+      "evidence_count_current": 4,
+      "access": "本地 categories/master_pool.json 与 abtest/data/*.json",
+      "limitations": "部分为软文口径；已按来源分级降权"
+    }
+  ],
+  "not_integrated_summary": {
+    "need_business_or_credentials": ["易车开放平台(实测API+安全榜)", "懂车帝开放平台(懂车分+全网舆情)", "汽车之家第三方结构化口碑", "知乎Access Secret"],
+    "legal_risk_do_not_collect": ["B站第三方评测内容", "抖音视频/评论批量抓取", "小红书笔记/评论"],
+    "no_coverage_current_pool": ["IVISTA/C-ICAP(只测新旗舰，当前21款零覆盖)"]
+  }
+}

@@ -38,6 +38,10 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 DIST = HERE / "dist"
 
+sys.path.insert(0, str(HERE))
+import paths  # noqa: E402  生成物名单单一事实源
+GENERATED_JSON = paths.GENERATED_JSON
+
 # ---- 发布规范配置（改这里即可调整规则）--------------------------------
 REQUIRED_FRONTMATTER = [
     "name", "display_name", "display_name_en", "description",
@@ -73,7 +77,9 @@ EXCLUDE_GLOBS = ["*.bak", "*.bak-*", "*.tmp", "*.pyc", "*.orig",
                  # 注：lifecycle_fetch/sync_cncap/auto_levels/auto_trims 虽无 import，
                  #     但被文档命令或其他模块以文件名引用，排除会触发文档引用检查失败/运行风险，保留。
                  ]
-EXCLUDE_DIRS = {"runs", "cache", "__pycache__", "dist", ".git"}
+EXCLUDE_DIRS = {"runs", "cache", "__pycache__", "dist", ".git",
+                # v10.0 模块化：data/ 是生成物缓存（可重建），tools/ 是一次性迁移脚本
+                "data", "tools"}
 MAX_ZIP_BYTES = 3 * 1024 * 1024                      # 官方压缩 zip 体积上限 3MB
 # 官方实际校验的是「解压后」总大小 <= 3MB；此前只查压缩后体积导致上传被拒。
 # 该常量把口径代码化，打包时第二个检查会用解压后总字节数比较。
@@ -109,6 +115,8 @@ def warn(msg):
 
 def is_excluded_name(name):
     if name in EXCLUDE_FILES:
+        return True
+    if name in GENERATED_JSON:      # 生成物（可联网重建）一律不进包，名单见 paths.py
         return True
     for g in EXCLUDE_GLOBS:
         if name.endswith(g.lstrip("*")):
@@ -146,6 +154,15 @@ def collect_files():
     for p in sorted(HERE.iterdir()):
         if p.is_dir():
             if p.name in EXCLUDE_DIRS:
+                continue
+            if p.name == "modules":
+                # v10.0：代码按职责分包在 modules/<pkg>/，整树放行（排除 __pycache__ 与 *regress*）
+                for c in sorted(p.rglob("*")):
+                    if not c.is_file() or c.suffix not in ROOT_INCLUDE_EXT:
+                        continue
+                    if "__pycache__" in c.parts or is_excluded_name(c.name):
+                        continue
+                    files.append(c)
                 continue
             if p.name == CATEGORIES_DIR:
                 for c in sorted(p.glob("*.json")):

@@ -254,6 +254,22 @@ function makeCond(fid,f){
 }
 function readCond(){const c={};for(const fid of Object.keys(FACTORS))c[fid]=document.getElementById('c_'+fid).value;return c;}
 
+/* ============================================================================
+ * engine.js —— 跨能源「环境分 + 实际续航」引擎（唯一事实源）
+ *
+ * 这是 modules/envscore 的核心：给一台车 + 一套用车条件，算出
+ *   1) rangeCalc / effRange：真实续航（用 PHYS 物理常数，服务端与浏览器同源）
+ *   2) adjust：环境分（12 项用车条件的软加减分 + 硬闸门 hard 标记）
+ *   3) compositeTier：按综合分划 T1/T2/T3
+ *
+ * 依赖注入（构建时由 build_compare.py 写入，不要在本文件里写死）：
+ *   PHYS  —— 物理常数对象，来自 modules/physics/ev_range_model.py
+ *   （车列表 CARS、条件表 FACTORS 由页面注入，本文件只消费）
+ *
+ * 纪律：本文件不放任何 DOM 操作。页面渲染（render/resetAll）留在
+ * build_energy_compare.py 的模板里；node 回归只跑本文件的纯函数。
+ * ========================================================================== */
+
 // ===== 物理续航模型 v5 =====
 // 基准电耗：真实电耗优先，缺失用物理回归(重量+CdA)估算 —— 已在 load_cars 算好 car.cons
 // 工况倍率：高速按每车 CdA/吨 差异化（风阻大的高速更费电，解释方盒子效应）
@@ -405,6 +421,7 @@ function adjust(car,cond){
 
   return {items,total,hard};
 }
+
 
 let carSort={k:'composite',dir:-1};
 function render(){

@@ -1,7 +1,7 @@
 # Car recommendation
 
 > 可信购车榜单引擎：口径闸门 / MCDA 稳健性检验 / 8 维打分统一榜 / 总候选池 / 多源交叉核验 / 证据分层 / 历史回测。
-> 无模型调用，同一输入必得同一输出。当前版本 **v9.7.53**。
+> 无模型调用，同一输入必得同一输出。当前版本 **v10.0.0**（模块化重构，口径与出榜结果不变）。
 
 ## 这是什么
 WorkBuddy 用户级 skill。核心是「车型排行榜全链路」：按需搜榜入池→取数→闸门→8 维打分→稳健性→三档→审查→报告，
@@ -16,6 +16,25 @@ WorkBuddy 用户级 skill。核心是「车型排行榜全链路」：按需搜�
 按第三方实测与多源口碑调整（`experience_facts.json`，证据分级加权、无证据不插补），
 保值率作为持有成本补偿进 `value` 维（`residual_values.json`）。页面展示区块统一由 `board_view.py` 注册表管理。
 详见下方 v7–v9.5 演进节。
+
+## 代码结构（v10.0 模块化）
+
+根目录 81 个平铺脚本收进六个模块，**根目录只留薄壳入口**（`python3 monthly.py` 等命令照旧可用，薄壳只转发）。
+
+| 模块 | 职责 | 规模 | 可独立发布 |
+|---|---|---|---|
+| `modules/research/` | 取数与证据采集，**所有对外网络调用的唯一出口** | 25 个采集器 + researcher | ✅ 检索取数 skill |
+| `modules/physics/` | 电动车实际续航物理模型（零依赖） | 1 | ✅ 续航估算 skill |
+| `modules/envscore/` | 跨能源环境分引擎（`engine.js` 唯一事实源 + 页面生成） | 2 | ✅ 用车条件适配计算器 |
+| `modules/engine/` | 打分口径 / 闸门 / 事实注入（纯计算） | 26 | 口径库 |
+| `modules/board/` | 出榜编排与渲染 | 19 | 主流程 |
+| `modules/regress/` | 回归测试与失败回测 | 7 + 4 js | 项目专属 |
+
+- **依赖只能向下**：`research`/`physics` 零依赖 → `envscore` → `engine` → `board`。反向 import 由 `layout_regress.py` 拦截。
+- **数据落盘**：`data/gen/` 放生成的大 JSON（可重建、不打包），`categories/` 只留人工配置（随包）。
+  读写一律走 `paths.cat()` / `paths.gen()`，不再手拼 `categories` 路径。
+- **回归**：`layout_regress.py` 守结构、`bug_regression.py` 守口径，另有 4 个专项回归（回归脚本开发者自用，不随包发布）。
+- 详细契约见 `MODULES.md` 与各包 `__init__.py`。
 
 ## 安装
 把本文件夹复制到 `~/.workbuddy/skills/` 下（安装身份沿用 omni-debate），重启会话即可被识别。

@@ -6,7 +6,7 @@
 > - **人**：想快速知道这套东西在干什么、数据从哪来、怎么改、哪里有坑。
 > - **Agent / 后来的维护者**：想在不读完全部源码的前提下定位「改哪个文件、改哪一步、会不会破坏口径」。
 >
-> 版本锚点：`~/.workbuddy/skills/omni-debate`（**v6.5，规范副本**，纯电四榜 EV 用它）；`runs/omni-debate-skill/omni-debate`（**v6.3，开发副本，已滞后**，燃油混动四榜 ICE 用它）。两者差异见 §7。
+> 版本锚点：`~/.workbuddy/skills/omni-debate`（**v10.0.0，规范副本**）。v10.0 完成模块化重构（81 个平铺脚本 → `modules/` 六包），口径与出榜结果不变；结构契约见 `MODULES.md`。
 
 ---
 
@@ -35,23 +35,41 @@ python3 ice_board.py --pool ice_pool_full.json --category car_ice_phev --out run
 
 ---
 
-## 2. 目录与副本现状（⚠️ 先看这里）
+## 2. 目录结构（v10.0 模块化，⚠️ 先看这里）
 
-### 2.1 三个代码位置
+> 结构契约与改代码规则以 **`MODULES.md`** 为准；本节只列「东西在哪」。
 
-| 位置 | 角色 | 谁在用 | 状态 |
-|---|---|---|---|
-| `~/.workbuddy/skills/omni-debate/` | **规范/安装副本**，模块最全 | 纯电四榜（`build_html.py` 从 `SKILL` 常量导入） | v6.5，含 lifecycle_confirm / airbag_gate / sales_drop |
-| `runs/omni-debate-skill/omni-debate/` | **开发副本**（git 风格，含 README/LICENSE/requirements） | 燃油混动四榜（`ice_board.py` 用 `HERE=脚本目录`） | v6.3，**缺** lifecycle_confirm / airbag_gate / sales_drop |
-| `/c/Users/海南岛南霸天/vehicle-data-hub/` | **外部数据源仓库**（独立 git repo，remote=上游 travisoa） | 生命周期「车系在售状态」、口碑评价数 | 提供 dcd/工信部/口碑原始数据，需本机 Chrome + 登录态 |
+### 2.1 源码树
+
+```
+paths.py                  路径唯一事实源（ROOT / cat() / gen() / src()）
+modules/
+  research/               取数与证据采集（唯一网络出口，25 个采集器 + researcher 检索）
+  physics/                续航物理模型（零依赖，物理常量单一事实源）
+  envscore/               环境分引擎：engine.js（唯一事实源）+ 页面生成器
+  engine/                 打分口径 / 闸门 / 事实注入（纯计算）
+  board/                  出榜编排与渲染（pipeline / monthly / board_v2 / master_pool）
+  regress/                回归测试（结构 / 口径 / 专项 / 打包 / node DOM）
+categories/               人工口径配置与事实库（随包发布）
+data/gen/                 机器生成的大 JSON（可重建，打包排除）
+runs/ dist/ tools/        产物 / 发行 zip / 一次性迁移脚本（均不打包与不入库）
+```
+
+根目录只留薄壳（`python3 monthly.py` 照旧可用，内部 `runpy` 转发到 `modules/`）。
+
+依赖方向单向：`research`、`physics` → `envscore` → `engine` → `board`；`regress` 可读全部。
+`python3 layout_regress.py` 拦截结构违规。
+
+（历史的 `runs/omni-debate-skill/omni-debate/` 开发副本与 `build_html.py` 均已在 v7–v9 期间废弃，本表不再维护。）
 
 ### 2.2 产物位置
 
 | 目录 | 内容 |
 |---|---|
-| `runs/car-ev-4boards/` | 纯电四榜：`candidates_trend.json`（候选池）、`car_ev.db`、`四榜报告.html`、`*.md` 证据文件 |
-| `runs/car-ice-4boards/` | 燃油混动四榜：`ice_pool_full.json`（187 款正式池）、`四榜报告.html`、`report.md`、`scoring_audit.md`、`summary.json`、`sensitivity.*`、`crash_evidence.md` |
-| `runs/car-ev-monthly/202610/` | 月度出榜产物（含 trims.md） |
+| `runs/car-ev-monthly/<YYYYMM>/` | 月度出榜产物（board HTML、report.md、summary.json、trims.md） |
+| `runs/midsuv_*_完整交互榜.html` | 跨能源正式榜（14 区块 + 内嵌推演器） |
+| `runs/v10-smoke/` | 重构后冒烟出榜产物（可删） |
+| `dist/` | `car-recommendation-vX.Y.Z.zip`（官方 3MB 上限） |
 
 ---
 
