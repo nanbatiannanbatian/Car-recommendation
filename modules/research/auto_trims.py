@@ -102,6 +102,48 @@ def find_sid(model, index):
         hit = nidx.get(norm(cand))
         if hit:
             return hit[1]["sid"], hit[0], f"variant:{cand}"
+    # 索引兜底（2026-11-21）：A-Z 在售索引会漏新车系，但车系页已存在。
+    # 只在本地索引全部 miss 时才走远程检索，失败返回 None，不猜。
+    sid, name, how = find_sid_remote(model, index)
+    if sid:
+        return sid, name, how
+    return None, None, None
+
+
+def find_sid_remote(model, index=None, timeout=25):
+    """汽车之家站点搜索兜底：索引（A-Z 在售列表）常漏新车系，但车系页/配置页已存在。
+
+    2026-11-21 根因：大众 ID.AURA T6 上市一个多月，A-Z 索引里没有它（grade 页只列
+    "在售"车系且更新滞后），find_sid 直接返回 None → skipped，于是"没有下拉框"。
+    实际上汽车之家车系页 (autohome.com.cn/8584) 和 config 页都在，parse_config 能正常
+    解析出 4 款配置。也就是说：**不是数据源没有，是我们找车系的方式太单一**。
+
+    策略：站点检索 → 从 URL 提取 series id（autohome.com.cn/<数字>）→ 交给 parse_config。
+    只在索引 miss 时调用，不影响正常路径性能；失败一律返回 None，不猜。
+    """
+    import re as _re
+    try:
+        from modules.research import researcher as R
+    except Exception:
+        return None, None, None
+    queries = [f"{model} 参数 配置", f"{model} 报价", model]
+    seen = set()
+    for q in queries:
+        try:
+            rs = R.search(q, backend="bing", n=8)
+        except Exception:
+            rs = []
+        for r in rs or []:
+            url = str(r.get("url") or "")
+            m = _re.search(r"autohome\.com\.cn/(\d{3,5})(?:/|$|\?)", url)
+            if not m:
+                continue
+            sid = m.group(1)
+            if sid in seen:
+                continue
+            seen.add(sid)
+            title = str(r.get("title") or "").strip()
+            return sid, title or model, f"remote_search:{sid}"
     return None, None, None
 
 

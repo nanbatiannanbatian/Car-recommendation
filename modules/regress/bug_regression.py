@@ -97,6 +97,7 @@ CASES = [
     ("BUG-072", "成绩已进crash字段却未参与打分(safety仍按插补)致有实锤等于没用", "v10.1.4"),
     ("BUG-073", "映射表人工分与公式复算不一致(同分率不同分)", "v10.1.5"),
     ("BUG-074", "缺逐配置数据的车静默无下拉框(大众T6),读者分不清是缺失还是无差异", "v10.1.6"),
+    ("BUG-075", "采集只有单源单点:索引miss就放弃(索引漏新车但车系页已存在)", "v10.1.7"),
 ]
 
 
@@ -1583,8 +1584,51 @@ def t074():
     return f"配置下拉二选一：{len(rows)} 款在榜车，{len(rows)-n_miss} 款有下拉、{n_miss} 款标注待补"
 
 
+def t075():
+    """采集必须有多源兜底：索引未命中不能直接放弃，要去站点检索找车系 id。
+
+    2026-11-21 根因（比"数据源没有"更准确）：大众 ID.AURA T6 / 小鹏 MONA L05
+    在汽车之家 A-Z 在售索引里查不到，但车系页（autohome.com.cn/8584）和 config 页
+    早就有，parse_config 能正常解析出 4 款配置。find_sid 只查索引一次，miss 即 skip，
+    于是整款车被跳过 → 页面没有下拉框。
+
+    修复：find_sid 末尾加 find_sid_remote（站点检索 → 从 URL 取 series id）。
+    这里锁死三件事：有兜底、能提取 id、兜底失败不瞎猜。
+    """
+    from modules.research import auto_trims as A
+    from modules.research import researcher as R
+
+    # 1) 源码层：兜底分支必须存在
+    src = _read("auto_trims.py")
+    assert "def find_sid_remote" in src, "缺远程兜底函数"
+    assert "remote_search" in src, "兜底结果未标记来源"
+
+    orig = R.search
+    try:
+        # 2) 索引空 + 搜索能定位车系页 → 必须拿到 sid
+        R.search = lambda *a, **kw: [
+            {"title": "【 测试车X 】 报价", "url": "https://www.autohome.com.cn/8584"}]
+        sid, name, how = A.find_sid_remote("测试车X")
+        assert sid == "8584" and how.startswith("remote_search"), (sid, how)
+        got = A.find_sid("测试车X", {})
+        assert got[0] == "8584", f"索引 miss 时未走兜底：{got}"
+
+        # 3) 兜底失败必须返回 None，不许猜一个 sid 出来
+        R.search = lambda *a, **kw: []
+        assert A.find_sid("测试车X", {})[0] is None, "兜底失败却返回了 sid"
+    finally:
+        R.search = orig
+
+    # 4) 只提取车系页形态（数字 id），不把文章页/品牌页当车系
+    import re as _re
+    assert _re.search(r"autohome\.com\.cn/(\d{3,5})", "https://www.autohome.com.cn/8584")
+    assert not _re.search(r"autohome\.com\.cn/(\d{3,5})(?:/|$|\?)",
+                          "https://car.autohome.com.cn/price/brand-1.html")
+    return "采集兜底：索引 miss → 站点检索取 series id → 正常解析；失败不猜 + 源码锁定"
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075]
 
 
 def run():
