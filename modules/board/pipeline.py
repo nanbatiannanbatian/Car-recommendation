@@ -95,6 +95,9 @@ def main():
                                          "；给出则报告附「投诉反馈」参考区")
     ap.add_argument("--quality", action="store_true",
                     help="把质量与品控作为第 8 维进综合打分；可与 --complaints 联用")
+    ap.add_argument("--score-audit", action="store_true",
+                    help="附「人工分核算审计」：逐维度盘点算分链路 + 从 evidence 硬参数按规则算客观分与人工分对照"
+                         "（只审计不改分，差异是待核实线索）")
     ap.add_argument("--no-thirdparty", action="store_true",
                     help="跳过第三方实测/拆车证据（默认启用，走 adjust 封顶通道）")
     ap.add_argument("--no-config-anchor", action="store_true",
@@ -378,6 +381,17 @@ def main():
     custom = parse_sliders(a.sliders)
     wv = L.build_schemes(cfg, custom).get("用户自定义") if custom else None
 
+    # 人工分核算审计（--score-audit）：此时分数已全部调整完，对照「出榜最终分 vs 客观规则分」。
+    # 只审计不改分：链路盘点 + 从 evidence 硬参数按 spec_score 规则算客观分，差异是待核实线索。
+    _sa_audit = None
+    if getattr(a, "score_audit", False):
+        from modules.engine import score_audit as SA
+        _sa_audit = SA.diff_audit(cands, threshold=0.5)
+        _sa_sum = SA.summarize(_sa_audit)
+        print("[人工分核算] 链路缺口 " + " / ".join(
+            f"{r['dim']}:{r['gap']}" for r in SA.link_audit() if r["gap"] != "WIRED")
+            + f"；差异 {_sa_audit['diff_count']} 项（只审计不改分）")
+
     _pool_data = json.load(open(a.candidates, encoding="utf-8"))
     parts = [f"# {cfg.get('label')} · 出榜报告", ""]
     parts.append(f"> 来源：`{os.path.basename(a.candidates)}`；"
@@ -429,6 +443,23 @@ def main():
         if _sf_sum["low_confidence"]:
             _parts_sf.append("低置信（厂商标定/软文口径，待核实）：" + "、".join(_sf_sum["low_confidence"][:8]) + "。")
         parts.append("\n".join(_parts_sf))
+
+    if _sa_audit is not None:
+        from modules.engine import score_audit as SA
+        _links = SA.link_audit()
+        _gap_lines = "；".join(f"{r['dim']}={r['gap']}" for r in _links)
+        _diff_lines = "；".join(
+            f"{d['model']} {d['dim']} {d['human']:g}→客观{d['objective']:g}({d['diff']:+g})"
+            for d in _sa_audit["diffs"][:12])
+        parts.append("> **人工分核算审计**（只审计不改分）：链路状态 " + _gap_lines + "。"
+                     f"跳过已闭环维度 {('、'.join(_sa_audit['skipped_wired']) or '无')}；"
+                     f"有足够硬参数可核算的车 {_sa_audit['checked']} 款，覆盖 "
+                     + "、".join(f"{k}:{v}" for k, v in _sa_audit["coverage"].items()) + "。"
+                     f"差异超 {_sa_audit['threshold']:g} 共 {_sa_audit['diff_count']} 项"
+                     + ("：" + _diff_lines if _diff_lines else "") + "。"
+                     "**差异是待核实线索、不是改分指令**——硬件强≠体验好（零实测车已由证据门槛封顶），"
+                     "须人工核实来源后再决定是否调分；无数据可算的维度（如 powertrain/value）"
+                     "本身就是「规则有了但数据没进候选池」的证据。")
 
     if _exp_gaps:
         parts.append(f"> **证据缺口**：{'、'.join(g['model']+chr(40)+g['dim']+chr(41) for g in _exp_gaps[:6])}"
@@ -515,6 +546,7 @@ def main():
         "space_calibration": _space_sum,
         "space_features": _sf_sum,
         "space_features_detail": {m: feats for m, feats in _sf_per_car.items()},
+        "score_audit": (_sa_sum if _sa_audit is not None else None),
         "experience_gaps": _exp_gaps,
         "safety_table_sync": _st_sync,
         # v9.7.20：候选池披露同步给页面（评审反复指出报告有、页面看不到）

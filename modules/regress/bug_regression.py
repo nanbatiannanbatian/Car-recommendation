@@ -107,6 +107,7 @@ CASES = [
     ("BUG-082", "T6实测数据没录入:采集抓不到试驾稿麋鹿/NOA+检测器只扫候选池+缺口只print不拦", "v10.2.7"),
     ("BUG-083", "MONA空间9.3全场第一但零实测:space被判硬数据不封顶+轴距0%覆盖+人工分从未校验", "v10.2.8"),
     ("BUG-084", "空间要素(前备箱/下沉后备箱/储物/真实表现)记在evidence却没用:得房率64%的N7拿8.5", "v10.2.9"),
+    ("BUG-085", "人工分全量核算:8维仅safety闭环/quality/powertrain规则没接/spec_score从没跑过", "v10.3.0"),
 ]
 
 
@@ -2178,8 +2179,54 @@ def t084():
     return "空间要素根治：两类结构化(real校验/storage仅披露不进分)+得房率信号抓N7不误伤G6"
 
 
+def t085():
+    """人工分全量核算审计回归。
+
+    2026-11-21 用户「全量检查哪些数据存在人工分没有算，一项项核算，加入测试」。
+    查实：8 维里只有 safety 有完整算分链；quality/powertrain 有规则没接链路；
+    adas/cabin/control/space/value 是人工分+局部封顶，spec_score 规则从没跑过
+    （依赖 21 个结构化字段一个都没进候选池，事实散在 evidence 文本里）。
+    修法：engine/score_audit.py 链路盘点 + 从 evidence 提取硬参数按规则算客观分与人工分对照，
+    只审计不改分，差异是待核实线索。pipeline --score-audit 出核账段落 + summary 审计。
+    """
+    from modules.engine import score_audit as SA
+
+    # 1) 模块自测
+    assert SA.selftest() == 0, "score_audit 单元自测失败"
+
+    # 2) 链路盘点：safety 闭环，quality/powertrain 有规则没接，其余部分接
+    links = {r["dim"]: r["gap"] for r in SA.link_audit()}
+    assert links["safety"] == "WIRED", f"safety 应闭环: {links}"
+    assert links["quality"] == "RULE_NOT_WIRED" and links["powertrain"] == "RULE_NOT_WIRED", \
+        f"quality/powertrain 应有规则没接: {links}"
+    assert links["adas"] == "PARTIAL_WIRED" and links["space"] == "PARTIAL_WIRED", links
+
+    # 3) 真实池提取 + 核算：有硬参数的维度能算，且差异可检出
+    import json, copy
+    pool = json.load(open(str(paths.ROOT / "runs" / "midsuv_bev_pool.json"), encoding="utf-8"))
+    audit = SA.diff_audit(pool["candidates"], threshold=0.5)
+    assert audit["skipped_wired"] == ["safety"], "已闭环 safety 不该产生伪差异"
+    assert "adas" in audit["coverage"] and audit["coverage"]["adas"] >= 5, \
+        f"adas 有硬参数应可核算: {audit['coverage']}"
+    # powertrain/value 无数据 → coverage 里不该有（这正是「规则有了数据没进池」的证据）
+    assert "powertrain" not in audit["coverage"] and "value" not in audit["coverage"], \
+        f"powertrain/value 缺数据不该算: {audit['coverage']}"
+    assert audit["diff_count"] > 0, "应检出人工分与规则分的差异"
+
+    # 4) 审计绝不改分（深比较）
+    snapshot = copy.deepcopy(pool["candidates"])
+    SA.diff_audit(pool["candidates"], threshold=0.5)
+    assert pool["candidates"] == snapshot, "审计不得改候选任何字段"
+
+    # 5) pipeline 接入开关与披露
+    src = _read("pipeline.py")
+    assert "score-audit" in src and "score_audit" in src, "pipeline 缺 --score-audit 开关"
+    assert "人工分核算审计" in src and "不是改分指令" in src, "报告缺核账披露/免责"
+    return "人工分核算审计：链路盘点+evidence硬参数算客观分对照+不改分+差异是线索(+t085)"
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085]
 
 
 def run():
