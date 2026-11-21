@@ -103,6 +103,8 @@ NEG_TARGETS = {
     "t105": ["space_parts", "充电循环次数"],
     # t106 断言 trims_store 存在 + auto_trims 有分流写回 + 下游走统一入口
     "t106": ["trims_store", "def write_back"],
+    # t107 断言电池容量项存在 + 三电子维度拆分 + 配置匹配不粘连
+    "t107": ["POWERTRAIN_GROUPS"],
 }
 
 # 数据断言型：测试名 -> (文件路径, 车型/键, 篡改模式)

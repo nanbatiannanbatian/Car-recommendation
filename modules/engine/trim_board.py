@@ -56,6 +56,9 @@ def spec_from_trim(trim: dict, base_spec: dict | None = None) -> dict:
     """
     s = dict(base_spec or {})
     s["kwh"] = trim.get("battery_kwh") or s.get("kwh")
+    # 配置指导价（万元）：电池容量项要算 kWh/万元（跨价位可比口径），必须带价
+    if trim.get("price") is not None:
+        s["price"] = trim.get("price")
     charge = str(trim.get("charge") or "")
     # 高压平台判定：三个来源任一成立即可——
     #   ① charge 文本里有 800V/900V（auto_trims 拼的、或人工写的）；

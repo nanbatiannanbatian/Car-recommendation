@@ -831,14 +831,31 @@ document.addEventListener('change',function(ev){
                  '<b>缺口披露</b>：电池/整车质保年限与充电循环次数，'
                  '汽车之家参数页<b>不提供该字段</b>（未采集，不推断、不编造）——'
                  '按质保年限横向比较只能人工核验厂商官网。</div>')
+        # v10.15.0：新增「电池素质 / 补能能力」两列——用户诉求「电池在三电占比高，
+        # 是不是要分开来」。三电一直是一个笼统的分数，读者看不出这辆车是电池好
+        # 还是补能快；拆开后两类硬件一目了然。
+        # 列的值来自 rule_adjust 的审计字段（逐项可复算），不是另算一套。
         H.append("<table><thead><tr><th style='text-align:left'>车型</th>"
                  "<th style='text-align:left'>评分配置</th><th>电量</th><th>高压平台</th>"
                  "<th style='text-align:left'>快充</th><th>最大充电功率</th><th>官方电耗</th>"
-                 "<th style='text-align:left'>电芯</th><th>换电</th><th>CLTC</th></tr></thead><tbody>")
+                 "<th style='text-align:left'>电芯</th><th>换电</th><th>CLTC</th>"
+                 "<th>电池素质</th><th>补能能力</th></tr></thead><tbody>")
         for r in rows:
             f = ef.get(r.get("model")) or {}
             if not f:
                 continue
+            # 分组来自 energy_facts（rule_adjust 明细已透传到那里），不另找来源
+            _g = f.get("groups") or {}
+            _bat = _g.get("电池素质") or {}
+            _chg = _g.get("补能能力") or {}
+            _bat_s = (f"{_bat.get('sum'):+.1f}" if _bat.get("sum") is not None else "—")
+            _chg_s = (f"{_chg.get('sum'):+.1f}" if _chg.get("sum") is not None else "—")
+            _tip = []
+            if _bat.get("items"):
+                _tip.append("电池素质：" + "、".join(i.get("text") or "" for i in _bat["items"]))
+            if _chg.get("items"):
+                _tip.append("补能能力：" + "、".join(i.get("text") or "" for i in _chg["items"]))
+            _title = e(" ｜ ".join(_tip)) if _tip else ""
             H.append(f"<tr><td class='name'>{e(r.get('model'))}</td>"
                      f"<td style='text-align:left'>{e(str(f.get('trim') or '—'))}</td>"
                      f"<td>{_num_unit(f.get('kwh'), ' kWh')}</td>"
@@ -848,8 +865,17 @@ document.addEventListener('change',function(ev){
                      f"<td>{_num_unit(f.get('consumption'), ' kWh/100km')}</td>"
                      f"<td style='text-align:left'>{e(str(f.get('cell') or '未披露'))}</td>"
                      f"<td>{e(str(f.get('swap') or '—'))}</td>"
-                     f"<td>{_num_unit(f.get('cltc_km'), ' km')}</td></tr>")
+                     f"<td>{_num_unit(f.get('cltc_km'), ' km')}</td>"
+                     f"<td title=\'{_title}\'>{_bat_s}</td>"
+                     f"<td title=\'{_title}\'>{_chg_s}</td></tr>")
         H.append("</tbody></table>")
+        H.append("<div class='rule'>「电池素质」= 电芯 + 电池容量 + 续航 + 热管理（电池本体）；"
+                 "「补能能力」= 高压平台 + 快充时间（补能通路）。两列是三电规则项的"
+                 "分组求和，<b>分组只用于披露、不改变三电总分的算法</b>（避免读者误以为"
+                 "换了权重）。悬停可看逐项依据。电池容量按 <b>kWh/万元</b> 判"
+                 "（每万元预算买到多少度电池）——本榜是 10–40 万全价位，"
+                 "电池度数的<b>绝对值跨价位不可比</b>，按绝对值判会系统性奖励高价车。")
+        H.append("</div>")
 
     # ---- 空间与储物事实（v10.11.0）
     if "space_facts" in ids:

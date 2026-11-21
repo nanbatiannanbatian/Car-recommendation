@@ -81,8 +81,15 @@ def _spec_of(c: dict, trims_db: dict) -> dict:
     entry = trims_db.get(c.get("model"))
     if not entry or not entry.get("trims"):
         return base_spec
-    ref, _fallback, _basis = TA.resolve_ref(
-        entry.get("scored_trim") or "", entry["trims"], [c])
+    # v10.15.0：scored_trim_ref（人工核验的**精确配置全名**）优先于 scored_trim（简称）。
+    # 两者不一致时，简称的模糊匹配可能落到**同型号的别的档次**（海狮06EV 的
+    # 「605 入门版」被配成 605领航Pro 15.38万，实际应为 605领航 15.99万）。
+    _ref_name = entry.get("scored_trim") or ""
+    _ref_full = entry.get("scored_trim_ref") or ""
+    if _ref_full and any(str(x.get("name")) == str(_ref_full)
+                          for x in (entry.get("trims") or [])):
+        _ref_name = _ref_full
+    ref, _fallback, _basis = TA.resolve_ref(_ref_name, entry["trims"], [c])
     if not ref:
         return base_spec
     return TB.spec_from_trim(ref, base_spec)
@@ -101,6 +108,25 @@ def rule_parts(cands: list[dict], dim: str) -> dict:
     out: dict[str, list] = {}
     for c in cands:
         out[c.get("model")] = fn(_spec_of(c, trims_db))
+    return out
+
+
+def _powertrain_groups(c: dict, trims_db: dict) -> dict:
+    """三电规则项的子维度分组披露：电池素质 / 补能能力。"""
+    from modules.engine import spec_score as SS
+    try:
+        g = SS.powertrain_group_parts(_spec_of(c, trims_db))
+    except Exception:
+        return {}
+    out = {}
+    for name, items in g.items():
+        if not items:
+            continue
+        out[name] = {
+            "items": [{"name": n, "value": v, "text": t} for n, v, t in items],
+            "sum": round(sum(v for _n, v, _t in items), 2),
+            "nominal_weight": SS.POWERTRAIN_GROUP_WEIGHT.get(name),
+        }
     return out
 
 
@@ -154,6 +180,14 @@ def apply_rule_adjust(cands: list[dict], dims=DIMS, alpha=ALPHA, cap=CAP,
                 "cap": cap, "alpha": alpha,
                 "items": detail[m],
             }
+            # 三电维：按「电池素质 / 补能能力」分组披露（2026-11-22）。
+            # 用户诉求「电池在三电占比高，是不是要分开来」——分开后读者能看清
+            # 这辆车是电池好还是补能快，而不是只看到一个笼统的「三电 8.5」。
+            if dim == "powertrain":
+                from modules.engine import trim_board as _TB
+                groups = _powertrain_groups(c, _TB.load_trims())
+                if groups:
+                    c["rule_adjust"][dim]["groups"] = groups
             touched.append(m)
         summary[dim] = {"status": "applied", "n_items": len(item_names),
                         "touched": touched}

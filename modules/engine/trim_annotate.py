@@ -142,6 +142,15 @@ def deltas_for(trim: dict, ref: dict) -> list[dict]:
 CONF_ORDER = {"low": 0, "medium": 1, "high": 2}
 
 
+# 配置档次/功能词表（用于定位具体配置）。
+# 数字相同但档次不同的配置必须靠这些词区分：602 越享型 vs 602 智享型 vs 602 智尊型。
+_TRIM_TOKENS = (
+    "激光", "ultra", "max", "plus", "pro", "智行", "旗舰",
+    "智享", "越享", "智尊", "尊享", "舒享", "畅享", "越界", "卓越", "领先",
+    "旗舰版", "标准版", "入门版", "长续航", "后驱", "四驱", "双电机",
+)
+
+
 def find_ref(name: str, trims: list[dict]) -> dict | None:
     """模糊匹配评分配置（v9.7.4：35款里34款精确匹配失败，必须模糊匹配）。
 
@@ -149,11 +158,27 @@ def find_ref(name: str, trims: list[dict]) -> dict | None:
     用归一化（去空格/去年份/去"纯电版"前缀）+ 关键数字串双重判定。
     """
     def norm(s: str) -> str:
-        s = str(s or "")
-        for junk in ("纯电版", "纯电", "款", "版", " ", "　"):
-            s = s.replace(junk, "")
+        """归一化配置名（用于精确/模糊匹配）。
+
+        2026-11-22 修根因（数字粘连 bug，42/71 款配置错配）：
+          原实现把空格**全部删除**，于是
+            「MONA L05 2027款 纯电 635 Max」→ 「monal05635max」
+          数字与型号粘在一起，数字正则抓到的是 0563/5635 而不是 635，
+          匹配必然失败 → 落到「按价格就近选取」的兜底 → 拿到错配置
+          （MONA L05 635 Max 被配成 535 Max 58.2kWh，整车三电/续航全错）。
+
+          现在：分隔符统一替换成 "."（保留边界，不粘连），年份删除时
+          也连同其两侧分隔符一起删；数字串用带前后边界的 3-4 位数字正则提取。
+        """
         import re
-        s = re.sub(r"20\d{2}", "", s)
+        s = str(s or "")
+        for junk in ("纯电版", "纯电", "款", "版"):
+            s = s.replace(junk, ".")
+        # 分隔符统一（空格/全角空格/连字符/下划线 → "."）
+        s = re.sub(r"[\s\-_\u3000]+", ".", s)
+        # 年份连同两侧分隔符删掉（避免留下孤立点）
+        s = re.sub(r"\.?20\d{2}\.?", ".", s)
+        s = re.sub(r"\.{2,}", ".", s).strip(".")
         return s.lower()
 
     target = norm(name)
@@ -164,17 +189,25 @@ def find_ref(name: str, trims: list[dict]) -> dict | None:
         if norm(t.get("name")) == target:
             return t
     # 2) 关键数字串（如 560/610/670）+ 关键配置词（激光/ultra/max）交集
+    #    数字串用 (?<!\d)\d{3,4}(?!\d) 加边界——否则「L05635」里的 0563 会被误当型号
     import re
-    nums = set(re.findall(r"\d{3,4}", target))
-    words = {w for w in ("激光", "ultra", "max", "plus", "pro", "智行", "旗舰") if w in target}
+    num_re = re.compile(r"(?<!\d)\d{3,4}(?!\d)")
+    nums = set(num_re.findall(target))
+    # 配置词表：数字相同但档次不同（602 越享型 vs 602 智享型）要能区分
+    words = {w for w in _TRIM_TOKENS if w in target}
     best, score = None, 0
     for t in trims:
         tn = norm(t.get("name"))
-        tnums = set(re.findall(r"\d{3,4}", tn))
-        twords = {w for w in ("激光", "ultra", "max", "plus", "pro", "智行", "旗舰") if w in tn}
-        sc = len(nums & tnums) * 2 + len(words & twords)
+        tnums = set(num_re.findall(tn))
+        twords = {w for w in _TRIM_TOKENS if w in tn}
+        # 数字命中权重高于词命中：型号数字（635/602）比「Max/激光」更能定位配置
+        sc = len(nums & tnums) * 3 + len(words & twords)
         if sc > score:
             best, score = t, sc
+    # 数字命中才是硬信号：只有词命中（无数字交集）不足以定位配置
+    if best is not None and not (nums & set(num_re.findall(norm(best.get("name"))))):
+        if not (words & {w for w in _TRIM_TOKENS if w in norm(best.get("name"))}):
+            return None
     return best if score >= 2 else None
 
 
@@ -237,6 +270,18 @@ def annotate_all(cands: list[dict], cfg: dict) -> dict:
         if not base:
             continue
         ref_name = entry.get("scored_trim") or ""
+        # v10.15.0：**scored_trim_ref 优先**。
+        # 人工条目里 scored_trim 常写的是「简称+档位」（如「605 入门版」），
+        # 而 scored_trim_ref 存的是**配置表里的精确全名**（「06 2026款 EV 605领航」）。
+        # 此前只用 scored_trim，简称匹配不到就落到价格兜底 → 可能选到同型号的别的档次
+        # （海狮06EV 的「605 入门版」被配成 605领航Pro 15.38万，实际应是 605领航 15.99万）。
+        # ref 是人工核验的精确引用，比简称可靠，优先用它。
+        _ref_full = entry.get("scored_trim_ref") or ""
+        if _ref_full:
+            _hit = next((x for x in (entry.get("trims") or [])
+                         if str(x.get("name")) == str(_ref_full)), None)
+            if _hit:
+                ref_name = _ref_full
         # v9.7.35（BUG-043 根治）：占位/匹配失败主动解析代表配置，写明依据；
         # 不再静默 fallback 给全车打 low（曾致主榜20/20低置信刷屏）。
         _same_model = [c for c in cands if c.get("model") == model]

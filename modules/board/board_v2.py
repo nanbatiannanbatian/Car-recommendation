@@ -66,7 +66,8 @@ except ImportError:  # pragma: no cover
 
 
 # ---------------------------------------------------------------- 三电与补能事实
-def energy_facts(rows: list[dict], trim_data: dict | None) -> dict:
+def energy_facts(rows: list[dict], trim_data: dict | None,
+                 rule_adjust: dict | None = None) -> dict:
     """逐车三电与补能事实（取**评分配置**那一档）。
 
     2026-11-21 新增：此前电压/快充/充电功率/官方电耗/换电只存在于数据层，
@@ -94,6 +95,11 @@ def energy_facts(rows: list[dict], trim_data: dict | None) -> dict:
             "cell": src.get("cell_supplier"),
             "swap": src.get("swap"),
             "cltc_km": src.get("cltc_km"),
+            # v10.15.0：三电子维度分组（电池素质 / 补能能力）——从 rule_adjust
+            # 审计字段透传，渲染层直接展示，不另算一套。
+            # rule_adjust_detail[model] = {dim: {..., "groups": {...}}}
+            "groups": (((rule_adjust or {}).get(m) or {})
+                       .get("powertrain", {}).get("groups") or {}),
         }
     return out
 
@@ -460,7 +466,8 @@ def build(cands: list[dict], cfg: dict, policy: dict,
           per_band: int = 10,
           no_experience: bool = False,
           tiers: dict[str, str] | None = None,
-          battery_platform: dict | None = None) -> dict:
+          battery_platform: dict | None = None,
+          rule_adjust_detail: dict | None = None) -> dict:
     facts = facts or {}
     # 候选池形状归一化（契约层）：price 文本转数值、trim 统一 dict
     from modules.contracts.candidate_schema import normalize_pool
@@ -605,7 +612,7 @@ def build(cands: list[dict], cfg: dict, policy: dict,
         "main_board": rows,
         "band_subboards": bands,
         # v10.11.0：三电与补能 / 空间与储物 事实区块（披露，不改分）
-        "energy_facts": energy_facts(rows, trim_data),
+        "energy_facts": energy_facts(rows, trim_data, rule_adjust_detail),
         "space_facts": space_facts(rows, cands),
         "segmented_summary": segmented_summary(rows, cands, policy, per_band),
         "product_power_board": product_power_board(rows, cands, cfg, policy),

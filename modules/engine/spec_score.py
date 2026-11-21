@@ -211,6 +211,31 @@ def powertrain_parts(s):
     ct = cell_tier_of(cell, s.get("cell_route"))
     if ct["tier"] != "unknown":
         parts.append(("电芯", ct["points"], ct["text"]))
+    # ── 电池容量（2026-11-22 新增，用户诉求）────────────────────────────
+    # 用户原话：「启源电池更好…电池度数又高，是不是在三电上需要去分开来」。
+    # 此前三电规则里**电池度数完全缺席**（只有续航 km），于是「大电池」这个
+    # 纯电车最核心的硬件差异不体现在分数上。
+    #
+    # 口径陷阱（必须避开）：榜是 10–40 万**全价位**（蔚来ES6 33.8万 vs 极狐T5 11.38万），
+    # 电池度数的**绝对值跨价位不可比**——25万的车电池大是价格带的必然结果，
+    # 不是三电技术更好，直接按 kWh 给分会系统性奖励高价车（与「空间维用车长」
+    # 当年重复计数的教训同类）。
+    # 所以用 **kWh/万元**（每万元预算买到多少度电池）——这是跨价位可比的口径，
+    # 项目里已有同名参考列（board_v2 的 kwh_per_wan）。
+    kwh = _n(s.get("kwh"))
+    price = _n(s.get("price"))
+    if kwh is not None and price:
+        per_wan = kwh / price          # kWh / 万元
+        if per_wan >= 5.0:
+            parts.append(("电池容量", 0.8, f"{kwh:g}kWh/{price:g}万 = {per_wan:.1f}kWh/万 +0.8"))
+        elif per_wan >= 4.2:
+            parts.append(("电池容量", 0.6, f"{kwh:g}kWh/{price:g}万 = {per_wan:.1f}kWh/万 +0.6"))
+        elif per_wan >= 3.4:
+            parts.append(("电池容量", 0.4, f"{kwh:g}kWh/{price:g}万 = {per_wan:.1f}kWh/万 +0.4"))
+        elif per_wan >= 2.8:
+            parts.append(("电池容量", 0.2, f"{kwh:g}kWh/{price:g}万 = {per_wan:.1f}kWh/万 +0.2"))
+        elif per_wan < 2.2:
+            parts.append(("电池容量", -0.4, f"{kwh:g}kWh/{price:g}万 = {per_wan:.1f}kWh/万 −0.4"))
     rg = _n(s.get("range_km"))
     if rg is not None:
         if rg >= 700:
@@ -229,6 +254,41 @@ def powertrain_parts(s):
     elif cool:
         parts.append(("冷却", -0.2, f"{cool} −0.2"))
     return parts
+
+
+# 三电维的**子维度分组**（2026-11-22 新增，用户诉求「电池在三电占比高，
+# 是不是要分开来」）。三电一直是一个笼统的「三电」分，读者看不出
+# 「电池本身好不好」与「补能快不快」这两件不同的事。分组后可分别披露。
+# 归组依据（每一项都只归一组，不重复计数）：
+#   电池素质 = 电池**本体**（电芯、容量、续航、热管理冷却）
+#   补能能力 = 补能**通路**（电压平台、充电时间）
+POWERTRAIN_GROUPS = {
+    "电池素质": ("电芯", "电池容量", "续航", "冷却"),
+    "补能能力": ("高压平台", "快充"),
+}
+# 三电维内部两组的名义权重（用于披露时的占比说明，不参与打分）
+#   电池素质权重更高——用户判断「电池在三电占比高」，业内横评也确实
+#   把「电池素质」列为三电首要项（电池占整车成本 30–40%）。
+#   补能能力是使用体验加分项，不构成硬件档次。
+POWERTRAIN_GROUP_WEIGHT = {"电池素质": 0.6, "补能能力": 0.4}
+
+
+def powertrain_group_parts(s) -> dict:
+    """把三电规则项按「电池素质 / 补能能力」分组返回（用于披露，不用于打分）。
+
+    返回 {组名: [(项名, 分值, 展示文本), ...]}。
+    """
+    out: dict[str, list] = {g: [] for g in POWERTRAIN_GROUPS}
+    for name, v, text in powertrain_parts(s):
+        placed = False
+        for g, items in POWERTRAIN_GROUPS.items():
+            if name in items:
+                out[g].append((name, v, text))
+                placed = True
+                break
+        if not placed:
+            out["电池素质"].append((name, v, text))
+    return out
 
 
 def score_powertrain(s):

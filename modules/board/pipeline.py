@@ -356,6 +356,9 @@ def main():
     # c["scores"]，排在它后面会被整体盖掉。
     from modules.engine import rule_adjust as _RA
     _rule_rep = _RA.apply_rule_adjust(cands)
+    # 逐车规则增量明细（供页面三电子维度分组展示）
+    _rule_detail = {c["model"]: c["rule_adjust"]
+                     for c in cands if c.get("rule_adjust")}
     if _rule_rep:
         print("[规则增量] " + " / ".join(
             f"{d} {v.get('status')}({len(v.get('touched') or [])}款)"
@@ -1021,6 +1024,7 @@ def main():
                 except Exception:                            # noqa: BLE001
                     pass
                 data_v2 = BV.build(cands_for_html, cfg_v2, pol, facts_v2, tiers=_tiers_v2,
+                                   rule_adjust_detail=_rule_detail,
                                    no_experience=True)  # 已在 pipeline 里调过，不重复累加
                 _as_of = a.as_of
                 if not _as_of:

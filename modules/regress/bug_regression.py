@@ -129,6 +129,7 @@ CASES = [
     ("BUG-104", "参数页字段大量未提取(只认电池组),缺口被伪装成数据源没有:轴距/后备厢/零百全丢且无门禁", "v10.12.1"),
     ("BUG-105", "空间维从未接入配置驱动规则+后备厢容积被标仅披露不进分,车长与轴距重复计数", "v10.12.2"),
     ("BUG-106", "人工条目与自动条目存储层双副本:人工证据链(source/quote/note含口径冲突披露)被自动模板覆盖345字段", "v10.13.0"),
+    ("BUG-107", "三电缺电池容量项+三电未拆电池/补能+配置匹配数字粘连致42款评分配置错配", "v10.15.0"),
 ]
 
 
@@ -3346,8 +3347,124 @@ def t106():
     return (f"人工/自动合流：存储层零副本（人工 {len(man_models)} 款 + 自动 {len(auto_models)} 款）"
             f"+ 人工证据链未被覆盖 + {len(db)} 款合流齐全 + 下游统一入口")
 
+def t107():
+    """三电维：电池容量进分 + 电池/补能子维度拆分 + 配置匹配不再错配（v10.15.0）。
+
+    用户 2026-11-22 指出：「小鹏和启源Q06三电分数一样是不是不公平，启源电池更好，
+    充电更快，电池在三电占比又高，电池度数又高，是不是在三电上需要去分开来」。
+    查出的根因有三层：
+      ① **电池度数完全没进三电规则** —— spec_score 里搜不到 kwh，只有续航 km；
+         「大电池」这个纯电车最核心的硬件差异在分数上不存在。
+      ② 三电一直是一个笼统的「三电」分，读者看不出电池好还是补能快。
+      ③ **配置匹配系统性错配**：find_ref 的 norm() 把空格全删，
+         「MONA L05 2027款 纯电 635 Max」→「monal05635max」，数字粘连成 0563，
+         匹配必然失败 → 落价格兜底 → MONA L05 的 635 Max（71.1kWh）被配成
+         535 Max（58.2kWh）。实测 **42/71 款受影响**。
+
+    本条锁死三条机制。
+    """
+    from modules.engine import spec_score as SS
+    from modules.engine import trim_annotate as TA
+    from modules.engine import trim_board as TB
+
+    # ① 电池容量项存在，且用 kWh/万元（跨价位可比）而非绝对 kWh
+    parts = SS.powertrain_parts({"kwh": 80.0, "price": 20.0, "range_km": 600})
+    cap = [p for p in parts if p[0] == "电池容量"]
+    assert cap, f"三电规则缺电池容量项: {[p[0] for p in parts]}"
+    assert "kWh/万" in cap[0][2], f"电池容量口径应为 kWh/万元: {cap[0][2]}"
+    # 同样 80kWh：20万的车 +0.8，40万的车不应拿同样分（跨价位不可比）
+    rich = SS.powertrain_parts({"kwh": 80.0, "price": 20.0})
+    poor = SS.powertrain_parts({"kwh": 80.0, "price": 40.0})
+    cr = [p for p in rich if p[0] == "电池容量"][0][1]
+    cp = [p for p in poor if p[0] == "电池容量"][0][1]
+    assert cr > cp, f"同样电池不同价位应区分（防高价车系统性占优）: {cr} vs {cp}"
+    # 缺价格 → 不参与（缺数据≠差）
+    assert not [p for p in SS.powertrain_parts({"kwh": 80.0}) if p[0] == "电池容量"], \
+        "缺价格时电池容量项应缺席"
+
+    # ② 三电子维度拆分：电池素质 / 补能能力
+    g = SS.powertrain_group_parts({"platform_800v": True, "charge_10_80_min": 10,
+                                    "cell_brand": "宁德时代", "range_km": 800,
+                                    "battery_cooling": "液冷", "kwh": 100, "price": 20})
+    assert set(g) == {"电池素质", "补能能力"}, f"三电子维度分组不对: {set(g)}"
+    assert {i[0] for i in g["电池素质"]} == {"电芯", "电池容量", "续航", "冷却"}, \
+        f"电池素质归组错: {[i[0] for i in g['电池素质']]}"
+    assert {i[0] for i in g["补能能力"]} == {"高压平台", "快充"}, \
+        f"补能能力归组错: {[i[0] for i in g['补能能力']]}"
+    # 每一项只归一组（不重复计数）
+    allitems = [i[0] for v in g.values() for i in v]
+    assert len(allitems) == len(set(allitems)), f"规则项重复归组: {allitems}"
+
+    # ②-b 源码层断言：电池容量项与子维度分组必须真的写在规则文件里
+    #     （_read 走源码断言型注入探针，失败回测靠它验证断言不形同虚设）
+    ss_src = _read("modules/engine/spec_score.py")
+    assert "电池容量" in ss_src, "spec_score 源码缺电池容量项"
+    assert "POWERTRAIN_GROUPS" in ss_src, "spec_score 源码缺三电子维度分组定义"
+    ta_src = _read("modules/engine/trim_annotate.py")
+    assert "(?<!\\d)" in ta_src or "num_re" in ta_src, \
+        "trim_annotate 源码缺数字边界正则（数字粘连回归）"
+
+    # ③ 配置匹配：数字不得粘连（MONA L05 635 Max 必须配到 635 Max 而非 535 Max）
+    trims = TB.load_trims()
+    e = trims.get("小鹏MONA L05")
+    if e:
+        ref = TA.find_ref(e.get("scored_trim") or "", e.get("trims") or [])
+        assert ref is not None, "MONA L05 评分配置匹配失败（数字粘连回归）"
+        assert "635" in str(ref.get("name")), \
+            f"MONA L05 评分配置错配到 {ref.get('name')!r}（应为 635 Max，71.1kWh）"
+    # 抽样若干车：匹配到的配置必须含 scored_trim 里的型号数字
+    import re as _re
+    num_re = _re.compile(r"(?<!\d)\d{3,4}(?!\d)")
+    checked = 0
+    for m2, e2 in trims.items():
+        name = e2.get("scored_trim")
+        if not name:
+            continue
+        ref2 = TA.find_ref(name, e2.get("trims") or [])
+        if not ref2:
+            continue
+        tn = set(num_re.findall(str(name)))
+        rn = set(num_re.findall(str(ref2.get("name"))))
+        if tn and not (tn & rn):
+            # 数字集不同要能区分「型号数字」与「车系名里的数字」
+            only_t = tn - rn
+            if only_t and not any(x in str(ref2.get("name")) for x in only_t):
+                raise AssertionError(f"{m2}: 评分配置 {name!r} 错配到 {ref2.get('name')!r}")
+        checked += 1
+    assert checked >= 40, f"匹配覆盖异常低: {checked}"
+    # ④ scored_trim_ref（人工核验的精确配置全名）必须优先于 scored_trim（简称）——
+    #    简称的模糊匹配可能落到同型号的别的档次（海狮06EV「605 入门版」→ 605领航Pro
+    #    15.38万，实际应为 605领航 15.99万）。
+    e6 = trims.get("海狮06EV")
+    if e6 and e6.get("scored_trim_ref"):
+        # 测**真实效果**：参考配置必须解析成 scored_trim_ref 那个配置。
+        # （不能直接调 resolve_ref —— 它拿的是简称，ref 优先是在调用方做的前置）
+        import copy as _copy
+        import json as _json
+        from modules.engine import leaderboard as _LB
+        _cfg = _LB.load_category("car_midsuv_bev")
+        _pool = _json.load(open(os.path.join(HERE, "runs", "midsuv_bev_pool.json"),
+                                encoding="utf-8"))
+        _cands = _copy.deepcopy(_pool.get("candidates") or [])
+        _ann = TA.annotate_all(_cands, _cfg)
+        _d6 = _ann.get("海狮06EV") or {}
+        _names = [t.get("name") for t in (_d6.get("trims") or [])]
+        assert e6.get("scored_trim_ref") in _names, \
+            f"scored_trim_ref 指向的配置不在逐配置表里: {e6.get('scored_trim_ref')!r}"
+        # 参考配置的 delta 必须为 0（它就是基准，不该被再加/减分）
+        for _t in (_d6.get("trims") or []):
+            if _t.get("name") == e6.get("scored_trim_ref"):
+                assert not _t.get("deltas"), \
+                    f"参考配置 {e6.get('scored_trim_ref')!r} 仍有 delta（重复计数）: {_t.get('deltas')}"
+    ta_src2 = _read("modules/engine/trim_annotate.py")
+    assert "scored_trim_ref" in ta_src2, "trim_annotate 未使用 scored_trim_ref"
+    ra_src2 = _read("modules/engine/rule_adjust.py")
+    assert "scored_trim_ref" in ra_src2, "rule_adjust 未使用 scored_trim_ref"
+    return (f"三电电池容量进分(kWh/万元，跨价位可比) + 电池素质/补能能力子维度拆分 + "
+            f"配置匹配不粘连({checked} 款抽样通过) + scored_trim_ref 优先")
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107]
 
 
 def run():
