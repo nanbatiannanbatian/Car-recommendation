@@ -124,6 +124,8 @@ def main():
                     help="跳过体验证据缺口门禁(须在报告说明为何文本实测无需入库)")
     ap.add_argument("--no-evidence-cap", action="store_true",
                     help="不做安全分举证封顶（仅 A/B 对照，验证封顶确实改变分数）")
+    ap.add_argument("--no-space-cap", action="store_true",
+                    help="不做空间硬数据一致性封顶（仅 A/B 对照，验证 space 虚高确实被压）")
     ap.add_argument("--no-auto-safety", action="store_true",
                     help="不按官方成绩自动映射 safety 分（仅 A/B 对照；正常出榜不要关）")
     ap.add_argument("--no-backfill", action="store_true",
@@ -217,6 +219,20 @@ def main():
     if _ev_sum:
         print("[证据封顶] " + " / ".join(f"{d} {v['count']}款→{v['cap']:g}"
                                          for d, v in _ev_sum.items()))
+
+    # space 硬数据一致性封顶（2026-11-21，用户第三次质疑 MONA 空间 9.3 触发）：
+    # evidence_gate 把 space 判为"纸面可判定、不封顶"，但 vehicle_physics 全库
+    # 轴距 0% 覆盖，space 其实是随包人工库拍的分、从没用硬数据校验过。
+    # space_consistency 用"尺寸不小于本车的车的中位"设上限，只压虚高不倒扣。
+    from modules.engine import space_consistency as SP
+    if getattr(a, "no_space_cap", False):
+        _space_adj, _space_uncal = [], []
+    else:
+        _space_adj, _space_uncal = SP.calibrate_space(cands)
+    _space_sum = SP.summarize(_space_adj, _space_uncal)
+    if _space_adj:
+        print("[空间一致性封顶] " + " / ".join(
+            f"{x['model']} {x['prev']:g}→{x['capped']:g}（{x['basis']}）" for x in _space_adj))
 
     # 证据缺口门禁（2026-11-21，用户追问「是否在代码层面确保不出错」后从 print 升级为硬拦）：
     # 文本/外部稿里有可核查实测（麋鹿 XX km/h / 城市NOA 实测）但体验证据库没记录 → 拦截出榜。
@@ -366,7 +382,19 @@ def main():
                      "（碰撞是门槛，没成绩不能和有成绩并列）；`adas/cabin/control/quality` 用"
                      "「有证据车中位」（举证责任只要求不超过典型水平，不是垫底）。"
                      f"有证据车不足 3 款的维度不封顶（避免拿 2 款车的噪声当全池天花板）。"
-                     f"**{'、'.join(EG.uncapped_dims())} 不封顶**——轴距/配置/三电参数是硬数据。")
+                     f"**{'、'.join(d for d in EG.uncapped_dims() if d != 'space')} 不封顶**——配置/三电参数是硬数据。")
+    if _space_adj:
+        _sp_lines = "；".join(f"{x['model']} {x['prev']:g}→{x['capped']:g}"
+                            for x in _space_adj[:6])
+        parts.append(f"> **空间硬数据一致性封顶**：{_sp_lines}。`space` 不受实测证据门槛约束"
+                     f"（轴距/车长本就是硬参数），但随包人工分从未用尺寸校验——本榜以"
+                     f"「尺寸不小于本车的车」space 中位为上限，超过容忍带 {SP.TOL:g} 才压，"
+                     f"只压虚高不倒扣。可比车不足 {SP.MIN_PEERS} 款不封顶。")
+    if _space_uncal:
+        parts.append(f"> **空间硬数据待补**：{'、'.join(_space_uncal[:8])}（共 {len(_space_uncal)} 款）"
+                     "无轴距/长宽高，无法做一致性校验——用 "
+                     "`research.fill_experience.extract_dimensions` 从参数页提取候选事实，"
+                     "人工核实后补进 `categories/vehicle_physics.json`（补后自动优先用轴距）。")
     if _exp_gaps:
         parts.append(f"> **证据缺口**：{'、'.join(g['model']+chr(40)+g['dim']+chr(41) for g in _exp_gaps[:6])}"
                      f"（共 {len(_exp_gaps)} 条）的文本里有实测数据但证据库无记录，"
@@ -449,6 +477,7 @@ def main():
         "safety_auto": {"applied": _sa, "skipped": _ss},
         "safety_cap": _cap_adj,
         "dimension_cap": _dim_cap,
+        "space_calibration": _space_sum,
         "experience_gaps": _exp_gaps,
         "safety_table_sync": _st_sync,
         # v9.7.20：候选池披露同步给页面（评审反复指出报告有、页面看不到）

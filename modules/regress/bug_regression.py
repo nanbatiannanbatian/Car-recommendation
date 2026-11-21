@@ -105,6 +105,7 @@ CASES = [
     ("BUG-080", "无实测车体验维度可断层最高(MONA adas9.4 vs 有实测G6 7.6)", "v10.2.4"),
     ("BUG-081", "维度证据门槛散落成多个特判函数,新增维度需再打补丁(quality漏网)", "v10.2.5"),
     ("BUG-082", "T6实测数据没录入:采集抓不到试驾稿麋鹿/NOA+检测器只扫候选池+缺口只print不拦", "v10.2.7"),
+    ("BUG-083", "MONA空间9.3全场第一但零实测:space被判硬数据不封顶+轴距0%覆盖+人工分从未校验", "v10.2.8"),
 ]
 
 
@@ -2069,8 +2070,58 @@ def t082():
     return "T6根因闭环：research可复用提取(待核实不入库)+外部源缺口检测+pipeline硬门禁"
 
 
+def t083():
+    """空间分硬数据一致性校准：MONA space 9.3 全场第一但零实测、尺寸不占优。
+
+    2026-11-21 用户问「小鹏MONA L05 空间分这么高合理吗」。查实 space=9.3 是
+    随包人工库拍的分、从未用硬数据校验；而 evidence_gate 以"轴距是硬数据"为由
+    把 space 列为不封顶——但 vehicle_physics 全库轴距 0% 覆盖，"硬数据"是空的。
+    体积最大的 ES6(16.49m³) 只有 8.3，体积中上的 MONA(15.38m³) 却 9.3——
+    体积与 space 几乎无相关。修复：space_consistency 用"尺寸不小于本车的车"
+    space 中位设上限，TOL=0.4 标定为全池只命中 MONA，只压虚高不倒扣。
+    """
+    from modules.engine import space_consistency as SP
+    from modules.research import fill_experience as FE
+
+    # 1) 模块 selftest：MONA 场景 + 小样本 + 容忍带 + 不倒扣 + 轴距优先
+    assert SP.selftest() == 0, "space_consistency 单元自测失败"
+
+    # 2) 真实池子标定：TOL=0.4 只命中 MONA 一款，9.3→8.8，其余不动
+    import json, copy
+    pool = json.load(open(str(paths.ROOT / "runs" / "midsuv_bev_pool.json"), encoding="utf-8"))
+    cands = copy.deepcopy(pool["candidates"])
+    before = {c["model"]: (c.get("scores") or {}).get("space") for c in cands}
+    adj, uncal = SP.calibrate_space(cands)
+    hit = {a["model"]: a["capped"] for a in adj}
+    assert hit == {"小鹏MONA L05": 8.8}, f"标定应只命中 MONA→8.8: {hit}"
+    assert uncal == [], f"本榜 21 款都有尺寸: {uncal}"
+    assert all(before.get(c["model"]) == (c.get("scores") or {}).get("space")
+               for c in cands if c["model"] != "小鹏MONA L05"), "不得误伤其他车"
+    mona = [c for c in cands if c["model"] == "小鹏MONA L05"][0]
+    assert mona.get("score_cap_reasons"), "封顶未留审计理由"
+    assert adj[0]["peers"] >= SP.MIN_PEERS, "锚点样本不足"
+
+    # 3) 标定唯一性：TOL 放宽到 0.5 会漏掉 MONA（证明 0.4 是必要的，不是随意取）
+    c2 = copy.deepcopy(pool["candidates"])
+    a2, _ = SP.calibrate_space(c2, tol=0.5)
+    assert "小鹏MONA L05" not in {a["model"] for a in a2}, "tol 必须卡在 0.4"
+
+    # 4) research 补硬数据的可复用提取器：只提取待核实、不误伤
+    dims = FE.extract_dimensions("车身尺寸 4870×1930×1636mm，轴距 2900mm", model="X")
+    assert {x["kind"] for x in dims} == {"wheelbase", "length_width_height"}, dims
+    assert all(x["verification"] == "pending" for x in dims), "尺寸提取不得自动入库"
+    assert FE.extract_dimensions("快充 280kW 售价 153800元") == [], "不得误伤功率/价格"
+
+    # 5) pipeline 接入了 space 校准与审计字段
+    src = _read("pipeline.py")
+    assert "space_consistency" in src and "calibrate_space" in src, "pipeline 未接空间校准"
+    assert '"space_calibration"' in src, "summary 缺 space 校准审计"
+    assert "no_space_cap" in src, "缺 A/B 对照开关"
+    return "空间虚高根治：硬数据一致性封顶(只命中MONA9.3→8.8)+不倒扣+research补尺寸"
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083]
 
 
 def run():

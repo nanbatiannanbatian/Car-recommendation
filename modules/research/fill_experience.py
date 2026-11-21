@@ -90,6 +90,43 @@ def extract_driving_evidence(text: str, model: str = "", url: str = "",
     return out
 
 
+# ---- 尺寸硬数据文本提取（可复用，纯函数，零网络零 IO）----
+# 空间一致性封顶（space_consistency）优先用轴距，但 vehicle_physics 全库轴距 0% 覆盖。
+# 参数页正文里有"轴距 2930mm / 长×宽×高 4870×1930×1636"这类文本，research 检索到后
+# 交给本函数提取成候选事实（verification=pending），人工核实后补进 vehicle_physics.json。
+# 与 extract_driving_evidence 同一纪律：只提取、不入库、不改分。
+_AXIS_RE = re.compile(r"轴距\s*[:：]?\s*(\d{4,5})\s*mm", re.I)
+_LWH_RE = re.compile(r"(\d{4})\s*[×xX*]\s*(\d{4})\s*[×xX*]\s*(\d{4})\s*mm", re.I)
+
+
+def extract_dimensions(text: str, model: str = "", url: str = "") -> list[dict]:
+    """从参数页正文提取轴距/长宽高的候选事实条目（**不入库、不改分**）。
+
+    Returns: [{model, kind, value, unit, claim, source, url, verification}]
+      - wheelbase: 轴距 mm
+      - length_width_height: 长×宽×高 mm（value 为 dict）
+      verification 恒为 "pending"：参数页可能是低配/特定款，须人工核实后写入
+      vehicle_physics.json。补录后 space_consistency.size_of 会自动优先用轴距。
+    """
+    text = str(text or "")
+    out: list[dict] = []
+    m = _AXIS_RE.search(text)
+    if m:
+        out.append({"model": model, "kind": "wheelbase", "value": int(m.group(1)),
+                    "unit": "mm", "claim": text[max(0, m.start() - 6):m.end()].strip(),
+                    "source": "research_params", "url": url, "verification": "pending",
+                    "note": "核实是哪个配置/款型的轴距，再写入 vehicle_physics 的 wheelbase_mm"})
+    w = _LWH_RE.search(text)
+    if w:
+        out.append({"model": model, "kind": "length_width_height",
+                    "value": {"length_mm": int(w.group(1)), "width_mm": int(w.group(2)),
+                              "height_mm": int(w.group(3))},
+                    "unit": "mm", "claim": w.group(0),
+                    "source": "research_params", "url": url, "verification": "pending",
+                    "note": "核实配置款型后写入 vehicle_physics 的 length/width/height_mm"})
+    return out
+
+
 def driving_evidence_selftest() -> int:
     """T6 场景回归：从试驾稿提取麋鹿+NOA，且不自动入库/不打分的契约。"""
     article = ("ID.AURA T6 麋鹿测试 80.02km/h 表现亮眼；"
@@ -105,6 +142,19 @@ def driving_evidence_selftest() -> int:
     assert extract_driving_evidence("这款车空间很大，价格厚道。") == []
     # 麋鹿正则不误伤百分比/快充（与 crash_systems 同纪律）
     assert extract_driving_evidence("充电 10-80% 用时 22 分钟") == []
+
+    # 尺寸提取（空间一致性封顶的硬数据来源）：轴距 + 长宽高，且只提取不入库
+    dims = extract_dimensions("车身尺寸 4870×1930×1636mm，轴距：2900mm", model="小鹏MONA L05")
+    assert len(dims) == 2, dims
+    wb = [x for x in dims if x["kind"] == "wheelbase"][0]
+    assert wb["value"] == 2900 and wb["verification"] == "pending", wb
+    lwh = [x for x in dims if x["kind"] == "length_width_height"][0]
+    assert lwh["value"] == {"length_mm": 4870, "width_mm": 1930, "height_mm": 1636}, lwh
+    # 只有轴距 / 只有普通文本
+    assert len(extract_dimensions("轴距 2800mm")) == 1
+    assert extract_dimensions("空间很大，配置厚道") == []
+    # 不误伤充电功率/价格里的 4 位数
+    assert extract_dimensions("快充功率 280kW，售价 153800 元") == []
     return 0
 
 
