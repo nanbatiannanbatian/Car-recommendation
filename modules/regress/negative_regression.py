@@ -99,6 +99,8 @@ NEG_DATA = {
     "t072": ("safety_check.apply_auto_scores", None, "no_auto_safety"),
     # t073：让「公式复算」永远返回 None（等于校验失效），手填错分将检不出 → 断言必须 FAIL
     "t073": ("safety_check.score_from_record", None, "no_formula"),
+    # t074：让无配置时返回空串（等于又静默），「必须标注待补」断言应 FAIL
+    "t074": ("render_board_html.trim_selector", None, "silent_trim"),
     # t039 断言从「源码文本含文件名」升级为「文件在同步集里」，探针改成把同步集清空
     "t039": ("sync_to_repo.collect", None, "empty_sync"),
 }
@@ -123,6 +125,7 @@ def _func_probe(name, fn, dotted, mode):
         "no_crash_backfill": lambda *a, **kw: ([], []),                    # 不回流成绩
         "no_auto_safety": lambda *a, **kw: ([], []),                       # 不映射安全分
         "no_formula": lambda *a, **kw: (None, ""),                         # 公式失效（校验形同虚设）
+        "silent_trim": lambda *a, **kw: "",                                # 静默：无配置时不标注
     }.get(mode)
     if wrong is None:
         return False, False

@@ -96,6 +96,7 @@ CASES = [
     ("BUG-071", "官方碰撞成绩只写在note文本未进字段致极氪7X进不了一档", "v10.1.3"),
     ("BUG-072", "成绩已进crash字段却未参与打分(safety仍按插补)致有实锤等于没用", "v10.1.4"),
     ("BUG-073", "映射表人工分与公式复算不一致(同分率不同分)", "v10.1.5"),
+    ("BUG-074", "缺逐配置数据的车静默无下拉框(大众T6),读者分不清是缺失还是无差异", "v10.1.6"),
 ]
 
 
@@ -1532,8 +1533,58 @@ def t073():
     return "映射表全表可复算 + 手填错分被门禁拦 + 候选池自动对齐表分 + 公式锁死"
 
 
+def t074():
+    """配置下拉框必须「二选一」：有阶梯给下拉，没采到给显式「配置待补」。
+
+    2026-11-21 用户问「大众 ID.AURA T6 为什么没有下拉框」：
+    该车在汽车之家查无车系（索引只有 ID.AURA 且已无 config 页），trims.json 无条目；
+    渲染时原来 `if td.get("trims")` 不成立就什么都不画 → 页面看起来像 bug，
+    读者无法区分「这车配置没差异」和「我们没采到」。现在强制标注 + 回归守住。
+    """
+    import html as _html
+    import re as _re
+    from modules.board import render_board_html as RH
+    from modules.contracts.model_names import canon
+
+    # 1) 函数级：两种输入都必须给出可识别标记
+    assert "trim-missing" in RH.trim_selector("大众ID.AURA T6", []), "无配置时未标注待补"
+    sel = RH.trim_selector("极氪7X", [{"name": "低配", "price": 22.98},
+                                     {"name": "高配", "price": 26.98}], "低配")
+    assert 'class="trimsel"' in sel and sel.count("<option") == 2, sel
+    assert "selected" in sel, "未选中评分配置"
+
+    # 2) 产物级：主榜每款车必须二选一，且判定与 trims.json 一致
+    hp = os.path.join(HERE, "runs", "midsuv_bev_202610", "榜单.html")
+    if not os.path.exists(hp):
+        return "配置下拉：函数级通过（产物缺失，跳过页面级）"
+    h = _read("runs/midsuv_bev_202610/榜单.html")
+    body = h.split('id="mainBoard"')[1].split("</table>")[0]
+    rows = [r for r in _re.findall(r"<tr[^>]*>(.*?)</tr>", body, _re.S) if "<td" in r]
+    assert rows, "主表无数据行"
+    bare = [r for r in rows if "trimsel" not in r and "trim-missing" not in r]
+    assert not bare, f"主榜 {len(bare)} 行既无下拉框也无『配置待补』标注"
+
+    db = json.load(open(str(paths.cat("trims.json")), encoding="utf-8"))
+    have = {canon(e.get("model")) for e in db.get("entries", [])
+            if len(e.get("trims") or []) >= 2}
+    bad = []
+    for row in rows:
+        m = _re.search(r"<td class='name'>([^<]+)<", row)
+        if not m:
+            continue
+        model = _html.unescape(m.group(1)).strip()
+        if canon(model) in have:
+            if "trimsel" not in row:
+                bad.append(f"{model} 有阶梯却无下拉框")
+        elif "trim-missing" not in row:
+            bad.append(f"{model} 无阶梯却未标待补")
+    assert not bad, "；".join(bad)
+    n_miss = sum(1 for r in rows if "trim-missing" in r)
+    return f"配置下拉二选一：{len(rows)} 款在榜车，{len(rows)-n_miss} 款有下拉、{n_miss} 款标注待补"
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074]
 
 
 def run():

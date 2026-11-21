@@ -67,6 +67,7 @@ modules/
     monthly.py               月度跑批
     board_v2.py              统一榜单引擎 v2
     board_view.py            页面区块注册表（展示层唯一事实源）
+    render_board_html.py     页面渲染（trim_selector 统一处理配置下拉/待补标注）
     render_board_html.py     HTML 渲染
     master_pool.py           总候选池（单一事实源）
     bootstrap.py             生成物一键重建（新装包首跑）

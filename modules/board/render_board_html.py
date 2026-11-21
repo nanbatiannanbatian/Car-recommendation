@@ -69,6 +69,7 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#faf9f6}
 td.name{text-align:left;font-weight:600;white-space:nowrap}
 /* v9.7.16：同档底色分组 + 警示标签 */
 tr.tier-T1 td{background:#eef8f0}tr.tier-T2 td{background:#fffdf5}tr.tier-T3 td{background:#fdf3f2}
+.trim-missing{display:inline-block;margin-top:2px;font-size:10.5px;color:#8a6d3b;background:#fcf8e3;border:1px solid #f0e0b8;border-radius:4px;padding:0 4px;cursor:help}
 .flag{display:inline-block;font-size:11px;font-weight:400;padding:1px 5px;border-radius:4px;margin-left:4px}
 .flag-warn{background:#fdf0ee;color:#b42318;border:1px solid #f3c9c3}
 .flag-est{background:#fbf3e9;color:#8a5a1f;border:1px solid #edd9bc}
@@ -242,6 +243,29 @@ def num(v, digits=1):
         return f"{float(v):.{digits}f}"
     except (TypeError, ValueError):
         return "—"
+
+
+def trim_selector(model, trims, best="", *, show_price=True, width=160) -> str:
+    """配置下拉框：有阶梯给 select，没采到给显式「配置待补」标注。
+
+    为什么不能静默（2026-11-21 用户问「大众ID.AURA T6 为什么没有下拉框」）：
+      没采到逐配置阶梯时，原来这里什么都不渲染——页面上就只剩一个车名，
+      读者无法区分「这车配置没差异」和「我们没采到」，看起来像渲染 bug。
+      现在统一给出可识别标注，并被回归 t074 强制检查（每款在榜车必须二选一）。
+    """
+    if trims:
+        opts = "".join(
+            f'<option value="{i}"'
+            f'{" selected" if t.get("name") == best else ""}>'
+            f'{e(t.get("name"))}'
+            + (f'（¥{e(t.get("price"))}）' if show_price else "")
+            + "</option>"
+            for i, t in enumerate(trims))
+        return (f'<br><select class="trimsel" data-model="{e(model)}" '
+                f'style="font-size:11px;max-width:{width}px">{opts}</select>')
+    return ('<br><span class="trim-missing" title="未采集到该车的逐配置阶梯'
+            '（trims.json 无条目），已列入待补清单。不影响主榜名次，'
+            '也不代表这车没有配置差异">配置待补</span>')
 
 
 def rank_badge(rank):
@@ -423,15 +447,8 @@ def render(data, summary, title, as_of):
                 if k == "rank":
                     H.append(f"<td class='c-rank'>{rank_badge(r.get('rank'))}</td>")
                 elif k == "model":
-                    sel = ""
-                    if td.get("trims"):
-                        opts = "".join(
-                            f'<option value="{i}"'
-                            f'{" selected" if t.get("name")==r.get("best_trim") else ""}>'
-                            f'{e(t.get("name"))}（¥{e(t.get("price"))}）</option>'
-                            for i, t in enumerate(td["trims"]))
-                        sel = (f'<br><select class="trimsel" data-model="{e(r["model"])}" '
-                               f'style="font-size:11px;max-width:160px">{opts}</select>')
+                    sel = trim_selector(r["model"], td.get("trims") or [],
+                                        r.get("best_trim"), width=160)
                     # v9.7.53：强推金标移到档位列（车名列不再重复显示）
                     H.append(f"<td class='name'>{e(val)}{risk_flags(r)}{crash_badge(r)}{sel}</td>")
                 elif k == "total":
@@ -567,15 +584,8 @@ def render(data, summary, title, as_of):
             sc = r.get("scores") or {}
             td = tb.get(r["model"]) or {}
             # 配置下拉：与主榜联动（class=trimsel 共用同一处理函数）
-            sel = ""
-            if td.get("trims"):
-                opts = "".join(
-                    f'<option value="{i}"'
-                    f'{" selected" if t.get("name")==r.get("best_trim") else ""}>'
-                    f'{e(t.get("name"))}（¥{e(t.get("price"))}）</option>'
-                    for i, t in enumerate(td["trims"]))
-                sel = (f'<br><select class="trimsel" data-model="{e(r["model"])}" '
-                       f'style="font-size:11px;max-width:150px">{opts}</select>')
+            sel = trim_selector(r["model"], td.get("trims") or [],
+                                r.get("best_trim"), width=150)
             H.append(f"<tr data-model='{e(r['model'])}'><td>{rank_badge(r.get('rank'))}</td>"
                      f"<td class='name'>{e(r.get('model'))}{sel}</td>"
                      f"<td class='ref'>{e(BV.main_cell('trim', r, r))}</td>"
@@ -764,16 +774,8 @@ document.addEventListener('change',function(ev){
             dcls = "delta-up" if isinstance(d, int) and d > 0 else ("delta-down" if isinstance(d, int) and d < 0 else "")
             mdl = it.get("model")
             td = tbpp.get(mdl) or {}
-            sel = ""
-            if td.get("trims"):
-                best = td.get("best_trim")
-                opts = "".join(
-                    f'<option value="{i}"'
-                    f'{" selected" if t.get("name")==best else ""}>'
-                    f'{e(t.get("name"))}</option>'
-                    for i, t in enumerate(td["trims"]))
-                sel = (f'<br><select class="trimsel" data-model="{e(mdl)}" '
-                       f'style="font-size:11px;max-width:150px">{opts}</select>')
+            sel = trim_selector(mdl, td.get("trims") or [],
+                                td.get("best_trim"), show_price=False, width=150)
             H.append(f"<tr data-model='{e(mdl)}'><td class='c-prank'>{it.get('power_rank')}</td>"
                      f"<td class='name'>{e(mdl)}{sel}</td>"
                      f"<td class='c-power'><span class='score'>{num(it.get('power_score'), 2)}</span></td>"
