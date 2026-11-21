@@ -119,6 +119,8 @@ NEG_DATA = {
     "t082": ("fill_experience.extract_driving_evidence", None, "no_extract"),
     # t083：关掉空间一致性校准（回到「space 人工拍分无人校验」），断言必须 FAIL
     "t083": ("space_consistency.calibrate_space", None, "no_space_cap"),
+    # t084：关掉空间要素提取器（回到「前备箱/得房率记了却没用」），断言必须 FAIL
+    "t084": ("space_features.extract_space_features", None, "no_sf_extract"),
     # t039 断言从「源码文本含文件名」升级为「文件在同步集里」，探针改成把同步集清空
     "t039": ("sync_to_repo.collect", None, "empty_sync"),
 }
@@ -152,6 +154,7 @@ def _func_probe(name, fn, dotted, mode):
         "no_evidence_gate": lambda *a, **kw: [],                           # 不做任何证据封顶
         "no_extract": lambda *a, **kw: [],                                  # 提取器失效（T6 实测又抓不到）
         "no_space_cap": lambda *a, **kw: ([], []),                          # 空间校准失效（MONA 9.3 又无人管）
+        "no_sf_extract": lambda *a, **kw: [],                               # 空间要素提取失效（得房率/前备箱又没用）
         "always_missing": lambda *a, **kw: {"status": "missing", "source": "", "trims": [],
                                            "attempts": [], "evidence": {}, "sid": None,
                                            "ah_name": ""},                # 调度退化为直接失败

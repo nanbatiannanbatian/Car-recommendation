@@ -230,6 +230,15 @@ def main():
     else:
         _space_adj, _space_uncal = SP.calibrate_space(cands)
     _space_sum = SP.summarize(_space_adj, _space_uncal)
+
+    # 空间要素结构化（2026-11-21 用户问「空间要考虑前备箱/下沉后备箱/储物/真实表现吗」）：
+    # 从 evidence.space_evidence 提取两类——real(得房率/膝部/腿部/间距，参与上面的校验)
+    # 与 storage(前备箱/后备箱/下沉储物，仅披露不进分)。只提取不打分，不碰渲染层。
+    from modules.engine import space_features as SF
+    _sf_per_car = {c["model"]: SF.extract_space_features(c) for c in cands}
+    _sf_per_car = {m: f for m, f in _sf_per_car.items() if f}
+    _sf_sum = SF.summarize(_sf_per_car)
+
     if _space_adj:
         print("[空间一致性封顶] " + " / ".join(
             f"{x['model']} {x['prev']:g}→{x['capped']:g}（{x['basis']}）" for x in _space_adj))
@@ -386,15 +395,41 @@ def main():
     if _space_adj:
         _sp_lines = "；".join(f"{x['model']} {x['prev']:g}→{x['capped']:g}"
                             for x in _space_adj[:6])
-        parts.append(f"> **空间硬数据一致性封顶**：{_sp_lines}。`space` 不受实测证据门槛约束"
-                     f"（轴距/车长本就是硬参数），但随包人工分从未用尺寸校验——本榜以"
-                     f"「尺寸不小于本车的车」space 中位为上限，超过容忍带 {SP.TOL:g} 才压，"
-                     f"只压虚高不倒扣。可比车不足 {SP.MIN_PEERS} 款不封顶。")
+        _sp_eff = [x for x in _space_adj if x.get("signal") == "efficiency"]
+        _sp_size = [x for x in _space_adj if x.get("signal") != "efficiency"]
+        parts.append(f"> **空间一致性封顶**：{_sp_lines}。`space` 不受实测证据门槛约束，"
+                     f"但随包人工分从未用硬数据校验——本榜两级信号只压虚高不倒扣："
+                     f"①尺寸（轴距>长×宽×高体积）：以「尺寸不小于本车的车」space 中位为上限，"
+                     f"容忍带 {SP.TOL:g}（高得房率车放宽 {SP.HIGH_EFF_RELIEF:g}），"
+                     f"可比车不足 {SP.MIN_PEERS} 款不封顶；"
+                     f"②真实空间表现（得房率）：得房率明显低于同尺寸正常车却高分，"
+                     f"压到正常车中位（容忍带 {SP.EFF_TOL:g}）。"
+                     f"本榜信号①命中 {len(_sp_size)} 款、信号②命中 {len(_sp_eff)} 款。")
     if _space_uncal:
         parts.append(f"> **空间硬数据待补**：{'、'.join(_space_uncal[:8])}（共 {len(_space_uncal)} 款）"
                      "无轴距/长宽高，无法做一致性校验——用 "
                      "`research.fill_experience.extract_dimensions` 从参数页提取候选事实，"
                      "人工核实后补进 `categories/vehicle_physics.json`（补后自动优先用轴距）。")
+    if _sf_per_car:
+        _sf_real_lines, _sf_store_lines = [], []
+        for _m, _feats in list(_sf_per_car.items())[:8]:
+            _g = SF.by_category(_feats)
+            if _g[SF.CAT_REAL]:
+                _sf_real_lines.append(_m + "：" + "、".join(
+                    f"{x['label']}{x['value']:g}{x['unit']}" for x in _g[SF.CAT_REAL]))
+            if _g[SF.CAT_STORAGE]:
+                _sf_store_lines.append(_m + "：" + "、".join(
+                    f"{x['label']}{x['value']:g}{x['unit']}" for x in _g[SF.CAT_STORAGE]))
+        _parts_sf = [f"> **空间要素披露**（从 `evidence.space_evidence` 结构化，"
+                     f"{_sf_sum['cars_with_features']} 款有数据；只披露/校验不直接加分）："]
+        if _sf_real_lines:
+            _parts_sf.append("**真实空间表现**（参与一致性校验）：" + "；".join(_sf_real_lines) + "。")
+        if _sf_store_lines:
+            _parts_sf.append("**储物便利**（不混进乘坐空间分，仅作选购参考）：" + "；".join(_sf_store_lines) + "。")
+        if _sf_sum["low_confidence"]:
+            _parts_sf.append("低置信（厂商标定/软文口径，待核实）：" + "、".join(_sf_sum["low_confidence"][:8]) + "。")
+        parts.append("\n".join(_parts_sf))
+
     if _exp_gaps:
         parts.append(f"> **证据缺口**：{'、'.join(g['model']+chr(40)+g['dim']+chr(41) for g in _exp_gaps[:6])}"
                      f"（共 {len(_exp_gaps)} 条）的文本里有实测数据但证据库无记录，"
@@ -478,6 +513,8 @@ def main():
         "safety_cap": _cap_adj,
         "dimension_cap": _dim_cap,
         "space_calibration": _space_sum,
+        "space_features": _sf_sum,
+        "space_features_detail": {m: feats for m, feats in _sf_per_car.items()},
         "experience_gaps": _exp_gaps,
         "safety_table_sync": _st_sync,
         # v9.7.20：候选池披露同步给页面（评审反复指出报告有、页面看不到）

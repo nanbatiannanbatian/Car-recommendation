@@ -106,6 +106,7 @@ CASES = [
     ("BUG-081", "维度证据门槛散落成多个特判函数,新增维度需再打补丁(quality漏网)", "v10.2.5"),
     ("BUG-082", "T6实测数据没录入:采集抓不到试驾稿麋鹿/NOA+检测器只扫候选池+缺口只print不拦", "v10.2.7"),
     ("BUG-083", "MONA空间9.3全场第一但零实测:space被判硬数据不封顶+轴距0%覆盖+人工分从未校验", "v10.2.8"),
+    ("BUG-084", "空间要素(前备箱/下沉后备箱/储物/真实表现)记在evidence却没用:得房率64%的N7拿8.5", "v10.2.9"),
 ]
 
 
@@ -2086,17 +2087,23 @@ def t083():
     # 1) 模块 selftest：MONA 场景 + 小样本 + 容忍带 + 不倒扣 + 轴距优先
     assert SP.selftest() == 0, "space_consistency 单元自测失败"
 
-    # 2) 真实池子标定：TOL=0.4 只命中 MONA 一款，9.3→8.8，其余不动
+    # 2) 真实池子标定（v10.2.9 起两类信号并存，按 signal 分组验证，都是「只压虚高不倒扣」）
+    #    体积信号：TOL=0.4 只命中 MONA 9.3→8.8，其余车不动（原 v10.2.8 断言保持强度）
+    #    得房率信号：N7 得房率64%却8.5 → 压到同尺寸正常车中位 8.3
     import json, copy
     pool = json.load(open(str(paths.ROOT / "runs" / "midsuv_bev_pool.json"), encoding="utf-8"))
     cands = copy.deepcopy(pool["candidates"])
     before = {c["model"]: (c.get("scores") or {}).get("space") for c in cands}
     adj, uncal = SP.calibrate_space(cands)
-    hit = {a["model"]: a["capped"] for a in adj}
-    assert hit == {"小鹏MONA L05": 8.8}, f"标定应只命中 MONA→8.8: {hit}"
+    by_sig = {}
+    for a in adj:
+        by_sig.setdefault(a.get("signal", "size"), {})[a["model"]] = a["capped"]
+    assert by_sig.get("size") == {"小鹏MONA L05": 8.8}, f"体积信号应只命中 MONA→8.8: {by_sig}"
+    assert by_sig.get("efficiency") == {"腾势N7": 8.3}, f"得房率信号应只命中 N7→8.3: {by_sig}"
     assert uncal == [], f"本榜 21 款都有尺寸: {uncal}"
+    touched = {"小鹏MONA L05", "腾势N7"}
     assert all(before.get(c["model"]) == (c.get("scores") or {}).get("space")
-               for c in cands if c["model"] != "小鹏MONA L05"), "不得误伤其他车"
+               for c in cands if c["model"] not in touched), "不得误伤其他车"
     mona = [c for c in cands if c["model"] == "小鹏MONA L05"][0]
     assert mona.get("score_cap_reasons"), "封顶未留审计理由"
     assert adj[0]["peers"] >= SP.MIN_PEERS, "锚点样本不足"
@@ -2120,8 +2127,59 @@ def t083():
     return "空间虚高根治：硬数据一致性封顶(只命中MONA9.3→8.8)+不倒扣+research补尺寸"
 
 
+def t084():
+    """空间要素（前备箱/下沉后备箱/储物/真实空间表现）是否该进空间分的根治回归。
+
+    2026-11-21 用户问「空间是否要考虑前备箱大小、下沉后备箱、储物空间、真实空间表现」。
+    查实：这些要素其实记在 evidence.space_evidence 里，但系统从没用过——
+    得房率64%的腾势N7 space=8.5，得房率85.6%的小鹏G6 却只有8.0。
+    修法：①结构化提取分两类(real参与校验/storage仅披露不进分)；②space_consistency
+    加得房率真实性信号(低得房率封顶/高得房率放宽)；③pipeline 报告披露。
+    """
+    from modules.engine import space_features as SF
+    from modules.engine import space_consistency as SP
+
+    # 1) 提取器自测：两类分开、待核实、低置信、不误伤
+    assert SF.selftest() == 0, "space_features 单元自测失败"
+
+    # 2) 真实池：两类要素都提取到了，且严格归类
+    import json, copy
+    pool = json.load(open(str(paths.ROOT / "runs" / "midsuv_bev_pool.json"), encoding="utf-8"))
+    all_feats = []
+    for c in pool["candidates"]:
+        all_feats.extend(SF.extract_space_features(c))
+    keys = {f["key"] for f in all_feats}
+    assert "efficiency" in keys and "knee_room" in keys, f"真实表现要素缺失: {keys}"
+    assert "frunk" in keys and "trunk" in keys and "under_floor" in keys, f"储物要素缺失: {keys}"
+    real_cats = {f["category"] for f in all_feats if f["key"] in ("efficiency", "knee_room", "leg_room")}
+    store_cats = {f["category"] for f in all_feats if f["key"] in ("frunk", "trunk", "under_floor")}
+    assert real_cats == {SF.CAT_REAL} and store_cats == {SF.CAT_STORAGE}, "要素归类错"
+
+    # 3) 得房率真实性信号：真实池 N7(64%却8.5)被压到正常车中位8.3，G6(85.6%)不误伤
+    cands = copy.deepcopy(pool["candidates"])
+    before = {c["model"]: c["scores"]["space"] for c in cands}
+    adj, _ = SP.calibrate_space(cands)
+    eff_hits = {a["model"]: a["capped"] for a in adj if a.get("signal") == "efficiency"}
+    assert eff_hits == {"腾势N7": 8.3}, f"低得房率虚高应只命中 N7→8.3: {eff_hits}"
+    g6 = [c for c in cands if "G6" in c["model"]][0]
+    assert g6["scores"]["space"] == before["小鹏G6"], "高得房率车不该被误伤"
+
+    # 4) 储物不进分：阿维塔有前备箱90L，但不该因此加分（分数只由体积/得房率信号决定）
+    avatr = [c for c in cands if "阿维塔07" in c["model"]][0]
+    assert avatr["scores"]["space"] == before["阿维塔07 纯电版"], "前备箱不得直接加分"
+
+    # 5) 模块 selftest 覆盖高得房率放宽 + 小样本保护
+    assert SP.selftest() == 0, "space_consistency 自测（含得房率信号）失败"
+
+    # 6) pipeline 接入披露与审计字段（只改数据链路，不碰渲染层）
+    src = _read("pipeline.py")
+    assert "space_features" in src and "space_features_detail" in src, "summary 缺空间要素审计"
+    assert "空间要素披露" in src and "储物便利" in src, "报告缺空间要素披露"
+    return "空间要素根治：两类结构化(real校验/storage仅披露不进分)+得房率信号抓N7不误伤G6"
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084]
 
 
 def run():

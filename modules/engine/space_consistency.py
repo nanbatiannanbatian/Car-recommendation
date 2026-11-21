@@ -41,6 +41,20 @@ TOL = 0.4
 # 可比样本下限：不足这么多款不做中位锚点（2 款的中位是噪声）。
 MIN_PEERS = 3
 
+# ── 真实空间表现信号（2026-11-21 用户问「空间要考虑得房率/储物/真实表现吗」）──
+# 体积只是上限的天花板，不反映「尺寸→体验」的转换率。得房率（套内/建筑面积比，
+# 车里=乘员舱占车长的比例）是随包 evidence 里已有的硬信息，用它补两件事：
+#   1) 得房率显著偏低却 space 高（腾势N7 得房率64%却8.5）→ 用「同尺寸且得房率正常
+#      的车」的 space 中位再压一道（这类车真实乘坐空间小，纸面尺寸占优也不该高分）。
+#   2) 得房率显著偏高（小鹏G6 85.6%）→ 体积封顶容忍带临时放宽，避免误伤高得房率车。
+# 阈值由来：本榜得房率 3 款有效值 64/83.34/85.6，正常档 >=78，高得房率 >=85。
+EFF_NORMAL_MIN = 78.0       # 视为「得房率正常」的下限（%）
+EFF_HIGH_MIN = 85.0         # 视为「高得房率」的下限（%），触发体积封顶放宽
+EFF_GAP = 10.0              # 得房率低于正常群体锚点这么多百分点才算「显著偏低」
+EFF_TOL = 0.15              # 得房率信号的容忍带（比体积 tol 小：得房率已是强证据，不该再宽待）
+MIN_EFF_PEERS = 2           # 得房率锚点最少可比车（实测仅 2 款正常 → 取 2，另加 gap 双条件防噪声）
+HIGH_EFF_RELIEF = 0.3       # 高得房率车体积封顶容忍带的额外放宽（分）
+
 
 def _load_physics():
     """读随包物理参数库，key 用 canon 归一化（跨库写法不一，T6 踩过坑）。"""
@@ -66,13 +80,34 @@ def size_of(c, physics=None):
     return None, None
 
 
-def calibrate_space(cands, physics=None, tol=TOL, min_peers=MIN_PEERS):
-    """空间分硬数据一致性封顶，原地修改 cands。
+def _apply_cap(c, anchor, prev, reason_detail, out, basis, tol_eff, peers, signal):
+    """统一封顶落点：只压虚高、不倒扣、留审计。"""
+    c["scores"]["space"] = round(anchor, 2)
+    reason = (f"space 一致性封顶（{signal}）：{reason_detail}，"
+              f"本车原 {prev:g} 超出容忍带 {tol_eff:g}，封顶至 {anchor:g}（不倒扣、仅压虚高）")
+    c.setdefault("score_cap_reasons", []).append(reason)
+    out.append({"model": c.get("model"), "dim": "space", "prev": prev,
+                "capped": round(anchor, 2), "anchor": round(anchor, 2),
+                "peers": peers, "basis": basis, "tol": tol_eff, "signal": signal})
+
+
+def calibrate_space(cands, physics=None, tol=TOL, min_peers=MIN_PEERS,
+                    eff_gap=EFF_GAP, eff_tol=EFF_TOL, min_eff_peers=MIN_EFF_PEERS,
+                    high_eff_relief=HIGH_EFF_RELIEF):
+    """空间分一致性封顶，原地修改 cands。
+
+    两级信号：
+      1) 尺寸硬数据（轴距>体积）：尺寸不小于本车的车 space 中位为上限（原逻辑）。
+         高得房率车 tol 临时 +high_eff_relief，避免误伤得房率高的车。
+      2) 真实空间表现（得房率）：得房率显著低于同尺寸正常车却 space 高 →
+         用「同尺寸且得房率正常」车的 space 中位再压一道。
 
     Returns (adjustments, uncalibrated)：
-      adjustments = [{model, dim, prev, capped, anchor, peers, size, basis, tol}]
+      adjustments = [{model, dim, prev, capped, anchor, peers, size, basis, tol, signal}]
       uncalibrated = [model, ...]  # 缺尺寸数据，research 待补
     """
+    from modules.engine.space_features import efficiency_of
+
     phys = physics if physics is not None else _load_physics()
     scored = []
     for c in cands:
@@ -80,30 +115,63 @@ def calibrate_space(cands, physics=None, tol=TOL, min_peers=MIN_PEERS):
         if not isinstance(s, (int, float)):
             continue
         size, basis = size_of(c, phys)
-        scored.append((c, float(s), size, basis))
+        eff = efficiency_of(c)
+        scored.append((c, float(s), size, basis, eff))
 
     out: list[dict] = []
     uncal: list[str] = []
-    for c, space, size, basis in scored:
+    capped_models: set[str] = set()
+
+    # ── 信号 1：尺寸硬数据封顶（高得房率车放宽容忍带）──
+    for c, space, size, basis, eff in scored:
         if size is None:
             uncal.append(c.get("model"))
             continue
-        # 尺寸不小于本车的车（含自己）space 集合
-        peers = [v for _, v, s2, _ in scored if s2 is not None and s2 >= size - 1e-9]
+        peers = [v for _, v, s2, _, _ in scored if s2 is not None and s2 >= size - 1e-9]
         if len(peers) < min_peers:
             continue
         anchor = round(statistics.median(peers), 2)
-        if space <= anchor + tol + 1e-9:
-            continue                      # 容忍带内，人工判断有效
+        tol_eff = tol + (high_eff_relief if (eff is not None and eff >= EFF_HIGH_MIN) else 0.0)
+        if space <= anchor + tol_eff + 1e-9:
+            continue
         prev = space
-        c["scores"]["space"] = anchor
-        reason = (f"space 硬数据一致性封顶：尺寸不小于本车（{size:g}{basis}）的 "
-                  f"{len(peers)} 款车 space 中位 {anchor:g}，本车原 {prev:g} "
-                  f"超出容忍带 {tol:g}，封顶至 {anchor:g}（不倒扣、仅压虚高）")
-        c.setdefault("score_cap_reasons", []).append(reason)
-        out.append({"model": c.get("model"), "dim": "space", "prev": prev,
-                    "capped": anchor, "anchor": anchor, "peers": len(peers),
-                    "size": size, "basis": basis, "tol": tol})
+        _apply_cap(c, anchor, prev,
+                   f"尺寸不小于本车（{size:g}{basis}）的 {len(peers)} 款车 space 中位 {anchor:g}"
+                   + (f"；本车得房率{eff:g}%属高档，容忍带放宽至{tol_eff:g}" if eff and eff >= EFF_HIGH_MIN else ""),
+                   out, f"{basis}" + ("+high_eff" if eff and eff >= EFF_HIGH_MIN else ""),
+                   tol_eff, len(peers), "size")
+        capped_models.add(c.get("model"))
+
+    # ── 信号 2：得房率真实性封顶（低得房率却高分）──
+    # 锚点群体 = 同尺寸(>=本车) 且 得房率 >= EFF_NORMAL_MIN 的车。
+    # 双条件防噪声：本车得房率 < 锚点群体下沿 - eff_gap，且 space > 锚点中位 + tol。
+    for c, space, size, basis, eff in scored:
+        if c.get("model") in capped_models:
+            continue                       # 已被信号1压过，不重复压
+        if eff is None or eff >= EFF_NORMAL_MIN:
+            continue
+        if size is None:
+            continue
+        normal = [(c2.get("model"), sp2, eff2) for c2, sp2, sz2, _, eff2 in scored
+                  if sp2 is not None and eff2 is not None
+                  and eff2 >= EFF_NORMAL_MIN
+                  and sz2 is not None and sz2 >= size - 1e-9]
+        if len(normal) < min_eff_peers:
+            continue
+        eff_values = [e for _, _, e in normal]
+        # 「正常群体下沿」取最小得房率（保守：只要明显低于最差正常车才算异常）
+        normal_floor = min(eff_values)
+        if eff > normal_floor - eff_gap + 1e-9:
+            continue                       # 差距不够，不算显著偏低
+        anchor = round(statistics.median([sp for _, sp, _ in normal]), 2)
+        if space <= anchor + eff_tol + 1e-9:
+            continue
+        prev = space
+        _apply_cap(c, anchor, prev,
+                   f"得房率仅 {eff:g}%，明显低于同尺寸正常车（{len(normal)}款，最低 {normal_floor:g}%）"
+                   f"的 space 中位 {anchor:g}",
+                   out, "efficiency", eff_tol, len(normal), "efficiency")
+        capped_models.add(c.get("model"))
     return out, uncal
 
 
@@ -167,6 +235,46 @@ def selftest() -> int:
     c5 = [mk("W0", 9.6), mk("W1", 8.0), mk("W2", 8.0), mk("W3", 8.0)]
     a5, _ = calibrate_space(c5, physics=p5)
     assert a5 and a5[0]["basis"] == "wheelbase_mm", f"应优先轴距: {a5}"
+
+    # ── 得房率真实表现信号（v10.2.9）──
+    # 构造：4 款同尺寸，得房率 64/83/85/84，得分 8.5/8.3/8.0/8.0。
+    # 低得房率车(64)给 8.5 > 正常车中位 8.15+EFF_TOL → 应封顶；高得房率车(85)不误伤。
+    from modules.engine.space_features import efficiency_of as _eff
+    phys6 = {f"得房车{i}": {"length_mm": 4860, "width_mm": 1935, "height_mm": 1602} for i in range(4)}
+    effs = [64.0, 83.0, 85.0, 84.0]
+    sps = [8.5, 8.3, 8.0, 8.0]
+    def mke(i):
+        c = mk(f"得房车{i}", sps[i])
+        c["evidence"] = {"space_evidence": f"得房率{effs[i]}%"}
+        return c
+    c6 = [mke(i) for i in range(4)]
+    assert all(_eff(c) is not None for c in c6), "得房率提取失败"
+    a6, _ = calibrate_space(c6, physics=phys6)
+    eff_hits = {a["model"]: a["capped"] for a in a6 if a.get("signal") == "efficiency"}
+    # 低得房率车被压；其余正常/高得房率车不被压
+    assert "得房车0" in eff_hits, f"低得房率虚高未被抓: {a6}"
+    assert all(f"得房车{i}" not in {a["model"] for a in a6} for i in (1, 2, 3)), f"误伤正常得房率车: {a6}"
+    assert all(c6[i]["scores"]["space"] == sps[i] for i in (1, 2, 3)), "正常车分数被改"
+
+    # 高得房率放宽：体积封顶时，高得房率车 tol +relief，容忍带内不封顶
+    # 3 款同尺寸，低分车给 8.8、中位 8.5，差 0.3 < 默认tol0.4 本就不封；
+    # 改成中位 8.4 → 差 0.4 卡边界；高得房率车 tol=0.7 → 不封，普通车 tol=0.4 → 封。
+    phys7 = {f"高得房{i}": {"length_mm": 4800, "width_mm": 1900, "height_mm": 1650} for i in range(4)}
+    def mkh(i, sp, eff):
+        c = mk(f"高得房{i}", sp)
+        c["evidence"] = {"space_evidence": f"得房率{eff}%"}
+        return c
+    # 3 款 8.4 做锚点，1 款 8.9 高得房率(≥85) → 差 0.5：普通车会被封(>0.4)，高得房率不封(0.5<0.7)
+    c7 = [mkh(0, 8.9, 86.0), mkh(1, 8.4, 82.0), mkh(2, 8.4, 82.0), mkh(3, 8.4, 82.0)]
+    a7, _ = calibrate_space(c7, physics=phys7)
+    assert "高得房0" not in {a["model"] for a in a7}, f"高得房率车被体积封顶误伤: {a7}"
+
+    # 小样本保护：只有 1 款正常得房率车 → 不足以做锚点，不封顶
+    c8 = [mke(0), {"model": "唯一正常", "scores": {"space": 8.0},
+                   "evidence": {"space_evidence": "得房率83%"}}]
+    a8, _ = calibrate_space(c8, physics={"得房车0": {"length_mm": 4860, "width_mm": 1935, "height_mm": 1602},
+                                         "唯一正常": {"length_mm": 4800, "width_mm": 1900, "height_mm": 1650}})
+    assert not any(a.get("signal") == "efficiency" for a in a8), f"小样本不该做效率封顶: {a8}"
     return 0
 
 
