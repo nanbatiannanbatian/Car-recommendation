@@ -41,6 +41,7 @@ DIST = HERE / "dist"
 sys.path.insert(0, str(HERE))
 import paths  # noqa: E402  生成物名单单一事实源
 GENERATED_JSON = paths.GENERATED_JSON
+REGRESSION_FIXTURES = paths.REGRESSION_FIXTURES
 
 # ---- 发布规范配置（改这里即可调整规则）--------------------------------
 REQUIRED_FRONTMATTER = [
@@ -123,6 +124,8 @@ def is_excluded_name(name):
     if name in EXCLUDE_FILES:
         return True
     if name in GENERATED_JSON:      # 生成物（可联网重建）一律不进包，名单见 paths.py
+        return True
+    if name in REGRESSION_FIXTURES:  # 回归测试专用样本：源码树/仓库保留，发布包不打包
         return True
     for g in EXCLUDE_GLOBS:
         if name.endswith(g.lstrip("*")):

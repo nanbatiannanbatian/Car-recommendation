@@ -72,6 +72,8 @@ NEG_TARGETS = {
     "t090": ["backfill_crash_from_cncap_table"],
     # t091：抹掉新闻稿救回入口定义（回到「救回只存在手动操作」），应 FAIL
     "t091": ["def rescue_targets"],
+    # t092：抹掉 paths.py 里的名单定义（回到「无代码化排除规则、样本混进包」），应 FAIL
+    "t092": ["REGRESSION_FIXTURES"],
 }
 
 # 数据断言型：测试名 -> (文件路径, 车型/键, 篡改模式)

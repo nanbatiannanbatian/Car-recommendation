@@ -114,6 +114,7 @@ CASES = [
     ("BUG-089", "多测评只取单一成绩不满足全纳入:数字图标车无成绩+C-IASI多维度未木桶取最低+跨体系无主分规则", "v10.4.0"),
     ("BUG-090", "cncap_scores已有零跑C11 86.4%却没回流:候选池/页面显示无成绩且无展示门禁", "v10.5.0"),
     ("BUG-091", "C-IASI数字图标车新闻稿救回写死单车+固定ID:新车无法复用、出榜无自动兜底", "v10.5.0"),
+    ("BUG-092", "回归专用候选池快照打进发布包:包体逼近3MB上限+无代码化排除规则", "v10.5.1"),
 ]
 
 
@@ -2564,8 +2565,70 @@ def t091():
     return ("新闻稿救回通用化：任意车型可解析+自动探测新稿ID+合并不丢旧车+无硬编码(+t091)")
 
 
+def t092():
+    """发布包体积治理：回归专用样本代码化排除，不破坏运行链路与回归可读。
+
+    背景（2026-11-21）：发布包解压后 2908KB，逼近 3MB 上限。真正的大生成文件夹
+    runs/(407MB) data/ 早已排除，但 categories/ 里 4 个候选池快照（~54KB）只被
+    bug_regression 当样本读、产品运行链路从不碰——却一直随包发布。
+    根因修复：paths.REGRESSION_FIXTURES 单一事实源 + build_release 统一排除，
+    而不是手工删文件名（下次新增样本又漏）。
+    """
+    from pathlib import Path
+    import inspect
+
+    # 1) 单一事实源存在且非空
+    assert paths.REGRESSION_FIXTURES, "无回归样本名单"
+    assert "REGRESSION_FIXTURES" in _read("paths.py"), "名单不在 paths.py"
+
+    # 2) 核心纪律：名单里的文件，产品运行链路（非 regress）零引用
+    runtime_hits = {}
+    for name in paths.REGRESSION_FIXTURES:
+        hits = []
+        for p in Path(HERE).rglob("*.py"):
+            rel = p.relative_to(HERE).as_posix()
+            if rel.startswith(("runs/", "data/", "dist/")) or "/regress/" in rel \
+                    or rel.startswith("build_release") or rel == "paths.py":
+                continue
+            if name in p.read_text(encoding="utf-8", errors="ignore"):
+                hits.append(rel)
+        if hits:
+            runtime_hits[name] = hits
+    assert not runtime_hits, f"回归样本被运行链路引用，不能排除: {runtime_hits}"
+
+    # 3) 运行依赖不得混进名单（防呆：新装包功能残缺）
+    for must_ship in ("ciasi_decoded.json", "filings_notes.json",
+                      "universe_car_midsuv_bev.json"):
+        assert must_ship not in paths.REGRESSION_FIXTURES, \
+            f"运行依赖 {must_ship} 误列入排除名单"
+
+    # 4) build_release 真的消费了这个名单（代码级，不是摆设）
+    import build_release as BR
+    assert "REGRESSION_FIXTURES" in inspect.getsource(BR.is_excluded_name), \
+        "build_release.is_excluded_name 未消费名单"
+    for name in paths.REGRESSION_FIXTURES:
+        assert BR.is_excluded_name(name), f"打包白名单未排除 {name}"
+    # 人工事实库/运行依赖仍随包（不能过度排除）
+    for name in ("master_pool.json", "ciasi_decoded.json", "filings_notes.json",
+                 "SKILL.md", "requirements.txt"):
+        assert not BR.is_excluded_name(name), f"随包必需文件被误排除: {name}"
+
+    # 5) 源码树保留（回归测试要读），发布包已重建为不含样本
+    for name in paths.REGRESSION_FIXTURES:
+        assert (Path(HERE) / "categories" / name).exists(), f"源码树缺回归样本 {name}"
+    import glob as _glob, zipfile as _zf
+    zips = _glob.glob(str(Path(HERE) / "dist" / "*.zip"))
+    if zips:
+        with _zf.ZipFile(sorted(zips)[-1]) as z:
+            packed = {p.split("/")[-1] for p in z.namelist()}
+        leaked = packed & set(paths.REGRESSION_FIXTURES)
+        assert not leaked, f"发布包仍含回归样本: {leaked}"
+    return ("发布包回归样本代码化排除：4快照~54KB不进包+运行零引用+"
+            "运行依赖仍随包+源码树保留(+t092)")
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092]
 
 
 def run():

@@ -90,6 +90,11 @@ def run():
         check("产物含核心模块", "car-recommendation/build_midsuv_full.py" in names and "car-recommendation/SKILL.md" in names)
         # 可重建的生成物不进包；人工事实库（气囊/物理参数/基线池）必须在包里
         check("产物无生成物缓存", not any(any(f in n for f in paths.GENERATED_JSON) for n in names))
+        # v10.5.1：回归专用样本不进发布包（源码树/仓库保留供测试读）
+        check("产物无回归专用样本", not any(os.path.basename(n) in paths.REGRESSION_FIXTURES
+                                        for n in names))
+        check("回归样本仍在源码树", all((Path(HERE) / "categories" / f).exists()
+                                   for f in paths.REGRESSION_FIXTURES))
         check("产物含人工事实库", all(any(n.endswith("/" + f) for n in names)
                                   for f in paths.CURATED_JSON))
         gens = ("auto_trims.py", "build_ice_pool.py", "master_pool.py", "ice_crash.py",

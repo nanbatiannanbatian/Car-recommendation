@@ -45,6 +45,17 @@ GENERATED_JSON = {
     "cell_facts.json",   # build_cell_facts.py（联网电芯事实）
 }
 
+# 回归测试专用样本：只被 tests/regress 读、发布包运行链路不碰的一次性候选池快照。
+# v10.5.1：发布包体积治理——这类文件随源码树/仓库保留供回归用，但不进发布 zip。
+# 判据与 GENERATED_JSON 不同：不是「能重建」，而是「只有测试读、产品运行不需要」。
+# 误把运行依赖放进来会让新装包功能残缺，故每新增一条都要过 t092 的「零运行引用」检查。
+REGRESSION_FIXTURES = {
+    "candidates_compact_suv_bev.json",       # 紧凑型纯电SUV候选池快照（指纹/占位的测试样本）
+    "candidates_compact_bev_extended.json",  # 紧凑型纯电扩展榜快照
+    "candidates_compact_bev_audit.json",     # 紧凑型纯电审计榜快照
+    "universe_compact_bev_202610.json",      # 紧凑型纯电 universe 快照（非本品类运行门禁）
+}
+
 # 人工采集/核验的事实库：无法用代码重建，必须随包发布（合计约 143KB，在 3MB 限额内）
 CURATED_JSON = {
     "baseline_car_ev.json",     # 纯电基线候选池（214 款，一次性数据集）
