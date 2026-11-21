@@ -21,6 +21,7 @@ Hindustan Times 各国NCAP综述）：
 计分统一原则：各体系不可按得分率横向直接比较（年份/规程/选车方式不同），
 按"权威体系 + 等级/得分率"映射到统一 0-10 安全分，见 official_safety_scores.json。
 """
+import re
 from collections import OrderedDict
 
 # code -> 定义。code 即候选池 safety_basis 的标准值。
@@ -82,6 +83,28 @@ def family(basis):
     """体系家族：ncap(星级制) / ciasi / iihs。未知返回 None。"""
     code = normalize(basis)
     return SYSTEMS[code]["family"] if code else None
+
+
+# 「没有成绩」的文本标记：缺数据必须与「有成绩」区分，否则披露会虚报
+# （2026-11-21：报告写「有官方碰撞成绩 4/21」，实际 3 款，把「C-NCAP 已抽车未测」算成了有成绩）
+_NO_SCORE_MARKERS = ("无官方成绩", "无成绩", "未查到", "未测", "待测", "未公布",
+                     "暂无", "不适用", "—", "无数据")
+# 「有成绩」的必要特征：百分比 / 星级 / C-IASI 等级字母
+_SCORE_RE = re.compile(r"\d+(?:\.\d+)?\s*%|五星|\bG\+?\b|\bA\b|优秀|良好")
+
+
+def has_score(crash_text) -> bool:
+    """crash 文本里是否有可引用的具体成绩（百分比/星级/等级）。
+
+    单一真相源：披露统计、证据门禁、页面徽标都必须用它，不要各自写关键词表
+    ——各写一套的结果就是同一份数据在报告里两个数字。
+    """
+    t = str(crash_text or "").strip()
+    if not t:
+        return False
+    if any(k in t for k in _NO_SCORE_MARKERS):
+        return False
+    return bool(_SCORE_RE.search(t))
 
 
 def selftest():

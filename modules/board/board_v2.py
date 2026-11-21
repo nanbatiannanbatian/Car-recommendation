@@ -356,6 +356,12 @@ def build(cands: list[dict], cfg: dict, policy: dict,
     # 候选池形状归一化（契约层）：price 文本转数值、trim 统一 dict
     from modules.contracts.candidate_schema import normalize_pool
     cands = normalize_pool(cands)
+    # 价格回流：trims 已核验的官方指导价 → 候选池 price_guide（与 pipeline 同一份实现，
+    # 直接调 board_v2 出榜也受保护，不必记得先跑 --sync-prices）
+    from modules.engine import facts_sync as FS
+    _bf, _bs = FS.backfill_price_guide_from_trims(cands)
+    if _bf:
+        print(f"[价格回流] {len(_bf)} 款 price_guide 由 trims 官方指导价回填")
     # v9.6.1：电压/封装事实库（按评分配置）；调用方可覆盖
     if battery_platform is None:
         _bp_path = str(paths.cat("battery_platform.json"))

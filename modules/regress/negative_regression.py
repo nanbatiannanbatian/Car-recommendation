@@ -89,6 +89,10 @@ NEG_DATA = {
     "t050": ("runs/midsedan_bev_1218_202610/candidates_allprice.json", "特斯拉Model 3", "fake_single_month"),
     # t068：把归一化改为 identity（等于没归一化），「未归一化必须被检出」那条断言应 FAIL
     "t068": ("candidate_schema.normalize_pool", None, "no_normalize"),
+    # t069：把回填改成 no-op（等于没回流），「应回填」断言必须 FAIL
+    "t069": ("facts_sync.backfill_price_guide_from_trims", None, "no_backfill"),
+    # t070：把「是否有成绩」恒判为 True（等于又虚报），负向断言必须 FAIL
+    "t070": ("crash_systems.has_score", None, "always_score"),
     # t039 断言从「源码文本含文件名」升级为「文件在同步集里」，探针改成把同步集清空
     "t039": ("sync_to_repo.collect", None, "empty_sync"),
 }
@@ -108,6 +112,8 @@ def _func_probe(name, fn, dotted, mode):
         "hide_cell": lambda *a, **kw: "未披露电芯",
         "empty_sync": lambda *a, **kw: {},   # 同步集清空 → 「候选池必须进同步集」应 FAIL
         "no_normalize": lambda cands=None, *a, **kw: list(cands or []),  # 不归一化原样返回
+        "no_backfill": lambda *a, **kw: ([], []),                        # 不回流，什么都不填
+        "always_score": lambda *a, **kw: True,                            # 虚报：什么都算有成绩
     }.get(mode)
     if wrong is None:
         return False, False

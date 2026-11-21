@@ -120,6 +120,8 @@ def main():
     ap.add_argument("--skip-sibling-gate", action="store_true", help="跳过同源车评分一致性门禁(须在报告说明为何无据差异合理)")
     ap.add_argument("--skip-safety-gate", action="store_true", help="跳过安全分严谨性门禁(须在报告说明为何成绩映射分可偏离)")
     ap.add_argument("--html-title", help="HTML 页面标题")
+    ap.add_argument("--no-backfill", action="store_true",
+                    help="不回填 trims 官方指导价到候选池（仅 A/B 对照用；正常出榜不要关）")
     ap.add_argument("--force-stale", action="store_true",
                     help="强制使用旧指纹候选池出榜（仅调试/回测用，报告会标注数据过期）")
     a = ap.parse_args()
@@ -147,6 +149,30 @@ def main():
     # 这是契约层的事，不归一化会在 trim_annotate / auto_trims 里 TypeError。
     from modules.contracts.candidate_schema import normalize_pool
     cands = normalize_pool(cands)
+
+    # 价格回流（2026-11-21 事故根因修复）：trims.json 里已核验的官方指导价必须回流到
+    # 候选池 price_guide。闸门只认 price_guide，不回流就会把数据齐全的车判成
+    # price_unknown 落榜（当时 11 款全中招，榜单只剩 13-16 万的车）。
+    # 原来靠手动跑 --sync-prices，那是「规则存在人的记忆里」；现在出榜前自动执行。
+    from modules.engine import facts_sync as FS
+    from modules.contracts.model_names import canon as _canon
+    if getattr(a, "no_backfill", False):
+        _p_filled, _p_still = [], [c.get("model") for c in cands]
+    else:
+        _p_filled, _p_still = FS.backfill_price_guide_from_trims(cands)
+    if _p_filled:
+        print(f"[价格回流] trims 官方指导价 → 候选池 price_guide：{len(_p_filled)} 款（"
+              + "、".join(m for m, _ in _p_filled[:8]) + ("…" if len(_p_filled) > 8 else "") + "）")
+    # 门禁：回填后仍「trims 有价而候选池无价」= 回流逻辑失效（canon 漂移/字段改名），必须硬拦。
+    # 真缺口（trims 也没价）只披露不拦截，交给人补采集。
+    if _p_still and not getattr(a, "no_backfill", False):
+        _pm = FS.trims_price_map()
+        _leak = [m for m in _p_still if _canon(m) in _pm]
+        if _leak:
+            sys.exit("价格回流门禁：以下车型 trims.json 有官方指导价，但没能回填到候选池"
+                     "（多半是车名归一化/字段漂移）：" + "、".join(_leak) +
+                     "\n→ 查 modules/contracts/model_names.py 的 canon 与 trims 条目名；"
+                     "修好后重跑，不要用 --no-backfill 绕过。")
 
     # v9.7.43：候选池完整性门禁——出榜前必须联网盘点同级全量在售车型，与候选池比对。
     # 漏收的车必须逐个判定：能入池的补入候选池+trims.json，不能入池的写进 pool_excluded[] 并写明事实原因。
@@ -245,6 +271,16 @@ def main():
                  f"链路 取数→闸门→打分→稳健性→三档→审查。**全程无辩论。**")
     # v9.7.36：数据版本可追溯——读者知道分数是哪个 skill 版本/指纹生成的
     _gb = _pool_data.get("_generated_by") if isinstance(_pool_data, dict) else None
+    # 价格来源披露（2026-11-21）：回填了多少、哪些是真缺口，写在报告开头而不是藏在附录
+    if _p_filled:
+        parts.append(f"> **价格来源**：{len(_p_filled)} 款的指导价由 `trims.json` 官方配置页回填"
+                     f"（候选池原本缺 `price_guide`）："
+                     + "、".join(m for m, _ in _p_filled[:6])
+                     + ("…" if len(_p_filled) > 6 else "") + "。")
+    if _p_still:
+        parts.append(f"> **价格缺口**：{'、'.join(_p_still[:6])}"
+                     f"（共 {len(_p_still)} 款）候选池与 trims 均无官方指导价，"
+                     "这类车按 `price_unknown` 落榜，需补采集后重出。")
     if _gb:
         parts.append(f"> **数据版本**：候选池生成于 skill v{_gb.get('skill_version')}"
                      f"（指纹 `{str(_gb.get('fingerprint'))[:8]}`），"
@@ -254,8 +290,10 @@ def main():
     # v9.7.17：候选池与证据质量披露自动生成（不再手工写报告，重跑不丢）
     _all = cands
     _src_named = sum(1 for c in _all if c.get("source_ids"))
-    _crash_named = sum(1 for c in _all
-                       if c.get("crash") and not any(k in str(c.get("crash")) for k in ("无", "未查到", "—")))
+    # 用碰撞体系真相源判定「是否真有成绩」，不在这里另写一套关键词表
+    # （曾各写一套：披露写 4/21、实际 3 款，因为「已抽车未测」被当成有成绩）
+    from modules.engine import crash_systems as CRS
+    _crash_named = sum(1 for c in _all if CRS.has_score(c.get("crash")))
     _ev_cnt = {k: sum(1 for c in _all if c.get("evidence_status") == k) for k in ("A", "B", "C")}
     _ext_n = sum(1 for c in _all if c.get("extended") or c.get("score_evidence"))
     parts.append(
@@ -301,6 +339,9 @@ def main():
         "boards": {}, "tiers": {}, "review": {},
         # v9.7.23：未入池车型及原因（用户要求"能比就比，不能比说明原因"）
         "pool_excluded": (_pool_data.get("pool_excluded") if isinstance(_pool_data, dict) else []),
+        # 2026-11-21：价格回流审计（回填了哪些、哪些 trims 也没价）
+        "price_backfill": {"filled": [{"model": m, "price_guide": pg} for m, pg in _p_filled],
+                           "still_missing": _p_still},
         # v9.7.20：候选池披露同步给页面（评审反复指出报告有、页面看不到）
         "pool_disclosure": {
             "total": len(_all), "sourced": _src_named, "crash": _crash_named,

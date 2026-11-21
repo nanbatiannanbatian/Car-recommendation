@@ -175,3 +175,67 @@ if __name__ == "__main__":
         print("[check] 全部字段已同步")
     else:
         ap.error("指定 --report / --check / --apply / --selftest 之一")
+
+
+# ---------------------------------------------------------------- 价格回流
+def trims_price_map(trims_path=None) -> dict:
+    """{canon(车型): [最低指导价, 最高指导价]} —— 供回填后的独立复核用。"""
+    from modules.contracts.model_names import canon
+    tp = trims_path or str(paths.cat("trims.json"))
+    if not os.path.exists(tp):
+        return {}
+    db = json.load(open(tp, encoding="utf-8"))
+    out = {}
+    for e in db.get("entries", []):
+        prices = [x.get("price") for x in e.get("trims", [])
+                  if isinstance(x.get("price"), (int, float))]
+        if prices:
+            out[canon(e.get("model") or "")] = [min(prices), max(prices)]
+    return out
+
+
+def backfill_price_guide_from_trims(cars, trims_path=None):
+    """把 trims.json 里已核验的官方指导价，回流到候选池的 price_guide。
+
+    为什么必须在链路上（2026-11-21 出中型纯电SUV榜的真实事故）：
+      auto_trims 已从汽车之家参数页解析出官方指导价并写进 trims.json，
+      但候选池的 price_guide 还是 None；闸门只认 price_guide，于是 11 款车
+      （极氪7X / Model Y / 蔚来ES6 / 腾势N7 / 乐道L60 …）全被判 price_unknown
+      落榜，榜单只剩 10 款且全是 13-16 万。数据采到了、没回流 = 白采。
+
+    当时的补救是一个手动命令（master_pool --sync-prices），靠人记得跑——
+    那就是「规则只存在人的记忆里」。现在改成出榜前自动执行，并保留手动入口。
+
+    规则：
+      - 只填空值，不覆盖候选池已有的 price_guide（已有值可能来自更权威的官网逐个核对）
+      - 依据是 trims.json 的 price 字段，契约强制为数值且禁用促销价（见 trims_schema）
+      - 来源写进 price_source，可追溯
+
+    返回 (filled, still_missing)：
+      filled        [(车型, [最低价, 最高价]), ...] 已回填
+      still_missing [车型, ...] 仍无价且 trims 也没有 → 真缺口，需补采集（出榜时披露）
+    """
+    from modules.contracts.model_names import canon
+
+    tp = trims_path or str(paths.cat("trims.json"))
+    if not os.path.exists(tp):
+        return [], [c.get("model") for c in cars
+                    if not (isinstance(c.get("price_guide"), (list, tuple)) and c.get("price_guide"))]
+    db = json.load(open(tp, encoding="utf-8"))
+    by = {canon(e.get("model") or ""): e for e in db.get("entries", [])}
+
+    filled, still = [], []
+    for c in cars:
+        g = c.get("price_guide")
+        if isinstance(g, (list, tuple)) and g and g[0]:
+            continue
+        e = by.get(canon(c.get("model") or ""))
+        prices = [x.get("price") for x in (e or {}).get("trims", [])
+                  if isinstance(x.get("price"), (int, float))]
+        if not prices:
+            still.append(c.get("model"))
+            continue
+        c["price_guide"] = [min(prices), max(prices)]
+        c["price_source"] = "trims.json 官方指导价（汽车之家参数页逐配置解析，已核验非促销价）"
+        filled.append((c.get("model"), c["price_guide"]))
+    return filled, still

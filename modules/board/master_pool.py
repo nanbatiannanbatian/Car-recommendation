@@ -95,35 +95,12 @@ from modules.contracts.candidate_schema import (  # noqa: E402
 )
 
 
-def backfill_price_guide(pool: dict, trims_path: str | None = None) -> list[tuple[str, list]]:
-    """用逐配置表里已核验的官方指导价，回填候选池缺失的 price_guide。
-
-    为什么（2026-11-21 出中型纯电SUV榜踩到）：trims.json 里 auto_trims 已从汽车之家
-    参数页解析出官方指导价，但候选池的 price_guide 还是 None，于是 11 款车全被
-    price_unknown 闸门判落榜——数据明明采到了，只是没回流。
-    这里只填空值、不覆盖已有；来源写进 price_source，可追溯。
-    """
-    from modules.contracts.model_names import canon
-    tp = trims_path or str(paths.cat("trims.json"))
-    if not os.path.exists(tp):
-        return []
-    db = json.load(open(tp, encoding="utf-8"))
-    by = {canon(e.get("model") or ""): e for e in db.get("entries", [])}
-    fixed = []
-    for car in pool.get("cars", []):
-        c = car.get("candidate") or {}
-        g = c.get("price_guide")
-        if isinstance(g, (list, tuple)) and g and g[0]:
-            continue
-        e = by.get(canon(car.get("model") or ""))
-        prices = [x.get("price") for x in (e or {}).get("trims", [])
-                  if isinstance(x.get("price"), (int, float))]
-        if not prices:
-            continue
-        c["price_guide"] = [min(prices), max(prices)]
-        c["price_source"] = "trims.json 官方指导价（汽车之家参数页逐配置解析）"
-        fixed.append((car.get("model"), c["price_guide"]))
-    return fixed
+def backfill_price_guide(pool: dict, trims_path: str | None = None):
+    """池级包装：实现与出榜链路共用同一份（engine/facts_sync），不各写一套。"""
+    from modules.engine.facts_sync import backfill_price_guide_from_trims
+    filled, _still = backfill_price_guide_from_trims(
+        [car.get("candidate") or {} for car in pool.get("cars", [])], trims_path)
+    return filled
 
 
 def config_fingerprint(cfg: dict) -> str:

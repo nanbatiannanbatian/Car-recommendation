@@ -91,6 +91,8 @@ CASES = [
     ("BUG-066", "第一档过严叙事局限+强推荐未标稳稳第5的车+并行纪律", "v9.7.50"),
     ("BUG-067", "强推荐金标移到档位列+hover讲清为何强推/为何未进一档", "v9.7.53"),
     ("BUG-068", "候选池price/trim形状不一致(文本/字符串)致出榜TypeError", "v10.1.1"),
+    ("BUG-069", "trims已核验官方价未回流候选池致11款price_unknown落榜", "v10.1.2"),
+    ("BUG-070", "碰撞披露把「已抽车未测」算成有成绩(4/21实际3款)", "v10.1.2"),
 ]
 
 
@@ -1321,8 +1323,76 @@ def t068():
     return "契约归一化生效：price 文本/trim 字符串统一、未归一化能检出、下游不再 TypeError"
 
 
+def t069():
+    """trims 里已核验的官方指导价必须自动回流到候选池 price_guide（出榜链路内置）。
+
+    2026-11-21 出中型纯电SUV榜：auto_trims 已把官方指导价写进 trims.json，
+    但候选池 price_guide 还是 None，闸门只认 price_guide → 11 款（极氪7X/Model Y/
+    蔚来ES6/腾势N7/乐道L60…）全被判 price_unknown 落榜，榜单只剩 10 款且全是 13-16 万。
+    当时只补了个手动命令（--sync-prices）＝ 仍然靠人记得跑。这里锁死三件事：
+      ① 回填函数本身不覆盖已有值、不伪造无价车；
+      ② 出榜链路（pipeline / board_v2）自动调用，且有独立复核门禁；
+      ③ 审计结果进 summary.price_backfill，可追溯。
+    """
+    import tempfile
+    from modules.engine import facts_sync as FS
+
+    tmp = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8")
+    json.dump({"scoring_enabled": False, "entries": [
+        {"model": "测试车A", "trims": [{"name": "低配", "price": 10.0},
+                                     {"name": "高配", "price": 14.0}]},
+        {"model": "测试车B", "trims": []},
+    ]}, tmp, ensure_ascii=False)
+    tmp.close()
+    try:
+        cars = [
+            {"model": "测试车A", "price_guide": None},          # 应回填
+            {"model": "测试车A2", "price_guide": [9.9, 13.9]},  # 已有值不许覆盖
+            {"model": "测试车C", "price_guide": None},          # trims 也没有 → 真缺口
+        ]
+        filled, still = FS.backfill_price_guide_from_trims(cars, tmp.name)
+        assert ("测试车A", [10.0, 14.0]) in filled, f"未回填：{filled}"
+        assert cars[0].get("price_source", "").startswith("trims.json"), "回填未标来源"
+        assert cars[1]["price_guide"] == [9.9, 13.9], "覆盖了已有 price_guide"
+        assert still == ["测试车C"], f"真缺口判定错：{still}"
+        # 独立复核用索引：门禁靠它判断「trims 有价却没回流」
+        pm = FS.trims_price_map(tmp.name)
+        assert pm, "价格索引为空，门禁无法复核"
+    finally:
+        os.remove(tmp.name)
+
+    # 链路必须内置（而不是只留一个手动命令）
+    src = _read("pipeline.py")
+    assert "backfill_price_guide_from_trims" in src, "pipeline 未接价格回流"
+    assert "价格回流门禁" in src, "pipeline 缺回填失效的硬门禁"
+    assert "backfill_price_guide_from_trims" in _read("board_v2.py"), "board_v2 未接价格回流"
+    assert "price_backfill" in src, "summary 缺回填审计字段"
+    return "价格回流：自动回填/不覆盖已有/真缺口不伪造 + 链路内置 + 独立复核门禁 + 审计留痕"
+
+
+def t070():
+    """碰撞成绩披露口径：缺数据不得算成「有成绩」（单一真相源 has_score）。
+
+    2026-11-21 出中型纯电SUV榜时，报告写「有官方碰撞成绩 4/21」，
+    实际只有 3 款有分——第 4 款是「C-NCAP 已抽车未测」。
+    根因：pipeline 自己写了一串排除词（无/未查到/—），漏了「未测」，
+    而 crash_systems 又没有统一的「是否有成绩」判定。
+    现在口径收口到 crash_systems.has_score()，披露/门禁/徽标都必须用它。
+    """
+    from modules.engine.crash_systems import has_score
+    assert has_score("C-NCAP 90.2% 五星")
+    assert has_score("C-NCAP 92.7%")
+    assert has_score("C-IASI G+")
+    assert not has_score("C-NCAP 已抽车未测"), "「未测」被当成有成绩"
+    assert not has_score("无官方成绩（海狮07有）"), "「无官方成绩」被当成有成绩"
+    assert not has_score("—") and not has_score("") and not has_score(None)
+    src = _read("pipeline.py")
+    assert "CRS.has_score" in src, "pipeline 披露未走碰撞真相源"
+    return "碰撞披露：百分比/星级/等级才算成绩，未测/无成绩不计入，pipeline 走单一真相源"
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070]
 
 
 def run():

@@ -146,6 +146,10 @@ python3 bootstrap_data.py --apply --only trims.json --force
 | `universe_car_midsedan_allprice.json` | `universe_build.py --discover <json> --out <json>` | 是 | 先跑 `discover.py` |
 | `fact_library.json` | `facts_sync.py --apply` | 否 | 需 car_all 原始库 |
 
+**数据回流**：`facts_sync.backfill_price_guide_from_trims()` 是唯一实现，pipeline/board_v2 出榜前自动调用，
+`master_pool --sync-prices` 只是手动入口。新增「某事实库已有、候选池缺」的字段时，照这个模式做：
+自动回流 + 独立复核门禁 + 回归（t069 是样板），不要只加一个手动命令。
+
 **约束**：新增任何不打包的生成物，必须同时在 `paths.GENERATED_SPEC` 写重建命令，
 否则 `layout_regress` 报「每个生成物都有重建规格」失败——防止产出「永远缺、也没人知道怎么建」的文件。
 
