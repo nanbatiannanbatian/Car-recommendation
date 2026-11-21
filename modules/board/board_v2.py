@@ -65,6 +65,75 @@ except ImportError:  # pragma: no cover
     LB = None
 
 
+# ---------------------------------------------------------------- 三电与补能事实
+def energy_facts(rows: list[dict], trim_data: dict | None) -> dict:
+    """逐车三电与补能事实（取**评分配置**那一档）。
+
+    2026-11-21 新增：此前电压/快充/充电功率/官方电耗/换电只存在于数据层，
+    页面完全看不见——用户看到「电池来源：中创新航」却不知道这台车是不是 800V、
+    快充几分钟、官方电耗多少。��把这些**已采到的一手事实**摊开给读者。
+    """
+    out: dict[str, dict] = {}
+    for r in rows:
+        m = r.get("model")
+        td = (trim_data or {}).get(m) or {}
+        best = td.get("best_trim")
+        trims = td.get("trims") or []
+        t = next((x for x in trims if x.get("name") == best), None) or {}
+        bd = r.get("best_trim_detail") or {}
+        src = t or bd
+        if not src:
+            continue
+        out[m] = {
+            "trim": src.get("name") or "",
+            "kwh": src.get("battery_kwh"),
+            "voltage_v": src.get("voltage_v"),
+            "charge": src.get("charge"),
+            "charge_power_kw": src.get("charge_power_kw"),
+            "consumption": src.get("consumption"),
+            "cell": src.get("cell_supplier"),
+            "swap": src.get("swap"),
+            "cltc_km": src.get("cltc_km"),
+        }
+    return out
+
+
+def space_facts(rows: list[dict], cands: list[dict]) -> dict:
+    """逐车空间与储物事实：车身尺寸（vehicle_physics）+ 容积/得房率（evidence 提取）。
+
+    2026-11-21 新增：后备箱/前备箱容积此前被 space_features 标成「仅披露不进分」，
+    而页面连披露都没有——用户问「极氪7X 后备箱好像大一点」时页面给不出答案。
+    本区块只做**披露**：后备箱大不等于乘坐空间好（容积装东西、空间坐人），
+    绝不据此加分，只作为「空间一致性封顶」的旁证与读者判断依据。
+    """
+    from modules.contracts.model_names import canon
+    from modules.engine.space_features import extract_space_features
+    phys: dict[str, dict] = {}
+    p = str(paths.cat("vehicle_physics.json"))
+    if os.path.exists(p):
+        try:
+            for x in json.load(open(p, encoding="utf-8")).get("cars") or []:
+                phys[canon(x.get("model"))] = x
+        except (OSError, ValueError):
+            pass
+    by_model = {c.get("model"): c for c in cands}
+    out: dict[str, dict] = {}
+    for r in rows:
+        m = r.get("model")
+        c = by_model.get(m) or {}
+        rec = phys.get(canon(m)) or {}
+        d = {
+            "wheelbase_mm": rec.get("wheelbase_mm"),
+            "length_mm": rec.get("length_mm"),
+            "width_mm": rec.get("width_mm"),
+            "height_mm": rec.get("height_mm"),
+        }
+        for f in extract_space_features(c):
+            d[f["key"]] = f["value"]
+        out[m] = d
+    return out
+
+
 # ---------------------------------------------------------------- 事实参考列
 def fact_columns(c: dict, facts: dict[str, dict], policy: dict) -> dict:
     """抽取一台车的事实参考列。返回 {label: value}；不返回任何参与打分的字段。"""
@@ -510,6 +579,9 @@ def build(cands: list[dict], cfg: dict, policy: dict,
         },
         "main_board": rows,
         "band_subboards": bands,
+        # v10.11.0：三电与补能 / 空间与储物 事实区块（披露，不改分）
+        "energy_facts": energy_facts(rows, trim_data),
+        "space_facts": space_facts(rows, cands),
         "segmented_summary": segmented_summary(rows, cands, policy, per_band),
         "product_power_board": product_power_board(rows, cands, cfg, policy),
     }

@@ -25,13 +25,17 @@ SUPPLIER_CLASS_LABELS = {
 
 TRIM_FIELDS = ("name", "price", "battery_kwh", "battery_type", "cell_supplier",
                "supplier_class", "cltc_km", "charge", "motor_kw", "key_configs",
-               "group", "note", "consumption", "charge_power_kw", "swap")
+               "group", "note", "consumption", "charge_power_kw", "swap", "voltage_v")
 # consumption = 官方电耗（kWh/100km），来自汽车之家参数页「百公里耗(kWh/100km)」。
 # 2026-11-21 新增：此前电耗只有人工采集的 vehicle_physics.json（51/67 覆盖），
 # 自动采集这一路一直漏采，导致能效强/弱的车在三电维上被系统性低估或高估。
 # charge_power_kw = 最大充电功率（kW），「电池/充电」组的「功率(kW)」。
 #   有一批车（特斯拉/小鹏MONA 等）参数页不给快充时间也不给电压，只有这个字段。
 # swap = 是否支持换电（蔚来/乐道等），补能方式的一种。
+# voltage_v = 高压平台电压（V），来自「高压平台(V)」。
+#   为什么独立成字段而不塞进 charge 文本：charge 是人工核验过的表述，
+#   自动采集不能改它；而「缺电压」不等于「400V」（不少车官方根本不标），
+#   独立字段才分得清「官方没标」与「标了是 400V」。
 
 ENTRY_FIELDS = ("model", "source", "url", "date", "source_type", "quote",
                 "note", "trim_class")

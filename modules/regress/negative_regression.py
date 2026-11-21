@@ -94,6 +94,8 @@ NEG_TARGETS = {
     "t101": ["vehicle_facts_consistency"],
     # t102：抹掉 space_features 独立别名标记（回到「SF 别名被覆盖、报告段崩溃」），应 FAIL
     "t102": ["import space_features as SPF"],
+    # t103 断言 pipeline 接了规则增量 + 区块注册表里有 energy_facts/space_facts
+    "t103": ["apply_rule_adjust", "energy_facts"],
 }
 
 # 数据断言型：测试名 -> (文件路径, 车型/键, 篡改模式)

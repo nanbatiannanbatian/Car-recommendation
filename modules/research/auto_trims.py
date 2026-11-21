@@ -421,6 +421,11 @@ def parse_config(sid, pure_ev_only=True):
             if mc:
                 cons_n = float(mc.group(1))
 
+        # 高压平台电压（V）独立成字段：charge 是人工核验过的表述，自动采集不改它；
+        # 而「官方没标电压」与「标了是 400V」必须分得清，否则规则打分会把
+        # 没标的车当成弱平台（缺数据≠差）。
+        voltage_v = volt_n
+
         # 对外充电功率(kW)：「电池/充电」组的「功率(kW)」= 最大充电功率。
         # 有一批车（特斯拉/小鹏MONA 等）参数页**不给**快充时间与电压，
         # 只有这个功率字段——它是快充能力的唯一一手依据。
@@ -457,6 +462,7 @@ def parse_config(sid, pure_ev_only=True):
             "supplier_class": ("single_named" if cell_supplier else "undisclosed"),
             "cltc_km": cltc, "charge": charge, "motor_kw": motor,
             "consumption": cons_n, "charge_power_kw": power_kw, "swap": swap,
+            "voltage_v": voltage_v,
             "key_configs": [], "group": (yr.group(1) + "款") if yr else "在售",
             "note": "；".join(bits),
         })
@@ -608,8 +614,7 @@ def refresh_entries(db: dict, index: dict, cands: list[dict],
         if not e:
             continue
         _fill_missing_trim_fields(e)
-        if not e.get("auto_parsed"):
-            continue                      # 人工条目：只补 null，不改事实
+        is_auto = bool(e.get("auto_parsed"))
         # ① 优先复用条目自带 url 里的 sid 直接重抓。车系匹配会漂移：
         #    MONA L05 的 sid 8662 是远程检索来的，本地索引里没有，重新匹配必失败
         #    ——改了生成器却作用不到存量条目，等于没改。
@@ -630,13 +635,26 @@ def refresh_entries(db: dict, index: dict, cands: list[dict],
         for t in tl or []:
             o = old.get(t.get("name"))
             if not o:
+                # 人工条目的款型名与汽车之家差异大（「660 Max 激光雷达版」vs
+                # 「T6 2026款 660 Max 激光雷达版」）→ 按指导价后备匹配。
+                tp = t.get("price")
+                if isinstance(tp, (int, float)):
+                    cands_same = [x for x in old.values()
+                                  if isinstance(x.get("price"), (int, float))
+                                  and abs(x["price"] - tp) <= 0.011]
+                    o = cands_same[0] if len(cands_same) == 1 else None
+            if not o:
                 continue
             for k in ("cell_supplier", "supplier_class", "charge",
-                      "consumption", "charge_power_kw", "swap", "battery_type"):
+                      "consumption", "charge_power_kw", "swap", "voltage_v",
+                      "battery_type"):
                 nv = t.get(k)
                 if nv in (None, "", "—"):
                     continue
-                if o.get(k) != nv:
+                if o.get(k) == nv:
+                    continue
+                # 自动条目可覆盖；人工条目**只填空**，绝不覆盖已核验的值。
+                if is_auto or o.get(k) in (None, "", "—"):
                     o[k] = nv
                     hits += 1
         e["date"] = TODAY

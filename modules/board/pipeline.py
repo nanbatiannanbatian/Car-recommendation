@@ -358,6 +358,18 @@ def main():
     # 维度证据门槛（2026-11-21 统一）：safety 要碰撞成绩、adas/cabin/control 要实测、
     # quality 要 PPH 样本；space/value/powertrain 纸面可判定，不封顶。
     # 必须放在 crash 回流与安全映射之后，否则有成绩的车会被误判成「无证据」。
+    # 规则增量（v10.11.0）：把配置驱动规则接进人工基准分。
+    # 顺序理由：先硬件规则（人工基准 + 客观配置差），再体验证据（实测折损），
+    # 再电耗效率（能效），最后证据封顶（门槛）。
+    # 必须排在 with_config_scores 之前——那个函数用 best_trim 的 scores 覆盖
+    # c["scores"]，排在它后面会被整体盖掉。
+    from modules.engine import rule_adjust as _RA
+    _rule_rep = _RA.apply_rule_adjust(cands)
+    if _rule_rep:
+        print("[规则增量] " + " / ".join(
+            f"{d} {v.get('status')}({len(v.get('touched') or [])}款)"
+            for d, v in _rule_rep.items()))
+
     # 体验证据调整（2026-11-21）：原来只有 board_v2（HTML 链路）会 apply_experience，
     # pipeline（report/summary 链路）不调 → 同一份数据，report 说极氪7X 第一、HTML 说 MONA 第一。
     # 现在统一在 pipeline 里调一次，并把 no_experience=True 传给 board_v2，避免重复累加。
@@ -768,6 +780,13 @@ def main():
             "applied": _eff_applied,
             "detail": {c["model"]: c["powertrain_efficiency"]
                        for c in cands if c.get("powertrain_efficiency")},
+        },
+        # v10.11.0：配置驱动规则增量审计（逐项中位锚点、缺项不参与、双向封顶）
+        "rule_adjust": {
+            "enabled": True,
+            "summary": _rule_rep,
+            "detail": {c["model"]: c["rule_adjust"]
+                       for c in cands if c.get("rule_adjust")},
         },
         "safety_auto": {"applied": _sa, "skipped": _ss},
         "safety_cap": _cap_adj,

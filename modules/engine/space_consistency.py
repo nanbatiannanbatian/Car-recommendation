@@ -55,6 +55,29 @@ EFF_TOL = 0.15              # 得房率信号的容忍带（比体积 tol 小：
 MIN_EFF_PEERS = 2           # 得房率锚点最少可比车（实测仅 2 款正常 → 取 2，另加 gap 双条件防噪声）
 HIGH_EFF_RELIEF = 0.3       # 高得房率车体积封顶容忍带的额外放宽（分）
 
+# ── 储物容积一致性（2026-11-21，用户问「极氪7X 后备箱大，MONA 空间分凭什么更高」）──
+# 之前的后备箱容积被 space_features 标成 CAT_STORAGE「仅披露不进分」，而页面连披露都没有，
+# 读者只能凭感觉猜。这里补一道**只压虚高**的信号：
+#   同尺寸车里后备箱容积明显偏小（< 同组中位 × 70%）却 space 虚高 → 压到同组 space 中位。
+# 容积**大**不加分——后备箱大 ≠ 乘坐空间好，不能建立错误因果（容积装东西、空间坐人）。
+STORAGE_RATIO = 0.7         # 本车容积 < 同组中位 × 此值 → 视为显著偏小
+# 容忍带取 0.15（比体积的 0.4 严）：容积是直接可比的数字，不是间接代理；
+# 若与体积同宽，信号 1 总会先触发，信号 3 永远轮不上（等于白写）。
+STORAGE_TOL = 0.15
+MIN_STORAGE_PEERS = 3       # 储物锚点最少可比车
+
+
+def _trunk_of(c: dict) -> float | None:
+    """后备箱容积（L）——从 evidence.space_evidence 提取（唯一出处 space_features）。"""
+    from modules.engine.space_features import extract_space_features
+    for f in extract_space_features(c):
+        if f.get("key") == "trunk":
+            try:
+                return float(f.get("value"))
+            except (TypeError, ValueError):
+                return None
+    return None
+
 
 def _load_physics():
     """读随包物理参数库，key 用 canon 归一化（跨库写法不一，T6 踩过坑）。"""
@@ -93,7 +116,9 @@ def _apply_cap(c, anchor, prev, reason_detail, out, basis, tol_eff, peers, signa
 
 def calibrate_space(cands, physics=None, tol=TOL, min_peers=MIN_PEERS,
                     eff_gap=EFF_GAP, eff_tol=EFF_TOL, min_eff_peers=MIN_EFF_PEERS,
-                    high_eff_relief=HIGH_EFF_RELIEF):
+                    high_eff_relief=HIGH_EFF_RELIEF,
+                    storage_ratio=STORAGE_RATIO, storage_tol=STORAGE_TOL,
+                    min_storage_peers=MIN_STORAGE_PEERS):
     """空间分一致性封顶，原地修改 cands。
 
     两级信号：
@@ -121,6 +146,7 @@ def calibrate_space(cands, physics=None, tol=TOL, min_peers=MIN_PEERS,
     out: list[dict] = []
     uncal: list[str] = []
     capped_models: set[str] = set()
+    trunks = {c.get("model"): _trunk_of(c) for c in cands}
 
     # ── 信号 1：尺寸硬数据封顶（高得房率车放宽容忍带）──
     for c, space, size, basis, eff in scored:
@@ -171,6 +197,36 @@ def calibrate_space(cands, physics=None, tol=TOL, min_peers=MIN_PEERS,
                    f"得房率仅 {eff:g}%，明显低于同尺寸正常车（{len(normal)}款，最低 {normal_floor:g}%）"
                    f"的 space 中位 {anchor:g}",
                    out, "efficiency", eff_tol, len(normal), "efficiency")
+        capped_models.add(c.get("model"))
+
+    # ── 信号 3：储物容积一致性（后备箱明显偏小却 space 虚高 → 压）──
+    # 容积**大不加分**：后备箱大 ≠ 乘坐空间好（容积装东西、空间坐人），
+    # 只能用来压「储物明显不足却声称空间大」的虚高，不制造错误因果。
+    for c, space, size, basis, eff in scored:
+        if c.get("model") in capped_models:
+            continue                       # 已被信号1/2压过，不重复压
+        if size is None:
+            continue
+        vol = trunks.get(c.get("model"))
+        if vol is None:
+            continue
+        peers = [(c2.get("model"), sp2)
+                 for c2, sp2, sz2, _b, _e in scored
+                 if sz2 is not None and sz2 >= size - 1e-9
+                 and trunks.get(c2.get("model")) is not None]
+        if len(peers) < min_storage_peers:
+            continue
+        vol_med = statistics.median([trunks[m] for m, _s in peers])
+        if vol_med <= 0 or vol >= vol_med * storage_ratio:
+            continue                       # 容积不显著偏小
+        anchor = round(statistics.median([sp for _m, sp in peers]), 2)
+        if space <= anchor + storage_tol + 1e-9:
+            continue
+        prev = space
+        _apply_cap(c, anchor, prev,
+                   f"后备箱容积 {vol:g}L 明显小于同尺寸车（{len(peers)}款，中位 {vol_med:g}L）"
+                   f"的 space 中位 {anchor:g}",
+                   out, "storage", storage_tol, len(peers), "storage")
         capped_models.add(c.get("model"))
     return out, uncal
 
@@ -275,6 +331,29 @@ def selftest() -> int:
     a8, _ = calibrate_space(c8, physics={"得房车0": {"length_mm": 4860, "width_mm": 1935, "height_mm": 1602},
                                          "唯一正常": {"length_mm": 4800, "width_mm": 1900, "height_mm": 1650}})
     assert not any(a.get("signal") == "efficiency" for a in a8), f"小样本不该做效率封顶: {a8}"
+
+    # ── 储物容积信号（v10.11.0）──
+    # 构造：同尺寸 4 款，后备箱 905/822/763/420L，space 8.2/8.2/8.1/8.4。
+    # 容积 420L 那款明显偏小（同组中位 792.5 × 0.7 = 554.75）却 space 最高 8.4 → 应被压。
+    # 注意 space 刻意排布成「信号1（体积封顶）不触发」的样子，单独验证信号 3。
+    phys9 = {f"储物车{i}": {"length_mm": 4800, "width_mm": 1930, "height_mm": 1650}
+             for i in range(4)}
+    def mks(i, sp, vol):
+        c = mk(f"储物车{i}", sp)
+        c["evidence"] = {"space_evidence": f"后备箱约{vol}L"}
+        return c
+    c9 = [mks(0, 8.2, 905), mks(1, 8.2, 822), mks(2, 8.1, 763), mks(3, 8.4, 420)]
+    a9, _ = calibrate_space(c9, physics=phys9)
+    st_hits = [a for a in a9 if a.get("signal") == "storage"]
+    assert st_hits, f"储物容积偏小却虚高未被抓: {a9}"
+    assert st_hits[0]["model"] == "储物车3", f"压错了车: {st_hits}"
+    assert st_hits[0]["capped"] < 8.4, st_hits
+    # 容积大的车不被压（后备箱大 ≠ 乘坐空间好，不得反向加分）
+    assert "储物车0" not in {a["model"] for a in a9}, f"容积大不该被压: {a9}"
+    # 无后备箱数据的车不进储物信号
+    c10 = [mk(f"无容积车{i}", 8.2) for i in range(4)]
+    a10, _ = calibrate_space(c10, physics=phys9)
+    assert not any(a.get("signal") == "storage" for a in a10), a10
     return 0
 
 

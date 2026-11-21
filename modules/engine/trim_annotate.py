@@ -258,6 +258,9 @@ def annotate_all(cands: list[dict], cfg: dict) -> dict:
                 "name": t.get("name"), "price": t.get("price"),
                 "battery_kwh": t.get("battery_kwh"), "cell_supplier": t.get("cell_supplier"),
                 "charge": t.get("charge"), "cltc_km": t.get("cltc_km"),
+                # v10.11.0：三电与补能事实透传（页面「三电与补能」区块用）
+                "voltage_v": t.get("voltage_v"), "consumption": t.get("consumption"),
+                "charge_power_kw": t.get("charge_power_kw"), "swap": t.get("swap"),
                 "scores": sc, "total": weighted_total(sc), "power_score": pp_score,
                 "confidence": conf, "deltas": ds,
                 "note": t.get("note", ""), "score_source": "annotated",

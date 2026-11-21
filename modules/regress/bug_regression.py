@@ -125,6 +125,7 @@ CASES = [
     ("BUG-100", "极氪7X/阿维塔07电池来源空白:事实库无此车且缺联网兜底与缺失原因标注", "v10.9.0"),
     ("BUG-101", "同一车辆事实散落5处各自手写:改一处漏多处、无唯一真相源与漂移检测", "v10.10.0"),
     ("BUG-102", "import别名碰撞:space_features的SF覆盖score_fingerprint的SF,报告段SF.skill_version()崩溃", "v10.10.1"),
+    ("BUG-103", "配置驱动规则从未进主榜:极氪7X三电拿不到900V/快充加分反低于T6,后备箱容积页面零披露", "v10.11.0"),
 ]
 
 
@@ -378,8 +379,15 @@ def t046():
 def t045():
     """发布包自包含：证据采集工具必须在包内，不依赖外部 skill。"""
     import zipfile
-    for f in ("research/researcher.py", "research/config.json", "research/README.md"):
+    # v10.11.0：采集配置的真实位置是 modules/research/config.json。
+    # 断言里写的 research/config.json 是模块化(v10.0)之前的路径，搬家后没跟上——
+    # 偏偏 categories/research 下还真存在一份**内容完全相同的重复副本**，
+    # 于是断言"看起来通过"，实际包内真正的配置没人校验。
+    # 现在：① 断言指向真实位置；② 重复副本已删除（同一事实只留一个可写副本）。
+    for f in ("research/researcher.py", "modules/research/config.json", "research/README.md"):
         assert os.path.exists(os.path.join(HERE, f)), f"缺内置采集工具: {f}"
+    assert not os.path.exists(os.path.join(HERE, "research/config.json")), \
+        "research/config.json 重复副本仍在（同一事实应只有一个可写副本）"
     bld = _read("build_release.py")
     assert 'p.name == "research"' in bld, "打包未放行 research/"
     # 发布包实测含这三个文件（若有包）
@@ -2817,8 +2825,23 @@ def t096():
         f"特斯拉电耗最低却没加分: {before}→{tesla['scores']['powertrain']}"
     assert tesla["powertrain_efficiency"]["adjust"] > 0
     # 4) 高电耗车减分（全榜统一，不是给特斯拉开后门）
-    deepal = next(c for c in cands if c["model"] == "深蓝S07")
-    assert deepal["powertrain_efficiency"]["adjust"] < 0, "高电耗车应减分"
+    #    v10.11.0：不再钉死「深蓝S07」这一辆。官方 CLTC 电耗接入后，
+    #    每车取的是**评分配置对应值**（深蓝S07 = 12.6，低于榜内中位 13.5），
+    #    旧断言钉死的那辆车不再成立——那是数据口径变了，不是机制坏了。
+    #    改为**机制断言**：榜内官方电耗高于中位的车必须减分（双向性是纪律本身）。
+    mid = PE.median(cands, tbl)
+    assert mid, "电耗中位算不出"
+    over = [c for c in cands
+            if (c.get("powertrain_efficiency") or {}).get("status") == "applied"
+            and (c.get("powertrain_efficiency") or {}).get("consumption", 0) > mid]
+    assert over, "榜内应有电耗高于中位的车（否则中位锚点本身有问题）"
+    for c in over:
+        assert c["powertrain_efficiency"]["adjust"] < 0, \
+            f"高电耗车应减分: {c['model']} {c['powertrain_efficiency']}"
+    #    官方口径优先：充电/电耗来源可追溯
+    srcs = {(c.get("powertrain_efficiency") or {}).get("official") for c in cands
+            if (c.get("powertrain_efficiency") or {}).get("status") == "applied"}
+    assert True in srcs, "应至少有一款用官方 CLTC 电耗（trims.json）"
     # 5) pipeline 接入 + 开关存在
     assert "powertrain_efficiency" in _read("pipeline.py"), "pipeline 未接电耗修正"
     assert "no-powertrain-efficiency" in _read("pipeline.py"), "缺 A/B 对照开关"
@@ -3056,8 +3079,57 @@ def t102():
     return "别名碰撞门禁：pipeline SF/SPF 分离 + 生产模块零碰撞扫描 + skill_version 归属(+t102)"
 
 
+def t103():
+    """配置驱动规则接入人工基准分 + 三电补能/空间储物事实披露（v10.11.0）。
+
+    用户连续三次质疑同一类：极氪7X（900V/麒麟/10min 快充）三电拿不到硬件加分、
+    反而低于 15 万的大众T6；启源Q06 底盘好却操控不如 MONA；后备箱容积页面一个字不显示。
+    本条锁住四件事：
+      ① 规则增量已接进主榜（人工基准 + 逐项中位锚点的客观配置差）；
+      ② **缺参数的车不因缺参数被扣分**（逐项锚点的核心纪律）；
+      ③ 规则定义收敛在 spec_score 一处（不出现第二套口径）；
+      ④ 电压/快充/充电功率/官方电耗/换电与后备箱容积已在页面披露。
+    """
+    from modules.engine import rule_adjust as RA
+    assert RA.selftest() == 0, "规则增量模块自测失败"
+    # 1) pipeline 接入（且必须排在 with_config_scores 之前，否则会被 best_trim 覆盖）
+    src = _read("pipeline.py")
+    assert "rule_adjust" in src, "pipeline 未接规则增量"
+    assert "apply_rule_adjust" in src, "pipeline 未调用 apply_rule_adjust"
+    # 顺序：必须排在 with_config_scores 的**实际调用**之前，否则会被 best_trim 分数覆盖。
+    # 按行比较且带括号，避免命中注释里的同名词。
+    _lines = src.splitlines()
+    _ra_line = next(i for i, l in enumerate(_lines) if "_RA.apply_rule_adjust(cands)" in l)
+    _wc_line = next(i for i, l in enumerate(_lines) if "with_config_scores(" in l)
+    assert _ra_line < _wc_line, \
+        f"规则增量必须排在 with_config_scores 之前（行 {_ra_line} vs {_wc_line}）"
+    # 2) 规则分解唯一出处
+    ss = _read("modules/engine/spec_score.py")
+    assert "powertrain_parts" in ss and "control_parts" in ss, "规则分解未收敛到 spec_score"
+    # 3) 逐项锚点纪律：缺「高压平台」这一项的车，不该在这一项上被比较
+    cands = _read_pool()
+    RA.apply_rule_adjust(cands, dims=("powertrain", "control"))
+    t6 = next((c for c in cands if c["model"] == "大众ID.AURA T6"), None)
+    assert t6 is not None, "池内应有大众ID.AURA T6"
+    ra = (t6.get("rule_adjust") or {}).get("powertrain") or {}
+    assert "高压平台" not in (ra.get("items") or {}), \
+        "缺电压的车不该参与「高压平台」项（缺数据≠差）"
+    # 4) 硬件差距客观存在时，规则增量必须让差距体现出来（极氪7X > T6）
+    zk = next((c for c in cands if c["model"] == "极氪7X"), None)
+    assert zk is not None, "池内应有极氪7X"
+    zk_pt = (zk.get("rule_adjust") or {}).get("powertrain") or {}
+    assert zk_pt.get("adjust", 0) > 0, "极氪7X（900V/10min/宁德/802km）三电应加分"
+    # 5) 事实区块：页面必须披露三电补能与空间储物
+    bv = _read("modules/board/board_view.py")
+    assert '"energy_facts"' in bv and '"space_facts"' in bv, "事实区块未注册"
+    rh = _read("modules/board/render_board_html.py")
+    assert "三电与补能" in rh and "空间与储物" in rh, "事实区块未渲染"
+    return ("规则增量接进人工基准分(逐项中位锚点/缺参数不参与) + 极氪7X三电加分 + "
+            "T6缺电压不参与高压项 + 三电补能与空间储物区块已披露(+t103)")
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103]
 
 
 def run():

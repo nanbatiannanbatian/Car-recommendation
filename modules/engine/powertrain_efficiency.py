@@ -46,22 +46,71 @@ def _canon_key(s: str) -> str:
     return canon(s or "")
 
 
-def load_consumption(path: str | None = None) -> dict[str, dict]:
-    """返回 {canon(车型): {consumption, source_url, note}}，只保留有值的。"""
+def load_consumption(path: str | None = None, trims_path: str | None = None) -> dict[str, dict]:
+    """返回 {canon(车型): {consumption, source_url, note, official}}。
+
+    数据源与优先级（2026-11-21）：
+      ① **trims.json 的官方电耗**（汽车之家参数页「百公里耗(kWh/100km)」，
+         取评分配置对应值）——官方 CLTC 口径，与 fact_library 同口径，覆盖 369/427 配置；
+      ② `categories/vehicle_physics.json` 的人工采集值——兜底。
+
+    口径纪律（沿用 v10.10.0「电耗口径不合并」）：
+      两个来源口径**不完全可比**（人工采集取的是参数页首配，可能是增程版/不同配置）。
+      因此：①优先并标记 `official=True`；②只在该车没有官方值时兜底，标记 official=False；
+      **中位锚点优先只用 official=True 的车**（官方口径自洽），
+      官方样本不足 3 款才退回全量混合，并在审计里如实标注用了哪一档。
+      绝不把两个口径合成一个数再当事实用。
+    """
     p = path or PHYSICS
-    if not os.path.exists(p):
-        return {}
-    d = json.load(open(p, encoding="utf-8"))
     out: dict[str, dict] = {}
-    for row in d.get("cars") or []:
-        v = row.get("consumption")
-        if not isinstance(v, (int, float)) or v <= 0:
-            continue
-        out[_canon_key(row.get("model"))] = {
-            "consumption": float(v),
-            "source_url": row.get("source_url", ""),
-            "note": row.get("note", ""),
-        }
+    # ② 人工采集（兜底）
+    if os.path.exists(p):
+        try:
+            d = json.load(open(p, encoding="utf-8"))
+        except (OSError, ValueError):
+            d = {}
+        for row in d.get("cars") or []:
+            v = row.get("consumption")
+            if not isinstance(v, (int, float)) or v <= 0:
+                continue
+            out[_canon_key(row.get("model"))] = {
+                "consumption": float(v),
+                "source_url": row.get("source_url", ""),
+                "note": row.get("note", ""),
+                "official": False,
+                "origin": "vehicle_physics.json 人工采集",
+            }
+    # ① 官方电耗（优先，覆盖上面的人工值）
+    tp = trims_path or str(paths.cat("trims.json"))
+    if os.path.exists(tp):
+        try:
+            td = json.load(open(tp, encoding="utf-8"))
+        except (OSError, ValueError):
+            td = {}
+        for e in td.get("entries") or []:
+            m = e.get("model")
+            trims = e.get("trims") or []
+            if not m or not trims:
+                continue
+            ref = e.get("scored_trim_ref")
+            pick = next((t for t in trims if ref and t.get("name") == ref), None)
+            if pick is None:
+                # 无评分配置锚点时取「有电耗且价格最高」的配置（最接近车系主力）
+                cand = [t for t in trims
+                        if isinstance(t.get("consumption"), (int, float)) and t.get("consumption")]
+                pick = max(cand, key=lambda t: t.get("price") or 0) if cand else None
+            if not pick:
+                continue
+            v = pick.get("consumption")
+            if not isinstance(v, (int, float)) or v <= 0:
+                continue
+            out[_canon_key(m)] = {
+                "consumption": float(v),
+                "source_url": e.get("url", ""),
+                "note": f"汽车之家参数页「百公里耗(kWh/100km)」· {pick.get('name')}",
+                "official": True,
+                "origin": "trims.json 官方电耗",
+            }
     return out
 
 
@@ -71,10 +120,25 @@ def _norm_table(table: dict[str, dict]) -> dict[str, dict]:
 
 
 def median(cands: list[dict], table: dict[str, dict]) -> float | None:
+    """榜内电耗中位（锚点基准）。
+
+    口径分层（2026-11-21）：**优先只用官方电耗**（trims.json 的参数页值，CLTC 口径自洽）；
+    官方样本 < 3 款才退回全量混合（官方 + 人工采集），并由调用方在审计里标注。
+    """
     tbl = _norm_table(table)
-    vals = [tbl[_canon_key(c.get("model"))]["consumption"]
-            for c in cands if _canon_key(c.get("model")) in tbl]
-    return statistics.median(vals) if vals else None
+    vals, official = [], []
+    for c in cands:
+        k = _canon_key(c.get("model"))
+        if k not in tbl:
+            continue
+        vals.append(tbl[k]["consumption"])
+        if tbl[k].get("official"):
+            official.append(tbl[k]["consumption"])
+    if not vals:
+        return None
+    if len(official) >= 3:
+        return statistics.median(official)
+    return statistics.median(vals)
 
 
 def adjust_for(consumption: float, mid: float) -> tuple[float, str]:
@@ -117,6 +181,8 @@ def apply_efficiency(cands: list[dict], table: dict[str, dict] | None = None,
             "median": round(mid, 2), "adjust": adj,
             "before": before, "after": after, "why": why,
             "source_url": rec.get("source_url", ""),
+            "origin": rec.get("origin", ""),
+            "official": bool(rec.get("official")),
         }
     return cands
 

@@ -25,8 +25,8 @@
 
 用法
 ----
-  python3 ciasi_text_decode.py --out categories/ciasi_decoded.json       # 全量刷新（自动向上找新稿）
-  python3 ciasi_text_decode.py --end 132 --out categories/ciasi_decoded.json
+  python3 ciasi_text_decode.py --out data/gen/ciasi_decoded.json          # 全量刷新（自动向上找新稿）
+  python3 ciasi_text_decode.py --end 132 --out data/gen/ciasi_decoded.json
   python3 ciasi_text_decode.py --cars "某车A,某车B" --merge              # 只救指定车，合并进随包事实库
   python3 ciasi_text_decode.py --targets-from runs/midsuv_bev_pool.json --merge
   python3 ciasi_text_decode.py --selftest
@@ -488,7 +488,7 @@ def main() -> int:
     ap.add_argument("--end", type=int, default=None,
                     help="留空=自动向上探测新稿；给整数=兼容旧固定范围")
     # 默认输出随包事实库 categories/（随 skill 与 GitHub 分发）；data/gen 仅为缓存。
-    ap.add_argument("--out", default="categories/ciasi_decoded.json")
+    ap.add_argument("--out", default="data/gen/ciasi_decoded.json")
     ap.add_argument("--sleep", type=float, default=0.15)
     ap.add_argument("--max-misses", type=int, default=AUTO_MAX_MISSES)
     ap.add_argument("--cars", help="只救指定车型，逗号分隔；仍会合并进 --out")

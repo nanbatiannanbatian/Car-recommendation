@@ -815,6 +815,77 @@ document.addEventListener('change',function(ev){
                          f"<td class='ref'>{links}<br><span style='color:#7b8590'>{e(claim)}</span></td></tr>")
         H.append("</tbody></table>")
 
+    # ---- 三电与补能事实（v10.11.0：把已采到的一手补能事实摊开给读者）
+    if "energy_facts" in ids:
+        ef = data.get("energy_facts") or {}
+
+        def _num_unit(v, unit=""):
+            return f"{v:g}{unit}" if isinstance(v, (int, float)) else "—"
+
+        H.append("<h2>三电与补能 <span>逐车补能硬件与官方电耗 · 事实列不计分</span></h2>")
+        H.append('<div class="rule">电压/快充/最大充电功率/官方电耗取自汽车之家车系参数页'
+                 '「电池/充电」组；电芯逐配置取自「电芯品牌」，官方未标时按「电池特有技术」的'
+                 '官方产品名映射厂商（刀片→弗迪、麒麟→宁德、金钟罩→中创新航）。'
+                 '「未披露」= 官方页面确实没填，<b>不做推断、不插补</b>。'
+                 '本页展示的是评分配置那一档。</div>')
+        H.append("<table><thead><tr><th style='text-align:left'>车型</th>"
+                 "<th style='text-align:left'>评分配置</th><th>电量</th><th>高压平台</th>"
+                 "<th style='text-align:left'>快充</th><th>最大充电功率</th><th>官方电耗</th>"
+                 "<th style='text-align:left'>电芯</th><th>换电</th><th>CLTC</th></tr></thead><tbody>")
+        for r in rows:
+            f = ef.get(r.get("model")) or {}
+            if not f:
+                continue
+            H.append(f"<tr><td class='name'>{e(r.get('model'))}</td>"
+                     f"<td style='text-align:left'>{e(str(f.get('trim') or '—'))}</td>"
+                     f"<td>{_num_unit(f.get('kwh'), ' kWh')}</td>"
+                     f"<td>{_num_unit(f.get('voltage_v'), ' V')}</td>"
+                     f"<td style='text-align:left'>{e(str(f.get('charge') or '—'))}</td>"
+                     f"<td>{_num_unit(f.get('charge_power_kw'), ' kW')}</td>"
+                     f"<td>{_num_unit(f.get('consumption'), ' kWh/100km')}</td>"
+                     f"<td style='text-align:left'>{e(str(f.get('cell') or '未披露'))}</td>"
+                     f"<td>{e(str(f.get('swap') or '—'))}</td>"
+                     f"<td>{_num_unit(f.get('cltc_km'), ' km')}</td></tr>")
+        H.append("</tbody></table>")
+
+    # ---- 空间与储物事实（v10.11.0）
+    if "space_facts" in ids:
+        sf = data.get("space_facts") or {}
+
+        def _mm(v):
+            return f"{v:g}mm" if isinstance(v, (int, float)) else "—"
+
+        def _l(v):
+            return f"{v:g}L" if isinstance(v, (int, float)) else "—"
+
+        H.append("<h2>空间与储物 <span>车身尺寸与真实容积 · 后备箱大≠乘坐空间好</span></h2>")
+        H.append('<div class="rule">后备箱/前备箱/下沉储物容积与得房率，从各车取证文本结构化提取'
+                 '（保留原文片段，可逐条核）；车身尺寸来自汽车之家/易车参数页。'
+                 '空间维封顶的依据是<b>车身三维体积 + 得房率</b>；'
+                 '后备箱容积只作「储物明显不足却声称空间大」的旁证，'
+                 '<b>容积大不加分</b>——后备箱装东西、乘坐空间坐人，不是同一件事。</div>')
+        H.append("<table><thead><tr><th style='text-align:left'>车型</th><th>轴距</th>"
+                 "<th>长×宽×高</th><th>后备箱</th><th>前备箱</th><th>下沉储物</th>"
+                 "<th>得房率</th><th>后排腿部</th><th>后排膝部</th></tr></thead><tbody>")
+        for r in rows:
+            f = sf.get(r.get("model")) or {}
+            if not f:
+                continue
+            _L, _W, _H = f.get("length_mm"), f.get("width_mm"), f.get("height_mm")
+            dims = (f"{_L:g}×{_W:g}×{_H:g}mm"
+                    if all(isinstance(x, (int, float)) for x in (_L, _W, _H)) else "—")
+            eff = f.get("efficiency")
+            H.append(f"<tr><td class='name'>{e(r.get('model'))}</td>"
+                     f"<td>{_mm(f.get('wheelbase_mm'))}</td>"
+                     f"<td>{e(dims)}</td>"
+                     f"<td>{_l(f.get('trunk'))}</td>"
+                     f"<td>{_l(f.get('frunk'))}</td>"
+                     f"<td>{_l(f.get('under_floor'))}</td>"
+                     f"<td>{f'{eff:g}%' if isinstance(eff, (int, float)) else '—'}</td>"
+                     f"<td>{_mm(f.get('leg_room'))}</td>"
+                     f"<td>{_mm(f.get('knee_room'))}</td></tr>")
+        H.append("</tbody></table>")
+
     # ---- 逐车取证依据（历史有、v8.x 漏掉，v9.0 补回）
     if "evidence_notes" in ids:
         H.append("<h2>逐车取证依据 <span>取证要点 / 证据等级 / 销量口径 · 可逐条质疑</span></h2>")

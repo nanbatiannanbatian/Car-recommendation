@@ -69,47 +69,88 @@ def score_adas(s):
     return base, why
 
 
-def score_powertrain(s):
-    """三电：补能速度 > 电池容量 > 电芯品牌。"""
-    base, why = 6.0, []
+def powertrain_parts(s):
+    """三电各加减项的**分解**（规则唯一出处，score_powertrain 与 rule_adjust 共用）。
+
+    返回 [(项名, 分值, 展示文本)]。**参数缺失的项不出现**——这样 rule_adjust
+    可以逐项做「该项有数据的车」的中位锚点：缺某一项的车在该项上既不加分
+    也不扣分（缺数据 ≠ 差），不会因为没采到电压就被判三电弱。
+    """
+    parts = []
     if s.get("platform_800v") is True:
-        base += 1.0
-        why.append("800V +1.0")
+        parts.append(("高压平台", 1.0, "800V +1.0"))
     t = _n(s.get("charge_10_80_min"))
     if t is not None:
         if t <= 12:
-            base += 1.4
-            why.append(f"10–80% {t:g}min +1.4")
+            parts.append(("快充", 1.4, f"10–80% {t:g}min +1.4"))
         elif t <= 18:
-            base += 1.1
-            why.append(f"10–80% {t:g}min +1.1")
+            parts.append(("快充", 1.1, f"10–80% {t:g}min +1.1"))
         elif t <= 25:
-            base += 0.6
-            why.append(f"10–80% {t:g}min +0.6")
+            parts.append(("快充", 0.6, f"10–80% {t:g}min +0.6"))
         elif t <= 35:
-            base += 0.1
-            why.append(f"10–80% {t:g}min +0.1")
+            parts.append(("快充", 0.1, f"10–80% {t:g}min +0.1"))
         else:
-            base -= 0.4
-            why.append(f"10–80% {t:g}min −0.4")
+            parts.append(("快充", -0.4, f"10–80% {t:g}min −0.4"))
     cell = str(s.get("cell_brand") or "")
     if any(k in cell for k in ("宁德", "弗迪", "比亚迪")):
-        base += 0.7
-        why.append("一线电芯 +0.7")
+        parts.append(("电芯", 0.7, "一线电芯 +0.7"))
     elif cell and "未披露" not in cell:
-        base += 0.2
-        why.append("二线电芯 +0.2")
+        parts.append(("电芯", 0.2, "二线电芯 +0.2"))
     rg = _n(s.get("range_km"))
     if rg is not None:
         if rg >= 700:
-            base += 0.8
-            why.append(f"{rg:g}km +0.8")
+            parts.append(("续航", 0.8, f"{rg:g}km +0.8"))
         elif rg >= 600:
-            base += 0.5
-            why.append(f"{rg:g}km +0.5")
+            parts.append(("续航", 0.5, f"{rg:g}km +0.5"))
         elif rg < 500:
-            base -= 0.5
-            why.append(f"{rg:g}km −0.5")
+            parts.append(("续航", -0.5, f"{rg:g}km −0.5"))
+    return parts
+
+
+def score_powertrain(s):
+    """三电：补能速度 > 电池容量 > 电芯品牌。"""
+    base, why = 6.0, []
+    for _name, v, desc in powertrain_parts(s):
+        base += v
+        why.append(desc)
+    return base, why
+
+
+def control_parts(s):
+    """操控各加减项的分解（规则唯一出处，见 powertrain_parts 的同口径说明）。"""
+    parts = []
+    fs = str(s.get("susp_front") or "")
+    if "双叉臂" in fs or "双横臂" in fs:
+        parts.append(("前悬架", 1.0, "前双叉臂 +1.0"))
+    elif "麦弗逊" in fs:
+        parts.append(("前悬架", 0.0, "前麦弗逊 +0"))
+    rs = str(s.get("susp_rear") or "")
+    if any(k in rs for k in ("五连杆", "多连杆")):
+        parts.append(("后悬架", 0.5, "后多连杆 +0.5"))
+    elif "扭力梁" in rs:
+        parts.append(("后悬架", -0.6, "后扭力梁 −0.6"))
+    dr = str(s.get("drive") or "")
+    if "四驱" in dr:
+        parts.append(("驱动", 0.7, "四驱 +0.7"))
+    elif "后驱" in dr:
+        parts.append(("驱动", 0.4, "后驱 +0.4"))
+    z = _n(s.get("zero_to_100_s"))
+    if z is not None:
+        if z <= 5:
+            parts.append(("零百", 0.8, f"零百 {z:g}s +0.8"))
+        elif z <= 7:
+            parts.append(("零百", 0.3, f"零百 {z:g}s +0.3"))
+        elif z > 9:
+            parts.append(("零百", -0.5, f"零百 {z:g}s −0.5"))
+    return parts
+
+
+def score_control(s):
+    """操控：悬架形式与驱动形式是硬信息，零百是软信息。"""
+    base, why = 6.8, []
+    for _name, v, desc in control_parts(s):
+        base += v
+        why.append(desc)
     return base, why
 
 
@@ -150,37 +191,9 @@ def score_space(s):
 def score_control(s):
     """操控：悬架形式与驱动形式是硬信息，零百是软信息。"""
     base, why = 6.8, []
-    fs = str(s.get("susp_front") or "")
-    if "双叉臂" in fs or "双横臂" in fs:
-        base += 1.0
-        why.append("前双叉臂 +1.0")
-    elif "麦弗逊" in fs:
-        why.append("前麦弗逊 +0")
-    rs = str(s.get("susp_rear") or "")
-    if any(k in rs for k in ("五连杆", "多连杆")):
-        base += 0.5
-        why.append("后多连杆 +0.5")
-    elif "扭力梁" in rs:
-        base -= 0.6
-        why.append("后扭力梁 −0.6")
-    dr = str(s.get("drive") or "")
-    if "四驱" in dr:
-        base += 0.7
-        why.append("四驱 +0.7")
-    elif "后驱" in dr:
-        base += 0.4
-        why.append("后驱 +0.4")
-    z = _n(s.get("zero_to_100_s"))
-    if z is not None:
-        if z <= 5:
-            base += 0.8
-            why.append(f"零百 {z:g}s +0.8")
-        elif z <= 7:
-            base += 0.3
-            why.append(f"零百 {z:g}s +0.3")
-        elif z > 9:
-            base -= 0.5
-            why.append(f"零百 {z:g}s −0.5")
+    for _name, v, desc in control_parts(s):
+        base += v
+        why.append(desc)
     return base, why
 
 

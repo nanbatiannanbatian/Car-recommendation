@@ -48,22 +48,32 @@ def spec_from_trim(trim: dict, base_spec: dict | None = None) -> dict:
     s = dict(base_spec or {})
     s["kwh"] = trim.get("battery_kwh") or s.get("kwh")
     charge = str(trim.get("charge") or "")
-    s["platform_800v"] = ("800V" in charge) or ("900V" in charge) or s.get("platform_800v", False)
+    # 高压平台判定：三个来源任一成立即可——
+    #   ① charge 文本里有 800V/900V（auto_trims 拼的、或人工写的）；
+    #   ② voltage_v 独立字段 ≥ 800（汽车之家「高压平台(V)」，2026-11-21 新增）；
+    #   ③ 调用方已给的值（沿用）。
+    # 为什么要独立的 voltage_v：人工条目的 charge 是核验过的表述、不能被自动采集改写；
+    # 而「官方没标电压」与「标了是 400V」必须分得清——否则规则打分会把没标的车当弱平台。
+    vv = trim.get("voltage_v")
+    s["platform_800v"] = (("800V" in charge) or ("900V" in charge)
+                          or (isinstance(vv, (int, float)) and vv >= 800)
+                          or bool(s.get("platform_800v")))
     # 续航：配置表 cltc_km → spec_score range_km
     if trim.get("cltc_km") is not None:
         s["range_km"] = trim["cltc_km"]
     # 电芯：cell_supplier → cell_brand（一线品牌识别用）
     if trim.get("cell_supplier"):
         s["cell_brand"] = trim["cell_supplier"]
-    # 快充时间：从 "30–80% 约 20min" / "10-80% 12min" 抽分钟数
-    import re
-    m = re.search(r"(\d+)\s*[-–]\s*80%[^0-9]*(\d+)\s*min", charge)
-    if m:
-        s["charge_10_80_min"] = int(m.group(2))
-    else:
-        m2 = re.search(r"(\d+)\s*min", charge)
-        if m2:
-            s["charge_10_80_min"] = int(m2.group(1))
+    # 快充时间 → spec_score charge_10_80_min。
+    # 口径统一走 trim_annotate.charge_minutes（**唯一口径**）：
+    #   它按区间宽度把 10–80%(70%) / 30–80%(50%) / 10–70%(60%) 折算到等效 70% 区间。
+    #   此前这里自己写了一套正则，直接取「…80% 后的分钟数」——
+    #   启源Q06 的「30–80% 约 9min」被当成 10–80% 的 9min（虚高），
+    #   而 trim_annotate 同一份数据折算成 12.6min。两套口径同题不同答 = 事实分叉。
+    from modules.engine import trim_annotate as _TA
+    _equiv, _why = _TA.charge_minutes(trim)
+    if _equiv is not None:
+        s["charge_10_80_min"] = _equiv
     kcs = [str(x) for x in (trim.get("key_configs") or [])]
     if any("激光雷达" in x for x in kcs):
         s["adas_lidar"] = True

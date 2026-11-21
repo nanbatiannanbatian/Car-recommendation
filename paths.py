@@ -43,6 +43,11 @@ GENERATED_JSON = {
     "trims.json",        # auto_trims.py（seed 随包人工条目 + 联网补录自动条目）
     "ice_crash.json",    # ice_crash.py --pool <池>（联网碰撞证据）
     "cell_facts.json",   # build_cell_facts.py（联网电芯事实）
+    # 2026-11-21：ciasi_decoded.json 原先在 categories/ 与 data/gen/ 各存一份，
+    # 内容完全相同 → 同一事实两个可写副本（正是用户要根治的那类病）。
+    # 它由 ciasi_text_decode.py 从 C-IASI 官网发布稿解码生成，可重建 → 归生成物，
+    # 唯一位置 data/gen/，categories/ 那份删除。
+    "ciasi_decoded.json",
 }
 
 # 回归测试专用样本：只被 tests/regress 读、发布包运行链路不碰的一次性候选池快照。
@@ -92,6 +97,13 @@ GENERATED_SPEC: dict[str, dict] = {
         "cmd": "python3 build_cell_facts.py",
         "needs_net": True, "semi": False,
         "note": "电芯品牌/容量核验事实表",
+    },
+    "ciasi_decoded.json": {
+        "cmd": "python3 ciasi_text_decode.py --out data/gen/ciasi_decoded.json",
+        "needs_net": True, "semi": False,
+        "note": "C-IASI 官网结果发布稿的纯文字等级解码（可重建）。"
+                "原默认写 categories/ciasi_decoded.json，与 data/gen/ 那份重复，"
+                "已统一到 data/gen/ 单一副本。",
     },
 }
 
