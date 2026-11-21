@@ -117,6 +117,9 @@ CASES = [
     ("BUG-092", "回归专用候选池快照打进发布包:包体逼近3MB上限+无代码化排除规则", "v10.5.1"),
     ("BUG-093", "发布包带39个JSON占944KB:用户要零JSON数据可联网获得却无补回链路", "v10.5.2"),
     ("BUG-094", "蔚来ES6有本代EuroNCAP一手五星却判无成绩:出口版同源车成绩被一刀切降级+智驾分误抓隐患", "v10.5.2"),
+    ("BUG-095", "深蓝S07/宋L EV官网有一手碰撞成绩但页面空白:出榜不联网核验+权威库无此车", "v10.6.0"),
+    ("BUG-096", "特斯拉三电7.3垫底但电耗全榜最低:三电维度只看车端硬件、系统能效从未纳入", "v10.6.0"),
+    ("BUG-097", "GitHub仓库存43个JSON违背数据代码分离:同步脚本无.json排除规则", "v10.6.0"),
 ]
 
 
@@ -125,6 +128,18 @@ def _read(rel):
     # 绝不读根目录兼容薄壳，否则断言会跑在 10 行转发壳上、形同虚设。
     p = paths.src(rel)
     return open(p, encoding="utf-8").read() if p.exists() else ""
+
+
+def _read_path(rel):
+    """数据/库文件绝对路径（项目根下，不走 modules 索引）。"""
+    return str(paths.ROOT / rel)
+
+
+def _read_pool():
+    """读中型纯电SUV候选池（深拷贝，测试内可原地改）。"""
+    import copy
+    return copy.deepcopy(json.load(
+        open(str(paths.ROOT / "runs" / "midsuv_bev_pool.json"), encoding="utf-8"))["candidates"])
 
 
 def _in_sync_set(*names):
@@ -484,8 +499,10 @@ def t041():
     for f in ("categories/candidates_compact_suv_bev.json",
               "categories/car_compact_suv_bev.json"):
         assert os.path.exists(os.path.join(HERE, f)), f"未固化: {f}"
-    assert _in_sync_set("categories/candidates_compact_suv_bev.json",
-                        "categories/car_compact_suv_bev.json"), "候选池未进同步集"
+    # v10.6.0 起 GitHub 不传 JSON：候选池固化在源码树（上面已断言存在），
+    # 但按数据代码分离策略不进同步集。
+    assert not _in_sync_set("categories/candidates_compact_suv_bev.json"), \
+        "候选池 JSON 不应进 GitHub 同步集（v10.6.0 零 JSON）"
     p = os.path.join(HERE, "runs", "compact_suv_bev_202610", "榜单.html")
     if os.path.exists(p):
         t = _read("runs/compact_suv_bev_202610/榜单.html")
@@ -515,16 +532,19 @@ def t040():
     return "快充口径归一化+配置级delta生效"
 
 def t039():
-    """候选池必须固化在 categories（随包同步），不能只活在 runs。"""
+    """候选池必须固化在 categories 源码树（本地可复现），不能只活在 runs。
+
+    v10.6.0 起 GitHub 不传 JSON：固化在源码树 ≠ 同步到仓库；后者按数据代码分离停用。
+    """
     import os as _os
     for f in ("categories/candidates_compact_bev_extended.json",
               "categories/candidates_compact_bev_audit.json",
               "categories/universe_compact_bev_202610.json"):
         p = _os.path.join(HERE, f)
         assert _os.path.exists(p), f"候选池未固化: {f}"
-    # 必须进同步集（v10：镜像同步，无白名单）
-    assert _in_sync_set("categories/candidates_compact_bev_extended.json",
-                        "categories/candidates_compact_bev_audit.json"), "候选池未进同步集"
+    # v10.6.0 起 GitHub 不传 JSON：固化在源码树即可，不进同步集（数据代码分离）
+    assert not _in_sync_set("categories/candidates_compact_bev_extended.json"), \
+        "候选池 JSON 不应进 GitHub 同步集（v10.6.0 零 JSON）"
     # 内容完整性：6 款长尾车 + 分数 + 生命周期 + 代际事实
     ext = json.load(open(str(paths.cat("candidates_compact_bev_extended.json")), encoding="utf-8"))
     models = {c["model"] for c in ext["candidates"]}
@@ -2508,8 +2528,10 @@ def t090():
     c11 = next(c for c in cands if c["model"] == "零跑C11")
     assert not CS.is_official(c11.get("safety_basis")), "测试前置失败：C11 已有权威 basis"
 
-    # 与主链同序：先回填 note 文本成绩，再回填 C-NCAP 官方表
+    # 与主链同序：先回填 note 文本成绩，再回填 C-NCAP 官方表 + authoritative 库。
+    # v10.6.0 起库里新增深蓝S07(C-NCAP)/宋L EV(C-IASI)，不跑权威回填也会报漏显。
     FS.backfill_crash_from_text(cands)
+    FS.backfill_crash_from_authoritative(cands)
     filled = FS.backfill_crash_from_cncap_table(cands)
     assert any(m == "零跑C11" and d.startswith("C-NCAP 86.4%") and b == "cncap"
                for m, d, b in filled), f"C-NCAP 表未回流: {filled}"
@@ -2737,8 +2759,87 @@ def t094():
             "零泛化+N7仍无成绩+软文拒绝(+t094)")
 
 
+def t095():
+    """深蓝S07/宋L EV 官网有一手碰撞成绩但页面空白（v10.6.0，联网核查发现）。
+
+    根因：出榜只救回数字图标车，不对『本地权威库无此车』的联网核验；
+    两车官网有 C-NCAP 88.3% / C-IASI 一手测评，库和候选池都没有 → 页面空白。
+    修复：①补入权威库（带官网 URL）②新增 research 联网核验模块接进出榜
+    ③展示门禁保证有来源不空白。
+    """
+    import json as _json
+    from modules.engine import facts_sync as FS
+    # 1) 两车已在权威库（带来源）
+    cn = _json.load(open(_read_path("cncap_scores.json"), encoding="utf-8"))
+    assert abs(float(cn["scores"]["深蓝S07"]) - 88.3) < 0.01, "深蓝S07 C-NCAP 88.3% 未入库"
+    off = _json.load(open(_read_path("official_safety_scores.json"), encoding="utf-8"))
+    sl = off["car_scores"].get("比亚迪宋L EV")
+    assert sl and sl.get("system") == "C-IASI" and sl.get("grade") == "G", "宋L EV C-IASI G 未入库"
+    assert sl.get("source_url", "").startswith("https://www.ciasi.org.cn/"), "宋L 无官网来源"
+    # 2) 回流后页面字段有成绩
+    cands = _read_pool()
+    f = FS.backfill_crash_from_cncap_table(cands)
+    assert any(m == "深蓝S07" for m, _, _ in f), "深蓝S07 未回流"
+    from modules.engine import crash_systems as _CS
+    s07 = next(c for c in cands if c["model"] == "深蓝S07")
+    assert _CS.has_score(s07.get("crash")), "深蓝S07 回流后仍无成绩"
+    # 3) 联网核验模块存在且接进出榜（源码断言，避免真联网）
+    assert "crash_auto_verify" in _read("pipeline.py"), "pipeline 未接入碰撞自动联网核验"
+    assert "cncap-swiper" in _read("crash_auto_verify.py"), "联网核验模块无 C-NCAP 解析"
+    from modules.research import crash_auto_verify as CAV
+    assert CAV.selftest() == 0, "碰撞联网核验模块自测失败"
+    # 4) 宋L 保守取 G，不猜 G+（纪律）
+    assert sl.get("score") == 9.0, "宋L 不应猜 G+"
+    return ("碰撞联网核验：深蓝S07 C-NCAP88.3%/宋L EV C-IASI G 补库+回流+出榜联网比对"
+            "(+t095)")
+
+
+def t096():
+    """特斯拉三电垫底但电耗全榜最低：三电维度从未纳入系统能效（v10.6.0）。"""
+    from modules.engine import powertrain_efficiency as PE
+    # 1) 模块自测通过（低电耗加分/高电耗减分/无数据不动/封顶/只改三电）
+    assert PE.selftest() == 0, "电耗效率模块自测失败"
+    # 2) 全网数据：特斯拉电耗全榜第二低
+    tbl = PE.load_consumption()
+    assert PE._canon_key("特斯拉 Model Y") in tbl
+    assert tbl[PE._canon_key("特斯拉 Model Y")]["consumption"] <= 12.0
+    # 3) 端到端：特斯拉应加分
+    cands = _read_pool()
+    before = next(c for c in cands if c["model"] == "特斯拉 Model Y")["scores"]["powertrain"]
+    PE.apply_efficiency(cands)
+    tesla = next(c for c in cands if c["model"] == "特斯拉 Model Y")
+    assert tesla["scores"]["powertrain"] > before, \
+        f"特斯拉电耗最低却没加分: {before}→{tesla['scores']['powertrain']}"
+    assert tesla["powertrain_efficiency"]["adjust"] > 0
+    # 4) 高电耗车减分（全榜统一，不是给特斯拉开后门）
+    deepal = next(c for c in cands if c["model"] == "深蓝S07")
+    assert deepal["powertrain_efficiency"]["adjust"] < 0, "高电耗车应减分"
+    # 5) pipeline 接入 + 开关存在
+    assert "powertrain_efficiency" in _read("pipeline.py"), "pipeline 未接电耗修正"
+    assert "no-powertrain-efficiency" in _read("pipeline.py"), "缺 A/B 对照开关"
+    return ("三电能耗效率：全榜统一中位基准双向修正±0.4，特斯拉低电耗加分/高电耗车减分"
+            "(+t096)")
+
+
+def t097():
+    """GitHub 仓库存 43 个 JSON 违背数据代码分离（v10.6.0）。"""
+    import sync_to_repo as S
+    # 1) 同步脚本排除所有 .json（单一事实源）
+    assert '".json"' in _read("sync_to_repo.py"), "同步脚本 SKIP_SUFFIX 未含 .json（源码断言）"
+    assert ".json" in S.SKIP_SUFFIX, "同步脚本未排除 .json"
+    assert S.should_skip("categories/master_pool.json"), "categories JSON 未被排除"
+    assert S.should_skip("cncap_scores.json"), "根目录 JSON 未被排除"
+    assert not S.should_skip("modules/engine/spec_score.py"), "误伤 .py"
+    # 2) collect 源码树：同步集里不含任何 .json（验证规则真生效，非仅看常量）
+    got = S.collect(str(paths.ROOT))
+    assert not any(p.endswith(".json") for p in got), "源码树 JSON 仍进同步集"
+    # 3) data_bootstrap 已停用（数据源消失）
+    assert "停用" in _read("data_bootstrap.py"), "data_bootstrap 未标注停用"
+    return ("GitHub 零 JSON：同步脚本排除 .json + data_bootstrap 停用(+t097)")
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097]
 
 
 def run():

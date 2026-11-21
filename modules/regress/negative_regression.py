@@ -78,6 +78,12 @@ NEG_TARGETS = {
     "t093": ["EXCLUDE_ALL_JSON"],
     # t094：抹掉同源映射表（回到「出口版同源车成绩被一刀切拒、ES6判无成绩」），应 FAIL
     "t094": ["EXPORT_ALIASES"],
+    # t095：抹掉 C-NCAP 官网解析标记（回到「出榜不联网核验碰撞成绩」），应 FAIL
+    "t095": ["cncap-swiper"],
+    # t096：抹掉电耗修正开关（回到「三电维度无视系统能效」），应 FAIL
+    "t096": ["no-powertrain-efficiency"],
+    # t097：抹掉同步脚本 .json 排除标记（回到「GitHub 又存 JSON」），应 FAIL
+    "t097": ['".json"'],
 }
 
 # 数据断言型：测试名 -> (文件路径, 车型/键, 篡改模式)
@@ -141,8 +147,8 @@ NEG_DATA = {
     "t088": ("crash_systems.parse_all_scores_from_evidence", None, "no_multi_scores"),
     # t089：关掉多测评融合（回到「数字图标车无成绩、C-IASI 不木桶取最低」），断言必须 FAIL
     "t089": ("multi_evidence_score.fuse", None, "no_fusion"),
-    # t039 断言从「源码文本含文件名」升级为「文件在同步集里」，探针改成把同步集清空
-    "t039": ("sync_to_repo.collect", None, "empty_sync"),
+    # t039：v10.6.0 后改为「固化内容完整性」断言；删掉零跑B01的scores → 断言FAIL
+    "t039": ("categories/candidates_compact_bev_extended.json", "零跑B01", "delete_scores"),
 }
 
 

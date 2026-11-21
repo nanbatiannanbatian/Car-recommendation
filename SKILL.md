@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 10.5.2
+version: 10.6.0
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v10.5.2）
+# Car recommendation —— 可信购车榜单引擎（v10.6.0）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -62,14 +62,14 @@ paths.py       全项目路径唯一事实源（ROOT/cat()/gen()）+ 生成物�
 写生成物用 `paths.gen("xxx.json")`。**禁止再写 `os.path.join(HERE, "categories", ...)`**（重构前散落 46 处，
 文件一进 `modules/` 全指错目录）。文档里出现的 `categories/trims.json` 是逻辑数据名，实际位置以此规则解析。
 
-**打包判据（v10.5.2 用户新决定）：发布包零 JSON，数据全部联网补回。**
-- `build_release.EXCLUDE_ALL_JSON` 总闸门：**所有 `.json` 都不打包**（含人工事实库与品类配置，
-  包解压后从 2855KB 降到 1929KB）。用户 2026-11-21 明确："JSON 后缀的都可以不打包，数据可联网获得，
-  即便其他地方引用它们。" 新增 JSON 自动被总闸门排除，不靠手工列名。
-- **新装包首跑两步**（缺一不可，否则跑不出榜）：
-  1. `python3 -m modules.research.data_bootstrap --apply` —— 从已发布 GitHub 仓库补回 41 个 JSON
-     （走 contents API + base64；`raw.githubusercontent.com` 在大陆代理 SSL EOF 必失败，实测 0/4，故禁用）。
-     落盘前校验合法 JSON，防代理错误页污染。`--check` 可先看缺什么。
+**数据与代码分离（v10.6.0 用户最终决定）：发布包零 JSON，GitHub 仓库也零 JSON。**
+- `build_release.EXCLUDE_ALL_JSON` 总闸门：**所有 `.json` 都不打包**（包解压后 1929KB）。
+- `sync_to_repo.SKIP_SUFFIX` 含 `.json`：**GitHub 仓库不再存任何 JSON**（v10.6.0 从仓库删除 43 个 JSON）。
+  用户 2026-11-21 明确："上传 GitHub 的时候不上传 JSON 文件。" 新增 JSON 自动被两处总闸门排除。
+- **新装包数据获取**（v10.6.0 起）：
+  1. 人工事实库（气囊/物理参数/基线池/manual trims 等 41 个 JSON）：仓库与发布包都不带，
+     需从数据分发渠道单独获取（或按 `bootstrap_data.py --check` 的命令逐项联网重建可重建项）。
+     `modules/research/data_bootstrap.py` 已停用（原从 GitHub 补回，仓库已无 JSON 数据源）。
   2. `python3 bootstrap_data.py --apply` —— 重建 3 个生成物（trims/ice_crash/cell_facts），
      每项都有命令、联网标记与前置说明；`--check` 体检。
 - 旧判据（`paths.GENERATED_JSON` 可重建 / `CURATED_JSON` 人工事实库必须随包）保留作**数据分类**，

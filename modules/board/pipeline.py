@@ -100,6 +100,10 @@ def main():
                          "（只审计不改分，差异是待核实线索）")
     ap.add_argument("--no-thirdparty", action="store_true",
                     help="跳过第三方实测/拆车证据（默认启用，走 adjust 封顶通道）")
+    ap.add_argument("--no-powertrain-efficiency", action="store_true",
+                    help="跳过三电能耗效率修正（默认启用，全榜统一±0.4封顶；仅 A/B 对照用）")
+    ap.add_argument("--no-crash-verify", action="store_true",
+                    help="跳过出榜前的 C-NCAP 官网联网碰撞核验（默认启用；仅 A/B/断网对照用）")
     ap.add_argument("--no-config-anchor", action="store_true",
                     help="判档改用候选池车系基础分（回退到 v9.7.42 老口径，仅供 A/B 对照；默认用主榜同款最高配置分）")
     ap.add_argument("--airbag-gate", action="store_true",
@@ -197,6 +201,28 @@ def main():
                                  "matched": {}, "error": f"{type(_ex).__name__}: {_ex}"}
                 print(f"[新闻稿救回] 联网失败，沿用已缓存文字等级：{_ciasi_rescue['error']}")
 
+    # C-NCAP 官网自动联网核验（v10.6.0）：出榜前扫官网最新测评批次，与本榜车型比对。
+    # 发现「官网有成绩、本地库无」→ 告警并写审计（不自动覆盖人工核验值，防误伤）。
+    # 这是对「深蓝S07 官网有88.3%但页面空白」事故的根因修复：以前靠人记得查官网，
+    # 现在每次出榜都联网核一遍。失败只告警不阻断（research 唯一网络出口）。
+    _crash_verify = {"status": "skipped"}
+    if not getattr(a, "no_crash_verify", False):
+        from modules.research import crash_auto_verify as CAV
+        try:
+            _crash_verify = CAV.verify(cands)
+            _crash_verify["status"] = "ok"
+            if _crash_verify["new"]:
+                print("[碰撞核验] 官网已有成绩但本地库缺失（需补录 cncap_scores.json）：" +
+                      "、".join(f"{x['pool_model']}={x['overall']}%"
+                               for x in _crash_verify["new"]))
+            if _crash_verify["conflict"]:
+                print("[碰撞核验] 官网与本地库数值冲突（不自动覆盖，人工核验）：" +
+                      "、".join(f"{x['pool_model']} 官网{x['overall']}% vs 本地{x['local']}%"
+                               for x in _crash_verify["conflict"]))
+        except Exception as _ex:                           # 网络抖动不阻断本地出榜
+            _crash_verify = {"status": "error", "error": f"{type(_ex).__name__}: {_ex}"}
+            print(f"[碰撞核验] 联网核验失败，沿用本地库：{_crash_verify['error']}")
+
     # 价格回流（2026-11-21 事故根因修复）：trims.json 里已核验的官方指导价必须回流到
     # 候选池 price_guide。闸门只认 price_guide，不回流就会把数据齐全的车判成
     # price_unknown 落榜（当时 11 款全中招，榜单只剩 13-16 万的车）。
@@ -286,6 +312,18 @@ def main():
     from modules.engine import experience_score as _ES
     if not getattr(a, "no_experience", False):
         _ES.apply_experience(cands, enabled=True)
+
+    # 电耗效率修正（v10.6.0）：三电维度此前只看车端硬件（容量/电压/充电/电芯），
+    # 忽略了「同样电量跑更远」的系统能效——特斯拉电耗全榜最低却三电垫底即源于此。
+    # 全榜统一、以榜内中位为基准双向调整（±0.4封顶），无电耗数据不插补。
+    # 必须放在 experience 之后、evidence_gate 之前：证据封顶读的是最终分。
+    from modules.engine import powertrain_efficiency as _PE
+    _eff_applied = 0
+    if not getattr(a, "no_powertrain_efficiency", False):
+        _PE.apply_efficiency(cands)
+        _eff_applied = sum(1 for c in cands
+                           if (c.get("powertrain_efficiency") or {}).get("status") == "applied")
+        print(f"[电耗效率修正] {_eff_applied} 款有电耗一手数据（榜内中位为基准，±0.4封顶）")
 
     from modules.engine import evidence_gate as EG
     if getattr(a, "no_evidence_cap", False):
@@ -654,6 +692,7 @@ def main():
                                            for m, d, b in _n_filled]},
         # v10.5.0：C-IASI 数字图标车联网救回审计 + 展示覆盖门禁审计
         "ciasi_rescue": _ciasi_rescue,
+        "crash_auto_verify": _crash_verify,
         "crash_display_audit": {"leaks": _display_leaks},
         # 多成绩审计：全部成绩留痕 + 主成绩选择口径（取证据最强，不取最高/不叠加）
         "crash_multi_scores": [
@@ -669,6 +708,13 @@ def main():
              "excluded": x.get("excluded", [])}
             for x in _fusion if x.get("primary")
         ],
+        # v10.6.0：三电能耗效率修正审计（全榜统一、榜内中位基准、±0.4封顶）
+        "powertrain_efficiency": {
+            "enabled": not getattr(a, "no_powertrain_efficiency", False),
+            "applied": _eff_applied,
+            "detail": {c["model"]: c["powertrain_efficiency"]
+                       for c in cands if c.get("powertrain_efficiency")},
+        },
         "safety_auto": {"applied": _sa, "skipped": _ss},
         "safety_cap": _cap_adj,
         "dimension_cap": _dim_cap,

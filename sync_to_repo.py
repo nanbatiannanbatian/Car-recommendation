@@ -20,6 +20,8 @@ v10.0 起改成「镜像同步」而不是白名单：
 边界：
   - 绝不复制 runs/（400MB+ 产物）、data/（生成物）、dist/（zip）、.workbuddy/、__pycache__
   - 绝不复制 key.txt、*.bak / *.bak-* / *.tmp / *.pyc / *.orig
+  - v10.6.0 起绝不复制任何 .json（用户：GitHub 不传 JSON）。数据与代码分离：
+    仓库只存代码/文档，JSON 事实库不入 git；新装包需联网重建或从数据分发渠道获取。
   - 默认不删仓库文件（--prune 才删），但会列出「源码已无、仓库还在」的候选
   - 本脚本不碰 git，同步后自行 git add/commit/push
 """
@@ -37,7 +39,7 @@ DEFAULT_REPO = r"C:\Users\海南岛南霸天\WorkBuddy\2026-11-13-15-03-08\omni-
 SKIP_DIRS = {"runs", "data", "dist", ".git", "__pycache__", ".workbuddy", "cache",
              ".pytest_cache", ".mypy_cache", "node_modules"}
 SKIP_FILES = {"key.txt", "config.json.bak-20261113", "iv_archive_tmp.html"}
-SKIP_SUFFIX = (".pyc", ".pyo", ".tmp", ".orig", ".log")
+SKIP_SUFFIX = (".pyc", ".pyo", ".tmp", ".orig", ".log", ".json")
 SKIP_MARKERS = (".bak", ".bak-", "~$")
 
 

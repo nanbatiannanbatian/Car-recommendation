@@ -1,7 +1,11 @@
 # -*- coding: utf-8 -*-
 """data_bootstrap.py —— 新装包联网补回 JSON 数据（v10.5.2）
 
-背景（2026-11-21 用户决定）：
+⚠️ v10.6.0 起【停用】：用户决定「GitHub 不上传 JSON」，本模块的唯一数据源
+（GitHub 仓库的 categories/*.json）已不存在。保留文件仅为历史追溯，
+--check/--apply 会明确返回停用提示，不再发起联网。新装包数据获取方式见 SKILL.md。
+
+背景（2026-11-21 用户决定，已被 v10.6.0 新决定取代）：
   「JSON 后缀的都可以不打包，毕竟这些数据可以联网获得，即便其他地方引用它们。」
   发布包从 v10.5.2 起零 JSON（总闸门在 build_release.EXCLUDE_ALL_JSON），
   但新装包要能跑榜，必须先把数据拿回来。唯一可信联网源 = 已发布 GitHub 仓库
@@ -235,6 +239,13 @@ def main() -> int:
     if not (a.check or a.apply):
         ap.print_help()
         return 2
+    # v10.6.0：GitHub 仓库已不存 JSON（用户决定），本模块数据源消失 → 停用联网。
+    print("[停用] v10.6.0 起 GitHub 仓库不再存 JSON，data_bootstrap 无数据源。",
+          file=sys.stderr)
+    print("→ 新装包数据获取见 SKILL.md（bootstrap_data.py 重建生成物 + 人工事实库需单独分发）。",
+          file=sys.stderr)
+    print("→ 本模块保留仅供历史追溯；--selftest 仍可用。", file=sys.stderr)
+    return 2
     if a.check:
         r = survey()
         if not r["ok"]:
