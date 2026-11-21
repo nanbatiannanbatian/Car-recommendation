@@ -122,6 +122,7 @@ CASES = [
     ("BUG-097", "GitHub仓库存43个JSON违背数据代码分离:同步脚本无.json排除规则", "v10.6.0"),
     ("BUG-098", "碰撞核验只扫官网首页且断网只告警:无法证明每车都联网确认过", "v10.7.0"),
     ("BUG-099", "碰撞核验状态无时间戳且每次出榜重复抓取:当天无法复用、跨天不失效", "v10.8.0"),
+    ("BUG-100", "极氪7X/阿维塔07电池来源空白:事实库无此车且缺联网兜底与缺失原因标注", "v10.9.0"),
 ]
 
 
@@ -2939,8 +2940,52 @@ def t099():
     return "核验状态带时间戳 + 当天复用/跨天失效/数据变更重核/断网不缓存(+t099)"
 
 
+def t100():
+    """电池来源不遗漏（v10.9.0）：极氪7X/阿维塔07 电池来源空——根因是事实库
+    没有这两车、且无联网兜底。修复：research 联网核验（只出线索不回填，防串配置）+
+    事实库补录 + 页面缺失原因标注「—（原因）」。
+    """
+    from modules.research import cell_brand_verify as CBV
+    # 1) 模块确定性自测
+    assert CBV.selftest() == 0, "电芯联网核验自测失败"
+    # 2) 源码契约（防只改产物）
+    src = _read("cell_brand_verify.py")
+    for token in ("def verify_all", "def verify_cell", "def parse_brands",
+                  "STATUS_NOTE", "need_review", "def fetch_search"):
+        assert token in src, f"cell_brand_verify 缺 {token}"
+    pl = _read("pipeline.py")
+    assert "cell_brand_verify" in pl and "--no-cell-verify" in pl, "pipeline 未接电芯核验"
+    bv = _read("board_view.py")
+    assert "电芯_缺失原因" in bv, "页面未接缺失原因标注"
+    v2 = _read("board_v2.py")
+    assert "电芯_缺失原因" in v2, "fact_columns 未带出缺失原因"
+    # GitHub 新装无人工事实库时，靠可重建种子表 cell_facts 回退——两车须在种子里
+    seed = _read("build_cell_facts.py")
+    assert "极氪7X" in seed and "阿维塔07 纯电版" in seed, "重建种子表缺两车"
+    assert "cell_facts.json" in _read("board_view.py"), "load_fact_library 缺 cell_facts 回退"
+    # 3) 两车已补进事实库（带权威来源）
+    fl = json.load(open(paths.cat("fact_library.json"), encoding="utf-8"))
+    for m, brand in [("极氪7X", "宁德时代"), ("阿维塔07 纯电版", "宁德时代")]:
+        assert m in fl and fl[m].get("cell_brand"), f"{m} 未补进事实库"
+        assert brand in fl[m]["cell_brand"], f"{m} 电芯品牌错误: {fl[m]['cell_brand']}"
+    # 4) 页面渲染：缺失原因标注（用户确认的「—（原因）」样式）
+    from modules.board import board_view as BV
+    fr = {"电芯_缺失原因": "联网未查到该配置的电芯品牌"}
+    assert BV.main_cell("cell_brand", {"fact_ref": fr}, {}) == "—（联网未查到该配置的电芯品牌）"
+    # 5) 联网线索绝不回填为事实（实跑串配置的教训）
+    calls = {"n": 0}
+
+    def fake(q):
+        calls["n"] += 1
+        return "宁德时代 麒麟电池"  # 即使品牌+技术词同现
+
+    r = CBV.verify_cell("某车", {"trim": {"name": "X"}}, local_brand=None, fetcher=fake)
+    assert r["status"] == "need_review" and r["brand"] == "", "线索不得当事实回填"
+    return "电池来源不遗漏：两车补录+联网线索不回填+页面缺失原因标注(+t100)"
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100]
 
 
 def run():

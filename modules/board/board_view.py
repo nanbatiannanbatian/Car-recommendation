@@ -458,6 +458,10 @@ def main_cell(key: str, row: dict, cand: dict, grade: str = "") -> str:
         volt = (mv.group(1) + "V") if mv else bp.get("voltage")
         if volt and volt != "未披露":
             brand = f"{brand} · {volt}"
+        # v10.9.0：查不到电芯时标注原因（用户确认沿用 kWh/万元 的「—（原因）」样式）。
+        if brand in (None, "", "—"):
+            reason = fr.get("电芯_缺失原因")
+            return f"—（{reason}）" if reason else "—"
         return brand
     return "—"
 
@@ -512,9 +516,29 @@ def load_fact_library(explicit_path: str | None = None) -> dict:
     if not os.path.exists(path):
         return {}
     try:
-        return _json.load(open(path, encoding="utf-8"))
+        facts = _json.load(open(path, encoding="utf-8"))
     except (OSError, ValueError):
-        return {}
+        facts = {}
+    # v10.9.0：电芯品牌多源回退——cell_facts.json（可重建种子库）补 fact_library
+    # 缺电芯的车（如极氪7X/阿维塔07）。GitHub 新装无人工事实库时也能显示已核验电芯；
+    # 只补 cell_brand/kwh 等事实字段，不覆盖 fact_library 里已有的值。
+    try:
+        cell_path = str(paths.cat("cell_facts.json"))
+        cell_doc = _json.load(open(cell_path, encoding="utf-8"))
+        for e in (cell_doc.get("entries") or []):
+            m = e.get("model")
+            if not m:
+                continue
+            slot = facts.setdefault(m, {})
+            if not slot.get("cell_brand") and e.get("cell_brand"):
+                slot["cell_brand"] = e["cell_brand"]
+            if not slot.get("kwh") and e.get("battery_kwh"):
+                slot["kwh"] = e["battery_kwh"]
+            if not slot.get("scored_trim") and e.get("trim"):
+                slot["scored_trim"] = e["trim"]
+    except (OSError, ValueError):
+        pass
+    return facts
 
 
 def lifecycle_line(model: str, info) -> str:

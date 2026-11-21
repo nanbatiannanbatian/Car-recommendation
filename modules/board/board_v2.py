@@ -93,6 +93,12 @@ def fact_columns(c: dict, facts: dict[str, dict], policy: dict) -> dict:
             v = _num(f.get("cltc") or c.get("cltc"))
         elif k == "cell_brand":
             v = f.get("cell_brand") or c.get("cell_brand")
+            # v10.9.0：缺电芯且本次已联网核验 → 带出原因/线索，供页面显示「—（原因）」。
+            # 只在库与候选都为空时才写，不覆盖任何已核验事实。
+            if v in (None, "", "—"):
+                cv = c.get("_cell_verify") or {}
+                if cv.get("status") in ("need_review", "unavailable", "net_error"):
+                    out["电芯_缺失原因"] = cv.get("reason") or "联网未查到，待核"
         elif k == "is_800v":
             v = f.get("is_800v", c.get("is_800v"))
         elif k == "trend_sales":

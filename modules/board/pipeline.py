@@ -106,6 +106,10 @@ def main():
                     help="跳过出榜前的逐车联网碰撞核验（默认启用；仅 A/B/断网对照用）")
     ap.add_argument("--no-crash-cache", action="store_true",
                     help="忽略当天核验缓存、强制全部重新联网抓取（默认当天命中复用，跨天自动失效）")
+    ap.add_argument("--no-cell-verify", action="store_true",
+                    help="跳过电池来源（电芯品牌）联网核验（默认对缺失车型联网查并标注原因）")
+    ap.add_argument("--no-cell-cache", action="store_true",
+                    help="忽略当天电芯核验缓存、强制全部重新联网（默认当天复用，跨天失效）")
     ap.add_argument("--allow-degraded-network", action="store_true",
                     help="仅当联网主通道失败时允许降级出榜（标记 degraded；"
                          "官网有本地无/数值冲突永远阻断，此开关不适用）")
@@ -961,6 +965,35 @@ def main():
                 # 否则被生命周期闸门淘汰的停产车（如秦L EV）会出现在主榜却没档位。
                 _passed = set(_tiers_v2.keys())
                 cands_for_html = [c for c in cands if c.get("model") in _passed] if _passed else cands
+                # v10.9.0：电池来源联网核验（research 唯一出口）——事实库缺电芯的车
+                # 逐台联网查线索；查不到/仅线索的写入候选 _cell_verify，页面电池来源栏
+                # 显示「—（原因）」。绝不把搜索线索当事实回填（实跑会串配置）。
+                _cell_verify = {"status": "skipped"}
+                if not getattr(a, "no_cell_verify", False):
+                    try:
+                        from modules.research import cell_brand_verify as CBV
+                        _cell_verify = CBV.verify_all(
+                            cands_for_html, facts=facts_v2,
+                            use_cache=not getattr(a, "no_cell_cache", False))
+                        for _m, _r in _cell_verify["per_car"].items():
+                            if _r["status"] != "ok":
+                                for _c in cands_for_html:
+                                    if _c.get("model") == _m:
+                                        _c["_cell_verify"] = _r
+                                        break
+                        print("[电芯核验] " + "、".join(
+                            f"{k} {v}" for k, v in _cell_verify["summary"].items() if v))
+                    except Exception as _ex:                 # 联网失败不阻断出榜
+                        _cell_verify = {"status": "error",
+                                        "error": f"{type(_ex).__name__}: {_ex}"}
+                        print(f"[电芯核验] 失败（缺失将显示原因）：{_cell_verify['error']}",
+                              file=sys.stderr)
+                # 审计落本地 runs/（零 JSON 规则保护，不进 GitHub/发布包）
+                try:
+                    json.dump(_cell_verify, open(os.path.join(a.out, "cell_verify.json"), "w",
+                                                 encoding="utf-8"), ensure_ascii=False, indent=2)
+                except Exception:                            # noqa: BLE001
+                    pass
                 data_v2 = BV.build(cands_for_html, cfg_v2, pol, facts_v2, tiers=_tiers_v2,
                                    no_experience=True)  # 已在 pipeline 里调过，不重复累加
                 _as_of = a.as_of
