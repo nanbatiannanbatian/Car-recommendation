@@ -100,6 +100,7 @@ CASES = [
     ("BUG-075", "采集只有单源单点:索引miss就放弃(索引漏新车但车系页已存在)", "v10.1.7"),
     ("BUG-076", "多源采集无调度层/失败无留痕(待补清单只写「未匹配」)", "v10.1.9"),
     ("BUG-077", "联网取数未强制走research(业务模块可自行requests抓页面)", "v10.2.0"),
+    ("BUG-078", "无碰撞成绩车安全分可高于有实锤车(MONA L05 8.6 > bZ5 8.0)", "v10.2.2"),
 ]
 
 
@@ -977,6 +978,9 @@ def t054():
     # 走真实链路：表重算后候选池须先对齐表分，再跑门禁（pipeline 里就是这个顺序）。
     # 直接对历史池跑 check 会报 mismatch —— 那是「池子比表旧」，不是门禁误判。
     SFC.sync_table_scores_to_pool(d["candidates"], tbl)
+    # 再走举证封顶（与出榜链路同序：表分同步 → 封顶 → 门禁）。
+    # 历史池是按老口径给的分，无实锤车可能高于实锤车；不封顶直接跑门禁会报 monoton.
+    SFC.evidence_cap(d["candidates"])
     r = SFC.check(d["candidates"], tbl)
     assert r["passed"], f"真实池安全门禁未过: {r['issues']}"
     by = {c["model"]: c for c in d["candidates"]}
@@ -1788,8 +1792,55 @@ def t077():
     return "网络出口唯一：现状零越界 + 越界能被检出 + research 内放行 + 源链纳入约束 + 铁律成文"
 
 
+def t078():
+    """无官方碰撞成绩的车，safety 不得高于任何有实锤的车（举证责任，不是判劣）。
+
+    2026-11-21 用户质疑：「小鹏 MONA L05 碰撞成绩都没有，用料也没有 20 万车好，
+    为什么安全分这么高」。查实：它 note 自述「零交付、零实测、零碰撞成绩」，
+    safety 却是 8.6，比有 C-NCAP 86.7% 的丰田 bZ5（8.0）高 0.6。
+    根因两处：safety 底分是人工填的、范围与实锤车重叠；单调性门禁只比对映射表里
+    8 款老车，本池一款都不在表里 → 检查被整体跳过（显示「问题 0」）。
+    """
+    from modules.engine import safety_check as SC
+
+    def mk(model, crash, safety):
+        return {"model": model, "crash": crash, "scores": {"safety": safety}}
+
+    # 1) 封顶：无实锤者压到「有实锤最低分」，且不额外倒扣（缺数据不判劣）
+    cands = [mk("实锤高", "C-NCAP 92.7%", 9.0), mk("实锤低", "C-NCAP 86.7%", 8.0),
+             mk("零实锤A", "无官方成绩", 8.6), mk("零实锤B", "无官方成绩", 8.4),
+             mk("在测车", "C-NCAP 已抽车未测", 8.8)]
+    adj = SC.evidence_cap(cands)
+    assert {a["model"] for a in adj} == {"零实锤A", "零实锤B", "在测车"}, adj
+    for c in cands:
+        if "实锤" not in c["model"]:
+            assert c["scores"]["safety"] == 8.0, (c["model"], c["scores"]["safety"])
+            assert c.get("safety_cap_reason"), "封顶未留原因"
+    assert cands[0]["scores"]["safety"] == 9.0, "有实锤的被误压"
+
+    # 2) 池内无实锤时不封顶（没有可校准的锚，不能凭空压到某个数）
+    only_unproven = [mk("甲", "无官方成绩", 8.6), mk("乙", "无官方成绩", 8.2)]
+    assert SC.evidence_cap(only_unproven) == [], "全池无实锤却做了封顶"
+
+    # 3) 门禁：未封顶的无实锤车高于实锤最低 → 必须报 evidence_monotonicity
+    bad = [mk("实锤", "C-NCAP 86.7%", 8.0), mk("漏网", "无官方成绩", 8.6)]
+    r = SC.check(bad, table={"car_scores": {}, "systems": {}})
+    assert any(i["type"] == "evidence_monotonicity" for i in r["issues"]), r["issues"]
+    # 封顶后应通过
+    SC.evidence_cap(bad)
+    r2 = SC.check(bad, table={"car_scores": {}, "systems": {}})
+    assert not any(i["type"] == "evidence_monotonicity" for i in r2["issues"]), r2["issues"]
+
+    # 4) 链路内置 + 审计 + 披露
+    src = _read("pipeline.py")
+    assert "evidence_cap" in src, "pipeline 未接举证封顶"
+    assert "safety_cap" in src, "summary 缺封顶审计"
+    assert "举证封顶" in src, "报告缺封顶披露"
+    return "举证封顶：无实锤不高于实锤最低、全池无实锤不封顶、漏网被门禁拦、链路+审计+披露"
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078]
 
 
 def run():

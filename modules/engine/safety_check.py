@@ -92,22 +92,27 @@ def check(cands, table=None):
                            "fix": f"表内分数与规则复算不一致；运行 "
                                   f"`python3 safety_check.py --recompute --apply` 统一口径（{rule}）"})
 
-    # B. 单调性：有成绩车最低 >= 无成绩车中位
-    no_score_vals = []
+    # B. 举证单调性：有实锤车最低 >= 无实锤车最高
+    # 2026-11-21 修：原来只比对 official_safety_scores.json（8 款老车），本池一款都不在表里
+    # → 检查直接跳过，于是「MONA L05 零实锤却 8.6、比 C-NCAP 86.7% 的 bZ5 还高」没被拦。
+    # 现在直接读 cands 的 crash 字段（含自动映射分），并用「最高」而非「中位」——
+    # 无实锤的车一辆都不许高于任何有实锤的车。
+    from modules.engine import crash_systems as _CS2
+    proven_vals, unproven_vals = [], []
     for c in cands:
-        if c["model"] in car_scores:
-            continue
         s = (c.get("scores") or {}).get("safety")
-        if s is not None:
-            no_score_vals.append(float(s))
-    if official_vals and no_score_vals:
-        med_nos = round(statistics.median(no_score_vals), 1)
-        min_off = min(official_vals)
-        if min_off < med_nos:
-            issues.append({"type": "monotonicity", "model": "(全池)",
-                           "actual": f"有成绩最低{min_off} < 无成绩中位{med_nos}",
-                           "expected": f"有成绩最低>={med_nos}",
-                           "fix": "有官方碰撞成绩的车安全分不应低于无成绩车中位——检查是否被误降权"})
+        if s is None:
+            continue
+        (proven_vals if _CS2.parse_score(c.get("crash")) else unproven_vals).append(float(s))
+    no_score_vals = unproven_vals
+    if proven_vals and unproven_vals:
+        max_nos = round(max(unproven_vals), 1)
+        min_off = min(proven_vals)
+        if min_off < max_nos:
+            issues.append({"type": "evidence_monotonicity", "model": "(全池)",
+                           "actual": f"有实锤最低{min_off} < 无实锤最高{max_nos}",
+                           "expected": f"有实锤最低>={max_nos}（无实锤者不得高于任何实锤车）",
+                           "fix": "跑 safety_check.evidence_cap() 封顶，或核对有实锤车是否被误降权"})
     return {"checked": checked, "official_min": min(official_vals) if official_vals else None,
             "no_score_median": round(statistics.median(no_score_vals), 1) if no_score_vals else None,
             "has_score": has_score_n, "mapped": checked,
@@ -353,3 +358,49 @@ def main(argv=None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+# ---------------------------------------------------------------- 举证责任封顶
+def evidence_cap(cands):
+    """无官方碰撞成绩的车，safety 不得超过「有实锤车里的最低分」。
+
+    2026-11-21 用户质疑「小鹏 MONA L05 碰撞成绩都没有、用料也没 20 万车好，
+    为什么安全分这么高」——查实：它 note 自述「零交付、零实测、零碰撞成绩」，
+    safety 却是 8.6，比有 C-NCAP 86.7% 的丰田 bZ5（8.0）高 0.6。
+
+    为什么是封顶而不是扣分：
+      「没测过」不等于「不安全」（项目原则：缺数据不判劣），
+      但也不该被推断成「比测过的更安全」——这是举证责任问题。
+      所以只做上限约束：无实锤者不得高于任何一款有实锤的车，不额外倒扣。
+
+    规则：
+      - 有实锤 = crash 字段能解析出具体成绩（C-NCAP 得分率 / C-IASI 等级）
+      - cap = 这些车的 safety 最低值；池内无实锤车时不封顶（没有可校准的锚）
+      - 只在 safety 高于 cap 时下调，并记录 safety_cap_reason 供披露
+    返回 [{"model","prev","capped","reason"}]
+    """
+    from modules.engine import crash_systems as CS
+    proven = []
+    for c in cands:
+        if CS.parse_score(c.get("crash")):
+            v = (c.get("scores") or {}).get("safety")
+            if v is not None:
+                proven.append((c["model"], float(v)))
+    if not proven:
+        return []
+    cap = min(v for _, v in proven)
+    anchor = min(proven, key=lambda x: x[1])[0]
+    out = []
+    for c in cands:
+        if CS.parse_score(c.get("crash")):
+            continue                      # 有实锤的不封顶
+        s = (c.get("scores") or {}).get("safety")
+        if s is None or float(s) <= cap + 1e-9:
+            continue
+        prev = float(s)
+        c.setdefault("scores", {})["safety"] = cap
+        c["safety_cap_reason"] = (f"无官方碰撞成绩，safety 封顶至 {cap:g}"
+                                  f"（不超过有实锤车最低分，锚点 {anchor}）；"
+                                  f"原推断值 {prev:g}")
+        out.append({"model": c["model"], "prev": prev, "capped": cap, "anchor": anchor})
+    return out

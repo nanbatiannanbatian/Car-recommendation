@@ -67,6 +67,11 @@ WorkBuddy 用户级 skill。核心是「车型排行榜全链路」：按需搜�
     `universe_*`（盘点产物）、`airbags` / `vehicle_physics` / `baseline_car_ev`
   · 人工条目从 `trims.json` 分离到 `categories/trims_manual.json`，`auto_trims --seed-only`
     先用它生成基础库，再联网叠加自动条目——新装包不会再丢人工核验的配置表。
+- **安全分举证封顶（v10.2.2）**：无官方碰撞成绩的车，`safety` 不得超过「有实锤车里的最低分」
+  （`safety_check.evidence_cap()` 出榜前自动执行）。「没测过」不等于不安全，但不能被推断成
+  「比测过的更安全」——这是举证责任，不是判劣。全池无实锤时不封顶（没有可校准的锚）。
+  门禁从「无成绩车**中位**」收紧为「无实锤车**最高** ≤ 有实锤车最低」，并改为读 `crash` 字段，
+  不再只比对映射表里那几款（此前本池一款都不在表里，检查被整体跳过）。
 - **联网取数只走 research（v10.2.0，代码强制）**：除 `modules/research/` 外任何模块不得直接
   `import requests/urllib/httpx`，由 `layout_regress.check_network_egress()` 拦截（现状零越界，越界即 FAIL）；
   新增数据源必须注册进 `research/trim_sources.SOURCES`，存在性核对只出证据不出配置。

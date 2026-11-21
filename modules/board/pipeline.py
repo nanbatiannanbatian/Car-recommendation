@@ -192,6 +192,13 @@ def main():
               + "、".join(f"{x['model']} {x['prev']}→{x['score']:g}" for x in _st_sync[:5])
               + ("…" if len(_st_sync) > 5 else "") + "）")
 
+    # 举证责任封顶（2026-11-21）：无官方碰撞成绩的车 safety 不得超过有实锤车最低分。
+    # 用户质疑 MONA L05「零碰撞成绩却 8.6、比 C-NCAP 86.7% 的 bZ5 还高」。
+    _cap_adj = SFC.evidence_cap(cands)
+    if _cap_adj:
+        print(f"[举证封顶] {len(_cap_adj)} 款无实锤车 safety 封顶至 "
+              f"{_cap_adj[0]['capped']:g}（锚点 {_cap_adj[0]['anchor']}）")
+
     # 门禁：回填后仍「trims 有价而候选池无价」= 回流逻辑失效（canon 漂移/字段改名），必须硬拦。
     # 真缺口（trims 也没价）只披露不拦截，交给人补采集。
     if _p_still and not getattr(a, "no_backfill", False):
@@ -306,6 +313,11 @@ def main():
                  f"链路 取数→闸门→打分→稳健性→三档→审查。**全程无辩论。**")
     # v9.7.36：数据版本可追溯——读者知道分数是哪个 skill 版本/指纹生成的
     _gb = _pool_data.get("_generated_by") if isinstance(_pool_data, dict) else None
+    if _cap_adj:
+        parts.append(f"> **安全分举证封顶**：{len(_cap_adj)} 款无官方碰撞成绩，safety 统一封顶至 "
+                     f"{_cap_adj[0]['capped']:g}（不超过有实锤车最低分，锚点 {_cap_adj[0]['anchor']}）。"
+                     "「没测过」不等于不安全，但不能被推断成「比测过的更安全」；"
+                     "该维度不用于区分这些车，差异请看其他维度。")
     # 价格来源披露（2026-11-21）：回填了多少、哪些是真缺口，写在报告开头而不是藏在附录
     if _p_filled:
         parts.append(f"> **价格来源**：{len(_p_filled)} 款的指导价由 `trims.json` 官方配置页回填"
@@ -388,6 +400,7 @@ def main():
         "crash_backfill": {"filled": [{"model": m, "crash": d, "basis": b} for m, d, b in _c_filled],
                            "unresolved": _c_unres},
         "safety_auto": {"applied": _sa, "skipped": _ss},
+        "safety_cap": _cap_adj,
         "safety_table_sync": _st_sync,
         # v9.7.20：候选池披露同步给页面（评审反复指出报告有、页面看不到）
         "pool_disclosure": {
