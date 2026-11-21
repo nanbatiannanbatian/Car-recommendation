@@ -182,12 +182,18 @@ if __name__ == "__main__":
 def trims_price_map(trims_path=None) -> dict:
     """{canon(车型): [最低指导价, 最高指导价]} —— 供回填后的独立复核用。"""
     from modules.contracts.model_names import canon
-    tp = trims_path or str(paths.cat("trims.json"))
-    if not os.path.exists(tp):
-        return {}
-    db = json.load(open(tp, encoding="utf-8"))
+    if trims_path:
+        if not os.path.exists(trims_path):
+            return {}
+        db = json.load(open(trims_path, encoding="utf-8"))
+        entries = db.get("entries", [])
+    else:
+        # 2026-11-22：走统一入口（人工库 + 自动库合流），否则人工车型的官方价
+        # 可能读不到（人工条目已不再留在自动库里）。
+        from modules.data.trims_store import load as _load
+        entries = list(_load().values())
     out = {}
-    for e in db.get("entries", []):
+    for e in entries:
         prices = [x.get("price") for x in e.get("trims", [])
                   if isinstance(x.get("price"), (int, float))]
         if prices:
@@ -218,12 +224,16 @@ def backfill_price_guide_from_trims(cars, trims_path=None):
     """
     from modules.contracts.model_names import canon
 
-    tp = trims_path or str(paths.cat("trims.json"))
-    if not os.path.exists(tp):
-        return [], [c.get("model") for c in cars
-                    if not (isinstance(c.get("price_guide"), (list, tuple)) and c.get("price_guide"))]
-    db = json.load(open(tp, encoding="utf-8"))
-    by = {canon(e.get("model") or ""): e for e in db.get("entries", [])}
+    if trims_path:
+        if not os.path.exists(trims_path):
+            return [], [c.get("model") for c in cars
+                        if not (isinstance(c.get("price_guide"), (list, tuple)) and c.get("price_guide"))]
+        db = json.load(open(trims_path, encoding="utf-8"))
+        entries = db.get("entries", [])
+    else:
+        from modules.data.trims_store import load as _load
+        entries = list(_load().values())
+    by = {canon(e.get("model") or ""): e for e in entries}
 
     filled, still = [], []
     for c in cars:

@@ -233,15 +233,20 @@ def load_trim_cells(path: str | None = None) -> dict:
       「联网未查到该配置的电芯品牌」这类占位才有真实数据可回落。
     """
     from modules.contracts.model_names import canon
-    p = path or str(paths.cat("trims.json"))
-    if not os.path.exists(p):
-        return {}
-    try:
-        d = json.load(open(p, encoding="utf-8"))
-    except (OSError, ValueError):
-        return {}
+    if path:
+        if not os.path.exists(path):
+            return {}
+        try:
+            d = json.load(open(path, encoding="utf-8"))
+        except (OSError, ValueError):
+            return {}
+        entries = d.get("entries", [])
+    else:
+        # 2026-11-22：走统一入口（人工库 + 自动库合流）
+        from modules.data.trims_store import load as _load
+        entries = list(_load().values())
     out: dict[str, dict] = {}
-    for e in d.get("entries", []):
+    for e in entries:
         m = e.get("model")
         if not m:
             continue

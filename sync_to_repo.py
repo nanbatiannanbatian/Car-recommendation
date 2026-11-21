@@ -43,9 +43,20 @@ SKIP_SUFFIX = (".pyc", ".pyo", ".tmp", ".orig", ".log", ".json")
 SKIP_MARKERS = (".bak", ".bak-", "~$")
 
 
+# 2026-11-22：顶层才整棵排除。原先按「任意层级目录名匹配」，于是新增的
+# modules/data/（事实源读取层）被当成顶层 data/ 生成物目录整棵跳过——
+# 同步**静默漏文件**，代码上不了 GitHub 而不报错。
+# 顶层 data/ 是生成物（不传 JSON），但 modules/data/ 是**源码**，必须同步。
+TOPLEVEL_ONLY = {"runs", "data", "dist", ".git", ".workbuddy", "cache",
+                 ".pytest_cache", ".mypy_cache", "node_modules"}
+
+
 def should_skip(rel: str) -> bool:
     parts = rel.split(os.sep)
-    if any(p in SKIP_DIRS for p in parts[:-1]):
+    # 只有**顶层**目录名才整棵排除；嵌套层只排除缓存类
+    if parts[0] in TOPLEVEL_ONLY:
+        return True
+    if any(p in (SKIP_DIRS - TOPLEVEL_ONLY) for p in parts[:-1]):
         return True
     name = parts[-1]
     if name in SKIP_FILES:
@@ -59,7 +70,12 @@ def collect(root: str) -> dict[str, str]:
     """返回 {相对路径: 绝对路径}。"""
     out: dict[str, str] = {}
     for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
+        # 顶层才按 SKIP_DIRS 剪枝；嵌套层只剪缓存类目录（modules/data/ 要留）
+        if os.path.relpath(dirpath, root) == ".":
+            dirnames[:] = [d for d in dirnames if d not in TOPLEVEL_ONLY]
+        else:
+            dirnames[:] = [d for d in dirnames
+                           if d not in (SKIP_DIRS - TOPLEVEL_ONLY)]
         for fn in filenames:
             abs_p = os.path.join(dirpath, fn)
             rel = os.path.relpath(abs_p, root)

@@ -105,18 +105,18 @@ def _load_trim_wheelbase() -> dict:
         import os
         import paths
         from modules.contracts.model_names import canon
-        p = str(paths.cat("trims.json"))
-        if os.path.exists(p):
-            d = json.load(open(p, encoding="utf-8"))
-            for e in d.get("entries", []):
-                m = e.get("model")
-                if not m:
-                    continue
-                vals = [t.get("wheelbase_mm") for t in (e.get("trims") or [])
-                        if isinstance(t.get("wheelbase_mm"), (int, float)) and t.get("wheelbase_mm")]
-                if vals:
-                    vals.sort()
-                    out[canon(m)] = float(vals[len(vals) // 2])
+        # 2026-11-22：走统一入口（人工库 + 自动库合流）——人工车型的官方轴距
+        # 已随迁移回填进人工库，只读自动库会漏掉它们。
+        from modules.data.trims_store import load as _load
+        for e in _load().values():
+            m = e.get("model")
+            if not m:
+                continue
+            vals = [t.get("wheelbase_mm") for t in (e.get("trims") or [])
+                    if isinstance(t.get("wheelbase_mm"), (int, float)) and t.get("wheelbase_mm")]
+            if vals:
+                vals.sort()
+                out[canon(m)] = float(vals[len(vals) // 2])
     except (ImportError, OSError, ValueError):
         out = {}
     _TRIM_WB_CACHE = out

@@ -224,11 +224,18 @@ def build_suggest(matrix: dict, model: str, trims_db: dict | None = None,
 
 
 def load_trims(path: str | None = None) -> dict:
-    p = path or TRIMS
-    if not os.path.exists(p):
-        return {}
-    d = json.load(open(p, encoding="utf-8"))
-    return {e["model"]: e for e in d.get("entries", []) if e.get("model")}
+    """读逐配置事实。**统一走 trims_store**（人工库 + 自动库合流）。
+
+    2026-11-22：原来直接读 trims.json，人工条目在自动库里另有一份副本。
+    path 显式给定时读指定文件（测试/临时排查用）。
+    """
+    if path:
+        if not os.path.exists(path):
+            return {}
+        d = json.load(open(path, encoding="utf-8"))
+        return {e["model"]: e for e in d.get("entries", []) if e.get("model")}
+    from modules.data.trims_store import load as _load
+    return _load()
 
 
 def selftest() -> int:

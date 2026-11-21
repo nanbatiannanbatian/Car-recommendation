@@ -80,8 +80,10 @@ def load_all():
             scores[norm(c["model"])] = c
     # 母池已核验分 + 配置库逐配置
     mp = {norm(c["model"]):c for c in json.load(open(str(paths.cat("master_pool.json")),encoding="utf-8"))["cars"]}
+    # 2026-11-22：走统一入口（人工库 + 自动库合流）
+    from modules.data.trims_store import load as _load_trims
     tr_by = {}
-    for e in json.load(open(str(paths.cat("trims.json")),encoding="utf-8"))["entries"]:
+    for e in _load_trims().values():
         if e.get("model"): tr_by.setdefault(norm(e["model"]), e)
 
     rows, excluded = [], []

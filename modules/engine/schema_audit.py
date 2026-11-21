@@ -62,11 +62,18 @@ SCHEMA = {
 
 
 def load_trims(path: str | None = None) -> list[dict]:
-    p = path or TRIMS
-    if not os.path.exists(p):
-        raise SystemExit("找不到 trims.json：%s" % p)
-    d = json.load(open(p, encoding="utf-8"))
-    return d.get("entries", [])
+    """读逐配置事实。**统一走 trims_store**（人工库 + 自动库合流）。
+
+    2026-11-22：原来直接读 trims.json，人工条目在自动库里另有一份副本。
+    path 显式给定时读指定文件（测试/临时排查用）。
+    """
+    if path:
+        if not os.path.exists(path):
+            raise SystemExit("找不到 trims 文件：%s" % path)
+        d = json.load(open(path, encoding="utf-8"))
+        return d.get("entries", [])
+    from modules.data.trims_store import load_db as _load_db
+    return _load_db().get("entries", [])
 
 
 def _present(v) -> bool:

@@ -63,7 +63,9 @@ def load_all():
             scores[norm(c["model"])] = c
     # 已有数据
     mp = json.load(open(str(paths.cat("master_pool.json")),encoding="utf-8"))["cars"]
-    tr = json.load(open(str(paths.cat("trims.json")),encoding="utf-8"))["entries"]
+    # 2026-11-22：走统一入口（人工库 + 自动库合流）
+    from modules.data.trims_store import load as _load_trims
+    tr = list(_load_trims().values())
     mp_by = {norm(c["model"]):c for c in mp}
     tr_by = {norm(e["model"]):e for e in tr}
 

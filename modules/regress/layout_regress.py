@@ -29,18 +29,22 @@ import paths
 HERE = str(paths.ROOT)
 sys.path.insert(0, HERE)
 
-PKGS = ("contracts", "research", "physics", "envscore", "engine", "board", "regress")
+PKGS = ("contracts", "data", "research", "physics", "envscore", "engine", "board", "regress")
 ROOT_INFRA = {"paths", "build_release", "sync_to_repo"}
 THIN_MAX_LINES = 25
 
 # 允许的包间依赖（只准向下）。未列出的边 = 违规。
 ALLOWED = {
     "contracts": set(),                                  # 契约层：零依赖，谁都别依赖它之外的东西
-    "research": {"contracts"},
+    # data 层（2026-11-22 新增）：事实源读取（人工库+自动库合并视图）。
+    # 位置卡在 contracts 之上、research/engine 之下——
+    # research（写）与 engine（读）都要用同一个入口，放任一边都造成依赖倒挂。
+    "data": {"contracts"},
+    "research": {"contracts", "data"},
     "physics": {"contracts"},
-    "envscore": {"physics", "contracts"},
-    "engine": {"contracts"},
-    "board": {"engine", "research", "envscore", "physics", "contracts"},
+    "envscore": {"physics", "contracts", "data"},
+    "engine": {"contracts", "data"},
+    "board": {"engine", "research", "envscore", "physics", "contracts", "data"},
     "regress": set(PKGS),
 }
 

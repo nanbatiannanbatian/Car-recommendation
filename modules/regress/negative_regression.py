@@ -100,6 +100,8 @@ NEG_TARGETS = {
     "t104": ["AH_BODY_IDS", "_load_trim_wheelbase"],
     # t105 断言空间维接了规则增量 + 后备厢是独立子项 + 披露缺口
     "t105": ["space_parts", "充电循环次数"],
+    # t106 断言 trims_store 存在 + auto_trims 有分流写回 + 下游走统一入口
+    "t106": ["trims_store", "def write_back"],
 }
 
 # 数据断言型：测试名 -> (文件路径, 车型/键, 篡改模式)
@@ -264,6 +266,26 @@ def _data_probe(name, fn, path, key, mode):
     import copy
     fake = copy.deepcopy(obj)
 
+    # 2026-11-22：逐配置事实源已拆成两处（人工库 categories/trims_manual.json
+    # + 自动库 data/gen/trims.json），注入必须打到**真正被读的那个文件**。
+    # 原先只按 path 定位 trims.json，人工车型（MG07/深蓝L06）的注入全打偏
+    # → 断言形同虚设（失败回测检出 99/102）。
+    # 这里按车型在两处各查一次，命中哪个就注入哪个；两处都命中则都注入。
+    if path == "trims.json":
+        from modules.data.trims_store import MANUAL as _MANUAL, AUTO as _AUTO
+        targets = []
+        for cand in (_MANUAL, _AUTO):
+            try:
+                d2 = orig_load(open(cand, encoding="utf-8"))
+            except Exception:
+                continue
+            if any(e.get("model") == key for e in (d2.get("entries") or [])):
+                targets.append(cand)
+        if targets:
+            full = targets[0]
+            obj = orig_load(open(full, encoding="utf-8"))
+            fake = copy.deepcopy(obj)
+
     def walk(o):
         if isinstance(o, dict):
             if o.get("model") == key and mode == "delete_scores":
@@ -355,10 +377,17 @@ def _data_probe(name, fn, path, key, mode):
                     flat(x)
         flat(fake)
 
+    # 命中文件集合：注入目标文件 + （trims 场景下）人工库/自动库两处
+    _hit_paths = {os.path.normpath(full)}
+    if path == "trims.json":
+        from modules.data.trims_store import MANUAL as _MANUAL, AUTO as _AUTO
+        _hit_paths.add(os.path.normpath(_MANUAL))
+        _hit_paths.add(os.path.normpath(_AUTO))
+
     def patched_load(f, *a, **kw):
         try:
             fp = f.name if hasattr(f, "name") else str(f)
-            if os.path.normpath(fp).endswith(os.path.normpath(path)):
+            if os.path.normpath(fp) in _hit_paths:
                 return fake
         except Exception:
             pass

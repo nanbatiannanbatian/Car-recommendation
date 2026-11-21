@@ -128,6 +128,7 @@ CASES = [
     ("BUG-103", "配置驱动规则从未进主榜:极氪7X三电拿不到900V/快充加分反低于T6,后备箱容积页面零披露", "v10.11.0"),
     ("BUG-104", "参数页字段大量未提取(只认电池组),缺口被伪装成数据源没有:轴距/后备厢/零百全丢且无门禁", "v10.12.1"),
     ("BUG-105", "空间维从未接入配置驱动规则+后备厢容积被标仅披露不进分,车长与轴距重复计数", "v10.12.2"),
+    ("BUG-106", "人工条目与自动条目存储层双副本:人工证据链(source/quote/note含口径冲突披露)被自动模板覆盖345字段", "v10.13.0"),
 ]
 
 
@@ -166,7 +167,9 @@ def t001():
     """cltc_km/cell_supplier/charge 必须映射到 spec_score 入参。"""
     from modules.engine import trim_board as TB
     cfg = json.load(open(str(paths.cat("car_ev_1218_quality.json")), encoding="utf-8"))
-    trims = json.load(open(str(paths.cat("trims.json")), encoding="utf-8"))
+    # 2026-11-22：走统一入口（人工库 + 自动库合流）
+    from modules.data.trims_store import load as _load_trims
+    trims = {"entries": list(_load_trims().values())}
     e = next(x for x in trims["entries"] if x["model"] == "MG 07 纯电")
     t = next(t for t in e["trims"] if "845 激光" in t["name"])
     s = TB.spec_from_trim(t, None)
@@ -187,7 +190,9 @@ def t002():
 def t003():
     """配置名模糊匹配必须生效，不能精确匹配失败就 fallback 第一个。"""
     from modules.engine import trim_annotate as TA
-    trims = json.load(open(str(paths.cat("trims.json")), encoding="utf-8"))
+    # 2026-11-22：走统一入口（人工库 + 自动库合流）
+    from modules.data.trims_store import load as _load_trims
+    trims = {"entries": list(_load_trims().values())}
     e = next(x for x in trims["entries"] if x["model"] == "深蓝L06")
     # scored_trim「560 Ultra 激光版」≠ 实际「纯电版 560Ultra激光版」
     ref = TA.find_ref(e["scored_trim"], e["trims"])
@@ -440,7 +445,8 @@ def t043():
     fake_path = os.path.join(HERE, "__bug043_fake_trims.json")
     orig_trims = TA.TRIMS
     try:
-        td = json.load(open(str(paths.cat("trims.json")), encoding="utf-8"))
+        from modules.data.trims_store import load as _load_trims
+        td = {"entries": list(_load_trims().values())}
         fake = copy.deepcopy(td)
         c = json.load(open(str(paths.cat("candidates_compact_suv_bev.json")), encoding="utf-8"))["candidates"]
         cfg = json.load(open(str(paths.cat("car_compact_suv_bev.json")), encoding="utf-8"))
@@ -538,7 +544,8 @@ def t040():
     eq2, _ = TA.charge_minutes({"charge": "800V 兆瓦闪充 10-70% 5min"})
     assert eq2 is not None and 5 < eq2 < 7, f"闪充口径折算错误: {eq2}"
     # 配置级 delta：同车系快充版应比慢充版多快充加成
-    d = json.load(open(str(paths.cat("trims.json")), encoding="utf-8"))
+    from modules.data.trims_store import load as _load_trims
+    d = {"entries": list(_load_trims().values())}
     e = next(x for x in d["entries"] if x["model"] == "MG 07 纯电")
     slow = next(t for t in e["trims"] if "650" in t["name"])
     fast = next(t for t in e["trims"] if "845" in t["name"])
@@ -597,7 +604,8 @@ def t037():
 
 def t036():
     """电压/快充必须采集而非标未披露；配置级差异要体现。"""
-    d = json.load(open(str(paths.cat("trims.json")), encoding="utf-8"))
+    from modules.data.trims_store import load as _load_trims
+    d = {"entries": list(_load_trims().values())}
     entries = {e["model"]: e for e in d["entries"]}
     # 用随包 manual 里的真实案例（MG 07 同车 400V/800V 分层）；不依赖已删的累积条目
     e = entries.get("MG 07 纯电")
@@ -869,7 +877,9 @@ def t048():
     # 断言3：漏收的车已补入候选池+trims
     names = {c["model"] for c in d["candidates"]}
     assert "特斯拉Model 3" in names and "极氪007" in names and "比亚迪e7" in names, "门禁发现的车仍未入池"
-    trims = json.load(open(str(paths.cat("trims.json")), encoding="utf-8"))["entries"]
+    # 2026-11-22：走统一入口（人工库 + 自动库合流）
+    from modules.data.trims_store import load as _load_trims
+    trims = {"entries": list(_load_trims().values())}["entries"]
     tnames = {x["model"] for x in trims}
     assert "特斯拉Model 3" in tnames and "极氪007" in tnames and "比亚迪e7" in tnames, "入池车缺逐配置条目"
 
@@ -1665,7 +1675,8 @@ def t074():
     bare = [r for r in rows if "trimsel" not in r and "trim-missing" not in r]
     assert not bare, f"主榜 {len(bare)} 行既无下拉框也无『配置待补』标注"
 
-    db = json.load(open(str(paths.cat("trims.json")), encoding="utf-8"))
+    from modules.data.trims_store import load as _load_trims
+    db = {"entries": list(_load_trims().values())}
     have = {canon(e.get("model")) for e in db.get("entries", [])
             if len(e.get("trims") or []) >= 2}
     bad = []
@@ -3222,8 +3233,85 @@ def t105():
             "操控判据不降并披露覆盖限制 + 质保循环列缺口(+t105)")
 
 
+def t106():
+    """人工条目与车辆数据合流：消除存储层副本 + 人工证据链不被自动覆盖（v10.13.0）。
+
+    用户 2026-11-22 问「人工条目信息有没有必要和车辆数据信息放在一起」，
+    查出的根因：13 款人工条目在 categories/trims_manual.json 与
+    data/gen/trims.json **各存一份**，而且两份都可写 →
+      · auto_trims.refresh_entries 无条件改写所有条目的 source/quote/note
+        → 人工在易车/官方表查到的引文、以及 note 里的**口径冲突披露**
+          被自动模板文案顶掉（实测 345 个字段漂移，13 款全中）；
+      · load_db_merged 的合并方向是「生成物优先」，人工版形同虚设。
+
+    本条锁住四条机制：
+      ① 人工车型**不得**出现在自动库里（存储层零副本）；
+      ② 人工条目的 source/quote/note/launch_date 必须是人工原值，
+        不被自动模板覆盖；
+      ③ 合流视图 71 款齐全，且人工/自动来源标记正确；
+      ④ auto_trims 的 refresh 必须分流写回（人工写人工库、自动写自动库）。
+    """
+    import json as _json
+    from modules.data import trims_store as TS
+    assert TS.selftest() == 0, "trims_store 合流自测失败"
+
+    # ① 存储层零副本：人工车型不得残留在自动库
+    auto = _json.load(open(str(paths.cat("trims.json")), encoding="utf-8"))
+    auto_models = {e.get("model") for e in (auto.get("entries") or [])}
+    manual = _json.load(open(str(paths.cat("trims_manual.json")), encoding="utf-8"))
+    man_models = {e.get("model") for e in (manual.get("entries") or [])}
+    dup = sorted(man_models & auto_models)
+    assert not dup, f"人工车型仍残留在自动库（存储层副本未消除）: {dup}"
+    assert not any(e.get("auto_parsed") for e in (manual.get("entries") or [])), \
+        "人工库里混进了自动条目（来源分层被破坏）"
+
+    # ② 人工条目的元数据必须是人工版（未被自动模板覆盖）
+    db = TS.load()
+    auto_srcs = {e.get("source") for e in (auto.get("entries") or [])}
+    for e in (manual.get("entries") or []):
+        m = e.get("model")
+        got = db.get(m)
+        assert got is not None, f"合流视图缺人工条目 {m}"
+        assert got.get("source") == e.get("source"), \
+            f"{m} 的 source 被自动模板覆盖: {got.get('source')!r} != {e.get('source')!r}"
+        assert got.get("quote") == e.get("quote"), f"{m} 的 quote 被覆盖"
+        assert got.get("note") == e.get("note"), f"{m} 的 note（口径冲突披露）被覆盖"
+        assert got.get("launch_date") == e.get("launch_date"), f"{m} 的 launch_date 丢失"
+        assert e.get("source") not in auto_srcs or e.get("source_type") != "official_config_page_auto", \
+            f"{m} 的 source 疑似被写成自动模板"
+
+    # ③ 合流视图完整 + 来源标记正确
+    assert len(db) >= 70, f"合流后车型数过少: {len(db)}"
+    n_manual = sum(1 for v in db.values() if TS.provenance(v)["level"] == "manual")
+    n_auto = sum(1 for v in db.values() if TS.provenance(v)["level"] == "auto")
+    assert n_manual == len(man_models), f"人工条目数不符: {n_manual} != {len(man_models)}"
+    assert n_auto == len(auto_models), f"自动条目数不符: {n_auto} != {len(auto_models)}"
+
+    # ④ refresh 分流写回（人工写人工库、自动写自动库）
+    at = _read("modules/research/auto_trims.py")
+    assert "def write_back" in at, "auto_trims 缺分流写回函数"
+    assert 'if is_auto:' in at, "refresh 未按来源区分元数据写入（人工条目会被自动模板覆盖）"
+    # ④-b 自动模板文案不得出现在人工条目里（防"改回旧写法"）
+    for e in (manual.get("entries") or []):
+        assert "自动补录" not in str(e.get("note") or ""), \
+            f"{e.get('model')} 的 note 是自动模板文案（人工条目被自动流程覆盖了）"
+        assert "自动解析" not in str(e.get("source") or ""), \
+            f"{e.get('model')} 的 source 是自动模板文案（人工条目被自动流程覆盖了）"
+    ts = _read("modules/data/trims_store.py")
+    assert "def load(" in ts and "def load_db(" in ts, "trims_store 缺统一读取入口"
+
+    # ⑤ 下游不得再直接 json.load trims.json（防止新副本再生）
+    for rel in ("modules/engine/trim_board.py", "modules/engine/trim_annotate.py",
+                "modules/engine/trim_coverage.py", "modules/engine/facts_sync.py",
+                "modules/engine/powertrain_efficiency.py", "modules/engine/space_consistency.py",
+                "modules/research/cell_brand_verify.py", "modules/engine/trims.py"):
+        src = _read(rel)
+        assert "trims_store" in src, f"{rel} 未走 trims_store 统一入口（可能读到残缺副本）"
+    return (f"人工/自动合流：存储层零副本（人工 {len(man_models)} 款 + 自动 {len(auto_models)} 款）"
+            f"+ 人工证据链未被覆盖 + {len(db)} 款合流齐全 + 下游统一入口")
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106]
 
 
 def run():

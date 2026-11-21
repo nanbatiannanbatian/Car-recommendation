@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 10.12.2
+version: 10.13.0
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v10.12.2）
+# Car recommendation —— 可信购车榜单引擎（v10.13.0）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -40,21 +40,24 @@ author: "nanbatiannanbatian"
 ```
 modules/
   contracts/   数据契约层（零依赖零 IO）：trims 字段/枚举/校验、车名归一化
+  data/        事实源读取层：trims_store（人工库+自动库合并读视图，全项目唯一入口）
   research/    取数与证据采集：所有对外网络调用的唯一出口（25 个采集器 + researcher 检索）
   physics/     电动车实际续航物理模型（零依赖；物理常量单一事实源）
   envscore/    跨能源环境分引擎：engine.js（唯一事实源）+ 页面生成器
   engine/      打分口径 / 闸门 / 事实注入（纯计算，无 IO）
   board/       出榜编排与渲染（pipeline / monthly / board_v2 / master_pool / bootstrap）
-  regress/     回归测试：结构 15 项 + bug 67 项 + 失败回测 63 条 + 专项回归 + node 测试
+  regress/     回归测试：结构 16 项 + bug 106 项 + 失败回测 102 条 + 专项回归 + node 测试
 data/gen/      可重建的生成物（trims/master_pool/ice_crash…），**不打包**，用 bootstrap_data.py 生成
 categories/    人工维护的口径配置 + 不可重建的事实库（气囊/物理参数/基线池），随包发布
 runs/ dist/    跑批产物与发行 zip，**不打包**
 paths.py       全项目路径唯一事实源（ROOT/cat()/gen()）+ 生成物名单与重建规格
 ```
 
-**依赖只能向下**：`contracts`（最底层，零依赖）← `research`/`physics` ← `envscore` ← `engine` ← `board`。
-两处倒挂已消解：车名归一化 `canon` 下沉到 `contracts/model_names.py`（原 `engine→board`）；
-逐配置校验 `validate` 下沉到 `contracts/trims_schema.py`（原 `research→engine`，采集方不该依赖打分引擎）。
+**依赖只能向下**：`contracts`（最底层，零依赖）← `data` ← `research`/`physics` ← `envscore` ← `engine` ← `board`。
+三处倒挂已消解：车名归一化 `canon` 下沉到 `contracts/model_names.py`（原 `engine→board`）；
+逐配置校验 `validate` 下沉到 `contracts/trims_schema.py`（原 `research→engine`，采集方不该依赖打分引擎）；
+逐配置事实读取 `trims_store` 下沉到 `data/`（原 `research→engine`，采集侧与计算侧都要读同一个合并视图，
+放任一边都造成倒挂；放 contracts 又违反「契约层零 IO」）。
 违规由 `layout_regress.py` 拦截（开发者回归，不随包发布）：薄壳、依赖方向、契约层纯净度、
 生成物位置与**可重建性**、路径硬编码、文档 CLI 共六类。
 

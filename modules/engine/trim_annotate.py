@@ -38,12 +38,21 @@ W = {"powertrain": 0.18, "safety": 0.162, "adas": 0.135, "space": 0.126,
      "value": 0.117, "control": 0.09, "cabin": 0.09, "quality": 0.1}
 
 
-def load_trims() -> dict[str, dict]:
-    p = TRIMS
-    if not os.path.exists(p):
-        return {}
-    d = json.load(open(p, encoding="utf-8"))
-    return {e["model"]: e for e in d.get("entries", []) if e.get("model")}
+def load_trims(path: str | None = None) -> dict[str, dict]:
+    """读逐配置事实。**统一走 trims_store**（人工库 + 自动库合并读视图）。
+
+    2026-11-22：原来这里直接 json.load(trims.json)，而人工条目在自动库里
+    另有一份副本 → 读到哪份取决于文件状态，同一事实两个读法。
+    现在人工与自动在存储层互斥，合流只在 trims_store 一处发生。
+    path 参数保留：非空时读指定文件（测试/临时排查用）。
+    """
+    if path:
+        if not os.path.exists(path):
+            return {}
+        d = json.load(open(path, encoding="utf-8"))
+        return {e["model"]: e for e in d.get("entries", []) if e.get("model")}
+    from modules.data.trims_store import load as _load
+    return _load()
 
 
 def weighted_total(scores: dict) -> float:

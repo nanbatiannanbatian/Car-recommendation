@@ -254,7 +254,9 @@ def _load_gen(path: str):
 
 def load_cars():
     mp = _load_gen(MP)
-    tr = _load_gen(TR)
+    # 2026-11-22：走统一入口（人工库 + 自动库合流）
+    from modules.data.trims_store import load_db as _load_trims_db
+    tr = _load_trims_db()
     fl = _load_gen(FL)  # 真实电耗库
     vpdoc = _load_gen(VP)  # 物理参数库(采集)
     wm = WEIGHT_MAP  # 统一维度框架（数值与原榜单权重一致）

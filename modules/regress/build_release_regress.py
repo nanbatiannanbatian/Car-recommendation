@@ -106,7 +106,10 @@ def run():
                 "auto_levels.py", "facts_sync.py", "universe_build.py", "airbags.py")
         check("产物含全部生成脚本", all(any(n.endswith("/" + g) for n in names) for g in gens))
         check("产物含模块树", any(n.startswith("car-recommendation/modules/") for n in names))
-        check("产物不含 data/ 生成物缓存", not any("/data/" in n for n in names))
+        # 只排除**根目录**的 data/（生成物缓存）；modules/data/ 是代码层，
+        # 2026-11-22 新增（事实源读取层），必须随包发布。
+        check("产物不含 data/ 生成物缓存",
+              not any(n.startswith("car-recommendation/data/") for n in names))
     else:
         check("实际产物存在", False, "请先运行 python build_release.py")
 

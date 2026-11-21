@@ -126,8 +126,13 @@ def main():
     data = json.load(open(a.candidates, encoding="utf-8"))
     cands = [c for c in data["candidates"] if c.get("power") == "BEV"]
     cfg = L.load_category(a.category)
-    trims = json.load(open(a.trims, encoding="utf-8"))
-    tby = {e["model"]: e for e in trims.get("entries", [])}
+    # 2026-11-22：走统一入口（人工库 + 自动库合流）；显式传 --trims 时读指定文件
+    if a.trims and a.trims != str(paths.cat("trims.json")):
+        trims = json.load(open(a.trims, encoding="utf-8"))
+        tby = {e["model"]: e for e in trims.get("entries", [])}
+    else:
+        from modules.data.trims_store import load as _load_trims
+        tby = _load_trims()
 
     def kwh_of(c):
         e = tby.get(c.get("model"))

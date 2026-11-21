@@ -161,12 +161,20 @@ ALIASES = {
 
 
 def load_db_merged(path):
-    """读取 trims 库，并把随包的人工核验条目合并进来（manual 优先）。
+    """读取 trims 库，并把随包的人工核验条目合并进来（**读视图**，不落盘）。
 
     为什么：trims.json 是「可重建生成物」不打包，但里面混着人工核验条目
     （逐配置表来自媒体/官网交叉核对，汽车之家车系库查无，联网也抓不回来）。
     不合并的话，新装包重建 = 人工条目全丢（2026-11-21 用户指出的隐患）。
     现在 categories/trims_manual.json 随包，生成时作为底座叠加自动补录。
+
+    2026-11-22 改造（v10.13.0，消除存储层双副本）：
+      原来这里返回的 db 会被 --refresh 写回 data/gen/trims.json，
+      于是**人工条目在自动库里留了一份可写副本**，且刷新时自动模板会覆盖
+      人工的 source/quote/note（实测 345 字段漂移，人工证据链被抹）。
+      现在改成：人工库（categories/trims_manual.json）与自动库
+      （data/gen/trims.json）**各管各的写**，本函数只负责给出合并读视图。
+      写入侧见 write_back()：人工条目回写人工库，自动条目回写自动库。
     """
     db = None
     if path and os.path.exists(path):
@@ -183,11 +191,108 @@ def load_db_merged(path):
     return db
 
 
+def load_manual_db():
+    """人工核验库（唯一可写的人工事实源）。"""
+    mp = paths.CAT_DIR / "trims_manual.json"
+    if not mp.exists():
+        return {"entries": [], "out_of_board_examples": []}
+    return json.load(open(mp, encoding="utf-8"))
+
+
+def load_auto_db(path):
+    """自动采集库（只读派生物，只含 auto_parsed 条目）。"""
+    if path and os.path.exists(path):
+        return json.load(open(path, encoding="utf-8"))
+    return {"scoring_enabled": False, "entries": [], "out_of_board_examples": []}
+
+
+def write_back(db: dict, out_path: str, dry_run: bool = False) -> dict:
+    """把刷新结果**按来源分流写回两处**（消除存储层双副本的关键）。
+
+    规则：
+      · 人工条目（auto_parsed 非真）→ 写回 categories/trims_manual.json
+        （人工事实的唯一 owner；自动补录的字段只填空，不改人工已核验的值）
+      · 自动条目（auto_parsed 为真）→ 写回 out_path（data/gen/trims.json）
+      · 自动库里的 out_of_board_examples 不再需要（带外示例只存在于人工库）
+
+    2026-11-22：原来所有条目都写进 data/gen/trims.json，人工条目因此在自动库
+    里留了一份可写副本，且被自动模板文案覆盖元数据（345 字段漂移）。
+    """
+    manual_db = load_manual_db()
+    auto_entries: list[dict] = []
+    manual_entries: list[dict] = []
+    for e in db.get("entries", []):
+        if e.get("auto_parsed"):
+            auto_entries.append(e)
+        else:
+            manual_entries.append(e)
+    # 人工条目：合并回人工库（人工库已有该车型则原地替换，保留人工元数据）
+    man_by = {e.get("model"): e for e in manual_db.get("entries", [])}
+    for e in manual_entries:
+        m = e.get("model")
+        old = man_by.get(m)
+        if old is None:
+            man_by[m] = e
+            continue
+        # 只填空：人工已核验的值一个字不改
+        for k, v in e.items():
+            if k in ("trims", "source", "quote", "note", "date", "url",
+                     "source_type", "launch_date", "scored_trim", "board",
+                     "in_board", "trim_class", "scored_trim_ref", "price_band_max",
+                     "validation_note", "user_claim_check", "pure_ev_filtered",
+                     "auto_parsed", "partial_fields"):
+                continue                      # 元数据：人工版为准
+            if old.get(k) in (None, "", "—", [], {}) and v not in (None, "", "—", [], {}):
+                old[k] = v
+        old_t = {t.get("name"): t for t in (old.get("trims") or [])}
+        for t in (e.get("trims") or []):
+            ot = old_t.get(t.get("name"))
+            if ot is None:
+                old.setdefault("trims", []).append(t)
+                continue
+            for k, v in t.items():
+                if ot.get(k) in (None, "", "—") and v not in (None, "", "—"):
+                    ot[k] = v                    # 只填空
+    manual_db["entries"] = list(man_by.values())
+    auto_db = {"scoring_enabled": db.get("scoring_enabled", False),
+               "entries": auto_entries,
+               "out_of_board_examples": db.get("out_of_board_examples", [])}
+    if not dry_run:
+        mp = paths.CAT_DIR / "trims_manual.json"
+        with open(mp, "w", encoding="utf-8") as f:
+            json.dump(manual_db, f, ensure_ascii=False, indent=2)
+        with open(out_path, "w", encoding="utf-8") as f:
+            json.dump(auto_db, f, ensure_ascii=False, indent=2)
+    return {"manual": len(manual_db.get("entries") or []),
+            "auto": len(auto_entries),
+            "out_path": out_path}
+
+
 def seed_from_manual(out_path):
-    """只把人工条目落成基础 trims 库（不联网、不需候选池）。新装包 bootstrap 用。"""
-    db = load_db_merged(None)
+    """只把人工条目落成基础 trims 库（不联网、不需候选池）。新装包 bootstrap 用。
+
+    2026-11-22：人工条目**只写人工库**（categories/trims_manual.json 已是 owner，
+    这里只做校验与契约补齐），自动库保持为空——人工条目在自动库里的那份副本
+    已消除，避免同一个事实有两个可写位置。
+    """
+    db = load_manual_db()
+    for e in db.get("entries", []) + db.get("out_of_board_examples", []):
+        _fill_missing_trim_fields(e)
+    errs = validate_trims(db)
+    if errs:
+        print("[校验失败]", file=sys.stderr)
+        for e in errs[:20]:
+            print("  ", e, file=sys.stderr)
+        raise SystemExit(1)
+    mp = paths.CAT_DIR / "trims_manual.json"
+    with open(mp, "w", encoding="utf-8") as f:
+        json.dump(db, f, ensure_ascii=False, indent=2)
+    # 自动库清空（只留结构壳）：人工条目不再在这里留副本
     os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
-    json.dump(db, open(out_path, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump({"scoring_enabled": db.get("scoring_enabled", False),
+                   "entries": [], "out_of_board_examples": []},
+                  f, ensure_ascii=False, indent=1)
     return len(db.get("entries") or [])
 
 
@@ -753,21 +858,32 @@ def refresh_entries(db: dict, index: dict, cands: list[dict],
                 if is_auto or o.get(k) in (None, "", "—"):
                     o[k] = nv
                     hits += 1
-        e["date"] = TODAY
-        e["quote"] = _quote_of(e.get("trims") or [])
-        e["partial_fields"] = _missing_fields(e.get("trims") or [])
-        e["source"] = ("汽车之家车系参数页（自动解析：款型名 / 官方指导价 / 电池能量 / CLTC / "
-                       "电芯品牌 / 高压平台V / 快充时间与区间 / 官方电耗 / 换电）")
-        e["note"] = (f"自动补录，目标车系「{m}」匹配方式 {how}。"
-                     + "已按参数页「能源类型」列只保留纯电动款型，"
-                       "排除同车系 DM-i / 增程 / 燃油款型；"
-                     + "只采信参数页里的结构化字段；电芯逐配置取自「电芯品牌」，"
-                       "该字段为空时按「电池特有技术」的官方产品名映射厂商（如刀片→弗迪、"
-                       "麒麟→宁德、金钟罩→中创新航），来源写在各配置 note 里。"
-                       "电压取自「高压平台(V)」，快充取自「电池快充时间/区间」，"
-                       "官方电耗取自「百公里耗(kWh/100km)」。"
-                       "上市时长与媒体口径的配置亮点未取得，显式记 null / 空数组，不推断、不加分。"
-                       "这是部分事实条目，证据密度低于人工核验条目（source_type 可区分）。")
+        # 条目级元数据：**人工条目一个字都不改**（2026-11-22 修复）。
+        # 原 bug：这段无条件执行，导致 13 款人工核验条目的 source/quote/note
+        # 全被自动模板文案顶掉（实测 345 个字段漂移）——人工在易车/官方表里
+        # 查到的引文、以及在 note 里写下的**口径冲突披露**（如日产N7 电芯供应商
+        # 两说、零跑C10 混装）全部消失，等于把"人已经查清的判断"擦掉。
+        # 自动条目才写自动模板（它本来就是自动解析的）。
+        if is_auto:
+            e["date"] = TODAY
+            e["quote"] = _quote_of(e.get("trims") or [])
+            e["partial_fields"] = _missing_fields(e.get("trims") or [])
+            e["source"] = ("汽车之家车系参数页（自动解析：款型名 / 官方指导价 / 电池能量 / CLTC / "
+                           "电芯品牌 / 高压平台V / 快充时间与区间 / 官方电耗 / 换电）")
+            e["note"] = (f"自动补录，目标车系「{m}」匹配方式 {how}。"
+                         + "已按参数页「能源类型」列只保留纯电动款型，"
+                           "排除同车系 DM-i / 增程 / 燃油款型；"
+                         + "只采信参数页里的结构化字段；电芯逐配置取自「电芯品牌」，"
+                           "该字段为空时按「电池特有技术」的官方产品名映射厂商（如刀片→弗迪、"
+                           "麒麟→宁德、金钟罩→中创新航），来源写在各配置 note 里。"
+                           "电压取自「高压平台(V)」，快充取自「电池快充时间/区间」，"
+                           "官方电耗取自「百公里耗(kWh/100km)」。"
+                           "上市时长与媒体口径的配置亮点未取得，显式记 null / 空数组，不推断、不加分。"
+                           "这是部分事实条目，证据密度低于人工核验条目（source_type 可区分）。")
+        else:
+            # 人工条目：只更新"还缺哪些字段"这份**事实状态**，
+            # 不碰 source/quote/note（那是人工核验的证据链）。
+            e["partial_fields"] = _missing_fields(e.get("trims") or [])
         if hits:
             updated.append(f"{m}({hits}字段)")
         time.sleep(SLEEP)
@@ -775,7 +891,11 @@ def refresh_entries(db: dict, index: dict, cands: list[dict],
     for e in db.get("entries", []) + db.get("out_of_board_examples", []):
         _fill_missing_trim_fields(e)
     if not dry_run:
-        json.dump(db, open(out_path, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+        # 2026-11-22：按来源分流写回——人工条目写人工库，自动条目写自动库。
+        # 原来不管来源一律写 data/gen/trims.json → 人工条目在自动库里留了
+        # 一份可写副本（元数据还被自动模板覆盖）。
+        st = write_back(db, out_path, dry_run=False)
+        print(f"[refresh] 写回：人工库 {st['manual']} 条 / 自动库 {st['auto']} 条")
     return len(updated)
 
 
@@ -803,6 +923,9 @@ def main():
         print(f"[seed] 从 trims_manual.json 生成基础库 {n} 条 → {a.out or a.db}")
         return 0
     db = load_db_merged(a.db)
+    # 2026-11-22：人工条目也必须在刷新范围内。
+    # load_db_merged 返回的 db 已合入人工条目（人工版优先），所以刷新会同时
+    # 处理人工与自动条目；write_back 再按来源分流写回两处。
     index = json.load(open(a.index, encoding="utf-8"))
     cands = json.load(open(a.candidates, encoding="utf-8"))["candidates"]
     have = {e["model"] for e in db["entries"]}
@@ -871,7 +994,8 @@ def main():
                       "（source_type=official_config_page_auto，partial_fields 列明缺项，"
                       "证据密度低于人工核验条目，不产生任何分数）。")
         out = a.out or a.db
-        json.dump(db, open(out, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+        # 2026-11-22：分流写回——人工条目写人工库，自动条目写自动库。
+        st = write_back(db, out, dry_run=False)
         errs = validate_trims(db)
         if errs:
             print("[校验失败]", file=sys.stderr)
@@ -879,7 +1003,8 @@ def main():
                 print("  ", e, file=sys.stderr)
             sys.exit(1)
         print(f"\n[ok] 新增 {len(added)} 款，跳过 {len(skipped)} 款；"
-              f"trims.json 现共 {len(db['entries'])} 款，校验通过 → {out}")
+              f"写回：人工库 {st['manual']} 条 / 自动库 {st['auto']} 条，"
+              f"校验通过 → {out}")
     else:
         print(f"\n[dry-run] 将新增 {len(added)} 款")
     if skipped:

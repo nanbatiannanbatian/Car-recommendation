@@ -53,8 +53,10 @@ def load_context():
         d = json.load(open(os.path.join(RUNS,f"midsuv_202610_scores_batch{i}.json"),encoding="utf-8"))
         for c in d["cars"]: scores[norm(c["model"])] = c
     mp = {norm(c["model"]):c for c in json.load(open(str(paths.cat("master_pool.json")),encoding="utf-8"))["cars"]}
+    # 2026-11-22：走统一入口（人工库 + 自动库合流）
+    from modules.data.trims_store import load as _load_trims
     trims = {}
-    for e in json.load(open(str(paths.cat("trims.json")),encoding="utf-8"))["entries"]:
+    for e in _load_trims().values():
         if e.get("model"): trims.setdefault(norm(e["model"]), e.get("trims",[]))
     vp = {norm(c["model"]):c for c in json.load(open(str(paths.cat("vehicle_physics.json")),encoding="utf-8"))["cars"]}
     fl = json.load(open(str(paths.cat("fact_library.json")),encoding="utf-8"))

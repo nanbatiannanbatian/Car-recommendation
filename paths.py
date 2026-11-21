@@ -84,8 +84,11 @@ GENERATED_SPEC: dict[str, dict] = {
     "trims.json": {
         "cmd": "python3 auto_trims.py --seed-only",
         "needs_net": False, "semi": False,
-        "note": "先用随包的 categories/trims_manual.json 生成基础库（人工核验条目，开箱可用）；"
-                "要补齐自动条目再跑 auto_trims.py --candidates <池> --index <索引> --out data/gen/trims.json",
+        "note": "先把随包的 categories/trims_manual.json 校验并落成人工事实源"
+                "（2026-11-22 起人工条目只存这一处，自动库清空）；"
+                "要补齐自动条目再跑 auto_trims.py --candidates <池> --index <索引> --out data/gen/trims.json。"
+                "下游一律通过 modules/engine/trims_store.py 读取（人工库+自动库合并视图），"
+                "不要直接 json.load 本文件——人工条目已不在这里。",
     },
     "ice_crash.json": {
         "cmd": "python3 ice_crash.py --pool categories/master_pool.json",

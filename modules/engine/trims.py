@@ -66,9 +66,18 @@ MIN_KM_PER_10K = 100.0           # J2：或每万元至少 100km CLTC
 
 
 def load_db(path: str = DEFAULT_DB) -> dict:
-    if not os.path.exists(path):
-        return {"entries": [], "out_of_board_examples": []}
-    return json.load(open(path, encoding="utf-8"))
+    """读逐配置事实库。**统一走 trims_store**（人工库 + 自动库合并 db 视图）。
+
+    2026-11-22：原来直接读 trims.json，而人工条目在自动库里另有一份副本，
+    读到哪份取决于文件状态。现在合流只在 trims_store 一处发生。
+    path 显式给定时读指定文件（测试/临时排查用）。
+    """
+    if path and path != DEFAULT_DB:
+        if not os.path.exists(path):
+            return {"entries": [], "out_of_board_examples": []}
+        return json.load(open(path, encoding="utf-8"))
+    from modules.data.trims_store import load_db as _load_db
+    return _load_db()
 
 
 def months_on_market(entry: dict, as_of: str | None = None) -> float | None:

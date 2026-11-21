@@ -81,13 +81,18 @@ def load_consumption(path: str | None = None, trims_path: str | None = None) -> 
                 "origin": "vehicle_physics.json 人工采集",
             }
     # ① 官方电耗（优先，覆盖上面的人工值）
-    tp = trims_path or str(paths.cat("trims.json"))
-    if os.path.exists(tp):
+    if trims_path:
         try:
-            td = json.load(open(tp, encoding="utf-8"))
+            td = json.load(open(trims_path, encoding="utf-8")) if os.path.exists(trims_path) else {}
         except (OSError, ValueError):
             td = {}
-        for e in td.get("entries") or []:
+        td_entries = td.get("entries") or []
+    else:
+        # 2026-11-22：走统一入口（人工库 + 自动库合流）
+        from modules.data.trims_store import load as _load
+        td_entries = list(_load().values())
+    if td_entries:
+        for e in td_entries:
             m = e.get("model")
             trims = e.get("trims") or []
             if not m or not trims:
