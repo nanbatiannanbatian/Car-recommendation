@@ -827,7 +827,10 @@ document.addEventListener('change',function(ev){
                  '「电池/充电」组；电芯逐配置取自「电芯品牌」，官方未标时按「电池特有技术」的'
                  '官方产品名映射厂商（刀片→弗迪、麒麟→宁德、金钟罩→中创新航）。'
                  '「未披露」= 官方页面确实没填，<b>不做推断、不插补</b>。'
-                 '本页展示的是评分配置那一档。</div>')
+                 '本页展示的是评分配置那一档。'
+                 '<b>缺口披露</b>：电池/整车质保年限与充电循环次数，'
+                 '汽车之家参数页<b>不提供该字段</b>（未采集，不推断、不编造）——'
+                 '按质保年限横向比较只能人工核验厂商官网。</div>')
         H.append("<table><thead><tr><th style='text-align:left'>车型</th>"
                  "<th style='text-align:left'>评分配置</th><th>电量</th><th>高压平台</th>"
                  "<th style='text-align:left'>快充</th><th>最大充电功率</th><th>官方电耗</th>"

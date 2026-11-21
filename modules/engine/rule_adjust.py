@@ -57,7 +57,9 @@ import paths
 HERE = str(paths.ROOT)
 
 # 接入的维度 → spec_score 的算分函数名
-DIMS = ("powertrain", "control")
+# 2026-11-22 拍板：空间维也接进来（业内横评与大众购车认知都把「装载空间」算作空间的一部分，
+# 但作为**独立子项**，不用容积去推断乘坐空间）。
+DIMS = ("powertrain", "control", "space")
 
 ALPHA = 0.5        # 单项规则分差 → 增量 的折算系数
 CAP = 0.8          # 单维总增量封顶（分）
@@ -91,7 +93,8 @@ def rule_parts(cands: list[dict], dim: str) -> dict:
     from modules.engine import spec_score as SS
     from modules.engine import trim_board as TB
 
-    fn = {"powertrain": SS.powertrain_parts, "control": SS.control_parts}.get(dim)
+    fn = {"powertrain": SS.powertrain_parts, "control": SS.control_parts,
+          "space": SS.space_parts}.get(dim)
     if fn is None:
         return {}
     trims_db = TB.load_trims()

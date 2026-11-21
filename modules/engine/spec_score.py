@@ -104,6 +104,15 @@ def powertrain_parts(s):
             parts.append(("续航", 0.5, f"{rg:g}km +0.5"))
         elif rg < 500:
             parts.append(("续航", -0.5, f"{rg:g}km −0.5"))
+    # 电池冷却方式（2026-11-22 拍板接入）：直冷是当前快充高倍率的主流方案，
+    # 液冷是主流且够用，风冷基本退出。业内看快充能力必看冷却方式。
+    cool = str(s.get("battery_cooling") or "")
+    if "直冷" in cool:
+        parts.append(("冷却", 0.3, "直冷 +0.3"))
+    elif "液冷" in cool:
+        parts.append(("冷却", 0.2, "液冷 +0.2"))
+    elif cool:
+        parts.append(("冷却", -0.2, f"{cool} −0.2"))
     return parts
 
 
@@ -154,37 +163,57 @@ def score_control(s):
     return base, why
 
 
-def score_space(s):
-    """空间：轴距与车长双判，座位数加成。"""
-    base, why = 6.4, []
+def space_parts(s):
+    """空间维规则项分解（规则唯一出处）。
+
+    **业内惯例 + 大众认知的拍板（2026-11-22）**：
+    汽车之家/懂车帝的参数对比与第三方横评，都把「空间」拆成两块各自给分：
+      ① **乘坐空间**——轴距（客观尺寸）+ 得房率/后排腿部（真实表现）
+      ② **装载空间**——后备厢/前备箱容积
+    家用 SUV/MPV 买家两者都看：「后排能坐几个人」和「能装几个行李箱」是两个
+    不同的实用诉求，**都属于空间**。所以这里把轴距与后备厢容积作为**两个独立子项**
+    分别进 space 维：
+      · 不用容积去推断乘坐空间（那是错误因果——溜背造型容积大但乘坐空间一般）；
+      · 也不把二者混成一个分，页面同时披露，读者自己区分；
+      · 容积项幅度刻意小于轴距项：容积差异对"空间体验"的影响弱于轴距，
+        且容积常由造型（溜背/掀背/尾门开口）决定，判据更软。
+
+    轴距区间沿用 v9.x 起的标定；装载区间按家用车装载能力的常见分档：
+      ≥800L 大型装载能力 / 600–800 充裕 / 450–600 够用 / <350 局促。
+    """
+    parts = []
     wb = _n(s.get("wheelbase_mm"))
     if wb is not None:
         if wb >= 3000:
-            base += 1.6
-            why.append(f"轴距 {wb:g} +1.6")
+            parts.append(("轴距", 1.6, f"轴距 {wb:g} +1.6"))
         elif wb >= 2900:
-            base += 1.2
-            why.append(f"轴距 {wb:g} +1.2")
+            parts.append(("轴距", 1.2, f"轴距 {wb:g} +1.2"))
         elif wb >= 2800:
-            base += 0.6
-            why.append(f"轴距 {wb:g} +0.6")
+            parts.append(("轴距", 0.6, f"轴距 {wb:g} +0.6"))
         elif wb < 2700:
-            base -= 1.0
-            why.append(f"轴距 {wb:g} −1.0")
-    ln = _n(s.get("length_mm"))
-    if ln is not None:
-        if ln >= 4950:
-            base += 0.9
-            why.append(f"车长 {ln:g} +0.9")
-        elif ln >= 4800:
-            base += 0.5
-            why.append(f"车长 {ln:g} +0.5")
-        elif ln < 4600:
-            base -= 0.7
-            why.append(f"车长 {ln:g} −0.7")
-    if _n(s.get("seats"), 5) >= 6:
-        base += 0.4
-        why.append("六座 +0.4")
+            parts.append(("轴距", -1.0, f"轴距 {wb:g} −1.0"))
+    tr = _n(s.get("trunk_l"))
+    if tr is not None:
+        if tr >= 800:
+            parts.append(("装载", 0.5, f"后备厢 {tr:g}L +0.5"))
+        elif tr >= 600:
+            parts.append(("装载", 0.3, f"后备厢 {tr:g}L +0.3"))
+        elif tr >= 450:
+            parts.append(("装载", 0.1, f"后备厢 {tr:g}L +0.1"))
+        elif tr < 350:
+            parts.append(("装载", -0.3, f"后备厢 {tr:g}L −0.3"))
+    seats = _n(s.get("seats"))
+    if seats is not None and seats >= 6:
+        parts.append(("座位", 0.4, "六座 +0.4"))
+    return parts
+
+
+def score_space(s):
+    """空间：轴距（乘坐）+ 后备厢容积（装载）双判，座位数加成。"""
+    base, why = 6.4, []
+    for _name, v, desc in space_parts(s):
+        base += v
+        why.append(desc)
     return base, why
 
 

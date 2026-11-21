@@ -79,6 +79,15 @@ def spec_from_trim(trim: dict, base_spec: dict | None = None) -> dict:
     # 现在有官方值就以官方值为准（官方值优先于媒体/车主口述）。
     if trim.get("zero_to_100_s") is not None:
         s["zero_to_100_s"] = trim["zero_to_100_s"]
+    # v10.12.2（拍板接入空间维）：官方轴距 + 后备厢容积 + 电池冷却方式。
+    # 轴距是「乘坐空间」的客观代理（比车长准：车长含前后悬，不是乘员舱长度）；
+    # 后备厢容积是「装载空间」的客观指标——业内横评与大众购车认知都认它是空间的一部分。
+    if trim.get("wheelbase_mm") is not None:
+        s["wheelbase_mm"] = trim["wheelbase_mm"]
+    if trim.get("trunk_l") is not None:
+        s["trunk_l"] = trim["trunk_l"]
+    if trim.get("battery_cooling") is not None:
+        s["battery_cooling"] = trim["battery_cooling"]
     kcs = [str(x) for x in (trim.get("key_configs") or [])]
     if any("激光雷达" in x for x in kcs):
         s["adas_lidar"] = True

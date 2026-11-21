@@ -98,6 +98,8 @@ NEG_TARGETS = {
     "t103": ["apply_rule_adjust", "energy_facts"],
     # t104 断言 auto_trims 含 AH_BODY_IDS/AH_BASE_IDS + 空间维用官方轴距
     "t104": ["AH_BODY_IDS", "_load_trim_wheelbase"],
+    # t105 断言空间维接了规则增量 + 后备厢是独立子项 + 披露缺口
+    "t105": ["space_parts", "充电循环次数"],
 }
 
 # 数据断言型：测试名 -> (文件路径, 车型/键, 篡改模式)
