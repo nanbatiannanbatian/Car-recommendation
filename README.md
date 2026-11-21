@@ -1,7 +1,7 @@
 # Car recommendation
 
 > 可信购车榜单引擎：口径闸门 / MCDA 稳健性检验 / 8 维打分统一榜 / 总候选池 / 多源交叉核验 / 证据分层 / 历史回测。
-> 无模型调用，同一输入必得同一输出。当前版本 **v10.6.0**（碰撞成绩出榜自动联网核验不漏报 + 三电纳入电耗效率维度 + GitHub 零 JSON）。
+> 无模型调用，同一输入必得同一输出。当前版本 **v10.7.0**（碰撞成绩逐车联网核验门禁：官网有本地无/数值冲突/断网硬拦出榜 + 历史来源回访 + 三电电耗效率 + GitHub 零 JSON）。
 
 ## 这是什么
 WorkBuddy 用户级 skill。核心是「车型排行榜全链路」：按需搜榜入池→取数→闸门→8 维打分→稳健性→三档→审查→报告，
@@ -225,6 +225,16 @@ WorkBuddy 用户级 skill。核心是「车型排行榜全链路」：按需搜�
   四重判据）放行；软文/智驾分/C-ICAP/无映射车仍拒绝。`facts_sync.backfill_crash_from_text` 接入。
   实测 ES6 从"无成绩"→ `Euro NCAP 93.95% 五星`，安全分 8.7；C-ICAP 92.9% 智驾分未被误抓，
   全池零泛化。回归 `t093/t094` + 反向注入 + `build_release_regress` 3 条新断言锁死。
+- **碰撞成绩逐车联网核验门禁（v10.7.0）**：用户问「确定碰撞成绩前是不是都要联网查询、写进代码以后都按这个来、能否不误报」。
+  根因：v10.6.0 的核验只扫 C-NCAP 官网首页最新批次（历史车抓不到）、联网失败只告警沿用本地库——无法证明「每车都联网确认过」。
+  修复：research 层 `crash_auto_verify.verify_all()` 对每款入池车产出明确状态（live_confirmed/new_found/conflict/
+  cache_verified/cache_no_url/cache_unconfirmed/source_stale/no_score/network_error），`coverage_gate()` 分级门禁：
+  **官网有本地无 / 数值冲突 / 联网主通道失败 → 硬阻断出榜**（新增 `--allow-degraded-network` 仅对断网显式降级）；
+  历史批次回访一手来源页确认后再采信，失效/未存 URL 如实披露。核验必须在三条 crash 回流之后
+  （ES6 只在 evidence 文本里的成绩回流前 crash 为空会被误标 no_score，实跑踩过）；research 不反向依赖 engine
+  （board 层用 `crash_systems.parse_score` 解析后以 `pool_parsed` 传入）。真实出榜 21 款：
+  cache_verified 3 / cache_unconfirmed 1 / cache_no_url 8 / no_score 9、零阻断。
+  README/SKILL 版本同步。回归 `t098` + 反向注入（94/94）+ layout（禁止硬编码 categories 与反向依赖）+ 其余全套全绿。
 - **碰撞自动联网核验 + 电耗效率维度 + GitHub 零 JSON（v10.6.0）**：用户追问「以后车型是不是也会联网查碰撞成绩不漏报、
   特斯拉三电分低合适吗、GitHub 不传 JSON」。三件根因修复：
   ① **碰撞不漏报**：此前只有数字图标车联网救回，其余靠本地库——全榜联网核查揪出深蓝S07（C-NCAP 88.3%）

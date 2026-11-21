@@ -84,6 +84,8 @@ NEG_TARGETS = {
     "t096": ["no-powertrain-efficiency"],
     # t097：抹掉同步脚本 .json 排除标记（回到「GitHub 又存 JSON」），应 FAIL
     "t097": ['".json"'],
+    # t098：抹掉逐车门禁入口（回到「只扫首页 + 断网静默沿用」），应 FAIL
+    "t098": ["def coverage_gate"],
 }
 
 # 数据断言型：测试名 -> (文件路径, 车型/键, 篡改模式)

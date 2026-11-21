@@ -103,7 +103,10 @@ def main():
     ap.add_argument("--no-powertrain-efficiency", action="store_true",
                     help="跳过三电能耗效率修正（默认启用，全榜统一±0.4封顶；仅 A/B 对照用）")
     ap.add_argument("--no-crash-verify", action="store_true",
-                    help="跳过出榜前的 C-NCAP 官网联网碰撞核验（默认启用；仅 A/B/断网对照用）")
+                    help="跳过出榜前的逐车联网碰撞核验（默认启用；仅 A/B/断网对照用）")
+    ap.add_argument("--allow-degraded-network", action="store_true",
+                    help="仅当联网主通道失败时允许降级出榜（标记 degraded；"
+                         "官网有本地无/数值冲突永远阻断，此开关不适用）")
     ap.add_argument("--no-config-anchor", action="store_true",
                     help="判档改用候选池车系基础分（回退到 v9.7.42 老口径，仅供 A/B 对照；默认用主榜同款最高配置分）")
     ap.add_argument("--airbag-gate", action="store_true",
@@ -201,28 +204,6 @@ def main():
                                  "matched": {}, "error": f"{type(_ex).__name__}: {_ex}"}
                 print(f"[新闻稿救回] 联网失败，沿用已缓存文字等级：{_ciasi_rescue['error']}")
 
-    # C-NCAP 官网自动联网核验（v10.6.0）：出榜前扫官网最新测评批次，与本榜车型比对。
-    # 发现「官网有成绩、本地库无」→ 告警并写审计（不自动覆盖人工核验值，防误伤）。
-    # 这是对「深蓝S07 官网有88.3%但页面空白」事故的根因修复：以前靠人记得查官网，
-    # 现在每次出榜都联网核一遍。失败只告警不阻断（research 唯一网络出口）。
-    _crash_verify = {"status": "skipped"}
-    if not getattr(a, "no_crash_verify", False):
-        from modules.research import crash_auto_verify as CAV
-        try:
-            _crash_verify = CAV.verify(cands)
-            _crash_verify["status"] = "ok"
-            if _crash_verify["new"]:
-                print("[碰撞核验] 官网已有成绩但本地库缺失（需补录 cncap_scores.json）：" +
-                      "、".join(f"{x['pool_model']}={x['overall']}%"
-                               for x in _crash_verify["new"]))
-            if _crash_verify["conflict"]:
-                print("[碰撞核验] 官网与本地库数值冲突（不自动覆盖，人工核验）：" +
-                      "、".join(f"{x['pool_model']} 官网{x['overall']}% vs 本地{x['local']}%"
-                               for x in _crash_verify["conflict"]))
-        except Exception as _ex:                           # 网络抖动不阻断本地出榜
-            _crash_verify = {"status": "error", "error": f"{type(_ex).__name__}: {_ex}"}
-            print(f"[碰撞核验] 联网核验失败，沿用本地库：{_crash_verify['error']}")
-
     # 价格回流（2026-11-21 事故根因修复）：trims.json 里已核验的官方指导价必须回流到
     # 候选池 price_guide。闸门只认 price_guide，不回流就会把数据齐全的车判成
     # price_unknown 落榜（当时 11 款全中招，榜单只剩 13-16 万的车）。
@@ -259,6 +240,48 @@ def main():
     if _n_filled:
         print(f"[C-NCAP库回流] cncap_scores → crash/safety_basis：{len(_n_filled)} 款（"
               + "、".join(f"{m}({d})" for m, d, _ in _n_filled[:6]) + "）")
+
+    # 逐车碰撞成绩联网核验 + 出榜门禁（v10.7.0）：对每一款入池车产出明确核验状态。
+    # 必须在三条回流之后——ES6 这类成绩只在 evidence 文本里，回流前 crash 字段为空
+    # 会被误标 no_score（实跑踩过）。research 唯一网络出口逐车判定：官网有本地无 /
+    # 数值冲突 / 主通道失败一律硬阻断出榜；历史批次回访一手来源页确认后再采信。
+    _crash_verify = {"status": "skipped"}
+    if not getattr(a, "no_crash_verify", False):
+        from modules.research import crash_auto_verify as CAV
+        try:
+            # board 层用 engine 解析器把「页面实际显示」的 crash 字段结构化后传给
+            # research（research 不反向依赖 engine，包依赖只向下）。
+            from modules.engine import crash_systems as CRS
+            _pool_parsed: dict[str, dict] = {}
+            for _c in cands:
+                _p = (CRS.parse_score(_c.get("crash"))
+                      or CRS.parse_score(_c.get("safety_basis")))
+                if _p:
+                    _pool_parsed[_c.get("model")] = _p
+            _crash_verify = CAV.verify_all(
+                cands, pool_parsed=_pool_parsed,
+                ciasi_fresh=list((_ciasi_rescue.get("matched") or {}).keys()))
+            _gate = CAV.coverage_gate(
+                _crash_verify, allow_degraded=getattr(a, "allow_degraded_network", False))
+            _crash_verify["gate"] = _gate
+            _cnt: dict[str, int] = {}
+            for _r in _crash_verify["per_car"].values():
+                _cnt[_r["status"]] = _cnt.get(_r["status"], 0) + 1
+            print("[碰撞核验] 逐车状态：" + "、".join(
+                f"{k} {v}" for k, v in sorted(_cnt.items())))
+            if not _gate["ok"]:
+                sys.exit("碰撞联网核验门禁：" + _gate["reason"] +
+                         "\n→ 数据问题先补权威库/人工核验后重跑；断网重跑或加"
+                         " --allow-degraded-network 显式降级（报告会标注）。")
+        except SystemExit:
+            raise                                          # 门禁阻断不能被下面吞掉
+        except Exception as _ex:                           # 代码异常也按联网失败处理
+            _crash_verify = {"status": "error",
+                             "error": f"{type(_ex).__name__}: {_ex}"}
+            if not getattr(a, "allow_degraded_network", False):
+                sys.exit("碰撞联网核验异常（无法确认是否漏报）：" + _crash_verify["error"] +
+                         "\n→ 修代码/网络后重跑；确需降级加 --allow-degraded-network。")
+            print(f"[碰撞核验] 异常已显式降级：{_crash_verify['error']}")
 
     # 多测评融合（v10.4.0，2026-11-21）：用户要求「有评测就要纳入，按业内原则重新设计」。
     # 同体系多维度按木桶取最低（Euro NCAP/C-NCAP 官方口径）；跨体系按严格度选主分、

@@ -120,6 +120,7 @@ CASES = [
     ("BUG-095", "深蓝S07/宋L EV官网有一手碰撞成绩但页面空白:出榜不联网核验+权威库无此车", "v10.6.0"),
     ("BUG-096", "特斯拉三电7.3垫底但电耗全榜最低:三电维度只看车端硬件、系统能效从未纳入", "v10.6.0"),
     ("BUG-097", "GitHub仓库存43个JSON违背数据代码分离:同步脚本无.json排除规则", "v10.6.0"),
+    ("BUG-098", "碰撞核验只扫官网首页且断网只告警:无法证明每车都联网确认过", "v10.7.0"),
 ]
 
 
@@ -2838,8 +2839,57 @@ def t097():
     return ("GitHub 零 JSON：同步脚本排除 .json + data_bootstrap 停用(+t097)")
 
 
+def t098():
+    """逐车碰撞联网核验门禁（v10.7.0）：旧版只扫官网首页+失败只告警，
+    断网/历史车不在首页时都静默沿用本地库，无法证明「每车都联网确认过」。
+
+    修复：research 唯一出口 verify_all() 对每车产出状态；coverage_gate()
+    对「官网有本地无 / 数值冲突 / 联网失败」硬阻断，历史来源回访披露。
+    """
+    from modules.research import crash_auto_verify as CAV
+    # 1) 模块确定性自测（注入假 fetcher，不联网）
+    assert CAV.selftest_all() == 0, "逐车核验自测失败"
+    # 2) 源码契约：逐车核验 + 门禁 + 主链接入 + 降级开关都在（防只改产物）
+    src = _read("crash_auto_verify.py")
+    for token in ("def verify_all", "def coverage_gate", "BLOCKING_STATUSES",
+                  "STATUS_NOTE", "def fetch_url"):
+        assert token in src, f"crash_auto_verify 缺 {token}"
+    pl = _read("pipeline.py")
+    assert "verify_all(" in pl and "coverage_gate(" in pl, "pipeline 未接逐车门禁"
+    assert "allow-degraded-network" in pl, "缺显式降级开关"
+    assert "碰撞联网核验门禁" in pl, "门禁未硬拦"
+    # 3) 逐车状态：每款入池车都有状态；历史车回访确认（注入，不联网）
+    fake = """
+    alt="本代车A" class="cncap-swiper__car-image"
+    <span class="cncap-swiper__year">2026</span>
+    <p class="cncap-swiper__score-value">93.9%</p>
+    """
+    rows = CAV.parse_home(fake)
+    cands = [{"model": "本代车A"}, {"model": "历史车B"}, {"model": "无成绩车C"}]
+    table = {"scores": {"本代车A": 93.9, "历史车B": 88.3},
+             "sources": {"历史车B": {"source_url": "https://www.c-ncap.org.cn/evaluation/b2"}}}
+    rep = CAV.verify_all(cands, official=rows, table=table, decoded={},
+                         authoritative={},
+                         url_fetcher=lambda u: "<body>88.3%</body>")
+    assert set(rep["per_car"]) == {"本代车A", "历史车B", "无成绩车C"}, "每车必须有核验状态"
+    assert rep["per_car"]["本代车A"]["status"] == "live_confirmed"
+    assert rep["per_car"]["历史车B"]["status"] == "cache_verified"
+    assert rep["per_car"]["无成绩车C"]["status"] == "no_score"
+    assert CAV.coverage_gate(rep)["ok"], "无阻断项应放行"
+    # 4) 事故回放：官网有本地无（深蓝S07 类型）+ 断网，都必须硬拦
+    miss = CAV.verify_all([{"model": "本代车A"}], official=rows,
+                          table={"scores": {}}, decoded={}, authoritative={})
+    assert miss["per_car"]["本代车A"]["status"] == "new_found"
+    assert not CAV.coverage_gate(miss)["ok"], "官网有本地无必须阻断"
+    down = CAV.verify_all([{"model": "任意车"}], home_fetcher=lambda: None,
+                          table={"scores": {}}, decoded={}, authoritative={})
+    assert down["network_error"] and not CAV.coverage_gate(down)["ok"], "断网必须阻断"
+    assert CAV.coverage_gate(down, allow_degraded=True)["degraded"], "显式降级须标记"
+    return "逐车联网核验：每车有状态+三类硬阻断+历史回访披露，断网不再静默沿用(+t098)"
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098]
 
 
 def run():
