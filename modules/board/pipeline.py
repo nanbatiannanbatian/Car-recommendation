@@ -143,6 +143,10 @@ def main():
 
     data = json.load(open(a.candidates, encoding="utf-8"))
     cands = data.get("candidates", data)
+    # 候选池形状归一化（price "24.98万" → 24.98；trim 字符串 → {"name":...}）。
+    # 这是契约层的事，不归一化会在 trim_annotate / auto_trims 里 TypeError。
+    from modules.contracts.candidate_schema import normalize_pool
+    cands = normalize_pool(cands)
 
     # v9.7.43：候选池完整性门禁——出榜前必须联网盘点同级全量在售车型，与候选池比对。
     # 漏收的车必须逐个判定：能入池的补入候选池+trims.json，不能入池的写进 pool_excluded[] 并写明事实原因。

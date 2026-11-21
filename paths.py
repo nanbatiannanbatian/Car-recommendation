@@ -144,7 +144,7 @@ def module(dotted: str):
 
     if "." in dotted:
         return importlib.import_module(dotted)
-    for pkg in ("research", "physics", "envscore", "engine", "board", "regress"):
+    for pkg in ("contracts", "research", "physics", "envscore", "engine", "board", "regress"):
         full = f"modules.{pkg}.{dotted}"
         try:
             return importlib.import_module(full)

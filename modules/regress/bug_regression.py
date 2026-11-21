@@ -90,6 +90,7 @@ CASES = [
     ("BUG-065", "二值命中截断埋没稳稳第5的车(Model3)+产品力市场口径不清", "v9.7.48"),
     ("BUG-066", "第一档过严叙事局限+强推荐未标稳稳第5的车+并行纪律", "v9.7.50"),
     ("BUG-067", "强推荐金标移到档位列+hover讲清为何强推/为何未进一档", "v9.7.53"),
+    ("BUG-068", "候选池price/trim形状不一致(文本/字符串)致出榜TypeError", "v10.1.1"),
 ]
 
 
@@ -1292,8 +1293,36 @@ def t067():
     return f"强推主榜金标：{body.count('strong-main')}处(hover含原因)，非强推车不误标"
 
 
+def t068():
+    """候选池同一字段多种形状（price 文本 / trim 字符串）必须由契约层归一化。
+
+    2026-11-21 出「纯电中型SUV」榜时真实踩到：22 款里 11 款 trim 是字符串、
+    22 款 price 全是 "24.98万" 文本；master_pool 把原始记录直接塞进 candidate，
+    trim_annotate `t.get("price") - price_hint` 抛 TypeError，整条出榜崩掉。
+    """
+    from modules.contracts.candidate_schema import (
+        check_candidate, normalize_pool, price_of)
+    from modules.engine import trim_annotate as TA
+    raw = [{"model": "极氪7X", "price": "24.98万", "trim": "103kWh 后驱MAX"},
+           {"model": "另一款", "price": 15.0, "trim": {"name": "激光雷达版", "price": "14.99"}}]
+    norm = normalize_pool(raw)
+    assert all(check_candidate(c) == [] for c in norm), [check_candidate(c) for c in norm]
+    assert norm[0]["price"] == 24.98 and norm[0]["trim"] == {"name": "103kWh 后驱MAX", "price": None}
+    assert norm[1]["trim"]["price"] == 14.99, norm[1]["trim"]
+    # 不归一化必须被检出（否则门禁是摆设）
+    assert check_candidate({"price": "24.98万", "trim": "X"}), "未归一化未被检出"
+    # 下游 resolve_ref 拿到 str price 不再崩，且按价格就近选配置
+    trims = [{"name": "A", "price": 24.99}, {"name": "B", "price": 30.0}]
+    ref, _fb, basis = TA.resolve_ref("", trims, [{"price": "24.98万"}])
+    assert ref and ref["name"] == "A", (ref, basis)
+    # 价格优先级不许改（价位段子榜按它划带）
+    assert price_of({"trim": {"price": "14.99"}, "price": 20}) == 14.99
+    assert price_of({"price_guide": ["12.99", "16.69"]}) == 12.99
+    return "契约归一化生效：price 文本/trim 字符串统一、未归一化能检出、下游不再 TypeError"
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068]
 
 
 def run():

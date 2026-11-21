@@ -28,6 +28,7 @@ import re
 import sys
 from modules.engine import lifecycle_confirm as LC
 from modules.engine import crash_systems as CS
+from modules.contracts.candidate_schema import trim_name  # noqa: E402  配置名统一读法
 
 try:
     from modules.engine import ranking
@@ -1065,7 +1066,7 @@ def tier_report(cands: list[dict], cfg: dict, weights: list[float] | None = None
                "price": c.get("price") or "",
                # v9.7.43：判档已用配置锚定分，评分配置名也必须跟着用同款，
                # 否则第一档表显示610版、分却是845版的（标签与分数不同源）。
-               "trim": (c.get("scored_trim_used") or (c.get("trim") or {}).get("name"))}
+               "trim": (c.get("scored_trim_used") or trim_name(c) or "")}
 
         blockers = []
         # v9.7.43：第一档用家族去重命中率（同家族算法算1票，防MG07那种6票全抱团虚高）

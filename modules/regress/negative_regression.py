@@ -87,6 +87,8 @@ NEG_DATA = {
     "t023": ("runs/compact_bev_202610_candidates.json", "零跑B01", "evidence_to_B"),
     "t025": ("runs/compact_bev_202610_candidates.json", "零跑Lafa5", "flatten_adas_all"),
     "t050": ("runs/midsedan_bev_1218_202610/candidates_allprice.json", "特斯拉Model 3", "fake_single_month"),
+    # t068：把归一化改为 identity（等于没归一化），「未归一化必须被检出」那条断言应 FAIL
+    "t068": ("candidate_schema.normalize_pool", None, "no_normalize"),
     # t039 断言从「源码文本含文件名」升级为「文件在同步集里」，探针改成把同步集清空
     "t039": ("sync_to_repo.collect", None, "empty_sync"),
 }
@@ -105,6 +107,7 @@ def _func_probe(name, fn, dotted, mode):
         "wrong_charge": lambda *a, **kw: (20, "wrong"),
         "hide_cell": lambda *a, **kw: "未披露电芯",
         "empty_sync": lambda *a, **kw: {},   # 同步集清空 → 「候选池必须进同步集」应 FAIL
+        "no_normalize": lambda cands=None, *a, **kw: list(cands or []),  # 不归一化原样返回
     }.get(mode)
     if wrong is None:
         return False, False

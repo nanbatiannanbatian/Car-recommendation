@@ -70,13 +70,22 @@ ALIASES = {
     "埃安Ray7": "Ray7",
     "东风奕派M8": "奕派M8",
     "东风风行星海V6": "星海V6",
+    # 2026-11-21 出纯电中型SUV榜时补：候选池带品牌前缀、汽车之家索引不带。
+    # 每条都在 ah_grade_index.json 里核实过车系名存在（不是模糊猜的）。
+    "比亚迪宋L EV": "宋L EV",
+    "比亚迪海狮07EV": "海狮07 EV",
+    "比亚迪海狮06 EV": "海狮06",
+    "比亚迪海狮06EV": "海狮06",
+    "特斯拉 Model Y": "Model Y",
+    "阿维塔07 纯电版": "阿维塔07",
+    "问界M5纯电版": "问界M5",
 }
 
 
 def find_sid(model, index):
     nidx = {norm(k): (k, v) for k, v in index.items()}
     # 别名优先：候选池带品牌前缀，索引不带；走显式白名单，不做模糊匹配
-    alias = ALIASES.get(model)
+    alias = {norm(k): v for k, v in ALIASES.items()}.get(norm(model))
     if alias and norm(alias) in nidx:
         hit = nidx[norm(alias)]
         return hit[1]["sid"], hit[0], f"alias:{alias}"
@@ -132,12 +141,22 @@ def parse_config(sid, pure_ev_only=True):
             # 指导价列键名被 CSS 混淆（实测只剩「厂()」），用「全是可解析数字」识别。
             # 页面里数字列很多（车长/功率/续航），先全收集，再取最靠前的一组里
             # 最靠前的一列——基本参数组第 2 项就是官方指导价。
-            if vals and nm != "车型" and sum(
-                    bool(re.fullmatch(r"\d{1,3}(?:\.\d{1,2})?", v)) for v in vals) >= max(2, len(vals) * 0.7):
-                price_cols.append((gi, ii, nm, list(zip(ids, vals))))
+            # 价格列有两道判据（2026-11-21 修）：
+            #   a) 列名可信：汽车之家把"厂商指导价"混淆成「厂()」，含「厂」/「指导价」优先
+            #   b) 值域兜底：纯数字列不止价格一个（CLTC 续航 620 也是纯数字，会抢到第一位，
+            #      导致所有款型 price=620 → 被 3~120 万过滤掉 → 整款车解析出 0 个配置）
+            named = nm != "车型" and ("厂" in nm or "指导价" in nm)
+            numeric = sum(bool(re.fullmatch(r"\d{1,3}(?:\.\d{1,2})?", v)) for v in vals)
+            in_range = sum(1 for v in vals
+                           if re.fullmatch(r"\d{1,3}(?:\.\d{1,2})?", v) and 3 <= float(v) <= 120)
+            if vals and named:
+                price_cols.append((0, gi, ii, nm, list(zip(ids, vals))))
+            elif (vals and nm != "车型" and numeric >= max(2, len(vals) * 0.7)
+                  and in_range >= max(2, numeric * 0.9)):
+                price_cols.append((1, gi, ii, nm, list(zip(ids, vals))))
     if price_cols:
-        price_cols.sort(key=lambda x: (x[0], x[1]))
-        for sid2, val in price_cols[0][3]:
+        price_cols.sort(key=lambda x: (x[0], x[1], x[2]))
+        for sid2, val in price_cols[0][4]:
             if sid2 is not None:
                 specs[sid2]["_price"] = val
     if not specs:
@@ -212,7 +231,8 @@ def board_of(c):
 
 
 def make_entry(c, sid, ah_name, how, trims_list, pure_ev_only=True):
-    tr = c.get("trim") or {}
+    from modules.contracts.candidate_schema import trim_of
+    tr = trim_of(c) or {}
     target = tr.get("price")
     ref_basis = "latest_group_price_nearest"
     # 参数页常同时列多个年款；先在「全表」按候选池评分配置价格做精确匹配，

@@ -21,6 +21,7 @@ paths.py                     路径唯一事实源：ROOT / cat() / gen() / src(
 modules/
   contracts/                 数据契约层（零依赖零 IO）
     trims_schema.py          逐配置阶梯 trims.json 的字段/枚举/校验
+    candidate_schema.py      候选池单条形状：price 文本/trim 字符串归一化 + 形状体检
     model_names.py           车名归一化 canon
   research/                  取数 · 检索 · 证据采集（唯一网络出口）
     researcher.py            站点画像检索（17 站点）+ 广告识别 + 博主可信度

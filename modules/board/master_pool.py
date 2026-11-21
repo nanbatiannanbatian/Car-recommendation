@@ -88,38 +88,42 @@ def body_from_cls(cls: str) -> str:
     return ""
 
 
-def price_of(c: dict) -> float | None:
-    """取评分配置价（万元）：trim.price 优先，其次 price_guide 下限，最后解析 price 文本。"""
-    t = c.get("trim")
-    if isinstance(t, dict):
-        for k in ("price", "guide_price"):
-            v = _num(t.get(k))
-            if v:
-                return v
-    g = c.get("price_guide")
-    if isinstance(g, (list, tuple)) and g:
-        v = _num(g[0])
-        if v:
-            return v
-    v = _num(c.get("price_wan"))
-    if v:
-        return v
-    return _num_first(str(c.get("price") or ""))
+# 价格/配置形状的读取与归一化统一走契约层（v10.1：原来这里自己解析，
+# 与 trim_annotate / leaderboard 各写一套，遇到 price="24.98万" 或 trim 是字符串就崩）
+from modules.contracts.candidate_schema import (  # noqa: E402
+    num as _num, normalize_candidate, price_of, trim_of,
+)
 
 
-def _num_first(s: str) -> float | None:
-    m = re.search(r"\d+(?:\.\d+)?", s)
-    return float(m.group()) if m else None
+def backfill_price_guide(pool: dict, trims_path: str | None = None) -> list[tuple[str, list]]:
+    """用逐配置表里已核验的官方指导价，回填候选池缺失的 price_guide。
 
-
-def _num(v):
-    if v is None or v == "":
-        return None
-    try:
-        f = float(v)
-        return f
-    except (TypeError, ValueError):
-        return None
+    为什么（2026-11-21 出中型纯电SUV榜踩到）：trims.json 里 auto_trims 已从汽车之家
+    参数页解析出官方指导价，但候选池的 price_guide 还是 None，于是 11 款车全被
+    price_unknown 闸门判落榜——数据明明采到了，只是没回流。
+    这里只填空值、不覆盖已有；来源写进 price_source，可追溯。
+    """
+    from modules.contracts.model_names import canon
+    tp = trims_path or str(paths.cat("trims.json"))
+    if not os.path.exists(tp):
+        return []
+    db = json.load(open(tp, encoding="utf-8"))
+    by = {canon(e.get("model") or ""): e for e in db.get("entries", [])}
+    fixed = []
+    for car in pool.get("cars", []):
+        c = car.get("candidate") or {}
+        g = c.get("price_guide")
+        if isinstance(g, (list, tuple)) and g and g[0]:
+            continue
+        e = by.get(canon(car.get("model") or ""))
+        prices = [x.get("price") for x in (e or {}).get("trims", [])
+                  if isinstance(x.get("price"), (int, float))]
+        if not prices:
+            continue
+        c["price_guide"] = [min(prices), max(prices)]
+        c["price_source"] = "trims.json 官方指导价（汽车之家参数页逐配置解析）"
+        fixed.append((car.get("model"), c["price_guide"]))
+    return fixed
 
 
 def config_fingerprint(cfg: dict) -> str:
@@ -137,7 +141,12 @@ def config_fingerprint(cfg: dict) -> str:
 def load_pool(path=DEFAULT_POOL) -> dict:
     if not os.path.exists(path):
         return new_pool()
-    return json.load(open(path, encoding="utf-8"))
+    pool = json.load(open(path, encoding="utf-8"))
+    # 读入即归一化：历史池子里 price 可能是 "24.98万"、trim 可能是纯字符串，
+    # 不归一化会在下游 `t.get("price") - hint` 处崩（2026-11-21 实际踩到）。
+    for car in pool.get("cars", []):
+        normalize_candidate(car.get("candidate") or {})
+    return pool
 
 
 def new_pool() -> dict:
@@ -155,6 +164,18 @@ def new_pool() -> dict:
 
 
 def save_pool(pool: dict, path=DEFAULT_POOL):
+    # 门禁：写池前先归一化 + 体检，脏形状（price 字符串 / trim 字符串）不许入库。
+    # 出过事：原始记录直接塞进 candidate，下游 `price - hint` TypeError 整个出榜崩掉。
+    from modules.contracts.candidate_schema import check_candidate, normalize_candidate
+    bad = []
+    for car in pool.get("cars", []):
+        cand = car.get("candidate") or {}
+        normalize_candidate(cand)
+        errs = check_candidate(cand)
+        if errs:
+            bad.append(f"{car.get('model')}: {'; '.join(errs)}")
+    if bad:
+        raise SystemExit("候选池形状门禁未通过（先修数据再写池）：\n  " + "\n  ".join(bad[:10]))
     os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
     json.dump(pool, open(path, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
 
@@ -862,6 +883,8 @@ def main():
     sub.add_argument("--audit", action="store_true")
     sub.add_argument("--stats", action="store_true")
     sub.add_argument("--rescore", action="store_true")
+    sub.add_argument("--sync-prices", action="store_true",
+                     help="用 trims.json 的官方指导价回填候选池缺失 price_guide（只填空值）")
     sub.add_argument("--selftest", action="store_true")
     # query 过滤器
     ap.add_argument("--cls", help="级别关键词，逗号分隔（中型SUV,中型车）")
@@ -907,6 +930,19 @@ def main():
         return cmd_audit(a)
     if a.stats:
         return cmd_stats(a)
+    if a.sync_prices:
+        pool = load_pool(a.pool)
+        fixed = backfill_price_guide(pool)
+        for m, pg in fixed:
+            print(f"  + {m:<18} price_guide = {pg[0]:g}–{pg[1]:g} 万")
+        if fixed and a.apply:
+            save_pool(pool, a.out)
+            print(f"已回填 {len(fixed)} 款 → {a.out}")
+        elif fixed:
+            print(f"dry-run：将回填 {len(fixed)} 款（加 --apply 写入）")
+        else:
+            print("没有需要回填的 price_guide")
+        return 0
     if a.rescore:
         return cmd_rescore(a)
     return 1

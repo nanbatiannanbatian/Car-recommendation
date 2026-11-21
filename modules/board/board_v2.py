@@ -353,6 +353,9 @@ def build(cands: list[dict], cfg: dict, policy: dict,
           tiers: dict[str, str] | None = None,
           battery_platform: dict | None = None) -> dict:
     facts = facts or {}
+    # 候选池形状归一化（契约层）：price 文本转数值、trim 统一 dict
+    from modules.contracts.candidate_schema import normalize_pool
+    cands = normalize_pool(cands)
     # v9.6.1：电压/封装事实库（按评分配置）；调用方可覆盖
     if battery_platform is None:
         _bp_path = str(paths.cat("battery_platform.json"))

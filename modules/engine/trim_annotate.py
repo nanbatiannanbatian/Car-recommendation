@@ -191,14 +191,18 @@ def resolve_ref(name: str, trims: list[dict], cands_for_model: list[dict] | None
     # 占位或匹配失败：选代表配置
     if not trims:
         return None, True, "无配置可选"
+    # 价格一律走契约层解析（price_guide/price_wan/price 文本），
+    # 否则遇到 price="24.98万" 就是 str - float 的 TypeError。
+    from modules.contracts.candidate_schema import price_of
     price_hint = None
     for c in (cands_for_model or []):
         pg = c.get("price_guide") or []
         if isinstance(pg, list) and len(pg) == 2:
             price_hint = (pg[0] + pg[1]) / 2
             break
-        if c.get("price"):
-            price_hint = c["price"]
+        p = price_of(c)
+        if p:
+            price_hint = p
             break
     if price_hint:
         ref = min(trims, key=lambda t: abs((t.get("price") or 0) - price_hint))
