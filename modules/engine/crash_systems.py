@@ -207,6 +207,93 @@ def parse_score(text) -> dict | None:
     return None
 
 
+# ---------------------------------------------------------------- 证据文本 → 结构化（严格）
+# 为什么不能只靠 parse_score 扫 evidence（2026-11-21 Model Y 事故）：
+#   parse_score 是为「短 crash 文案」（如 "C-NCAP 90.7%"）设计的宽松解析器，
+#   直接扫长篇 evidence 会把「宣称C-NCAP五星安全车身设计」（宣传口径）、
+#   「问界M7 95.0%」（他车成绩）、「C-NCAP基础行车辅助92.9%」（智驾C-ICAP）
+#   误抓成碰撞成绩。实测误伤 6 款无成绩车。所以证据文本必须走严格解析器：
+#     1) 只认肯定锚点「有<体系>官方成绩」；
+#     2) C-IASI 必须解析出「车内乘员G+/车外行人G+/辅助安全G」维度等级结构；
+#     3) 官方口径：三指数取最低档，耐撞维修经济性仅参考不主导；
+#     4) 同一车多次测评取最新（与 ciasi_text_decode 纪律一致）。
+_ANCHOR_RE = re.compile(
+    r"有\s*(?P<sys>C-IASI|C-NCAP|Euro\s*NCAP|ANCAP|IIHS|NHTSA|JNCAP|KNCAP)\s*"
+    r"(?:官方|碰撞|测评)?\s*(?:碰撞)?成绩", re.I)
+# 出现这些词说明该句不是「本车碰撞实测成绩」的肯定陈述
+_NEG_EVIDENCE = ("无官方", "未取得", "未查到", "未见", "软文", "宣传口径",
+                 "厂商口径", "设计标准", "C-ICAP", "辅助驾驶得分")
+_CIASI_DIM_PATTERNS = {
+    "occupant": re.compile(r"(?:车内)?乘员(?:安全)?\s*(G\+|G|A|M|P)"),
+    "pedestrian": re.compile(r"(?:车外)?行人(?:安全)?\s*(G\+|G|A|M|P)"),
+    "assist": re.compile(r"(?:车辆)?辅助(?:驾驶)?安全\s*(G\+|G|A|M|P)"),
+}
+_CIASI_GRADE_ORDER = {"P": 0, "M": 1, "A": 2, "G": 3, "G+": 4}
+
+
+def parse_ciasi_dimensions(text) -> dict | None:
+    """从 C-IASI 多维度等级文本提取（乘员/行人/辅助）三指数，取最低档。
+
+    只认至少 2 个维度的组合（单个 G 可能是「只给G/G+/A/M/P等级」枚举句）。
+    多次测评按文本顺序取最后一组完整维度（最新）。返回 None 表示证据不足。
+    """
+    groups = []
+    for seg in re.split(r"[①②③④⑤⑥⑦⑧⑨⑩；;]", str(text or "")):
+        dims = {}
+        for k, pat in _CIASI_DIM_PATTERNS.items():
+            found = pat.search(seg)
+            if found:
+                dims[k] = found.group(1)
+        if len(dims) >= 2:
+            groups.append(dims)
+    if not groups:
+        return None
+    latest = groups[-1]
+    grade = min(latest.values(), key=lambda g: _CIASI_GRADE_ORDER.get(g, -1))
+    return {"grade": grade, "dims": latest, "n_tests": len(groups)}
+
+
+def parse_score_from_evidence(text) -> dict | None:
+    """从证据长文本严格提取权威碰撞成绩；证据不足返回 None（不猜）。
+
+    与 parse_score 返回同构（basis/system_cn/score/stars/grade/year/display），
+    额外带 evidence=True 与 ciasi_dims（C-IASI 三指数明细）供审计。
+    """
+    t = str(text or "")
+    for seg in re.split(r"[。\n]", t):
+        m = _ANCHOR_RE.search(seg)
+        if not m:
+            continue
+        head = seg[:m.start()]
+        if any(k in head for k in ("无", "未", "没", "非")):
+            continue
+        basis = normalize(m.group("sys"))
+        if not basis:
+            continue
+        # C-IASI：后文（到「注意：」前）取维度等级，覆盖多次测评
+        if basis == "ciasi":
+            tail = t[t.find(m.group(0)):].split("注意：")[0]
+            dim = parse_ciasi_dimensions(tail)
+            if not dim:
+                continue
+            return {"basis": basis, "system_cn": cn_name(basis), "score": None,
+                    "stars": None, "grade": dim["grade"], "year": None,
+                    "display": f"{cn_name(basis)} {dim['grade']}",
+                    "ciasi_dims": dim["dims"], "evidence": True}
+        # 得分率体系：锚点同句必须有「综合得分率」，且不能是智驾C-ICAP
+        if SYSTEMS[basis]["grade"] == "star":
+            if any(k in seg for k in _NEG_EVIDENCE):
+                continue
+            pm = re.search(r"综合得分率\s*(\d{2,3}(?:\.\d+)?)\s*%", seg)
+            if not pm:
+                continue
+            score = float(pm.group(1))
+            return {"basis": basis, "system_cn": cn_name(basis), "score": score,
+                    "stars": None, "grade": None, "year": None,
+                    "display": f"{cn_name(basis)} {score:g}%", "evidence": True}
+    return None
+
+
 def selftest():
     assert normalize("euro_ncap") == "euro_ncap"
     assert normalize("E-NCAP") == "euro_ncap"
@@ -220,6 +307,28 @@ def selftest():
     assert cn_name("e-ncap") == "Euro NCAP"
     assert family("ciasi") == "ciasi" and family("euro_ncap") == "ncap"
     assert len(SYSTEMS) >= 12, "体系清单应覆盖全部权威体系"
+    # 严格证据解析（Model Y 事故 + 误伤防护）
+    my = ("有C-IASI官方成绩（非C-NCAP得分率）：①2021款——耐撞性与维修经济性P、"
+          "车内乘员安全G、车外行人安全G、辅助安全G；②中期改款——耐撞维修M、"
+          "车内乘员G+、车外行人G+、辅助安全G、新能源专项G。来源：官网。"
+          "注意：C-IASI只给G/G+/A/M/P等级、无百分制得分率。")
+    r = parse_score_from_evidence(my)
+    assert r and r["basis"] == "ciasi" and r["grade"] == "G", f"Model Y C-IASI三指数应取最低G: {r}"
+    assert r["ciasi_dims"] == {"occupant": "G+", "pedestrian": "G+", "assist": "G"}, r
+    # 枚举句「只给G/G+/A/M/P等级」单独出现不得当成成绩
+    assert parse_ciasi_dimensions("注意：C-IASI只给G/G+/A/M/P等级、无百分制得分率") is None
+    # 误伤防护：宣传口径/他车成绩/智驾C-ICAP/否定句都不算成绩
+    for bad in (
+        "无C-NCAP成绩；宣称按C-NCAP五星安全车身设计（厂商软文口径，非实测）",
+        "无官方成绩；首页最新结果中有问界M7 2025（95.0%）但无M5",
+        "无官方成绩（本代NT2.0未取得）；C-NCAP基础行车辅助92.9%实为C-ICAP智驾测评",
+        "明确无官方碰撞成绩，未参加C-NCAP测试",
+    ):
+        assert parse_score_from_evidence(bad) is None, f"误伤无成绩车: {bad}"
+    # 肯定的 C-NCAP 得分率仍要抓到
+    r2 = parse_score_from_evidence(
+        "有C-NCAP官方成绩：C-NCAP（2024年版规程），测评年份2025，综合得分率90.7%，五星。来源：中汽测评官网")
+    assert r2 and r2["basis"] == "cncap" and r2["score"] == 90.7, r2
     return 0
 
 

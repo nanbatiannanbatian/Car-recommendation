@@ -108,6 +108,7 @@ CASES = [
     ("BUG-083", "MONA空间9.3全场第一但零实测:space被判硬数据不封顶+轴距0%覆盖+人工分从未校验", "v10.2.8"),
     ("BUG-084", "空间要素(前备箱/下沉后备箱/储物/真实表现)记在evidence却没用:得房率64%的N7拿8.5", "v10.2.9"),
     ("BUG-085", "人工分全量核算:8维仅safety闭环/quality/powertrain规则没接/spec_score从没跑过", "v10.3.0"),
+    ("BUG-086", "ModelY有C-IASI一手成绩却标缺权威碰撞:回填只扫note漏evidence+宽松解析误抓枚举句", "v10.3.1"),
 ]
 
 
@@ -2225,8 +2226,63 @@ def t085():
     return "人工分核算审计：链路盘点+evidence硬参数算客观分对照+不改分+差异是线索(+t085)"
 
 
+def t086():
+    """证据文本里的权威碰撞成绩必须回流：Model Y 有 C-IASI 却标「缺权威碰撞成绩」。
+
+    2026-11-21 用户「Model Y 显示缺权威碰撞成绩，我记得有呀」。
+    三层根因（都是代码层，不是数据缺失）：
+      1) Model Y 的 C-IASI 一手成绩（官网 show-784，乘员G+/行人G+/辅助G）
+         只写在 evidence.crash_evidence，顶层 crash/basis 都空；
+      2) backfill_crash_from_text 只扫 crash/note/safety_note，漏了 evidence → 成绩白采；
+      3) 直接把 evidence 丢给宽松 parse_score 会误伤 6 款无成绩车
+         （「五星安全车身设计」宣传口径 / 问界M7 他车成绩 / C-ICAP 智驾分 / 枚举句 G/G+/A/M/P）。
+    修法：crash_systems.parse_score_from_evidence 严格解析（肯定锚点 + C-IASI 维度结构
+    + 三指数取最低 + 多次测评取最新），backfill 在顶层无成绩时才用它。
+    """
+    from modules.engine import crash_systems as CS
+    from modules.engine import facts_sync as FS
+    from modules.board import render_board_html as RH
+    from modules.contracts.candidate_schema import normalize_pool
+    import copy
+
+    # 1) 单元自测（含 Model Y 命中 + 4 类误伤防护）
+    assert CS.selftest() == 0, "crash_systems 自测失败"
+
+    # 2) 严格解析器：Model Y 证据命中 ciasi/G（三指数乘员G+行人G+辅助G→最低G）
+    pool = json.load(open(str(paths.ROOT / "runs" / "midsuv_bev_pool.json"), encoding="utf-8"))
+    my = next(x for x in pool["candidates"] if x["model"] == "特斯拉 Model Y")
+    r = CS.parse_score_from_evidence(my["evidence"]["crash_evidence"])
+    assert r and r["basis"] == "ciasi" and r["grade"] == "G", f"Model Y 严格解析失败: {r}"
+    assert r["ciasi_dims"] == {"occupant": "G+", "pedestrian": "G+", "assist": "G"}, r["ciasi_dims"]
+
+    # 3) 回填全池：Model Y 必须进 filled；原来 13 款无成绩车仍 unresolved（无误伤）
+    cands = normalize_pool(copy.deepcopy(pool["candidates"]))
+    filled, unres = FS.backfill_crash_from_text(cands)
+    filled_m = {m for m, _, _ in filled}
+    assert "特斯拉 Model Y" in filled_m, f"Model Y 未回填: {filled}"
+    my2 = next(x for x in cands if x["model"] == "特斯拉 Model Y")
+    assert my2.get("safety_basis") == "ciasi" and my2.get("crash") == "C-IASI G", \
+        f"Model Y 字段未结构化: {my2.get('safety_basis')} / {my2.get('crash')}"
+    assert my2.get("crash_ciasi_dims"), "C-IASI 三指数明细缺审计留痕"
+    for bad in ("腾势N7", "问界M5纯电版", "蔚来ES6", "小鹏G6", "比亚迪宋L EV"):
+        assert bad not in filled_m, f"无成绩车 {bad} 被误填成有成绩"
+
+    # 4) 展示层：回填后不再标「缺权威碰撞成绩」，且徽标显示 C-IASI
+    row = {"safety_basis": my2["safety_basis"], "crash": my2["crash"]}
+    assert "缺权威碰撞成绩" not in RH.risk_flags(row), "有 C-IASI 实锤仍被标缺成绩"
+    badge = re.sub(r"<[^>]+>", "", RH.crash_badge(row))
+    assert "C-IASI" in badge, f"徽标未显示 C-IASI: {badge}"
+
+    # 5) 链路内置：回填函数必须调严格解析器（防以后退回宽松扫描）
+    src = str(paths.src("facts_sync.py"))
+    assert os.path.exists(src), f"源码路径不存在: {src}"
+    assert "parse_score_from_evidence" in open(src, encoding="utf-8").read(), "回填未走严格解析器"
+    return ("证据碰撞成绩回流：Model Y C-IASI 进字段+三指数取最低+13款无成绩车零误伤+"
+            "误标消失+徽标显示(+t086)")
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086]
 
 
 def run():

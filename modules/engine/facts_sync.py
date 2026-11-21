@@ -255,6 +255,12 @@ def backfill_crash_from_text(cars):
       - 已有权威 basis 的车不覆盖（尊重已核验的一手数据）
       - crash 已有具体成绩但 basis 空（如零跑C10）→ 只补 basis，不改文案
       - 解析依据是 crash/note/safety_note 三处文本，来源写进 crash_source
+      - 2026-11-21 补：成绩还可能只写在 evidence.crash_evidence（Model Y 即此情形：
+        C-IASI 官网 show-784 的一手等级全在证据里，顶层 crash/basis 都空 → 被误标
+        「缺权威碰撞成绩」并被封顶）。但 evidence 是长文本，宽松的 parse_score 会把
+        「五星安全车身设计」宣传口径 / 他车成绩 / C-ICAP 智驾分误抓成碰撞成绩
+        （实测误伤 6 款无成绩车），所以 evidence 必须走严格解析器
+        crash_systems.parse_score_from_evidence（只认肯定锚点 + C-IASI 维度结构）。
     返回 (filled, unresolved)：unresolved = 文本里也解析不出成绩的车
     """
     from modules.engine import crash_systems as CS
@@ -265,15 +271,28 @@ def backfill_crash_from_text(cars):
             continue
         text = " ".join(str(c.get(k) or "") for k in ("crash", "note", "safety_note"))
         parsed = CS.parse_score(text)
+        source_tag = "crash/note 文本"
+        quote = text.strip()[:60]
+        if not parsed:
+            # 顶层三处解析不出 → 再试 evidence.crash_evidence（严格解析，防误伤）
+            ev = c.get("evidence") or {}
+            ce = str(ev.get("crash_evidence") or "") if isinstance(ev, dict) else ""
+            if ce:
+                parsed = CS.parse_score_from_evidence(ce)
+                if parsed:
+                    source_tag = "evidence.crash_evidence 严格解析"
+                    quote = ce.strip()[:60]
         if not parsed:
             unresolved.append(c.get("model"))
             continue
         if not CS.has_score(c.get("crash")):
             c["crash"] = parsed["display"]
         c["safety_basis"] = parsed["basis"]
-        c["crash_source"] = ("由 crash/note 文本自动解析（原文：" +
-                             text.strip()[:60] + "）；已核验体系 " + parsed["system_cn"])
+        c["crash_source"] = (f"由 {source_tag} 自动解析（原文：" +
+                             quote + "）；已核验体系 " + parsed["system_cn"])
         if parsed.get("score") is not None:
             c["safety_score_value"] = parsed["score"]
+        if parsed.get("ciasi_dims"):
+            c["crash_ciasi_dims"] = parsed["ciasi_dims"]
         filled.append((c.get("model"), parsed["display"], parsed["basis"]))
     return filled, unresolved

@@ -1,7 +1,7 @@
 # Car recommendation
 
 > 可信购车榜单引擎：口径闸门 / MCDA 稳健性检验 / 8 维打分统一榜 / 总候选池 / 多源交叉核验 / 证据分层 / 历史回测。
-> 无模型调用，同一输入必得同一输出。当前版本 **v10.3.0**（人工分全量核算审计：算分链路盘点 + 客观分对照 + 只审计不改分）。
+> 无模型调用，同一输入必得同一输出。当前版本 **v10.3.1**（证据文本里的权威碰撞成绩回流：Model Y 的 C-IASI 不再误标「缺权威碰撞成绩」）。
 
 ## 这是什么
 WorkBuddy 用户级 skill。核心是「车型排行榜全链路」：按需搜榜入池→取数→闸门→8 维打分→稳健性→三档→审查→报告，
@@ -128,6 +128,22 @@ WorkBuddy 用户级 skill。核心是「车型排行榜全链路」：按需搜�
   **「规则有了但数据没进候选池」本身就是核算结论**。pipeline `--score-audit` 出核账段落+
   summary `score_audit` 审计，默认关闭不影响正常出榜。回归 `t085` + 反向注入
   `no_audit_extract` 锁死（提取失效则测试挂）。
+- **证据文本碰撞成绩回流（v10.3.1）**：用户「Model Y 显示缺权威碰撞成绩，我记得有呀」。
+  查实 Model Y 有 C-IASI 一手成绩（官网 show-784 + 媒体 1003113663007：2021 款乘员/行人/辅助
+  G/G/G、2025 中期改款 G+/G+/G），但成绩只写在 `evidence.crash_evidence`，顶层 `crash`/
+  `safety_basis` 都空——`backfill_crash_from_text` 只扫 `crash`/`note`/`safety_note` 三处，
+  漏了 evidence，于是成绩白采、被误标「缺权威碰撞成绩」，还被 `evidence_cap` 从 8.5 误封到 8.0。
+  **不能简单把 evidence 丢给宽松的 `parse_score`**：实测会误伤 6 款无成绩车
+  （腾势 N7「五星安全车身设计」宣传口径、问界 M5 提到问界 M7 95%、蔚来 ES6 的 C-ICAP
+  智驾分 92.9%、小鹏 G6「未取得」、宋 L EV「未参加测试」、以及「只给 G/G+/A/M/P 等级」枚举句）。
+  修复：① `engine/crash_systems.py` 新增 `parse_score_from_evidence()` 严格解析器——
+  只认「有〈体系〉官方成绩」肯定锚点；C-IASI 必须解析出乘员/行人/辅助维度等级结构，
+  按官方口径**三指数取最低档**、多次测评取最新（Model Y → G）；得分率体系要求「综合得分率」
+  且排除 C-ICAP；② `facts_sync.backfill_crash_from_text()` 在顶层三处解析不出时才走严格解析器，
+  不覆盖已有权威 basis，C-IASI 三指数明细写进 `crash_ciasi_dims` 供审计。
+  真实池：回填 6 款（原 5 款 + Model Y），13 款无成绩车零误伤；Model Y safety 8.5→9.0
+  （C-IASI G→9.0，不再进封顶）、页面徽标显示 C-IASI、「缺权威碰撞成绩」标记消失、
+  报告显示「证据达标（C-IASI 碰撞实锤）」。回归 `t086` + 反向注入 `no_evidence_crash` 锁死。
 - **体验维度举证封顶（v10.2.4）**：智驾 / 车机 / 操控这三类「纸面参数看不出来」的维度，
   无独立实测或车主样本的车，`scores` 封顶至「有实测车该维度最低分」（`experience_score.cap_unproven()`）。
   厂商宣传（`vendor_claim`）不算依据。**空间不封顶**——轴距/车长是硬数据，可纸面判定。

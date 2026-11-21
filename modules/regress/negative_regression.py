@@ -123,6 +123,8 @@ NEG_DATA = {
     "t084": ("space_features.extract_space_features", None, "no_sf_extract"),
     # t085：关掉核算字段提取（回到「evidence 硬参数提不出、规则从没跑」），断言必须 FAIL
     "t085": ("score_audit.extract_spec_fields", None, "no_audit_extract"),
+    # t086：关掉严格证据解析（回到「Model Y 的 C-IASI 全在 evidence 里却没人回填」），断言必须 FAIL
+    "t086": ("crash_systems.parse_score_from_evidence", None, "no_evidence_crash"),
     # t039 断言从「源码文本含文件名」升级为「文件在同步集里」，探针改成把同步集清空
     "t039": ("sync_to_repo.collect", None, "empty_sync"),
 }
@@ -158,6 +160,7 @@ def _func_probe(name, fn, dotted, mode):
         "no_space_cap": lambda *a, **kw: ([], []),                          # 空间校准失效（MONA 9.3 又无人管）
         "no_sf_extract": lambda *a, **kw: [],                               # 空间要素提取失效（得房率/前备箱又没用）
         "no_audit_extract": lambda *a, **kw: {},                            # 核算字段提取失效（规则又没数据可算）
+        "no_evidence_crash": lambda *a, **kw: None,                         # 严格证据解析失效（Model Y C-IASI 又白采）
         "always_missing": lambda *a, **kw: {"status": "missing", "source": "", "trims": [],
                                            "attempts": [], "evidence": {}, "sid": None,
                                            "ah_name": ""},                # 调度退化为直接失败
