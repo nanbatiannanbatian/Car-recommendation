@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 10.2.0
+version: 10.2.1
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v10.2.0）
+# Car recommendation —— 可信购车榜单引擎（v10.2.1）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -98,6 +98,8 @@ paths.py       全项目路径唯一事实源（ROOT/cat()/gen()）+ 生成物�
 
 1. **任何模块要联网，只能调用 `modules/research/` 下的函数**；不得自己 `import requests / urllib /
    httpx / aiohttp / http.client`。由 `layout_regress.check_network_egress()` 强制，越界即 FAIL。
+   **本条不接受任何例外**：极轻量级的联网（哪怕只是 GET 一个 JSON）也要在 `research/` 内实现一个
+   函数、由业务模块调用。「就两行，就地写方便」正是把超时/重试/留痕/可追溯一起丢掉的开始。
    为什么：业务模块直接抓页面会绕过超时/重试/留痕/防编造整套约束，且「这条数据从哪来」无法追溯。
 2. **新增数据源必须注册进 `modules/research/trim_sources.py` 的 `SOURCES` 源链**，实现
    `_try_xxx(model)` 后登记；不许在业务模块里临时抓一个页面就写库。源链顺序固定：
@@ -109,6 +111,8 @@ paths.py       全项目路径唯一事实源（ROOT/cat()/gen()）+ 生成物�
 5. 跨站现状（2026-11-21 实测）：易车 API 返回反爬 HTML、懂车帝 config 页 0 字节、
    有驾内嵌数据只有 1 条主推款 → 靠 requests 拿不到齐全的跨站配置表；要做得引入浏览器自动化，
    届时仍必须遵守本条：实现放在 `modules/research/` 内并注册源链。
+6. `layout_regress.EXCEPTIONS` 只用于**包间依赖方向**的个别登记，**对网络出口不适用**：
+   往例外表里塞网络豁免也不会生效（`scan_network_egress` 不读它），这一点由回归 t077 验证。
 
 ## ⛔ 第零步：接到排行指令，先判榜型再出榜（2026-11-20 用户明确要求，强制）
 

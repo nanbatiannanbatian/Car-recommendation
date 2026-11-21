@@ -178,6 +178,10 @@ def check_network_egress() -> None:
     此前只是 MODULES.md 里一句声明——声明会忘，门禁不会：
     任何业务模块自己 import requests 抓页面，都会绕过超时/重试/留痕/防编造这一整套约束，
     也会让「数据从哪来」无法追溯。越界即 FAIL。
+
+    **本条不接受任何例外**（2026-11-21 用户明确）：极轻量级的联网也要在 research 内实现、
+    对外暴露一个函数供业务模块调用，而不是在业务模块里就地写两行 requests。
+    所以这里不读 EXCEPTIONS——即使有人往例外表里登记，也照样拦。
     """
     bad = scan_network_egress()
     check("联网只走 research", not bad,

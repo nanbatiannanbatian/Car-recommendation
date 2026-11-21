@@ -1757,6 +1757,23 @@ def t077():
         if probe.exists():
             probe.unlink()
 
+    # 2b) 无例外：往 EXCEPTIONS 里塞一条网络豁免，也必须照样检出
+    probe2 = paths.MODULES / "engine" / "_tmp_egress_probe.py"
+    try:
+        probe2.write_text("import requests\n", encoding="utf-8")
+        base = len(LR.scan_network_egress())
+        key = ("engine", "_tmp_egress_probe", "requests")
+        LR.EXCEPTIONS[key] = "试图绕过网络出口约束"
+        try:
+            after = LR.scan_network_egress()
+        finally:
+            LR.EXCEPTIONS.pop(key, None)
+        assert any("_tmp_egress_probe.py" in h for h in after), "例外表可以豁免网络越界（不允许）"
+        assert len(after) == base, (base, len(after))
+    finally:
+        if probe2.exists():
+            probe2.unlink()
+
     # 3) research 包内允许（它才是出口），且不得被误报
     assert not any("modules/research/" in h for h in LR.scan_network_egress())
 
