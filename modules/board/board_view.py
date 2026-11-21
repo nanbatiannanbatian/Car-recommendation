@@ -519,24 +519,21 @@ def load_fact_library(explicit_path: str | None = None) -> dict:
         facts = _json.load(open(path, encoding="utf-8"))
     except (OSError, ValueError):
         facts = {}
-    # v10.9.0：电芯品牌多源回退——cell_facts.json（可重建种子库）补 fact_library
-    # 缺电芯的车（如极氪7X/阿维塔07）。GitHub 新装无人工事实库时也能显示已核验电芯；
-    # 只补 cell_brand/kwh 等事实字段，不覆盖 fact_library 里已有的值。
+    # v10.10.0：电芯事实统一走 vehicle_facts 权威入口（唯一真相源在契约层，随包存活）。
+    # 旧实现直接读 cell_facts.json 副本——那份是生成物，新装包没有就静默漏显示。
+    # 现在按权威全集补齐 facts 里缺电芯的车；不覆盖 fact_library 已有的值。
     try:
-        cell_path = str(paths.cat("cell_facts.json"))
-        cell_doc = _json.load(open(cell_path, encoding="utf-8"))
-        for e in (cell_doc.get("entries") or []):
-            m = e.get("model")
-            if not m:
-                continue
+        from modules.research import vehicle_facts as VF
+        for e in VF.iter_authoritative_cells():
+            m = e["model"]
             slot = facts.setdefault(m, {})
             if not slot.get("cell_brand") and e.get("cell_brand"):
                 slot["cell_brand"] = e["cell_brand"]
-            if not slot.get("kwh") and e.get("battery_kwh"):
-                slot["kwh"] = e["battery_kwh"]
+            if not slot.get("kwh") and e.get("kwh"):
+                slot["kwh"] = e["kwh"]
             if not slot.get("scored_trim") and e.get("trim"):
                 slot["scored_trim"] = e["trim"]
-    except (OSError, ValueError):
+    except (ImportError, OSError, ValueError):
         pass
     return facts
 

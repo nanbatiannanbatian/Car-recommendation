@@ -92,9 +92,20 @@ def fact_columns(c: dict, facts: dict[str, dict], policy: dict) -> dict:
         elif k == "cltc":
             v = _num(f.get("cltc") or c.get("cltc"))
         elif k == "cell_brand":
+            # v10.10.0：三处取数归一——权威入口 > 候选池 > 传入的 facts 副本。
+            # 页面显示值不变（权威值与副本一致，consistency_report 保证），
+            # 但新装包缺 JSON 副本时仍能从随代码的种子表拿到已核验电芯。
             v = f.get("cell_brand") or c.get("cell_brand")
+            if v in (None, "", "—"):
+                try:
+                    from modules.research import vehicle_facts as VF
+                    _rec = VF.cell(c.get("model", ""))
+                    if _rec:
+                        v = _rec["brand"]
+                except ImportError:
+                    pass
             # v10.9.0：缺电芯且本次已联网核验 → 带出原因/线索，供页面显示「—（原因）」。
-            # 只在库与候选都为空时才写，不覆盖任何已核验事实。
+            # 只在库、候选、权威源都为空时才写，不覆盖任何已核验事实。
             if v in (None, "", "—"):
                 cv = c.get("_cell_verify") or {}
                 if cv.get("status") in ("need_review", "unavailable", "net_error"):

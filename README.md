@@ -1,7 +1,7 @@
 # Car recommendation
 
 > 可信购车榜单引擎：口径闸门 / MCDA 稳健性检验 / 8 维打分统一榜 / 总候选池 / 多源交叉核验 / 证据分层 / 历史回测。
-> 无模型调用，同一输入必得同一输出。当前版本 **v10.9.0**（电池来源不遗漏：事实库补录 + 缺电芯联网核验只出线索不回填 + 查不到页面标注「—（原因）」 + 碰撞核验时间戳缓存 + 逐车联网核验门禁 + GitHub 零 JSON）。
+> 无模型调用，同一输入必得同一输出。当前版本 **v10.10.0**（车辆事实单一数据源：契约层唯一可写种子 + research 统一读取入口 + 派生副本漂移自检；电耗双口径不合并；电池来源不遗漏 + 缺电芯联网核验 + 碰撞核验时间戳缓存 + 逐车联网核验门禁 + GitHub 零 JSON）。
 
 ## 这是什么
 WorkBuddy 用户级 skill。核心是「车型排行榜全链路」：按需搜榜入池→取数→闸门→8 维打分→稳健性→三档→审查→报告，
@@ -225,6 +225,10 @@ WorkBuddy 用户级 skill。核心是「车型排行榜全链路」：按需搜�
   四重判据）放行；软文/智驾分/C-ICAP/无映射车仍拒绝。`facts_sync.backfill_crash_from_text` 接入。
   实测 ES6 从"无成绩"→ `Euro NCAP 93.95% 五星`，安全分 8.7；C-ICAP 92.9% 智驾分未被误抓，
   全池零泛化。回归 `t093/t094` + 反向注入 + `build_release_regress` 3 条新断言锁死。
+- **车辆事实单一数据源（v10.10.0）**：用户指出「经常有车辆数据多个地方同步不及时，能否只用一个数据源免除同步问题」。
+  评估结论：**物理合并成一个文件不可行**——① 电耗等字段是两个口径（fact_library=评分配置 CLTC 电耗、vehicle_physics=参数页首配/可能增程版电耗，深蓝S07 12.6 vs 17.4 是不同事实不是不同步，强行合并污染评分/物理模型）；② 零 JSON 铁律（GitHub/发布包不带 JSON）；③ 生成物/人工库分类契约。
+  根治方案：**每个事实只留一个可写源，其余只读派生**。① 新建 `contracts/vehicle_facts_seed.py`（纯代码、零 IO/零依赖、随包存活）为唯一可写真相源——39 条带权威来源 `CELL_SEED` + 55 条历史兜底 `CELL_LEGACY` 共 94 台；② `build_cell_facts.py` 的种子表改为 `F = _SEED.CELL_SEED`，不再手写（消除重复源）；③ 新建 `research/vehicle_facts.py` 统一读取入口 `cell()/facts_for()/iter_authoritative_cells()`，优先级 seed>legacy>JSON 兜底、车名 canon 归一，**不提供合并后的 consumption**（口径不同禁止伪统一）；④ `board_view.load_fact_library`/`board_v2.fact_columns`/`pipeline` 全部收口到统一入口，出榜前 `consistency_report()` 检测派生副本漂移并写审计。
+  验证：页面 141 行显示值与改前**零差异**；模拟无 JSON 新装仍能从种子表取到全部 94 台电芯、零漂移；t101 + 反向注入（97/97）锁定。回归 bug 101/101、失败回测 97/97、layout 16、energy_compare 20、energy_router 32、midsuv_full 46、build_release 37 全绿。
 - **电池来源不遗漏（v10.9.0）**：用户指出「极氪和阿维塔电池来源空的不对，肯定可以获取数据，代码层级修复，确保以后不遗漏；但凡查不到就联网查，还查不到在这栏标注原因」。
   根因：这两车从没进过任何电芯事实库（fact_library/cell_facts/battery_platform 全无条目），`fact_columns()` 取 cell_brand 落空，页面就空。
   修复三层：① `research/cell_brand_verify.py` 对缺电芯车联网核验（research 唯一出口，零依赖百度摘要），

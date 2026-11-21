@@ -297,6 +297,21 @@ def main():
                          "\n→ 修代码/网络后重跑；确需降级加 --allow-degraded-network。")
             print(f"[碰撞核验] 异常已显式降级：{_crash_verify['error']}")
 
+    # 车辆事实一致性门禁（v10.10.0）：同一事实在权威源与各派生副本的值必须一致。
+    # 旧架构里电芯散落 5 处各自手写，改一处漏四处（极氪7X 补 3 处仍漏），
+    # 现在唯一可写源在契约层，派生副本只被读取；漂移=有人绕开权威源手改了副本，
+    # 出榜前显式告警并写审计，避免静默展示错误事实。不阻断（副本不影响页面取数）。
+    try:
+        from modules.research import vehicle_facts as VF
+        _vf_consistency = VF.consistency_report()
+        if not _vf_consistency["ok"]:
+            print("[事实一致性] 警告：派生副本与权威源漂移（页面以权威源为准）：" +
+                  "、".join(f"{x['copy']}/{x['model']}={x['copy_value']}"
+                           f"(权威 {x['authoritative']})"
+                           for x in _vf_consistency["drifts"][:8]))
+    except Exception as _ex:                               # 自检失败不影响出榜
+        _vf_consistency = {"ok": False, "error": f"{type(_ex).__name__}: {_ex}"}
+
     # 多测评融合（v10.4.0，2026-11-21）：用户要求「有评测就要纳入，按业内原则重新设计」。
     # 同体系多维度按木桶取最低（Euro NCAP/C-NCAP 官方口径）；跨体系按严格度选主分、
     # 其余列示不叠加（各国 NCAP 无对应关系）。一手来源含 C-IASI 官网新闻稿纯文字等级
@@ -730,6 +745,8 @@ def main():
         # v10.5.0：C-IASI 数字图标车联网救回审计 + 展示覆盖门禁审计
         "ciasi_rescue": _ciasi_rescue,
         "crash_auto_verify": _crash_verify,
+        # v10.10.0：车辆事实单一数据源审计（权威源 94 台 / 派生副本漂移）
+        "vehicle_facts_consistency": _vf_consistency,
         "crash_display_audit": {"leaks": _display_leaks},
         # 多成绩审计：全部成绩留痕 + 主成绩选择口径（取证据最强，不取最高/不叠加）
         "crash_multi_scores": [

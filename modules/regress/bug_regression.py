@@ -123,6 +123,7 @@ CASES = [
     ("BUG-098", "碰撞核验只扫官网首页且断网只告警:无法证明每车都联网确认过", "v10.7.0"),
     ("BUG-099", "碰撞核验状态无时间戳且每次出榜重复抓取:当天无法复用、跨天不失效", "v10.8.0"),
     ("BUG-100", "极氪7X/阿维塔07电池来源空白:事实库无此车且缺联网兜底与缺失原因标注", "v10.9.0"),
+    ("BUG-101", "同一车辆事实散落5处各自手写:改一处漏多处、无唯一真相源与漂移检测", "v10.10.0"),
 ]
 
 
@@ -2959,10 +2960,12 @@ def t100():
     assert "电芯_缺失原因" in bv, "页面未接缺失原因标注"
     v2 = _read("board_v2.py")
     assert "电芯_缺失原因" in v2, "fact_columns 未带出缺失原因"
-    # GitHub 新装无人工事实库时，靠可重建种子表 cell_facts 回退——两车须在种子里
-    seed = _read("build_cell_facts.py")
-    assert "极氪7X" in seed and "阿维塔07 纯电版" in seed, "重建种子表缺两车"
-    assert "cell_facts.json" in _read("board_view.py"), "load_fact_library 缺 cell_facts 回退"
+    # v10.10.0 架构升级：唯一可写种子迁到契约层（随 GitHub/发布包存活），
+    # build_cell_facts 只引用它；board_view 统一走 vehicle_facts 入口读权威值。
+    seed = _read("vehicle_facts_seed.py")
+    assert "极氪7X" in seed and "阿维塔07 纯电版" in seed, "权威种子缺两车"
+    assert "F = _SEED.CELL_SEED" in _read("build_cell_facts.py"), "种子表未收口到唯一真相源"
+    assert "vehicle_facts" in _read("board_view.py"), "load_fact_library 未走统一入口"
     # 3) 两车已补进事实库（带权威来源）
     fl = json.load(open(paths.cat("fact_library.json"), encoding="utf-8"))
     for m, brand in [("极氪7X", "宁德时代"), ("阿维塔07 纯电版", "宁德时代")]:
@@ -2984,8 +2987,45 @@ def t100():
     return "电池来源不遗漏：两车补录+联网线索不回填+页面缺失原因标注(+t100)"
 
 
+def t101():
+    """车辆事实单一数据源（v10.10.0）：同一事实不再多处手写。
+
+    根因：电芯散落 5 处（种子 F/cell_facts/fact_library/master_pool/trims），
+    改一处漏多处。修复：契约层唯一可写种子 + research 统一读取入口 + 漂移自检。
+    """
+    from modules.research import vehicle_facts as VF
+    from modules.contracts import vehicle_facts_seed as SEED
+    # 1) 模块自测
+    assert VF.selftest() == 0, "vehicle_facts 自测失败"
+    # 2) 唯一真相源在契约层（纯净：零 IO/零依赖，layout 已守）
+    seed_src = _read("vehicle_facts_seed.py")
+    for token in ("CELL_SEED", "CELL_LEGACY", "ENERGY_NOTE"):
+        assert token in seed_src, f"契约种子缺 {token}"
+    # build_cell_facts 不再手写种子，只引用契约层
+    bcf = _read("build_cell_facts.py")
+    assert "F = _SEED.CELL_SEED" in bcf and '"极氪7X"' not in bcf, "种子未收口/仍重复手写"
+    # 3) 统一读取优先级：seed > legacy > JSON，且车名归一
+    r = VF.cell("极氪7X")
+    assert r and r["origin"] == "seed" and r["brand"] == "宁德时代(时代吉利)", r
+    assert VF.cell("MG4")["origin"] == "legacy", "legacy 兜底失效"
+    assert VF.cell("阿维塔07")["brand"] == VF.cell("阿维塔07 纯电版")["brand"]
+    assert VF.cell("不存在的车XYZ999") is None, "不得编造事实"
+    # 4) 电耗口径不合并（防止伪统一污染评分/物理模型）
+    v = VF.facts_for("深蓝L06")
+    assert "consumption" not in v and "CLTC" in v["energy_note"], v
+    assert "CLTC" in SEED.ENERGY_NOTE
+    # 5) 漂移自检：注入一个漂移能被测出（不写真实文件，直接测报告结构）
+    rep = VF.consistency_report()
+    assert rep["ok"] and rep["authoritative_n"] >= 90 and rep["drifts"] == [], rep
+    # 6) 页面/主链读取已收口到统一入口
+    assert "vehicle_facts" in _read("board_view.py") and "vehicle_facts" in _read("board_v2.py")
+    pl = _read("pipeline.py")
+    assert "vehicle_facts_consistency" in pl and "consistency_report" in pl, "pipeline 未接一致性门禁"
+    return "车辆事实单一源：契约种子唯一可写+统一读取+漂移自检+电耗口径不合并(+t101)"
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101]
 
 
 def run():
