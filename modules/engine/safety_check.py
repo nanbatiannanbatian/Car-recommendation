@@ -59,6 +59,21 @@ def check(cands, table=None):
                            "expected": want_basis,
                            "fix": f"给 {model} 写 safety_basis={want_basis}"})
 
+    # A2. 池内「有权威碰撞成绩但未进映射表」：只报缺口，不擅自给分。
+    # 为什么不像价格那样自动回填：映射表里同样是 C-NCAP、得分率相近的车分数并不一致
+    # （90.8%→8.9、90.6%→8.5、91.3%→9.1），说明还叠加了分项/年款口径的人工判断；
+    # 用公式硬算会造出与既有表不一致的假分。所以：成绩进字段（事实），分数等人定。
+    from modules.engine import crash_systems as _CS
+    unmapped = []
+    has_score_n = 0
+    for c in cands:
+        if not _CS.parse_score(c.get("crash")):
+            continue
+        has_score_n += 1
+        if c["model"] not in car_scores:
+            unmapped.append({"model": c["model"], "crash": c.get("crash"),
+                             "basis": c.get("safety_basis")})
+
     # B. 单调性：有成绩车最低 >= 无成绩车中位
     no_score_vals = []
     for c in cands:
@@ -77,6 +92,7 @@ def check(cands, table=None):
                            "fix": "有官方碰撞成绩的车安全分不应低于无成绩车中位——检查是否被误降权"})
     return {"checked": checked, "official_min": min(official_vals) if official_vals else None,
             "no_score_median": round(statistics.median(no_score_vals), 1) if no_score_vals else None,
+            "has_score": has_score_n, "mapped": checked, "unmapped": unmapped,
             "issues": issues, "passed": not issues}
 
 

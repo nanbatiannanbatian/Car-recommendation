@@ -68,6 +68,9 @@ BLOCKS = [
 # 每项 (表头, 取值函数)；取值函数 (row, by_model, grades) -> 字符串
 MAIN_BOARD_COLUMNS = [
     "rank", "model", "trim", "price", "sales", "total", "tier",
+    # 2026-11-21：主榜直接展示权威碰撞成绩（用户要求「有成绩的要看得见」）。
+    # 展示的是 crash 字段解析出的体系+成绩；「在测」= 已抽车未出成绩；「—」= 无成绩。
+    "crash",
     "evidence", "period", "kwh_per_wan", "cell_brand", "verdict",
 ]
 
@@ -366,7 +369,7 @@ def car_verdict(row: dict, cand: dict, meta: dict | None = None) -> dict:
 MAIN_COL_LABELS = {
     "rank": "#", "model": "车型", "trim": "评分配置", "price": "指导价(万)",
     "sales": "趋势月销", "total": "加权分", "tier": "档位", "evidence": "证据",
-    "period": "周期", "kwh_per_wan": "kWh/万元", "cell_brand": "电池来源",
+    "period": "周期", "crash": "碰撞成绩", "kwh_per_wan": "kWh/万元", "cell_brand": "电池来源",
     "verdict": "评价（优缺点/适合人群/建议）",
 }
 
@@ -402,6 +405,9 @@ def main_cell(key: str, row: dict, cand: dict, grade: str = "") -> str:
         return f"{float(row['total']):.1f}" if row.get("total") is not None else "—"
     if key == "tier":
         return str(row.get("tier") or "")
+    if key == "crash":
+        from modules.engine import crash_systems as _CS
+        return _CS.display_short(cand.get("crash"))
     if key == "evidence":
         return str(row.get("evidence_status") or cand.get("evidence_status") or row.get("evidence") or "—")
     if key == "period":

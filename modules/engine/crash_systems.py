@@ -93,6 +93,15 @@ _NO_SCORE_MARKERS = ("无官方成绩", "无成绩", "未查到", "未测", "待
 _SCORE_RE = re.compile(r"\d+(?:\.\d+)?\s*%|五星|\bG\+?\b|\bA\b|优秀|良好")
 
 
+def _negated(t: str) -> bool:
+    """文本里是否出现「无/未/没 + NCAP/IASI」这种否定表述。
+
+    不加这条会把「无C-NCAP成绩；9min快充(10-97%)」判成有成绩——
+    百分比来自快充、体系词来自否定句，两个片段拼出假成绩。
+    """
+    return bool(re.search(r"(无|未|没|非)\s*C?\s*-?\s*(?:N?CAP|IASI)", t, re.I))
+
+
 def has_score(crash_text) -> bool:
     """crash 文本里是否有可引用的具体成绩（百分比/星级/等级）。
 
@@ -104,7 +113,96 @@ def has_score(crash_text) -> bool:
         return False
     if any(k in t for k in _NO_SCORE_MARKERS):
         return False
+    if _negated(t):
+        return False
+    # 「第三方称五星但无得分率」「宣传口径」这类不能当权威成绩（宝马i3 曾误报）
+    if any(k in t for k in ("无得分率", "无得分", "宣传口径", "传闻")):
+        return False
     return bool(_SCORE_RE.search(t))
+
+
+# ---------------------------------------------------------------- 文本 → 结构化
+_TEXT_SYS_RE = re.compile(
+    r"(?P<sys>C\s*-?\s*NCAP|CNCAP|C\s*-?\s*IASI|CIASI|Euro\s*NCAP|E\s*-?\s*NCAP|ANCAP|IIHS|NHTSA)",
+    re.I)
+_PCT_RE = re.compile(r"(\d{2,3}(?:\.\d+)?)\s*%")
+_STAR_RE = re.compile(r"([五五四四三三]|[3-5])\s*星")
+_GRADE_RE = re.compile(r"(?:^|[^A-Za-z])(G\+{0,2}|A|M|P)(?![A-Za-z])")
+_CN_NUM = {"五": 5, "5": 5, "四": 4, "4": 4, "三": 3, "3": 3}
+
+
+def display_short(crash_text) -> str:
+    """主榜展示用短文本：有成绩给「C-NCAP 90.7%」，在测给「在测」，没测给「—」。
+
+    页面与 Markdown 共用这一个函数，避免两处各写一套判断
+    （曾出现「有 C-NCAP 徽标」却说「无成绩」）。
+    """
+    parsed = parse_score(crash_text)
+    if parsed:
+        return parsed["display"]
+    t = str(crash_text or "")
+    if ("抽车" in t) or ("在测" in t) or ("测试中" in t):
+        return "在测"
+    return "—"
+
+
+def parse_score(text) -> dict | None:
+    """从自由文本里解析出「体系 + 成绩」，返回结构化 dict；解析不出返回 None。
+
+    为什么要它：2026-11-21 出中型纯电SUV榜，4 款车（极氪7X 90.7% / 阿维塔07 90.2% /
+    乐道L60 89.2% / 海狮07 EV 87.3%）的 C-NCAP 成绩**只写在 note 自由文本里**，
+    crash/safety_basis 是空的 → 被判「无权威碰撞实锤」，极氪7X 因此进不了一档。
+    这里把「从文本抽成绩」固化成代码，出榜前自动进字段。
+
+    严格性（踩过的坑）：「无C-NCAP成绩；9min快充(10-97%)」曾被解析成「C-NCAP 97%」——
+    体系词在否定句、百分比来自快充。所以：
+      - 体系词前 3 字若是否定词 → 跳过
+      - 只在该体系词**同一分句**（到 ；，。| 换行为止）里找分数/星级/等级
+
+    返回: {"basis","system_cn","score","stars","grade","display"}
+    """
+    t = str(text or "").strip()
+    if not t:
+        return None
+    for m in _TEXT_SYS_RE.finditer(t):
+        pre = t[max(0, m.start() - 3):m.start()]
+        if any(k in pre for k in ("无", "未", "没", "非", "暂无")):
+            continue
+        basis = normalize(m.group("sys"))
+        if not basis:
+            continue
+        clause = re.split(r"[；;，,。|\n]", t[m.end():])[0]
+        # 同句里若写明是第三方传言/无得分率/宣传口径，不当作权威成绩
+        if any(k in clause for k in ("第三方称", "宣传", "无得分率", "无得分", "传闻", "网传")):
+            continue
+        grade_kind = SYSTEMS[basis]["grade"]
+        score = stars = grade = None
+        if grade_kind == "star":
+            pm = _PCT_RE.search(clause)
+            score = float(pm.group(1)) if pm else None
+            sm = _STAR_RE.search(clause)
+            stars = _CN_NUM.get(sm.group(1)) if sm else None
+            if score is None and stars is None:
+                continue
+        elif grade_kind in ("letter", "award"):
+            gm = _GRADE_RE.search(clause)
+            if not gm:
+                continue
+            grade = gm.group(1)
+        else:
+            continue
+        sys_cn = SYSTEMS[basis]["cn"]
+        if score is not None:
+            display = f"{sys_cn} {score:g}%"
+            if stars:
+                display += " 五星"
+        elif stars:
+            display = f"{sys_cn} 五星"
+        else:
+            display = f"{sys_cn} {grade}"
+        return {"basis": basis, "system_cn": sys_cn, "score": score,
+                "stars": stars, "grade": grade, "display": display}
+    return None
 
 
 def selftest():

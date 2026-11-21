@@ -93,6 +93,8 @@ NEG_DATA = {
     "t069": ("facts_sync.backfill_price_guide_from_trims", None, "no_backfill"),
     # t070：把「是否有成绩」恒判为 True（等于又虚报），负向断言必须 FAIL
     "t070": ("crash_systems.has_score", None, "always_score"),
+    # t071：把成绩回流改成 no-op（文本成绩进不了字段），回填断言必须 FAIL
+    "t071": ("facts_sync.backfill_crash_from_text", None, "no_crash_backfill"),
     # t039 断言从「源码文本含文件名」升级为「文件在同步集里」，探针改成把同步集清空
     "t039": ("sync_to_repo.collect", None, "empty_sync"),
 }
@@ -114,6 +116,7 @@ def _func_probe(name, fn, dotted, mode):
         "no_normalize": lambda cands=None, *a, **kw: list(cands or []),  # 不归一化原样返回
         "no_backfill": lambda *a, **kw: ([], []),                        # 不回流，什么都不填
         "always_score": lambda *a, **kw: True,                            # 虚报：什么都算有成绩
+        "no_crash_backfill": lambda *a, **kw: ([], []),                    # 不回流成绩
     }.get(mode)
     if wrong is None:
         return False, False

@@ -362,6 +362,10 @@ def build(cands: list[dict], cfg: dict, policy: dict,
     _bf, _bs = FS.backfill_price_guide_from_trims(cands)
     if _bf:
         print(f"[价格回流] {len(_bf)} 款 price_guide 由 trims 官方指导价回填")
+    # 碰撞成绩回流：note 里有成绩就结构化进 crash/safety_basis（与 pipeline 同一份实现）
+    _cf, _cu = FS.backfill_crash_from_text(cands)
+    if _cf:
+        print(f"[碰撞回流] {len(_cf)} 款 crash/safety_basis 由文本成绩回填")
     # v9.6.1：电压/封装事实库（按评分配置）；调用方可覆盖
     if battery_platform is None:
         _bp_path = str(paths.cat("battery_platform.json"))

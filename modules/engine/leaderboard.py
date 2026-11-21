@@ -1088,8 +1088,18 @@ def tier_report(cands: list[dict], cfg: dict, weights: list[float] | None = None
             blockers.append(f"独立算法家族命中 {_ff_hits}/{_ff_n}={_ff:.0%}<{_need}")
         if a["topk_freq"] < rules["t1_min_joint_freq"]:
             blockers.append(f"全情景命中 {a['topk_freq']:.0%}<{rules['t1_min_joint_freq']:.0%}")
+        # 2026-11-21：拆开两条，不再混写。原来是一句「证据 B 未达 A（无权威碰撞成绩）」，
+        # 把「综合证据等级」和「碰撞实锤」两件事塞进一句，读起来像自我矛盾
+        # （证据 A 的车也显示「证据 A 未达 A」）；且「在测」也被说成「无成绩」。
         if ev_for_t1 not in rules["t1_evidence"]:
-            blockers.append(f"证据 {ev} 未达 {'/'.join(rules['t1_evidence'])}（无权威碰撞成绩）")
+            blockers.append(f"综合证据 {ev} 未达 {'/'.join(rules['t1_evidence'])}"
+                            f"（口碑样本/上市时长维度，非碰撞）")
+        if not has_crash_evidence:
+            _short = CS.display_short(c.get("crash"))
+            if _short == "在测":
+                blockers.append("碰撞已抽车、尚未出成绩")
+            else:
+                blockers.append("无权威碰撞成绩")
         if airbag_gate:
             # 第1档气囊准入闸——三态，**只拦「明确缺失」，不拦「未核验」**。
             # 为什么不再用 null 拦：null 表示「我们没取到证据」，是数据缺口，
@@ -1455,8 +1465,12 @@ def top_table(cands: list[dict], cfg: dict, weights: list[float] | None = None,
              "**同档组只表示名次不可辨，与下一节「第一/二/三档」不是一回事**："
              "同档组第 1 组也可能是证据不足、不该买的车。")
     L.append("")
-    L.append("| 名次 | 车型 | 评分配置 | 指导价 | 趋势月销 | 加权分 | 名次区间(95%) | 同档组 | 气囊 侧/帘/中 | 证据 | 周期 |")
-    L.append("|---|---|---|---|---|---|---|---|---|---|---|")
+    def _crash_short(c):
+        from modules.engine import crash_systems as _CS
+        return _CS.display_short(c.get("crash"))
+
+    L.append("| 名次 | 车型 | 评分配置 | 指导价 | 趋势月销 | 加权分 | 名次区间(95%) | 同档组 | 碰撞成绩 | 气囊 侧/帘/中 | 证据 | 周期 |")
+    L.append("|---|---|---|---|---|---|---|---|---|---|---|---|")
     for i, r in enumerate(ranked):
         c = by.get(r["model"], {})
         trim = c.get("trim") or {}
@@ -1488,7 +1502,7 @@ def top_table(cands: list[dict], cfg: dict, weights: list[float] | None = None,
         ladder_mark = " <sup>配</sup>" if lad.get("status") == "verified" else ""
         L.append(f"| {i+1} | **{r['model']}** | {tname or '—'}{ladder_mark} | {price} | {stxt} | "
                  f"{r['total']:.1f} | {civ or '—'} | {gid[i]} | "
-                 f"{airbag_tags(c)} | {r['evidence']} | {lcs or '在售'} |")
+                 f"{_crash_short(c)} | {airbag_tags(c)} | {r['evidence']} | {lcs or '在售'} |")
     L.append("")
     spans = [f"第 {g[0]+1}" + (f"–{g[-1]+1}" if len(g) > 1 else "") +
              f" 名（{len(g)} 款）" for g in groups]

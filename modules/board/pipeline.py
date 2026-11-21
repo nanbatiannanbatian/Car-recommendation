@@ -163,6 +163,14 @@ def main():
     if _p_filled:
         print(f"[价格回流] trims 官方指导价 → 候选池 price_guide：{len(_p_filled)} 款（"
               + "、".join(m for m, _ in _p_filled[:8]) + ("…" if len(_p_filled) > 8 else "") + "）")
+    # 碰撞成绩回流（2026-11-21）：note 文本里写了 C-NCAP/C-IASI 成绩但 crash/safety_basis
+    # 是空的 → 自动解析进字段。极氪7X 曾因这一条进不了一档（家族 6/6、全情景 98%）。
+    _c_filled, _c_unres = FS.backfill_crash_from_text(cands)
+    if _c_filled:
+        print(f"[碰撞回流] 文本成绩 → crash/safety_basis：{len(_c_filled)} 款（"
+              + "、".join(f"{m}({d})" for m, d, _ in _c_filled[:6])
+              + ("…" if len(_c_filled) > 6 else "") + "）")
+
     # 门禁：回填后仍「trims 有价而候选池无价」= 回流逻辑失效（canon 漂移/字段改名），必须硬拦。
     # 真缺口（trims 也没价）只披露不拦截，交给人补采集。
     if _p_still and not getattr(a, "no_backfill", False):
@@ -223,7 +231,11 @@ def main():
         sys.exit("安全分严谨性门禁：\n" + "\n".join(lines) +
                  "\n→ 按 official_safety_scores.json 映射表统一有成绩车的安全分与 basis。"
                  "\n→ 确认合理用 --skip-safety-gate（须在报告说明）。")
-    print(f"[安全分门禁] 有成绩车 {_sc['checked']} 款 / 最低 {_sc['official_min']} / 无成绩中位 {_sc['no_score_median']} / 问题 0")
+    _um = _sc.get("unmapped") or []
+    print(f"[安全分门禁] 池内有碰撞成绩 {_sc.get('has_score', _sc['checked'])} 款 / "
+          f"已映射 {_sc.get('mapped', _sc['checked'])} 款 / 待映射 {len(_um)} 款 / 问题 0"
+          + (("（待映射：" + "、".join(x["model"] for x in _um[:5])
+              + ("…" if len(_um) > 5 else "") + "，分数仍按无成绩插补）") if _um else ""))
 
     # v9.7.43：生命周期中文化门禁——所有状态值必须有中文映射，
     # 防止 on_sale 这类漏映射导致页面直出英文（特斯拉曾中招）。
@@ -293,7 +305,8 @@ def main():
     # 用碰撞体系真相源判定「是否真有成绩」，不在这里另写一套关键词表
     # （曾各写一套：披露写 4/21、实际 3 款，因为「已抽车未测」被当成有成绩）
     from modules.engine import crash_systems as CRS
-    _crash_named = sum(1 for c in _all if CRS.has_score(c.get("crash")))
+    # 只统计 crash 字段里能解析出成绩的车（不看 note：note 里可能有「无成绩+快充百分比」）
+    _crash_named = sum(1 for c in _all if CRS.parse_score(c.get("crash")))
     _ev_cnt = {k: sum(1 for c in _all if c.get("evidence_status") == k) for k in ("A", "B", "C")}
     _ext_n = sum(1 for c in _all if c.get("extended") or c.get("score_evidence"))
     parts.append(
@@ -342,6 +355,8 @@ def main():
         # 2026-11-21：价格回流审计（回填了哪些、哪些 trims 也没价）
         "price_backfill": {"filled": [{"model": m, "price_guide": pg} for m, pg in _p_filled],
                            "still_missing": _p_still},
+        "crash_backfill": {"filled": [{"model": m, "crash": d, "basis": b} for m, d, b in _c_filled],
+                           "unresolved": _c_unres},
         # v9.7.20：候选池披露同步给页面（评审反复指出报告有、页面看不到）
         "pool_disclosure": {
             "total": len(_all), "sourced": _src_named, "crash": _crash_named,

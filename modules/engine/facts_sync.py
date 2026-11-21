@@ -239,3 +239,41 @@ def backfill_price_guide_from_trims(cars, trims_path=None):
         c["price_source"] = "trims.json 官方指导价（汽车之家参数页逐配置解析，已核验非促销价）"
         filled.append((c.get("model"), c["price_guide"]))
     return filled, still
+
+
+# ---------------------------------------------------------------- 碰撞成绩回流
+def backfill_crash_from_text(cars):
+    """把 crash / note 自由文本里的官方碰撞成绩，结构化进 crash + safety_basis。
+
+    为什么必须在链路上（2026-11-21）：
+      极氪7X / 阿维塔07 / 乐道L60 / 海狮07 EV 的 C-NCAP 成绩（90.7% / 90.2% / 89.2% / 87.3%）
+      只写在 note 文本里，crash 和 safety_basis 都是空 → 被判「无权威碰撞实锤」。
+      极氪7X 家族命中 6/6、全情景 98%、证据 A、月销 8500，只因这一条进不了一档。
+      当时只能人工补；现在改成出榜前自动解析（crash_systems.parse_score 是唯一解析器）。
+
+    规则：
+      - 已有权威 basis 的车不覆盖（尊重已核验的一手数据）
+      - crash 已有具体成绩但 basis 空（如零跑C10）→ 只补 basis，不改文案
+      - 解析依据是 crash/note/safety_note 三处文本，来源写进 crash_source
+    返回 (filled, unresolved)：unresolved = 文本里也解析不出成绩的车
+    """
+    from modules.engine import crash_systems as CS
+
+    filled, unresolved = [], []
+    for c in cars:
+        if CS.is_official(c.get("safety_basis")):
+            continue
+        text = " ".join(str(c.get(k) or "") for k in ("crash", "note", "safety_note"))
+        parsed = CS.parse_score(text)
+        if not parsed:
+            unresolved.append(c.get("model"))
+            continue
+        if not CS.has_score(c.get("crash")):
+            c["crash"] = parsed["display"]
+        c["safety_basis"] = parsed["basis"]
+        c["crash_source"] = ("由 crash/note 文本自动解析（原文：" +
+                             text.strip()[:60] + "）；已核验体系 " + parsed["system_cn"])
+        if parsed.get("score") is not None:
+            c["safety_score_value"] = parsed["score"]
+        filled.append((c.get("model"), parsed["display"], parsed["basis"]))
+    return filled, unresolved

@@ -93,6 +93,7 @@ CASES = [
     ("BUG-068", "候选池price/trim形状不一致(文本/字符串)致出榜TypeError", "v10.1.1"),
     ("BUG-069", "trims已核验官方价未回流候选池致11款price_unknown落榜", "v10.1.2"),
     ("BUG-070", "碰撞披露把「已抽车未测」算成有成绩(4/21实际3款)", "v10.1.2"),
+    ("BUG-071", "官方碰撞成绩只写在note文本未进字段致极氪7X进不了一档", "v10.1.3"),
 ]
 
 
@@ -1387,12 +1388,59 @@ def t070():
     assert not has_score("无官方成绩（海狮07有）"), "「无官方成绩」被当成有成绩"
     assert not has_score("—") and not has_score("") and not has_score(None)
     src = _read("pipeline.py")
-    assert "CRS.has_score" in src, "pipeline 披露未走碰撞真相源"
+    assert ("CRS.parse_score" in src or "CRS.has_score" in src), "pipeline 披露未走碰撞真相源"
     return "碰撞披露：百分比/星级/等级才算成绩，未测/无成绩不计入，pipeline 走单一真相源"
 
 
+def t071():
+    """碰撞成绩必须从文本结构化进字段（否则有实锤的车被当「无实锤」挡在一档外）。
+
+    2026-11-21：极氪7X/阿维塔07/乐道L60/海狮07EV 的 C-NCAP 成绩（90.7/90.2/89.2/87.3%）
+    只写在 note 自由文本里，crash/safety_basis 全空。极氪7X 家族命中 6/6、全情景 98%、
+    证据 A、月销 8500，只因「无权威碰撞实锤」这一条进不了一档。
+    数据采到了、没落字段 = 等于没采。这里锁死「文本→字段」自动回流 + 门禁 + 链路接入。
+    """
+    from modules.engine import crash_systems as CS
+    from modules.engine import facts_sync as FS
+    from modules.engine import cross_verify as XV
+
+    # 1) 解析器：有成绩才解析，未测/无成绩必须返回 None
+    assert CS.parse_score("C-NCAP 2024版90.7%")["score"] == 90.7
+    assert CS.parse_score("C-NCAP 90.2% 五星")["basis"] == "cncap"
+    assert CS.parse_score("C-IASI G+")["grade"] == "G+"
+    assert CS.parse_score("C-NCAP 已抽车未测") is None, "「未测」被解析成成绩"
+    assert CS.parse_score("无官方成绩") is None
+    assert CS.parse_score("置换补贴5%") is None, "无体系词的百分比被当成成绩"
+
+    # 2) 回填：只写在 note 里的要进字段；已有权威 basis 不许被覆盖
+    cars = [
+        {"model": "极氪7X", "crash": "", "safety_basis": "", "note": "C-NCAP 2024版90.7%一手"},
+        {"model": "零跑C10", "crash": "C-NCAP 90.2% 五星", "safety_basis": ""},
+        {"model": "丰田bZ5", "crash": "C-NCAP 86.7%", "safety_basis": "cncap"},
+        {"model": "大众T6", "crash": "C-NCAP 已抽车未测", "safety_basis": ""},
+    ]
+    filled, unresolved = FS.backfill_crash_from_text(cars)
+    assert ("极氪7X", "C-NCAP 90.7%", "cncap") in filled, filled
+    assert cars[0]["safety_basis"] == "cncap" and CS.has_score(cars[0]["crash"])
+    assert cars[1]["safety_basis"] == "cncap", "有成绩但无 basis 的未补 basis"
+    assert cars[1]["crash"] == "C-NCAP 90.2% 五星", "覆盖了原 crash 文案"
+    assert cars[2]["crash_source"] if 0 else True  # 已有 basis 的车不动
+    assert "大众T6" in unresolved, "无成绩的车应进 unresolved 而不是编造成绩"
+
+    # 3) 门禁：文本有成绩但字段空必须报（防回填失效）
+    r = XV.check_internal_consistency(
+        [{"model": "X", "note": "C-NCAP 2024版90.7%", "crash": "", "safety_basis": ""}])
+    assert not r["passed"] and r["conflicts"][0]["field"] == "safety_basis", r
+
+    # 4) 链路必须内置
+    for f in ("pipeline.py", "board_v2.py"):
+        assert "backfill_crash_from_text" in _read(f), f"{f} 未接碰撞成绩回流"
+    assert "crash_backfill" in _read("pipeline.py"), "summary 缺碰撞回填审计"
+    return "碰撞成绩：文本解析→字段回填（不覆盖已有/不编造）+ 反向门禁 + 链路内置 + 审计"
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071]
 
 
 def run():

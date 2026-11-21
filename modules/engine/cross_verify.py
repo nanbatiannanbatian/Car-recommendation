@@ -440,6 +440,24 @@ def check_internal_consistency(cands: list[dict]) -> dict:
                 "basis": basis,
                 "fix": "删除 note 里的『无碰撞成绩』断言或更新为最新成绩；note 是展示文案，不得与结构字段矛盾",
             })
+            continue
+        # 反向检测（2026-11-21 补）：文本里明明有官方成绩，但 structured 字段是空的。
+        # 极氪7X/阿维塔07/乐道L60/海狮07EV 四款的 C-NCAP 成绩只写在 note 里，
+        # crash/safety_basis 全空 → 被判「无实锤」，极氪7X 因此进不了一档。
+        # 解析器与回填都在 facts_sync；这里只负责「没回填成功必须报出来」。
+        from modules.engine import crash_systems as _CS
+        _parsed = _CS.parse_score(f"{crash} {note}")
+        if _parsed and not _CS.is_official(basis):
+            conflicts.append({
+                "model": c.get("model"),
+                "field": "safety_basis",
+                "note": note[:80],
+                "crash": crash[:60],
+                "basis": basis,
+                "fix": f"文本里已有 {_parsed['display']}，但 safety_basis 为空——"
+                       f"应由 facts_sync.backfill_crash_from_text() 回填；"
+                       f"若它没回填，说明 crash_systems.parse_score 覆盖不到这种写法，需补解析规则",
+            })
     return {"checked": len(cands), "conflicts": conflicts, "passed": not conflicts}
 
 
