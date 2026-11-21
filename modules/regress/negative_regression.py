@@ -42,7 +42,6 @@ NEG_TARGETS = {
     "t016": ["version:"],  # 抹SKILL版本号断言FAIL
     "t035": ["基准配置（无配置级差异）"],
     "t038": ["弗迪[二代/非闪充]"],
-    "t039": ["candidates_compact_bev_extended.json"],
     "t041": ["未入池车型及原因"],
     "t042": ["no_cell"],
     "t043": ["is_placeholder_ref"],
@@ -88,6 +87,8 @@ NEG_DATA = {
     "t023": ("runs/compact_bev_202610_candidates.json", "零跑B01", "evidence_to_B"),
     "t025": ("runs/compact_bev_202610_candidates.json", "零跑Lafa5", "flatten_adas_all"),
     "t050": ("runs/midsedan_bev_1218_202610/candidates_allprice.json", "特斯拉Model 3", "fake_single_month"),
+    # t039 断言从「源码文本含文件名」升级为「文件在同步集里」，探针改成把同步集清空
+    "t039": ("sync_to_repo.collect", None, "empty_sync"),
 }
 
 
@@ -103,6 +104,7 @@ def _func_probe(name, fn, dotted, mode):
         "return_english": lambda st: st,
         "wrong_charge": lambda *a, **kw: (20, "wrong"),
         "hide_cell": lambda *a, **kw: "未披露电芯",
+        "empty_sync": lambda *a, **kw: {},   # 同步集清空 → 「候选池必须进同步集」应 FAIL
     }.get(mode)
     if wrong is None:
         return False, False

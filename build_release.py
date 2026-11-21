@@ -49,8 +49,11 @@ REQUIRED_FRONTMATTER = [
 ]
 SKILL_NAME = "car-recommendation"          # zip 内顶层目录名
 CATEGORIES_DIR = "categories"
-ROOT_INCLUDE_EXT = {".py", ".md", ".json", ".txt"}   # 根目录放行扩展名
+ROOT_INCLUDE_EXT = {".py", ".md", ".json", ".txt", ".js"}   # v10：.js 是 envscore 引擎真身，必须随包
 EXCLUDE_FILES = {                                     # 文件名精确排除
+    # 回归用 node 测试（开发者自用）；envscore/engine.js 是产品代码，不在此列
+    "dynamic_blocks_test.js", "env_options_test.js",
+    "ev_range_test.js", "filter_default_test.js",
     "key.txt",                # 疑似密钥
     "build_release.py",       # 打包脚本自身
     "sync_to_repo.py",        # 作者私用同步脚本，含本机仓库路径

@@ -229,11 +229,34 @@ def norm(s):
     return "".join(ch for ch in str(s).lower() if ch.isalnum())
 
 
+# 生成物（master_pool/trims/fact_library/vehicle_physics）不随发布包，新装包首跑前需重建。
+# 缺文件时给可执行的下一步，而不是抛裸 FileNotFoundError 让人猜。
+_REBUILD_HINT = {
+    "master_pool.json": "python3 master_pool.py --intake --month <YYYYMM> --apply  # 或从总池快照恢复",
+    "trims.json": "python3 auto_trims.py --apply  # 逐配置阶梯自动补录",
+    "fact_library.json": "python3 facts_sync.py --apply  # 原始库→事实库同步",
+    "vehicle_physics.json": "python3 sync_to_repo.py 之后由采集脚本重建（或在源码目录复制 data/gen/vehicle_physics.json）",
+}
+
+
+def _load_gen(path: str):
+    try:
+        return json.load(open(path, encoding="utf-8"))
+    except FileNotFoundError as e:
+        name = os.path.basename(path)
+        hint = _REBUILD_HINT.get(name, "见 MODULES.md「数据落盘」")
+        raise SystemExit(
+            f"[缺数据] {path}\n"
+            f"  这个 JSON 是生成物，不随发布包（data/gen/ 打包排除）。\n"
+            f"  重建方式：{hint}"
+        ) from e
+
+
 def load_cars():
-    mp = json.load(open(MP, encoding="utf-8"))
-    tr = json.load(open(TR, encoding="utf-8"))
-    fl = json.load(open(FL, encoding="utf-8"))  # 真实电耗库
-    vpdoc = json.load(open(VP, encoding="utf-8"))  # 物理参数库(采集)
+    mp = _load_gen(MP)
+    tr = _load_gen(TR)
+    fl = _load_gen(FL)  # 真实电耗库
+    vpdoc = _load_gen(VP)  # 物理参数库(采集)
     wm = WEIGHT_MAP  # 统一维度框架（数值与原榜单权重一致）
     trim_by_model = {}
     # 事实库按归一化车名建索引

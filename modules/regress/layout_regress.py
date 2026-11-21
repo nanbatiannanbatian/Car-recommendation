@@ -106,8 +106,11 @@ def check_generated_placement() -> None:
     leaked = [n for n in paths.GENERATED_JSON if (paths.CAT_DIR / n).exists()]
     check("生成物只在 data/gen/", not leaked,
           "categories/ 残留生成物（会被打包、且与 data/gen 两份真相）：" + "、".join(sorted(leaked)))
-    missing_gen_dir = not paths.GEN_DIR.is_dir()
-    check("data/gen 目录存在", not missing_gen_dir, "data/gen 缺失（生成链路会写错位置）")
+    # 不要求 data/gen 一定存在：新装包（zip 不含 data/）本来就还没有生成物，
+    # 目录由 paths.gen() 首次写入时创建。这里只校验「写入路径确实收口到 GEN_DIR」。
+    gen_target = paths.gen  # noqa: F841  存在性检查
+    ok = paths.GEN_DIR == paths.DATA_DIR / "gen" and paths.GEN_DIR.parent == paths.DATA_DIR
+    check("生成物写入路径收口到 data/gen", ok, f"GEN_DIR={paths.GEN_DIR} 不在 data/ 下")
 
 
 def check_no_hardcoded_paths() -> None:

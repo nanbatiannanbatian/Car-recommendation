@@ -100,6 +100,18 @@ def _read(rel):
     return open(p, encoding="utf-8").read() if p.exists() else ""
 
 
+def _in_sync_set(*names):
+    """候选池是否会被同步到仓库（v10 起 sync_to_repo 是镜像同步，没有手工白名单）。
+
+    原来断言「白名单里要有这个文件名」——白名单本身已删除，改成直接跑一遍收集逻辑：
+    文件在同步集里 = 下次同步一定不会漏（比字符串匹配更强）。
+    """
+    from importlib import import_module
+    sync = import_module("sync_to_repo")
+    have = sync.collect(str(paths.ROOT))
+    return all(any(r.replace("\\", "/").endswith(n) for r in have) for n in names)
+
+
 def t001():
     """cltc_km/cell_supplier/charge 必须映射到 spec_score 入参。"""
     from modules.engine import trim_board as TB
@@ -403,8 +415,8 @@ def t041():
     for f in ("categories/candidates_compact_suv_bev.json",
               "categories/car_compact_suv_bev.json"):
         assert os.path.exists(os.path.join(HERE, f)), f"未固化: {f}"
-    src = _read("sync_to_repo.py")
-    assert "candidates_compact_suv_bev.json" in src
+    assert _in_sync_set("categories/candidates_compact_suv_bev.json",
+                        "categories/car_compact_suv_bev.json"), "候选池未进同步集"
     p = os.path.join(HERE, "runs", "compact_suv_bev_202610", "榜单.html")
     if os.path.exists(p):
         t = _read("runs/compact_suv_bev_202610/榜单.html")
@@ -441,9 +453,9 @@ def t039():
               "categories/universe_compact_bev_202610.json"):
         p = _os.path.join(HERE, f)
         assert _os.path.exists(p), f"候选池未固化: {f}"
-    # 同步白名单要包含
-    sync = _read("sync_to_repo.py")
-    assert "candidates_compact_bev_extended.json" in sync and "candidates_compact_bev_audit.json" in sync
+    # 必须进同步集（v10：镜像同步，无白名单）
+    assert _in_sync_set("categories/candidates_compact_bev_extended.json",
+                        "categories/candidates_compact_bev_audit.json"), "候选池未进同步集"
     # 内容完整性：6 款长尾车 + 分数 + 生命周期 + 代际事实
     ext = json.load(open(str(paths.cat("candidates_compact_bev_extended.json")), encoding="utf-8"))
     models = {c["model"] for c in ext["candidates"]}
