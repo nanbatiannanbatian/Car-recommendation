@@ -99,6 +99,7 @@ CASES = [
     ("BUG-074", "缺逐配置数据的车静默无下拉框(大众T6),读者分不清是缺失还是无差异", "v10.1.6"),
     ("BUG-075", "采集只有单源单点:索引miss就放弃(索引漏新车但车系页已存在)", "v10.1.7"),
     ("BUG-076", "多源采集无调度层/失败无留痕(待补清单只写「未匹配」)", "v10.1.9"),
+    ("BUG-077", "联网取数未强制走research(业务模块可自行requests抓页面)", "v10.2.0"),
 ]
 
 
@@ -1732,8 +1733,46 @@ def t076():
     return "多源调度：索引→检索→存在性核对；本地命中不打远程；miss 留痕且不编造"
 
 
+def t077():
+    """联网取数必须只走 research（唯一网络出口），越界要被门禁拦。
+
+    2026-11-21 用户要求：「查数据是否要用 research 模块，是否要加入铁律让你严格遵守，
+    你搭的可插拔也要纳入其中。」——此前 MODULES.md 只有一句声明，没有代码强制。
+    声明会忘；门禁不会。除 modules/research/ 外任何模块 import 网络库即 FAIL。
+    """
+    from modules.regress import layout_regress as LR
+    from modules.research import trim_sources as TS
+
+    # 1) 现状必须干净（有越界就说明有人绕过了 research）
+    cur = LR.scan_network_egress()
+    assert not cur, "存在越界网络调用：" + "；".join(cur[:4])
+
+    # 2) 能力断言：造一个越界文件，必须被检出
+    probe = paths.MODULES / "engine" / "_tmp_egress_probe.py"
+    try:
+        probe.write_text("import requests\n", encoding="utf-8")
+        hits = LR.scan_network_egress()
+        assert any("_tmp_egress_probe.py" in h for h in hits), f"越界 import 未被检出：{hits}"
+    finally:
+        if probe.exists():
+            probe.unlink()
+
+    # 3) research 包内允许（它才是出口），且不得被误报
+    assert not any("modules/research/" in h for h in LR.scan_network_egress())
+
+    # 4) 可插拔源链也纳入这条约束：源必须注册、结构化在前、存在性兜底
+    ids = [s["id"] for s in TS.SOURCES]
+    kinds = [s["kind"] for s in TS.SOURCES]
+    assert ids and "structured" in kinds and "existence" in kinds, (ids, kinds)
+    assert kinds[-1] == "existence", "存在性核对必须兜底（只出证据不出配置）"
+
+    # 5) 铁律必须写在 SKILL.md 里（人能读到），并由上面的门禁强制执行
+    assert "联网取数只走 research" in _read("SKILL.md"), "SKILL.md 缺该铁律"
+    return "网络出口唯一：现状零越界 + 越界能被检出 + research 内放行 + 源链纳入约束 + 铁律成文"
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077]
 
 
 def run():

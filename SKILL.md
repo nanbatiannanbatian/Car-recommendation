@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 10.1.9
+version: 10.2.0
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v10.1.9）
+# Car recommendation —— 可信购车榜单引擎（v10.2.0）
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -90,6 +90,25 @@ paths.py       全项目路径唯一事实源（ROOT/cat()/gen()）+ 生成物�
 
 当前已代码化的门禁清单（出榜前 pipeline 自动跑）：完整性门禁 / 内部一致性门禁 / 判档分同源 / 指纹门禁 /
 逐配置覆盖 / 48+ 条 bug 回归。新增任何铁律时，对照这套模式补门禁+回归。
+
+## ⛔ 联网取数只走 research（唯一网络出口，代码强制）
+
+来源：2026-11-21 用户「查数据是否要用 research 模块，是否要加入铁律让你严格遵守，
+你搭的可插拔也要纳入其中」。此前只有 MODULES.md 里一句声明——**声明会忘，门禁不会**。
+
+1. **任何模块要联网，只能调用 `modules/research/` 下的函数**；不得自己 `import requests / urllib /
+   httpx / aiohttp / http.client`。由 `layout_regress.check_network_egress()` 强制，越界即 FAIL。
+   为什么：业务模块直接抓页面会绕过超时/重试/留痕/防编造整套约束，且「这条数据从哪来」无法追溯。
+2. **新增数据源必须注册进 `modules/research/trim_sources.py` 的 `SOURCES` 源链**，实现
+   `_try_xxx(model)` 后登记；不许在业务模块里临时抓一个页面就写库。源链顺序固定：
+   本地索引 → 站点检索 → **存在性核对（最后，只出证据）**。
+3. **存在性核对只产出证据**（车在售、指导价区间），**不得产出要入库的结构化字段**。
+   宁可标「配置待补」，不许编造配置——这是「事实不进分」的同一条底线。
+4. 联网函数必须：带超时、失败返回 None/空而**不抛未捕获异常**、每次尝试写进 `attempts` 留痕
+   （待补清单要能看出「试过哪些源、各因何失败」，而不是一句「未匹配」）。
+5. 跨站现状（2026-11-21 实测）：易车 API 返回反爬 HTML、懂车帝 config 页 0 字节、
+   有驾内嵌数据只有 1 条主推款 → 靠 requests 拿不到齐全的跨站配置表；要做得引入浏览器自动化，
+   届时仍必须遵守本条：实现放在 `modules/research/` 内并注册源链。
 
 ## ⛔ 第零步：接到排行指令，先判榜型再出榜（2026-11-20 用户明确要求，强制）
 

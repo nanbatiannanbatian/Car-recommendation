@@ -67,6 +67,9 @@ WorkBuddy 用户级 skill。核心是「车型排行榜全链路」：按需搜�
     `universe_*`（盘点产物）、`airbags` / `vehicle_physics` / `baseline_car_ev`
   · 人工条目从 `trims.json` 分离到 `categories/trims_manual.json`，`auto_trims --seed-only`
     先用它生成基础库，再联网叠加自动条目——新装包不会再丢人工核验的配置表。
+- **联网取数只走 research（v10.2.0，代码强制）**：除 `modules/research/` 外任何模块不得直接
+  `import requests/urllib/httpx`，由 `layout_regress.check_network_egress()` 拦截（现状零越界，越界即 FAIL）；
+  新增数据源必须注册进 `research/trim_sources.SOURCES`，存在性核对只出证据不出配置。
 - **多源调度层（v10.1.9）**：`trim_sources.collect_trims()` 按「本地索引 → 站点检索 → 内容页存在性核对」
   顺序尝试，每步留痕（`attempts`），待补清单里能看出「试过哪些源、各因何失败」。
   前两个源能出结构化配置；第三个只确认「车确实在售 + 指导价区间」，**不产出配置**（防编造）。

@@ -23,7 +23,8 @@ modules/
     trims_schema.py          逐配置阶梯 trims.json 的字段/枚举/校验
     candidate_schema.py      候选池单条形状：price 文本/trim 字符串归一化 + 形状体检
     model_names.py           车名归一化 canon
-  research/                  取数 · 检索 · 证据采集（唯一网络出口）
+  research/                  取数 · 检索 · 证据采集（**唯一网络出口，代码强制**）
+    trim_sources.py          多源调度：索引→站点检索→存在性核对，attempts 留痕
     researcher.py            站点画像检索（17 站点）+ 广告识别 + 博主可信度
     fetch_dcd_sales.py       懂车帝逐月销量（纯电/插混/增程拆分）
     fetch_cncap.py           C-NCAP 官方成绩
@@ -107,6 +108,11 @@ regress ────────────────────────
   - `research/auto_trims → engine/trims.validate`：下沉到 `contracts/trims_schema.py`（采集方不该依赖打分引擎）。
 - `layout_regress.EXCEPTIONS` 现为空。新增例外必须登记并写原因，否则结构回归报违规。
 
+**网络出口唯一（2026-11-21 用户要求，代码强制）**：除 `research/` 外任何包不得
+`import requests/urllib/httpx/aiohttp/http.client`，由 `layout_regress.check_network_egress()` 拦截；
+新增数据源必须注册进 `research/trim_sources.SOURCES`（结构化源在前、存在性核对兜底），
+存在性核对只出证据不出配置。
+
 ## 4. 数据落盘
 
 **判据只有一条：能不能用代码重新生成。不是体积。**
@@ -179,7 +185,7 @@ python3 bootstrap_data.py --apply --only trims.json --force
 
 | 脚本 | 守什么 | 项数 |
 |---|---|---|
-| `layout_regress.py` | 结构：薄壳 / 依赖方向 / 契约层纯净 / 生成物可重建 / 路径硬编码 / 文档 CLI | 15 |
+| `layout_regress.py` | 结构：薄壳 / 依赖方向 / 契约层纯净 / 生成物可重建 / **网络出口唯一** / 路径硬编码 / 文档 CLI | 16 |
 | `bug_regression.py` | 口径：历史 bug 断言 + 反向注入回测 | 67（含 63 条注入） |
 | `energy_router_regress.py` | A/B 榜型自动判定 | 32 |
 | `energy_compare_regress.py` | 比较器与环境分引擎 | 20 |

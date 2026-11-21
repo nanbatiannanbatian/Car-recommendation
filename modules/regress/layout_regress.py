@@ -135,6 +135,55 @@ def check_rebuildable() -> None:
     check("人工事实库随包存在", not absent, "缺文件（应随包，不重建）：" + "、".join(sorted(absent)))
 
 
+# 联网库：只允许出现在 modules/research/（唯一网络出口）
+_NET_IMPORT_RE = re.compile(
+    r"^\s*(?:import|from)\s+(requests|urllib|http\.client|httpx|aiohttp|websocket)\b")
+
+
+def scan_network_egress() -> list[str]:
+    """扫描除 research 外的所有项目源码，返回越界引用网络的「文件:行 内容」。"""
+    bad: list[str] = []
+    roots = [paths.MODULES] + [paths.ROOT]
+    for base in roots:
+        for f in sorted(base.glob("*.py")):
+            rel = f.relative_to(paths.ROOT).as_posix()
+            if rel.startswith("modules/research/"):
+                continue
+            if rel.startswith("tools/") or rel.startswith("runs/"):
+                continue
+            for i, line in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
+                s = line.strip()
+                if s.startswith("#"):
+                    continue
+                if _NET_IMPORT_RE.match(line):
+                    bad.append(f"{rel}:{i} {s[:60]}")
+        for pkg in paths.MODULES.iterdir():
+            if not pkg.is_dir() or pkg.name in ("research", "__pycache__"):
+                continue
+            for f in sorted(pkg.glob("*.py")):
+                rel = f.relative_to(paths.ROOT).as_posix()
+                for i, line in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
+                    s = line.strip()
+                    if s.startswith("#"):
+                        continue
+                    if _NET_IMPORT_RE.match(line):
+                        bad.append(f"{rel}:{i} {s[:60]}")
+    return bad
+
+
+def check_network_egress() -> None:
+    """联网取数只走 research（唯一网络出口）。
+
+    2026-11-21 用户要求把「查数据必须用 research」变成铁律并代码化。
+    此前只是 MODULES.md 里一句声明——声明会忘，门禁不会：
+    任何业务模块自己 import requests 抓页面，都会绕过超时/重试/留痕/防编造这一整套约束，
+    也会让「数据从哪来」无法追溯。越界即 FAIL。
+    """
+    bad = scan_network_egress()
+    check("联网只走 research", not bad,
+          "以下位置直接引用了网络库（应改为调用 modules/research/）：" + "；".join(bad[:6]))
+
+
 def check_generated_placement() -> None:
     leaked = [n for n in paths.GENERATED_JSON if (paths.CAT_DIR / n).exists()]
     check("生成物只在 data/gen/", not leaked,
@@ -191,6 +240,7 @@ def main() -> int:
     check_direction()
     check_contracts_pure()
     check_rebuildable()
+    check_network_egress()
     check_generated_placement()
     check_no_hardcoded_paths()
     check_doc_cli()
