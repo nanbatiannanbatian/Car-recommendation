@@ -1,1 +1,4 @@
 lxml>=4.9        # 页面解析（fetch_cncap/fetch_bili）
+requests>=2.28   # 联网采集（fetch_* / discover / 物理参数抓取）
+numpy>=1.24      # 数值计算与稳健性分析
+pymcdm>=1.0      # MCDA 多准则决策（verify_mcda 对拍裁判）
