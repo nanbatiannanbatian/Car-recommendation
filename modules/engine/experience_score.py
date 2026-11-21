@@ -41,12 +41,19 @@ def load_library(path: str | None = None) -> dict:
 
 
 def adjustments(model: str, lib: dict) -> dict:
-    """返回 {dim: (adjust值, [证据id...])}；按来源权重加总后封顶。"""
+    """返回 {dim: (adjust值, [证据id...])}；按来源权重加总后封顶。
+
+    车名一律走 canon 归一化（2026-11-21 修）：库里写「特斯拉Model Y」，候选池写
+    「特斯拉 Model Y」，裸名比对会静默漏掉它那份麋鹿 80.9km/h（五车第一）的实测，
+    于是有实测的车等于没实测——与 evidence_gate 同一个坑，两处必须同口径。
+    """
+    from modules.contracts.model_names import canon
     acc = {d: 0.0 for d in DIMS}
     src = defaultdict(list)
     weights = lib.get("source_weights") or {}
+    key = canon(model or "")
     for e in lib.get("entries") or []:
-        if e.get("model") != model or e.get("dimension") not in DIMS:
+        if canon(e.get("model") or "") != key or e.get("dimension") not in DIMS:
             continue
         w = float(weights.get(e.get("source_type"), 0.35))
         delta = float(e.get("direction", 0)) * float(e.get("weight", 0)) * w
@@ -243,48 +250,14 @@ if __name__ == "__main__":
 # ---------------------------------------------------------------- 体验维度举证封顶
 def cap_unproven(cands: list[dict], lib: dict | None = None,
                  dims=("adas", "cabin", "control")) -> list[dict]:
-    """无实测依据的车，体验类维度封顶至「有依据车该维度的最低分」。
+    """体验三维的证据封顶——**薄包装**，实现在 evidence_gate.DIM_POLICY。
 
-    2026-11-21 用户质疑「小鹏 MONA L05 智驾/车机/空间分数断层高，有没有参考实测」：
-    查实它零交付、零实测、零车主样本，experience_facts.json / thirdparty_tests.json
-    里都没有它，但 adas 9.4（全场最高），而同品牌有实测的小鹏 G6 只有 7.6。
-    这些维度是**纸面参数看不出来**的（算法调校、车机流畅度、底盘质感），
-    拿配置推断值去压实测值，等于用宣传口径压实测证据。
-
-    规则（与 safety 的举证封顶同构）：
-      - 依据 = experience_facts 里该车该维度有非 vendor_claim 的记录
-        （independent_test 实测 / owner_report 车主样本 / up_review 大V实车）
-      - 无依据 → 该维度封顶至有依据车的最低分；只封顶不倒扣（缺数据不判劣）
-      - 某维度全池都无依据 → 不封顶（没有可校准的锚）
-    返回 [{"model","dim","prev","capped","anchor"}]
+    2026-11-21 二次校准：原来的独立实现有三个缺陷（用户质疑「大众 T6 智驾/操控分低」时查实）：
+      ① 车名裸比对，库写「特斯拉Model Y」、池写「特斯拉 Model Y」→ 麋鹿 80.9km/h 失联；
+      ② 锚点一律用「有证据车最低分」，等于「没测过只能垫底」；
+      ③ 有证据车只有 2 款时也照样封顶，拿噪声当全池天花板。
+    现在统一由 evidence_gate 处理（canon 归一化 + 分维度锚点 + 小样本不封顶），
+    这里只保留函数名，避免「同一件事两套实现」。
     """
-    lib = lib if lib is not None else load_library()
-    have: dict[str, dict[str, set]] = {}
-    for e in lib.get("entries", []):
-        m, d, st = e.get("model"), e.get("dimension"), e.get("source_type")
-        if d in dims and st != "vendor_claim":
-            have.setdefault(m, {}).setdefault(d, set()).add(st)
-
-    out = []
-    for dim in dims:
-        proven = [(c["model"], float(c["scores"][dim]))
-                  for c in cands
-                  if dim in have.get(c.get("model"), {})
-                  and isinstance((c.get("scores") or {}).get(dim), (int, float))]
-        if not proven:
-            continue
-        floor = min(v for _, v in proven)
-        anchor = min(proven, key=lambda x: x[1])[0]
-        for c in cands:
-            if dim in have.get(c.get("model"), {}):
-                continue
-            s = (c.get("scores") or {}).get(dim)
-            if not isinstance(s, (int, float)) or float(s) <= floor + 1e-9:
-                continue
-            prev = float(s)
-            c["scores"][dim] = floor
-            c.setdefault("score_cap_reasons", []).append(
-                f"{dim} 无实测依据，封顶至 {floor:g}（锚点 {anchor}）")
-            out.append({"model": c["model"], "dim": dim, "prev": prev,
-                        "capped": floor, "anchor": anchor})
-    return out
+    from modules.engine import evidence_gate as EG
+    return EG.apply_all(cands, experience_lib=lib, only=dims)

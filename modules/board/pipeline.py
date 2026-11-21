@@ -197,6 +197,13 @@ def main():
     # 维度证据门槛（2026-11-21 统一）：safety 要碰撞成绩、adas/cabin/control 要实测、
     # quality 要 PPH 样本；space/value/powertrain 纸面可判定，不封顶。
     # 必须放在 crash 回流与安全映射之后，否则有成绩的车会被误判成「无证据」。
+    # 体验证据调整（2026-11-21）：原来只有 board_v2（HTML 链路）会 apply_experience，
+    # pipeline（report/summary 链路）不调 → 同一份数据，report 说极氪7X 第一、HTML 说 MONA 第一。
+    # 现在统一在 pipeline 里调一次，并把 no_experience=True 传给 board_v2，避免重复累加。
+    from modules.engine import experience_score as _ES
+    if not getattr(a, "no_experience", False):
+        _ES.apply_experience(cands, enabled=True)
+
     from modules.engine import evidence_gate as EG
     if getattr(a, "no_evidence_cap", False):
         _ev_adj = []
@@ -208,6 +215,15 @@ def main():
     if _ev_sum:
         print("[证据封顶] " + " / ".join(f"{d} {v['count']}款→{v['cap']:g}"
                                          for d, v in _ev_sum.items()))
+
+    # 证据缺口检测（2026-11-21）：文本里有可核查实测（麋鹿 XX km/h / 城市NOA 实测）
+    # 但体验证据库没记录 → 报出来。T6 的麋鹿 80.02km/h 就这样被漏过一次，
+    # 结果被判「零实测」封顶到 7.8，而实测 75.2km/h 的车是 8.5。
+    from modules.engine import cross_verify as XV
+    _exp_gaps = XV.check_experience_gaps(cands) if not getattr(a, "no_evidence_cap", False) else []
+    if _exp_gaps:
+        print(f"[证据缺口] {len(_exp_gaps)} 条文本实测未入库：" +
+              "、".join(f"{g['model']}({g['dim']})" for g in _exp_gaps[:5]))
 
     # adjust 黑箱门禁：总分加减必须留依据（此前 11 款 adjust 无 reason，不可审计）
     _adj_bad = [c.get("model") for c in cands
@@ -333,9 +349,15 @@ def main():
     if _ev_sum:
         _lines = "；".join(f"{d} {v['count']} 款 → {v['cap']:g}（锚点 {v['anchor']}）"
                           for d, v in _ev_sum.items())
-        parts.append(f"> **维度证据封顶**：{_lines}。规则：无证据者不得超过有证据者，只封顶不倒扣"
-                     f"（缺数据不判劣）。**{'、'.join(EG.uncapped_dims())} 不封顶**——"
-                     "轴距/配置/三电参数是硬数据，可纸面判定。")
+        parts.append(f"> **维度证据封顶**：{_lines}。规则分两种：`safety` 用「有实锤车最低分」"
+                     "（碰撞是门槛，没成绩不能和有成绩并列）；`adas/cabin/control/quality` 用"
+                     "「有证据车中位」（举证责任只要求不超过典型水平，不是垫底）。"
+                     f"有证据车不足 3 款的维度不封顶（避免拿 2 款车的噪声当全池天花板）。"
+                     f"**{'、'.join(EG.uncapped_dims())} 不封顶**——轴距/配置/三电参数是硬数据。")
+    if _exp_gaps:
+        parts.append(f"> **证据缺口**：{'、'.join(g['model']+chr(40)+g['dim']+chr(41) for g in _exp_gaps[:6])}"
+                     f"（共 {len(_exp_gaps)} 条）的文本里有实测数据但证据库无记录，"
+                     "按「零实测」封顶——核实来源后补录 `categories/experience_facts.json`。")
     if _sa:
         _chg = [x for x in _sa if x["prev"] is not None and abs(float(x["prev"]) - x["score"]) > 0.05]
         parts.append(f"> **安全分来源**：{len(_sa)} 款按官方碰撞成绩自动映射"
@@ -414,6 +436,7 @@ def main():
         "safety_auto": {"applied": _sa, "skipped": _ss},
         "safety_cap": _cap_adj,
         "dimension_cap": _dim_cap,
+        "experience_gaps": _exp_gaps,
         "safety_table_sync": _st_sync,
         # v9.7.20：候选池披露同步给页面（评审反复指出报告有、页面看不到）
         "pool_disclosure": {
@@ -619,7 +642,8 @@ def main():
                 # 否则被生命周期闸门淘汰的停产车（如秦L EV）会出现在主榜却没档位。
                 _passed = set(_tiers_v2.keys())
                 cands_for_html = [c for c in cands if c.get("model") in _passed] if _passed else cands
-                data_v2 = BV.build(cands_for_html, cfg_v2, pol, facts_v2, tiers=_tiers_v2)
+                data_v2 = BV.build(cands_for_html, cfg_v2, pol, facts_v2, tiers=_tiers_v2,
+                                   no_experience=True)  # 已在 pipeline 里调过，不重复累加
                 _as_of = a.as_of
                 if not _as_of:
                     try:

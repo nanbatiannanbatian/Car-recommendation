@@ -414,6 +414,49 @@ FIELD_LABEL = {
 }
 
 
+
+
+# ---------------------------------------------------------------- 体验证据缺口
+_MOOSE_RE = _re.compile(r"麋鹿[^0-9]{0,8}(\d{2,3}(?:\.\d+)?)\s*(?:km\s*/?\s*h|公里)")
+_NOA_RE = _re.compile(r"(城市\s*NOA|城区\s*NOA)[^。；]{0,12}(实测|实车|试驾)")
+
+
+def check_experience_gaps(cands, lib=None) -> list[dict]:
+    """候选池文本里写了可核查的实测数据，但体验证据库没有对应条目 → 缺口。
+
+    为什么要有（2026-11-21 用户质疑「大众 T6 智驾/操控分低是否不客观」时查实）：
+      T6 的麋鹿 80.02km/h 明明在多家试驾稿里，却没进 experience_facts.json，
+      于是被判「零实测」封顶到 7.8——而实测只有 75.2km/h 的极氪7X 是 8.5。
+      数据在、没入库 = 等于没采。这和 crash「文本有成绩但字段空」是同一种病，
+      所以用同一种办法：出榜前扫一遍文本，有数字没条目就报出来。
+    只报缺口，不自动入库——麋鹿数字可能是宣传口径，要人判断来源后才录。
+    """
+    from modules.contracts.model_names import canon
+    from modules.engine import experience_score as ES
+    lib = lib if lib is not None else ES.load_library()
+    have: dict[str, set] = {}
+    for e in (lib or {}).get("entries", []):
+        have.setdefault(canon(e.get("model") or ""), set()).add(e.get("dimension"))
+    gaps = []
+    for c in cands:
+        k = canon(c.get("model") or "")
+        own = have.get(k, set())
+        text = " ".join(str(c.get(x) or "") for x in
+                        ("note", "safety_note", "intro", "highlight", "summary"))
+        m = _MOOSE_RE.search(text)
+        if m and "control" not in own:
+            gaps.append({"model": c.get("model"), "dim": "control", "kind": "moose",
+                         "value": float(m.group(1)),
+                         "fix": f"文本里有麋鹿 {m.group(1)}km/h，但 experience_facts 无 control 记录——"
+                                f"核实来源后补录（厂商公布标 up_review、第三方实测标 independent_test），"
+                                f"否则该车会被判「零实测」而封顶"})
+        if _NOA_RE.search(text) and "adas" not in own:
+            gaps.append({"model": c.get("model"), "dim": "adas", "kind": "noa",
+                         "value": None,
+                         "fix": "文本提到城市NOA实车/实测，但 experience_facts 无 adas 记录——核实后补录"})
+    return gaps
+
+
 def check_internal_consistency(cands: list[dict]) -> dict:
     """条目内一致性门禁（v9.7.43）：查"同一事实多字段自相矛盾"。
     现有工具只查跨源一致(cross_verify)和字段格式(schema_audit)，

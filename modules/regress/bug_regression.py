@@ -1886,27 +1886,52 @@ def t080():
     adas 却 9.4（全场最高），同品牌有实测的小鹏 G6 只有 7.6。
     这三类维度纸面参数看不出来，拿配置推断压实测值＝用宣传口径压实测证据。
     另：11 款车的 adjust 加减分没有 reason，属不可审计的总分黑箱。
+
+    2026-11-21 二次校准（用户质疑「T6 麋鹿 80.02 反而被压到 7.8」后定的正确设计）：
+      · 锚点 min → median：用「有证据车最低分」当天花板＝「没测过只能垫底」，
+        会把实测更强的车压到比实测弱的车还低，荒谬。
+      · min_proven=3：有证据车不足 3 款时拿噪声当全池天花板，统计上不成立 → 不封顶。
+      · 车名走 canon 归一化，库写「特斯拉Model Y」、池写「特斯拉 Model Y」失联的坑必须堵。
+    本测试从「2 款即封顶到 min 7.6」的旧断言升级为覆盖上述正确设计，且更强。
     """
     from modules.engine import experience_score as ES
+    from modules.contracts.model_names import canon
 
-    lib = {"entries": [
-        {"model": "有实测A", "dimension": "adas", "source_type": "independent_test"},
-        {"model": "有实测B", "dimension": "adas", "source_type": "owner_report"},
-        {"model": "仅宣传C", "dimension": "adas", "source_type": "vendor_claim"},
-    ]}
     def mk(m, adas, space=8.0):
         return {"model": m, "scores": {"adas": adas, "space": space}}
 
-    cands = [mk("有实测A", 9.0), mk("有实测B", 7.6), mk("仅宣传C", 9.4), mk("零依据D", 9.2)]
+    # 1) ≥3 款有实测，锚点应为中位而非最低：分数 9.0/8.0/7.6 → 中位 8.0（不是 min 7.6）
+    lib = {"entries": [
+        {"model": "有实测A", "dimension": "adas", "source_type": "independent_test"},
+        {"model": "有实测B", "dimension": "adas", "source_type": "owner_report"},
+        {"model": "有实测C", "dimension": "adas", "source_type": "independent_test"},
+        {"model": "仅宣传D", "dimension": "adas", "source_type": "vendor_claim"},
+    ]}
+    cands = [mk("有实测A", 9.0), mk("有实测B", 8.0), mk("有实测C", 7.6),
+             mk("仅宣传D", 9.4), mk("零依据E", 9.2)]
     adj = ES.cap_unproven(cands, lib=lib)
     got = {a["model"]: a["capped"] for a in adj}
-    # vendor_claim 不算依据 → 与零依据一样封顶到 7.6
-    assert got == {"仅宣传C": 7.6, "零依据D": 7.6}, got
-    assert cands[0]["scores"]["adas"] == 9.0 and cands[1]["scores"]["adas"] == 7.6, "有实测的被改"
-    assert cands[3].get("score_cap_reasons"), "封顶未留原因"
+    # vendor_claim 不算依据 → 与零依据一样封顶到中位 8.0（不是最低 7.6）
+    assert got == {"仅宣传D": 8.0, "零依据E": 8.0}, got
+    assert [c["scores"]["adas"] for c in cands[:3]] == [9.0, 8.0, 7.6], "有实测的被改"
+    assert cands[4].get("score_cap_reasons"), "封顶未留原因"
     # 空间不在封顶维度内（轴距/车长是硬数据，不该因无实测被压）
     assert "space" not in ES.cap_unproven.__defaults__[1], "space 不该纳入体验封顶"
-    # 某维度全池无依据 → 不封顶
+    assert cands[0]["scores"]["space"] == 8.0, "space 被误压"
+
+    # 2) 小样本不封顶：仅 2 款有实测 → 拿噪声当全池天花板不成立（T6 麋鹿曾因此被压）
+    lib2 = {"entries": [
+        {"model": "有实测A", "dimension": "adas", "source_type": "independent_test"},
+        {"model": "有实测B", "dimension": "adas", "source_type": "owner_report"},
+    ]}
+    c2 = [mk("有实测A", 9.0), mk("有实测B", 7.6), mk("零依据Z", 9.2)]
+    assert ES.cap_unproven(c2, lib=lib2) == [], "有证据车不足3款不该封顶"
+    assert c2[2]["scores"]["adas"] == 9.2, "小样本封顶误改了分数"
+
+    # 3) canon 归一化：库写「特斯拉Model Y」、池写「特斯拉 Model Y」必须算同一款
+    assert canon("特斯拉Model Y") == canon("特斯拉 Model Y"), "canon 未归一空格"
+
+    # 4) 某维度全池无依据 → 不封顶
     assert ES.cap_unproven([mk("甲", 9.0)], lib={"entries": []}) == []
 
     # adjust 门禁：源码必须有「非 0 必须写 reason」的拦截
@@ -1915,7 +1940,8 @@ def t080():
     # 体验封顶已并入统一证据门槛（v10.2.5），pipeline 不再单独调 cap_unproven
     assert "evidence_gate" in src, "pipeline 未接证据门槛（体验维度在 DIM_POLICY 里）"
     assert "dimension_cap" in src or "cap_unproven" in src, "summary 缺封顶审计"
-    return "体验封顶：无依据≤有实测最低、vendor_claim 不算依据、空间不封顶、adjust 必须有 reason"
+    return ("体验封顶：封到中位非最低、vendor_claim 不算、小样本(2款)不封顶、"
+            "canon 归一空格、空间不封顶、adjust 必须有 reason")
 
 
 def t081():
@@ -1941,24 +1967,44 @@ def t081():
     assert EG.DIM_POLICY["quality"]["cap_to"] == "median"
     assert EG.DIM_POLICY["safety"]["cap_to"] == "min"
 
-    # 3) 行为：有证据不动、无证据封顶、全池无证据不封顶
+    # 3) 行为：≥3 款有 PPH 样本 → 无样本车 force 到中位（统一锚点，不看原值高低）
+    #    三款有样本分数 5.0/6.0/7.0 → 中位 6.0；T6 手填 6.09 曾比被封到 6.74 的还低，
+    #    force 的意义正是「填低填高都是没依据，一律同尺度」，故填得低的也应上修到 6.0。
     cands = [
-        {"model": "有PPH", "ah_pph_usable": True, "ah_review_users": 80,
+        {"model": "有PPH1", "ah_pph_usable": True, "ah_review_users": 80,
          "scores": {"quality": 5.0, "space": 9.0}},
+        {"model": "有PPH2", "ah_pph_usable": True, "ah_review_users": 64,
+         "scores": {"quality": 6.0, "space": 9.0}},
+        {"model": "有PPH3", "ah_pph_usable": True, "ah_review_users": 50,
+         "scores": {"quality": 7.0, "space": 9.0}},
         {"model": "零样本", "ah_pph_usable": False, "ah_review_users": 0,
          "scores": {"quality": 8.0, "space": 9.3}},
-        {"model": "样本不足", "ah_pph_usable": False, "ah_review_users": 12,
-         "scores": {"quality": 7.5, "space": 8.8}},
+        {"model": "填得低", "ah_pph_usable": False, "ah_review_users": 12,
+         "scores": {"quality": 3.5, "space": 8.8}},
     ]
     adj = EG.apply_all(cands, experience_lib={"entries": []}, only=("quality",))
-    # 只有 1 款有证据 → 中位 = 它自己的 5.0，其余封顶到 5.0
-    assert {a["model"] for a in adj} == {"零样本", "样本不足"}, adj
-    assert cands[0]["scores"]["quality"] == 5.0, "有证据的被改"
-    assert cands[1]["scores"]["quality"] == 5.0 and cands[2]["scores"]["quality"] == 5.0
+    got = {a["model"]: a["capped"] for a in adj}
+    assert got == {"零样本": 6.0, "填得低": 6.0}, got
+    assert [c["scores"]["quality"] for c in cands[:3]] == [5.0, 6.0, 7.0], "有样本的被改"
+    # force：填低(3.5→6.0)上修、填高(8.0→6.0)下压，同一无依据状态同一尺度
+    assert cands[3]["scores"]["quality"] == 6.0 and cands[4]["scores"]["quality"] == 6.0
+    assert all(a.get("forced") for a in adj), "quality 应 force 而非仅封顶"
     # 空间不在 only 里 → 不被压
-    assert cands[1]["scores"]["space"] == 9.3
-    assert cands[1].get("score_cap_reasons"), "封顶未留原因"
-    # 全池无证据 → 不封顶
+    assert cands[3]["scores"]["space"] == 9.3
+    assert cands[3].get("score_cap_reasons"), "封顶未留原因"
+
+    # 3b) 小样本不封顶：有 PPH 样本不足 3 款 → 不拿噪声当全池天花板
+    c2 = [
+        {"model": "有PPH1", "ah_pph_usable": True, "ah_review_users": 80,
+         "scores": {"quality": 5.0}},
+        {"model": "零样本", "ah_pph_usable": False, "ah_review_users": 0,
+         "scores": {"quality": 8.0}},
+    ]
+    assert EG.apply_all(c2, experience_lib={"entries": []}, only=("quality",)) == [], \
+        "有样本不足3款不该封顶"
+    assert c2[1]["scores"]["quality"] == 8.0, "小样本封顶误改了分数"
+
+    # 3c) 全池无证据 → 不封顶
     assert EG.apply_all([{"model": "甲", "scores": {"quality": 8.0}}],
                         experience_lib={"entries": []}, only=("quality",)) == []
 
