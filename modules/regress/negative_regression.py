@@ -77,7 +77,7 @@ NEG_DATA = {
     "t007": ("runs/midsedan_bev_1218_202610/board_v2_data.json", "MG 07 纯电", "same_score_trims"),
     "t011": ("car_midsedan_allprice.json", "price_band", "tighten_band"),
     "t021": ("trims.json", "零跑B01", "remove_lidar_name"),
-    "t036": ("trims.json", "零跑B01", "remove_charge"),       # 删charge→电压断言FAIL
+    "t036": ("trims.json", "MG 07 纯电", "remove_charge"),     # 删charge→电压断言FAIL（用随包manual里的真实案例）
     "t005": ("board_view.main_cell", None, "wrong_trim"),                # 函数patch
     "t013": ("board_view.main_cell", None, "wrong_total"),
     "t019": ("board_view.lifecycle_status_cn", None, "return_english"),

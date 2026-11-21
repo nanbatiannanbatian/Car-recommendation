@@ -1,0 +1,1548 @@
+{
+ "深蓝L06": {
+  "kwh": 56.12,
+  "consumption": 11.5,
+  "cell_brand": "宁德时代",
+  "cltc": 560,
+  "trend_sales": 5758,
+  "life_status": "new_launch",
+  "life_note": "2027 款 10 月 9 日上市，10 月为换代首月",
+  "scored_trim": "560 Ultra 激光版",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 4.32,
+  "price": 12.99,
+  "_source": {
+   "price_src": "cell_facts",
+   "cons_src": "https://car.m.yiche.com/shenlanl06/m188660/peizhi/?from=ybm",
+   "cons_quote": "26款 纯电版 560km Max 基本信息 ... CLTC纯电续航里程[km] 560 ... 百公里耗电量[kWh/100km] 11.5",
+   "cons_trim": "26款 纯电版 560km Max",
+   "sales_src": "baseline_trend",
+   "flags": [
+    "新车"
+   ]
+  }
+ },
+ "马自达EZ-6": {
+  "kwh": 56.1,
+  "consumption": 13.4,
+  "cell_brand": "宁德时代(时代长安)",
+  "cltc": 600,
+  "trend_sales": 2144,
+  "scored_trim": "纯电入门版（480 Air+）",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 4.01,
+  "price": 13.98,
+  "_source": {
+   "price_src": "cell_facts",
+   "cons_src": "https://car.m.yiche.com/mazda/m181622/peizhi/",
+   "cons_quote": "25款 纯电版 600km 智雅运动版 ... CLTC纯电续航里程[km] 600 ... 百公里耗电量[kWh/100km] 13.4",
+   "cons_trim": "25款 纯电版 600km 智雅运动版",
+   "sales_src": "baseline_trend",
+   "flags": [
+    "月销<3000"
+   ]
+  }
+ },
+ "风云A9": {
+  "kwh": 70.11,
+  "consumption": 12.3,
+  "cell_brand": "得壹能源(奇瑞犀牛自研)",
+  "cltc": 655,
+  "trend_sales": 5859,
+  "scored_trim": "655 MAX 激光雷达版",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 5.4,
+  "price": 12.99,
+  "_source": {
+   "price_src": "cell_facts",
+   "cons_src": "https://car.m.yiche.com/fengyune05/peizhi/?from=ybm",
+   "cons_quote": "易车风云A9参数配置表：纯电版 655MAX激光雷达版|2026|在售|12.99万|纯电|…|磷酸铁锂电池|70.11|…|655|得壹能源|12.3|178。字段：电池电量[kWh]=70.11、CLTC纯电续航里程[km]=655、百公里耗电量[kWh/100km]=12.3。",
+   "cons_trim": "风云A9 2026款 纯电版 655MAX激光雷达版",
+   "sales_src": "baseline_trend"
+  }
+ },
+ "秦MAX EV": {
+  "kwh": 64.315,
+  "consumption": 11.4,
+  "cell_brand": "弗迪(第二代刀片)",
+  "cltc": 630,
+  "trend_sales": 3635,
+  "life_status": "new_launch",
+  "life_note": "8 月 13 日上市，接替停产的秦L",
+  "scored_trim": "EV 630 超越型",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 4.84,
+  "price": 13.29,
+  "_source": {
+   "price_src": "cell_facts",
+   "cons_src": "https://car.m.yiche.com/qinmax/m191321/peizhi/?from=ybm",
+   "cons_quote": "26款 EV 630km 卓越型 ... CLTC纯电续航里程[km] 630 ... 百公里耗电量[kWh/100km] 11.4",
+   "cons_trim": "26款 EV 630km 卓越型",
+   "sales_src": "baseline_trend",
+   "flags": [
+    "新车"
+   ]
+  },
+  "cell_gen": "二代",
+  "cell_flash": "闪充",
+  "cell_gen_basis": "2026款二代刀片630km闪充版（domain_search 2026-11-20）"
+ },
+ "海豹06EV": {
+  "kwh": 56.64,
+  "consumption": 11.4,
+  "cell_brand": "弗迪(刀片)",
+  "cltc": 630,
+  "trend_sales": 4564,
+  "scored_trim": "545 高配",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 4.36,
+  "price": 12.98,
+  "_source": {
+   "price_src": "cell_facts",
+   "cons_src": "https://car.yiche.com/haibao06/m191077/peizhi/?from=ybm",
+   "cons_quote": "27款 EV 630旗舰型 ... CLTC纯电续航里程[km] 630 ... 电池电量[kWh] 64.32 百公里耗电量[kWh/100km] 11.4",
+   "cons_trim": "27款 EV 630旗舰型",
+   "sales_src": "baseline_trend"
+  },
+  "cell_gen": "二代",
+  "cell_flash": "待核",
+  "cell_gen_basis": "630km二代刀片，闪充版未正式上市（domain_search 2026-11-20）"
+ },
+ "MG 07 纯电": {
+  "kwh": 67.0,
+  "consumption": 12.3,
+  "cell_brand": "上汽清陶(半固态)",
+  "cltc": 610,
+  "trend_sales": 12236,
+  "scored_trim": "610 激光雷达版",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 5.28,
+  "price": 12.69,
+  "_source": {
+   "price_src": "cell_facts",
+   "cons_src": "https://car.m.yiche.com/mg07/peizhi/?from=ybm",
+   "cons_quote": "易车MG 07参数配置表：纯电 610 激光雷达版|2026|在售|12.69万|纯电|…|半固态电池|67|…|610|苏州清陶|12.3|176。字段：电池电量[kWh]=67、CLTC纯电续航里程[km]=610、百公里耗电量[kWh/100km]=12.3。",
+   "cons_trim": "MG 07 2026款 纯电 610激光雷达版",
+   "sales_src": "baseline_trend"
+  }
+ },
+ "银河A7 EV": {
+  "kwh": 58.05,
+  "consumption": 11.4,
+  "cell_brand": "神盾金砖(吉利自研/耀宁)",
+  "cltc": 550,
+  "trend_sales": 2147,
+  "scored_trim": "带内主力配置",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 4.37,
+  "price": 13.28,
+  "_source": {
+   "price_src": "cell_facts",
+   "cons_src": "https://www.galaxy-geely.com/A7EV",
+   "cons_quote": "参数配置 550km 尊享版 550km 臻享版 ... CLTC纯电续航里程(km) 550 ... 电池能量(kWh) 58.05 ... 百公里电耗(kWh/100km) 11.4",
+   "cons_trim": "550km 尊享版",
+   "sales_src": "baseline_trend",
+   "flags": [
+    "月销<3000"
+   ]
+  }
+ },
+ "深蓝L07": {
+  "kwh": 56.12,
+  "consumption": 12,
+  "cell_brand": "宁德时代(时代长安)",
+  "trend_sales": 697,
+  "life_status": "facelift_pending",
+  "life_note": "2027 款已在渠道露出（易车标注「待售」），现款清库",
+  "scored_trim": "550 Max",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 3.85,
+  "price": 14.59,
+  "_source": {
+   "price_src": "cell_facts",
+   "cons_src": "https://car.m.yiche.com/shenlanl07/peizhi/?from=ybm",
+   "cons_quote": "|纯电版 550km 550Max华为乾崑智驾ADS SE版|2026|在售|14.59万|纯电|...|550|12|(百公里耗电量[kWh/100km])",
+   "cons_trim": "纯电版 550km 550Max华为乾崑智驾ADS SE版",
+   "sales_src": "baseline_trend",
+   "flags": [
+    "月销<3000"
+   ]
+  }
+ },
+ "极狐阿尔法S5": {
+  "kwh": 64.8,
+  "consumption": 13.6,
+  "cell_brand": "宁德时代",
+  "cltc": 560,
+  "trend_sales": 4390,
+  "life_status": "facelift_pending",
+  "life_note": "2027 款 11 月 16 日上市，预售 12.18–14.48 万，新增 192 线激光雷达、骁龙 8775A 舱驾一体、5C 超充（650/750km）、148L 前备厢",
+  "scored_trim": "带内主力配置",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 5.03,
+  "price": 12.88,
+  "_source": {
+   "price_src": "cell_facts",
+   "cons_src": "https://car.yiche.com/n51ab/m184189/peizhi/",
+   "cons_quote": "25款 改款 560PRO 前驱185kW ... CLTC纯电续航里程[km] 560 ... 百公里耗电量[kWh/100km] 13.6",
+   "cons_trim": "25款 改款 560PRO 前驱185kW",
+   "sales_src": "baseline_trend"
+  }
+ },
+ "红旗天工05": {
+  "kwh": 62.0,
+  "consumption": 12.1,
+  "cell_brand": "宁德时代(时代一汽)",
+  "trend_sales": 294,
+  "scored_trim": "入门（550 青春版）",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 3.88,
+  "price": 15.98,
+  "_source": {
+   "price_src": "cell_facts",
+   "cons_src": "https://car.m.yiche.com/hongqie009/peizhi/?from=ybm",
+   "cons_quote": "|550km 青春版|2026|在售|15.98万|纯电|...|550|宁德时代(时代一汽)/中汽新能(无锡)|12.1|(百公里耗电量[kWh/100km])",
+   "cons_trim": "26款 550km 青春版",
+   "sales_src": "baseline_trend",
+   "flags": [
+    "月销<3000"
+   ]
+  }
+ },
+ "丰田bZ3": {
+  "kwh": 65.3,
+  "consumption": 11,
+  "cell_brand": "弗迪(刀片)",
+  "trend_sales": 1592,
+  "scored_trim": "550 PRO（610 PRO+）",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 4.67,
+  "price": 13.98,
+  "_source": {
+   "price_src": "cell_facts",
+   "cons_src": "https://car.m.yiche.com/yiqifengtianbz3/peizhi/?from=ybm",
+   "cons_quote": "|517km 智享家JOY|2026|在售|10.98万|纯电|...|517|弗迪|11|(百公里耗电量[kWh/100km])",
+   "cons_trim": "26款 517km 智享家JOY",
+   "sales_src": "baseline_trend",
+   "flags": [
+    "月销<3000"
+   ]
+  },
+  "cell_gen": "一代",
+  "cell_flash": "非闪充",
+  "cell_gen_basis": "老e-TNGA平台弗迪一代（domain_search 2026-11-20）"
+ },
+ "极狐贝塔S3": {
+  "kwh": 54.0,
+  "cell_brand": "宁德时代(巧克力换电)",
+  "trend_sales": 6963,
+  "scored_trim": "带内整车版",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 5.13,
+  "price": 10.53,
+  "_source": {
+   "price_src": "cell_facts",
+   "cons_quote": "未找到官方电耗（官网参数表 arcfox.com.cn/deployment-ARCFOXS3.html 为JS渲染仅返回车款列表、无电耗字段；易车参数页触发验证码；仅媒体稿提及充电版11kWh/换电版12kWh，非参数表字段，故不采）",
+   "sales_src": "baseline_trend",
+   "flags": [
+    "无官方电耗"
+   ]
+  }
+ },
+ "大众与众07": {
+  "kwh": 59.9,
+  "consumption": 12.1,
+  "cell_brand": "国轩高科",
+  "trend_sales": 696,
+  "scored_trim": "带内主力配置",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 4.61,
+  "price": 12.99,
+  "_source": {
+   "price_src": "cell_facts",
+   "cons_src": "https://car.m.yiche.com/yuzhong07/peizhi/?from=ybm",
+   "cons_quote": "|558km 后驱Pure|2026|在售|12.99万|纯电|...|558|国轩高科|12.1|...(百公里耗电量[kWh/100km])",
+   "cons_trim": "26款 558km 后驱Pure",
+   "sales_src": "baseline_trend",
+   "flags": [
+    "月销<3000"
+   ]
+  }
+ },
+ "海狮06EV": {
+  "kwh": 69.07,
+  "consumption": 13.3,
+  "cell_brand": "弗迪(第二代刀片)",
+  "cltc": 710,
+  "trend_sales": 10514,
+  "scored_trim": "605 入门版",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 4.32,
+  "price": 15.99,
+  "_source": {
+   "price_src": "cell_facts",
+   "cons_src": "https://car.m.yiche.com/guanzhigq3/m187238/peizhi",
+   "cons_quote": "26款 EV 710远航旗舰版 ... CLTC纯电续航里程[km] 710 ... 电池电量[kWh] 82.73 ... 百公里耗电量[kWh/100km] 13.3",
+   "cons_trim": "26款 EV 710远航旗舰版",
+   "sales_src": "baseline_trend"
+  },
+  "cell_gen": "二代",
+  "cell_flash": "闪充",
+  "cell_gen_basis": "2026款首批二代刀片，9分钟10-97%（domain_search 2026-11-20）"
+ },
+ "极狐阿尔法T5": {
+  "kwh": 64.8,
+  "consumption": 13.1,
+  "cell_brand": "宁德时代",
+  "cltc": 705,
+  "trend_sales": 1302,
+  "life_status": "facelift_pending",
+  "life_note": "改款在即，9 月起进入清库，月销 132 台不反映真实需求",
+  "scored_trim": "660 版",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 4.8,
+  "price": 13.5,
+  "_source": {
+   "price_src": "cell_facts",
+   "cons_src": "https://car.yiche.com/jihun50ab/m184852/peizhi/",
+   "cons_quote": "26款 纯电版 705km 元境智行版 ... CLTC纯电续航里程[km] 705 ... 百公里耗电量[kWh/100km] 13.1",
+   "cons_trim": "26款 纯电版 705km 元境智行版",
+   "sales_src": "baseline_trend",
+   "flags": [
+    "月销<3000"
+   ]
+  }
+ },
+ "小鹏MONA L05": {
+  "kwh": 71.1,
+  "consumption": 11.7,
+  "cell_brand": "中创新航",
+  "trend_sales": 0,
+  "life_status": "new_launch",
+  "life_note": "10 月 29 日上市、11 月 1 日开始交付，10 月零售 0 台属正常",
+  "scored_trim": "635 Max",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 4.45,
+  "price": 15.98,
+  "_source": {
+   "price_src": "cell_facts",
+   "cons_src": "https://car.m.yiche.com/xiaopengmonal05/peizhi/?from=ybm",
+   "cons_quote": "|纯电版 560 Plus|2027|在售|14.48万|纯电|...|560|中创新航|11.7|(百公里耗电量[kWh/100km])",
+   "cons_trim": "27款 纯电版 560 Plus",
+   "sales_src": "baseline_trend",
+   "flags": [
+    "新车",
+    "月销<3000"
+   ]
+  }
+ },
+ "零跑C10": {
+  "kwh": 81.9,
+  "consumption": 13.8,
+  "cell_brand": "国轩高科/亿纬动力/中创新航",
+  "cltc": 660,
+  "trend_sales": 10152,
+  "scored_trim": "660 激光雷达",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 5.74,
+  "price": 14.28,
+  "_source": {
+   "price_src": "cell_facts",
+   "cons_src": "https://www.autohome.com.cn/config/series/7382.html",
+   "cons_quote": "汽车之家零跑C10参数配置：2027款 660激光雷达版 厂商指导价14.28万；CLTC纯电续航里程660km，电池能量81.9kWh，百公里耗电量(kWh/100km)13.8（同款660智享版13.28万同为81.9kWh，三电参数一致）。注：指定价14.28万对应660激光雷达版，两款660km纯电配置共用同一电池/电机，官方电耗均为13.8kWh/100km。",
+   "cons_trim": "零跑C10 2027款 纯电 660激光雷达版",
+   "sales_src": "baseline_trend"
+  }
+ },
+ "零跑C11": {
+  "kwh": 81.9,
+  "consumption": 14.4,
+  "cell_brand": "蜂巢能源/国轩高科",
+  "cltc": 640,
+  "trend_sales": 6130,
+  "scored_trim": "640 激光雷达",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 5.26,
+  "price": 15.58,
+  "_source": {
+   "price_src": "cell_facts",
+   "cons_src": "https://car.yiche.com/lingpaocmore/m182371/peizhi?from=ybm",
+   "cons_quote": "26款 纯电版 640智享版 ... CLTC纯电续航里程[km] 640 ... 百公里耗电量[kWh/100km] 14.4",
+   "cons_trim": "26款 纯电版 640智享版",
+   "sales_src": "baseline_trend"
+  }
+ },
+ "深蓝S07": {
+  "kwh": 66.02,
+  "consumption": 12.6,
+  "cell_brand": "宁德时代/中创新航",
+  "trend_sales": 3912,
+  "scored_trim": "600 智行AI激光",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 4.23,
+  "price": 15.59,
+  "_source": {
+   "price_src": "cell_facts",
+   "cons_src": "https://car.m.yiche.com/changanshenlans7/peizhi/?from=ybm",
+   "cons_quote": "|纯电版 600智行AI激光版|2026|在售|15.59万|纯电|...|600|宁德时代|12.6|(百公里耗电量[kWh/100km])",
+   "cons_trim": "26款 纯电版 600智行AI激光版",
+   "sales_src": "baseline_trend"
+  }
+ },
+ "马自达EZ-60": {
+  "kwh": 77.94,
+  "cell_brand": "中创新航",
+  "trend_sales": 3730,
+  "scored_trim": "纯电 600 Max",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 4.84,
+  "price": 16.09,
+  "_source": {
+   "price_src": "cell_facts",
+   "cons_quote": "未找到官方电耗（易车参数页触发验证码、汽车之家参数页无百公里耗电量字段仅有电能当量1.71L/100km；媒体稿提及14.7kWh非参数表字段，故不采）",
+   "sales_src": "baseline_trend",
+   "flags": [
+    "无官方电耗"
+   ]
+  }
+ },
+ "长安启源Q06": {
+  "kwh": 66.02,
+  "consumption": 12.8,
+  "cell_brand": "中创新航",
+  "trend_sales": 6414,
+  "scored_trim": "602 智享",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 4.4,
+  "price": 14.99,
+  "_source": {
+   "price_src": "cell_facts",
+   "cons_src": "https://car.m.yiche.com/changanqiyuanq06e/peizhi/?from=ybm",
+   "cons_quote": "|纯电版 602 越享型|2027|在售|13.99万|纯电|...|602|中创新航|12.8|(百公里耗电量[kWh/100km])",
+   "cons_trim": "27款 纯电版 602 越享型",
+   "sales_src": "baseline_trend"
+  }
+ },
+ "丰田bZ5": {
+  "kwh": 65.28,
+  "consumption": 13.5,
+  "cell_brand": "弗迪(刀片)",
+  "cltc": 550,
+  "trend_sales": 929,
+  "scored_trim": "550 PRO",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 4.67,
+  "price": 13.98,
+  "_source": {
+   "price_src": "cell_facts",
+   "cons_src": "https://car.yiche.com/yiqifengtianbz3c/m191584/peizhi/?from=ybm",
+   "cons_quote": "27款 550 JOY ... CLTC纯电续航里程[km] 550 ... 百公里耗电量[kWh/100km] 13.5",
+   "cons_trim": "27款 550 JOY",
+   "sales_src": "baseline_trend",
+   "flags": [
+    "月销<3000"
+   ]
+  },
+  "cell_gen": "一代",
+  "cell_flash": "非闪充",
+  "cell_gen_basis": "弗迪一代老平台（domain_search 2026-11-20）"
+ },
+ "大众ID.AURA T6": {
+  "kwh": 77.5,
+  "consumption": 13.1,
+  "cell_brand": "宁德时代(时代一汽)",
+  "cltc": 660,
+  "trend_sales": 12032,
+  "life_status": "new_launch",
+  "life_note": "9 月 20 日上市，首个完整销售月即 12,032 台，仍处产能爬坡",
+  "scored_trim": "660 Max 激光雷达版",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 5.17,
+  "price": 14.99,
+  "_source": {
+   "price_src": "cell_facts",
+   "cons_src": "https://car.m.yiche.com/volkswagen/m191654/peizhi",
+   "cons_quote": "26款 660 Pro ... CLTC纯电续航里程[km] 660 ... 百公里耗电量[kWh/100km] 13.1",
+   "cons_trim": "26款 660 Pro",
+   "sales_src": "baseline_trend",
+   "flags": [
+    "新车"
+   ]
+  }
+ },
+ "日产N7": {
+  "kwh": 73.0,
+  "consumption": 13,
+  "cell_brand": "欣旺达/宁德时代",
+  "trend_sales": 1354,
+  "scored_trim": "625 Pro",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 5.22,
+  "price": 13.99,
+  "_source": {
+   "price_src": "cell_facts",
+   "cons_src": "https://car.m.yiche.com/dongfengrichann7/m180898/peizhi/",
+   "cons_quote": "25款 510km 510 Max ... 百公里耗电量[kWh/100km] 13 电能当量燃料消耗量[L/100km] 1.51",
+   "cons_trim": "2025款 510 Max（510km，58kWh）",
+   "sales_src": "baseline_trend",
+   "flags": [
+    "月销<3000"
+   ]
+  }
+ },
+ "银河TT": {
+  "kwh": 63.8,
+  "consumption": 11,
+  "cell_brand": "神盾短刀(吉利自研)",
+  "cltc": 640,
+  "trend_sales": 6894,
+  "scored_trim": "640 后驱版",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 4.56,
+  "price": 13.99,
+  "_source": {
+   "price_src": "cell_facts",
+   "cons_src": "https://www.galaxy-geely.com/YHTT",
+   "cons_quote": "CLTC工况续航里程(km) 640 640 640 725 百公里耗电量(kWh/100km) 11 11 11 11.5",
+   "cons_trim": "640 后驱尊享（CLTC 640km，63.8kWh）",
+   "sales_src": "baseline_trend"
+  }
+ },
+ "长安启源A06": {
+  "kwh": 61.73,
+  "consumption": 11,
+  "cell_brand": "宁德时代",
+  "trend_sales": 5152,
+  "scored_trim": "纯电 710 旗舰",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 4.41,
+  "price": 13.99,
+  "_source": {
+   "price_src": "cell_facts",
+   "cons_src": "https://car.m.yiche.com/changanqiyuanc390/peizhi/?from=ybm",
+   "cons_quote": "纯电版 630km 舒享版|2027|在售|11.99万|纯电|...|630|宁德时代|11|210",
+   "cons_trim": "纯电版 630km 舒享版（61.73kWh，宁德时代）",
+   "sales_src": "baseline_trend"
+  }
+ },
+ "长安启源A07": {
+  "kwh": 77.94,
+  "consumption": 12.5,
+  "cell_brand": "宁德时代",
+  "trend_sales": 1979,
+  "scored_trim": "纯电 730 豪华型",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 5.2,
+  "price": 14.99,
+  "_source": {
+   "price_src": "cell_facts",
+   "cons_src": "https://car.yiche.com/changanqiyuana07chundiandong/m184023/peizhi/?from=ybm",
+   "cons_quote": "26款 纯电版 超长蓝鲸版 730豪华型 ... 电池电量[kWh] 77.94 百公里耗电量[kWh/100km] 12.5",
+   "cons_trim": "26款 纯电版 超长蓝鲸版 730豪华型（77.94kWh，中创新航）",
+   "sales_src": "baseline_trend",
+   "flags": [
+    "月销<3000"
+   ]
+  }
+ },
+ "丰田铂智7": {
+  "kwh": 71.35,
+  "consumption": 12.7,
+  "cell_brand": "弗迪/宁德时代",
+  "trend_sales": 2054,
+  "scored_trim": "600 版",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 4.2,
+  "price": 16.98,
+  "_source": {
+   "price_src": "cell_facts",
+   "cons_src": "https://car.yiche.com/toyota/m180783/peizhi/",
+   "cons_quote": "26款 600 Pro ... 电池电量[kWh] 71.35 百公里耗电量[kWh/100km] 12.7",
+   "cons_trim": "26款 600 Pro（71.35kWh，中创新航）",
+   "sales_src": "baseline_trend",
+   "flags": [
+    "月销<3000"
+   ]
+  },
+  "cell_gen": "待核",
+  "cell_flash": "待核",
+  "cell_gen_basis": "弗迪/宁德混装代际未明（domain_search 2026-11-20）"
+ },
+ "大众与众09": {
+  "kwh": 91.963,
+  "consumption": 13.7,
+  "cell_brand": "宁德时代",
+  "trend_sales": 69,
+  "scored_trim": "705 后驱",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 5.11,
+  "price": 17.99,
+  "_source": {
+   "price_src": "cell_facts",
+   "cons_src": "https://car.m.yiche.com/yuzhong09/peizhi/?from=ybm",
+   "cons_quote": "755km 后驱Ultra|2026|在售|17.99万|纯电|...|755|宁德时代|13.7|230",
+   "cons_trim": "755km 后驱Ultra（91.96kWh，宁德时代）",
+   "sales_src": "baseline_trend",
+   "flags": [
+    "月销<3000"
+   ]
+  }
+ },
+ "埃安Ray7": {
+  "kwh": 62.98,
+  "consumption": 9.8,
+  "cell_brand": "中创新航/因湃",
+  "cltc": 702,
+  "life_status": "new_launch",
+  "life_note": "2026-11-12 上市，10月零售仅个位数",
+  "note": "官网配置表：702版62.98kWh→9.8；530版45.58kWh→9.7。原采集错配已修正。2026-11-12上市新车",
+  "scored_trim": "702 后驱驾趣宁德版",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 4.71,
+  "price": 13.38,
+  "_source": {
+   "price_src": "cell_facts",
+   "cons_src": "https://car.m.yiche.com/aianchundianjiaoche/m192487/peizhi/?from=ybm",
+   "cons_quote": "易车Ray7参数配置表：702 后驱驾趣宁德版|2027|在售|13.38万|纯电|…|磷酸铁锂电池|62.98|…|702|宁德时代|9.8|180。字段：电池电量[kWh]=62.98、CLTC纯电续航里程[km]=702、百公里耗电量[kWh/100km]=9.8。（广汽埃安官网配置表佐证：702 后驱驾趣宁德 13.38万，电池能量62.98kWh，CLTC综合工况电耗9.8kWh/100km）——已复核确认702版为9.8。",
+   "cons_trim": "Ray7 2027款 702后驱驾趣宁德版",
+   "flags": [
+    "新车",
+    "销量未知"
+   ]
+  }
+ },
+ "极狐阿尔法T7": {
+  "kwh": 84.8,
+  "consumption": 12.7,
+  "cell_brand": "宁德时代",
+  "cltc": 715,
+  "trend_sales": 8131,
+  "life_status": "new_launch",
+  "life_note": "9 月 16 日上市，10 月首个完整销售月 8,131 台（车系含增程）；乾崑版与普通版两套智驾并行",
+  "scored_trim": "715 ULTRA 乾崑版",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 5.02,
+  "price": 16.88,
+  "_source": {
+   "price_src": "cell_facts",
+   "cons_src": "https://www.yiche.com/zhaiyao/detail-12409-1543-6aab37307791f900094b6710.html",
+   "cons_quote": "动力与续航方面,全系标配宁德时代电池,纯电版CLTC续航最高715公里...百公里电耗低至12.7kWh",
+   "cons_trim": "纯电版（84.8kWh，CLTC 715km）",
+   "sales_src": "baseline_trend",
+   "flags": [
+    "新车",
+    "电耗为官宣口径非参数表"
+   ]
+  }
+ },
+ "日产NX8": {
+  "kwh": 73.0,
+  "consumption": 14.4,
+  "cell_brand": "欣旺达/宁德时代",
+  "trend_sales": 2974,
+  "scored_trim": "纯电 650 版",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 4.06,
+  "price": 17.99,
+  "_source": {
+   "price_src": "cell_facts",
+   "cons_src": "https://www.yiche.com/zhai/2638586",
+   "cons_quote": "东风日产NX8纯电版CLTC综合电耗低至14.4kWh/100km,顶配版本纯电续航达到650km",
+   "cons_trim": "纯电版 650 Max（81kWh，宁德时代）",
+   "sales_src": "baseline_trend",
+   "flags": [
+    "电耗为官宣口径非参数表",
+    "月销<3000"
+   ]
+  }
+ },
+ "别克E5": {
+  "kwh": 65.0,
+  "consumption": 13.4,
+  "cell_brand": "上汽时代(宁德合资)",
+  "cltc": 620,
+  "trend_sales": 202,
+  "scored_trim": "515 版",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 3.83,
+  "price": 16.99,
+  "_source": {
+   "price_src": "cell_facts",
+   "cons_src": "https://car.m.yiche.com/electraes/m181789/peizhi/?from=ybm",
+   "cons_quote": "25款 620km 尊享版 ... CLTC纯电续航里程[km] 620 ... 百公里耗电量[kWh/100km] 13.4",
+   "cons_trim": "25款 620km 尊享版（76.8kWh，时代上汽）",
+   "sales_src": "baseline_trend",
+   "flags": [
+    "月销<3000"
+   ]
+  }
+ },
+ "零跑C16": {
+  "kwh": 81.9,
+  "consumption": 14.6,
+  "cell_brand": "中创新航/国轩高科",
+  "trend_sales": 6117,
+  "scored_trim": "纯电 630 激光雷达智尊 5座",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 4.91,
+  "price": 16.68,
+  "_source": {
+   "price_src": "cell_facts",
+   "cons_src": "https://car.yiche.com/lingpaoc16/m188404/peizhi/?from=ybm",
+   "cons_quote": "27款 纯电版 630尊享版 5座 ... 电池电量[kWh] 81.9 百公里耗电量[kWh/100km] 14.6",
+   "cons_trim": "27款 纯电版 630尊享版 5座（81.9kWh）",
+   "sales_src": "baseline_trend"
+  }
+ },
+ "东风奕派M8": {
+  "kwh": 77.38,
+  "consumption": 14.6,
+  "cell_brand": "中创新航",
+  "trend_sales": 1087,
+  "scored_trim": "600 Pro 天元激光版",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 4.3,
+  "price": 17.98,
+  "_source": {
+   "price_src": "cell_facts",
+   "cons_src": "http://yipai.com.cn/configDetailsm8",
+   "cons_quote": "CLTC工况百公里耗电量(kWh/100km) 15.7 15.7 14.6 14.6 14.6 14.6",
+   "cons_trim": "600Pro 乾崑版（纯电，77.38kWh，宁德时代）",
+   "sales_src": "baseline_trend",
+   "flags": [
+    "月销<3000"
+   ]
+  }
+ },
+ "东风风行星海V6": {
+  "kwh": 60.5,
+  "consumption": 13.5,
+  "cell_brand": "欣旺达",
+  "cltc": 510,
+  "trend_sales": 538,
+  "scored_trim": "510 长续航（尊贵型）",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 5.27,
+  "price": 11.49,
+  "_source": {
+   "price_src": "cell_facts",
+   "cons_src": "https://car.yiche.com/xinghaiv6/m190491/peizhi/",
+   "cons_quote": "27款 510km 旗舰型 乾崑智驾ADS SE版 ... CLTC纯电续航里程[km] 510 ... 百公里耗电量[kWh/100km] 13.5",
+   "cons_trim": "27款 510km 旗舰型 乾崑智驾ADS SE版（60.5kWh，欣旺达）",
+   "sales_src": "baseline_trend",
+   "flags": [
+    "月销<3000"
+   ]
+  }
+ },
+ "MG4": {
+  "kwh": 53.9,
+  "consumption": 11.9,
+  "cell_brand": "宁德时代",
+  "trend_sales": 15503,
+  "life_status": "active",
+  "note": "统一到530智趣版：9.68万/53.9kWh/11.9/宁德时代。437版是42.8kWh/10.4/瑞浦兰钧，不可混配",
+  "scored_trim": "530 智趣版",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 5.57,
+  "price": 9.68,
+  "_source": {
+   "price_src": "MG官网+汽车之家同配置",
+   "cons_src": "https://www.autohome.com.cn/config/series/6651.html",
+   "cons_quote": "MG4 2026款 改款 530 智趣版：电池能量53.9kWh，电芯品牌宁德时代，百公里耗电量11.9",
+   "cons_trim": "530 智趣版"
+  }
+ },
+ "小鹏MONA M03": {
+  "kwh": 61.6,
+  "consumption": 10.8,
+  "cell_brand": "亿纬动力",
+  "cltc": 540,
+  "trend_sales": 7160,
+  "life_status": "active",
+  "scored_trim": "610 超长续航 Max",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 4.41,
+  "price": 13.98,
+  "_source": {
+   "price_src": "compact_trim",
+   "cons_src": "https://car.m.yiche.com/xiaopengmona/peizhi/?from=ybm",
+   "cons_quote": "|540 长续航Plus版|2026|在售|11.98万|纯电|...|CLTC纯电续航里程[km] 540|电芯品牌 弗迪|百公里耗电量[kWh/100km] 10.8|",
+   "cons_trim": "540 长续航Plus版"
+  },
+  "cell_gen": "待核",
+  "cell_flash": "待核",
+  "cell_gen_basis": "弗迪电芯但代际未见官方明示，不臆断（domain_search 2026-11-20）"
+ },
+ "AION RT": {
+  "kwh": 70.1,
+  "consumption": 10.5,
+  "cell_brand": "宁德时代",
+  "cltc": 710,
+  "trend_sales": 5914,
+  "life_status": "active",
+  "scored_trim": "710 智豪版",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 5.85,
+  "price": 11.98,
+  "_source": {
+   "price_src": "compact_trim",
+   "cons_src": "https://www.aion.com.cn/vehicle/config/table?cid=NTg%3D",
+   "cons_quote": "广汽埃安AION RT车型配置表：710 智豪版 11.98万；综合工况续航里程(km) 550 605 710；综合工况电耗(kWh/100km) 10.9 9.9 10.5 11.7 9.9；电池能量(kWh)*² 56.6 70.1 55.979 56.6。（汽车之家参数页佐证：AION RT 2027款 710智豪版，CLTC纯电续航里程710km，电池能量70.1kWh，百公里耗电量(kWh/100km)10.5）",
+   "cons_trim": "AION RT 710智豪版"
+  }
+ },
+ "零跑B01": {
+  "kwh": 69.7,
+  "consumption": 11.5,
+  "cell_brand": "宁德时代/国轩高科",
+  "cltc": 670,
+  "trend_sales": 4399,
+  "life_status": "active",
+  "scored_trim": "670 激光雷达版",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 5.82,
+  "price": 11.98,
+  "_source": {
+   "price_src": "compact_trim",
+   "cons_src": "https://car.m.yiche.com/lingpaob01/m189189/peizhi/?from=ybm",
+   "cons_quote": "易车零跑B01参数配置表：670激光雷达版|2027|在售|11.98万|纯电|…|磷酸铁锂电池|69.7|…|670|宁德时代|11.5|185。字段：电池电量[kWh]=69.7、CLTC纯电续航里程[km]=670、百公里耗电量[kWh/100km]=11.5。",
+   "cons_trim": "零跑B01 2027款 670激光雷达版"
+  }
+ },
+ "零跑Lafa5": {
+  "kwh": 67.1,
+  "consumption": 12.4,
+  "cell_brand": "国轩高科/中创新航/福鼎时代",
+  "cltc": 605,
+  "trend_sales": 4356,
+  "life_status": "active",
+  "scored_trim": "605 Pro",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 6.0,
+  "price": 11.18,
+  "_source": {
+   "price_src": "compact_trim",
+   "cons_src": "https://car.m.yiche.com/lingpaob05/m185407/peizhi/?from=ybm",
+   "cons_quote": "易车零跑Lafa5参数配置表：26款 605Pro；CLTC纯电续航里程[km] 605；电池电量67.1kWh；百公里耗电量[kWh/100km] 12.4。605 Pro官方指导价11.18万元（515 Plus 9.78万、515 Pro 10.58万、515 Max 11.58万、605 Pro 11.18万、605 Max 12.18万）。",
+   "cons_trim": "零跑Lafa5 2026款 605 Pro"
+  }
+ },
+ "秦PLUS EV": {
+  "kwh": 57.6,
+  "consumption": 11.9,
+  "cell_brand": "弗迪",
+  "cltc": 510,
+  "trend_sales": 2744,
+  "life_status": "active",
+  "scored_trim": "510km 领先型",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 4.81,
+  "price": 11.98,
+  "_source": {
+   "price_src": "compact_trim",
+   "cons_src": "https://car.yiche.com/qinplusdm/m177726/peizhi/?from=ybm",
+   "cons_quote": "25款 EV 智驾版 510km 超越型 ... CLTC纯电续航里程[km] 510 ... 百公里耗电量[kWh/100km] 11.9 ... 电池电量[kWh] 57.6 ... 11.9",
+   "cons_trim": "EV 智驾版 510km 超越型",
+   "flags": [
+    "月销<3000"
+   ]
+  },
+  "cell_gen": "二代",
+  "cell_flash": "非闪充",
+  "cell_gen_basis": "2026款全系二代刀片CTB，快充60-70kW；630km闪充版待上市（domain_search 2026-11-20）"
+ },
+ "荣威D6": {
+  "kwh": 53.95,
+  "consumption": 11.7,
+  "cell_brand": "宁德时代",
+  "cltc": 520,
+  "trend_sales": 1867,
+  "life_status": "active",
+  "scored_trim": "520km 舒享版",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 4.7,
+  "price": 11.48,
+  "_source": {
+   "price_src": "compact_trim",
+   "cons_src": "https://car.m.yiche.com/rongweid6/peizhi/?from=ybm",
+   "cons_quote": "易车荣威D6参数配置表：520km 舒享版|2026|在售|11.48万|纯电|…|磷酸铁锂电池|53.95|…|520|宁德时代|11.7|120。字段：电池电量[kWh]=53.95、CLTC纯电续航里程[km]=520、百公里耗电量[kWh/100km]=11.7。",
+   "cons_trim": "荣威D6 2026款 520km舒享版",
+   "flags": [
+    "月销<3000"
+   ]
+  }
+ },
+ "AION UT": {
+  "consumption": 11.7,
+  "cell_brand": "宁德时代",
+  "trend_sales": 1858,
+  "life_status": "active",
+  "note": "度数多源冲突：紧凑池52、小型池56.68、易车国内44.12/50.27/60，无法锁定同配置，度数置null不参与kWh/万元榜",
+  "scored_trim": "2027款 530 宁德版",
+  "consumption_std": "CLTC",
+  "price": 8.68,
+  "_source": {
+   "price_src": "raw_small",
+   "cons_src": "https://car.m.yiche.com/aionay2/peizhi/?from=ybm",
+   "cons_quote": "530 宁德版|2027|在售|8.68万|...|磷酸铁锂电池|56.68|...|530|宁德时代|11.7|100",
+   "cons_trim": "2027款 530 宁德版",
+   "flags": [
+    "度数存疑",
+    "月销<3000"
+   ]
+  }
+ },
+ "长安启源Q05": {
+  "kwh": 51.9,
+  "consumption": 11.3,
+  "cell_brand": "宁德时代(时代长安)",
+  "cltc": 405,
+  "trend_sales": 20022,
+  "life_status": "active",
+  "scored_trim": "506km 畅享版",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 5.09,
+  "price": 10.19,
+  "_source": {
+   "price_src": "compact_trim",
+   "cons_src": "https://car.m.yiche.com/changanqiyuanq05-11958/peizhi/?from=ybm",
+   "cons_quote": "|405km 畅享版|2027|在售|8.99万|纯电|...|CLTC纯电续航里程[km] 405|电芯品牌 宁德时代(时代长安)|百公里耗电量[kWh/100km] 11.3|",
+   "cons_trim": "405km 畅享版"
+  }
+ },
+ "小鹏MONA L03": {
+  "kwh": 69.0,
+  "consumption": 11.5,
+  "cell_brand": "中创新航",
+  "cltc": 550,
+  "trend_sales": 14885,
+  "life_status": "active",
+  "scored_trim": "650 Plus",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 5.16,
+  "price": 13.38,
+  "_source": {
+   "price_src": "compact_trim",
+   "cons_src": "https://car.m.yiche.com/xiaopengmonasuv/peizhi/?from=ybm",
+   "cons_quote": "|纯电版 550 Plus|2026|在售|12.38万|纯电|...|CLTC纯电续航里程[km] 550|电芯品牌 中创新航|百公里耗电量[kWh/100km] 11.5|",
+   "cons_trim": "纯电版 550 Plus"
+  }
+ },
+ "AION i60": {
+  "kwh": 77.65,
+  "consumption": 12.3,
+  "cell_brand": "因湃电池",
+  "cltc": 520,
+  "trend_sales": 12296,
+  "life_status": "active",
+  "scored_trim": "700 长续航版",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 5.98,
+  "price": 12.98,
+  "_source": {
+   "price_src": "compact_trim",
+   "cons_src": "https://www.aion.com.cn/vehicle/config/table?cid=NzI=",
+   "cons_quote": "2027款 AION i60 车型配置表：700 长续航版 12.98万（纯电）；CLTC纯电续航里程(km) 520 700 350；CLTC综合工况电耗(kWh/100km) 12 12.3；电池能量(kWh)*¹ 56.68 77.65 45.37。700长续航版对应77.65kWh、12.3kWh/100km。",
+   "cons_trim": "2027款 AION i60 纯电 700长续航版"
+  }
+ },
+ "元PLUS": {
+  "kwh": 57.545,
+  "consumption": 11.8,
+  "cell_brand": "弗迪",
+  "cltc": 540,
+  "trend_sales": 11954,
+  "life_status": "active",
+  "scored_trim": "540KM 超越型",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 4.43,
+  "price": 12.99,
+  "_source": {
+   "price_src": "compact_trim",
+   "cons_src": "https://car.m.yiche.com/yuanplus/peizhi/?from=ybm",
+   "cons_quote": "|540km 领先型|2026|在售|11.99万|纯电|...|CLTC纯电续航里程[km] 540|电芯品牌 弗迪|百公里耗电量[kWh/100km] 11.8|",
+   "cons_trim": "540km 领先型"
+  },
+  "cell_gen": "二代",
+  "cell_flash": "闪充",
+  "cell_gen_basis": "第三代2026-05全系二代刀片+800V闪充（domain_search 2026-11-20）"
+ },
+ "深蓝S05": {
+  "kwh": 56.12,
+  "consumption": 12.3,
+  "cell_brand": "宁德时代",
+  "cltc": 520,
+  "trend_sales": 11411,
+  "life_status": "active",
+  "scored_trim": "520 智臻版",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 4.32,
+  "price": 12.99,
+  "_source": {
+   "price_src": "compact_trim",
+   "cons_src": "https://car.m.yiche.com/shenlans05/peizhi/?from=ybm",
+   "cons_quote": "|纯电版 520智行版|2027|在售|11.99万|纯电|...|CLTC纯电续航里程[km] 520|电芯品牌 宁德时代|百公里耗电量[kWh/100km] 12.3|",
+   "cons_trim": "纯电版 520智行版"
+  }
+ },
+ "铂智3X": {
+  "kwh": 58.37,
+  "consumption": 12.6,
+  "cell_brand": "江苏正力/中创新航",
+  "cltc": 430,
+  "trend_sales": 9101,
+  "life_status": "active",
+  "scored_trim": "520 Pro",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 4.5,
+  "price": 12.98,
+  "_source": {
+   "price_src": "compact_trim",
+   "cons_src": "https://car.m.yiche.com/guangqifengtianbozhi3x/peizhi/?from=ybm",
+   "cons_quote": "|430 Air|2026|在售|10.98万|纯电|...|CLTC纯电续航里程[km] 430|电芯品牌 江苏正力|百公里耗电量[kWh/100km] 12.6|",
+   "cons_trim": "430 Air"
+  }
+ },
+ "海狮05EV": {
+  "kwh": 57.545,
+  "consumption": 11.8,
+  "cell_brand": "弗迪",
+  "cltc": 540,
+  "trend_sales": 9033,
+  "life_status": "active",
+  "scored_trim": "540 智航版",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 4.43,
+  "price": 12.99,
+  "_source": {
+   "price_src": "compact_trim",
+   "cons_src": "https://car.yiche.com/bydauto/m191788/peizhi/",
+   "cons_quote": "26款 EV 540km 闪充领航版 ... CLTC纯电续航里程[km] 540 ... 百公里耗电量[kWh/100km] 11.8 ... 电池电量[kWh] 57.55 百公里耗电量[kWh/100km] 11.8",
+   "cons_trim": "EV 540km 闪充领航版"
+  },
+  "cell_gen": "待核",
+  "cell_flash": "待核",
+  "cell_gen_basis": "弗迪刀片年款代际未明（domain_search 2026-11-20）"
+ },
+ "零跑B10": {
+  "kwh": 69.7,
+  "consumption": 12.6,
+  "cell_brand": "欣旺达/国轩高科",
+  "cltc": 610,
+  "trend_sales": 7719,
+  "life_status": "active",
+  "scored_trim": "610 悦享版",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 6.02,
+  "price": 11.58,
+  "_source": {
+   "price_src": "compact_trim",
+   "cons_src": "https://car.m.yiche.com/lingpaob10/m190879/peizhi/?from=ybm",
+   "cons_quote": "易车零跑B10参数配置表：610悦享版|2027|在售|11.58万|纯电|…|磷酸铁锂电池|69.7|…|610|欣旺达/国轩高科/中创新航|12.6|185。字段：电池电量[kWh]=69.7、CLTC纯电续航里程[km]=610、百公里耗电量[kWh/100km]=12.6。",
+   "cons_trim": "零跑B10 2027款 610悦享版"
+  }
+ },
+ "银河E5": {
+  "kwh": 61.52,
+  "consumption": 12.1,
+  "cell_brand": "蜂巢能源/国轩高科",
+  "cltc": 530,
+  "trend_sales": 6214,
+  "life_status": "active",
+  "scored_trim": "550 智充启航版",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 5.22,
+  "price": 11.78,
+  "_source": {
+   "price_src": "compact_trim",
+   "cons_src": "https://car.m.yiche.com/yinhee5/peizhi/?from=ybm",
+   "cons_quote": "|530km 启航版|2026|在售|10.98万|纯电|...|CLTC纯电续航里程[km] 530|电芯品牌 耀宁新能源/蜂巢能源/国轩高科|百公里耗电量[kWh/100km] 12.1|",
+   "cons_trim": "530km 启航版"
+  }
+ },
+ "五菱宏光MINIEV": {
+  "kwh": 25.1,
+  "consumption": 9.2,
+  "cell_brand": "国轩/瑞浦",
+  "trend_sales": 24518,
+  "life_status": "active",
+  "scored_trim": "2026款 四门版 301km 臻享款",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 4.58,
+  "price": 5.48,
+  "_source": {
+   "price_src": "raw_small",
+   "cons_src": "https://car.m.yiche.com/hongguangminiev/peizhi/?from=ybm",
+   "cons_quote": "四门版 301km 臻享款|2026|在售|5.48万|...|磷酸铁锂电池|25.1|...|301|国轩/瑞浦|9.2|30|-",
+   "cons_trim": "2026款 四门版 301km 臻享款"
+  }
+ },
+ "长安Lumin": {
+  "kwh": 28.08,
+  "consumption": 10.0,
+  "cell_brand": "宁德时代",
+  "trend_sales": 5224,
+  "life_status": "active",
+  "scored_trim": "2026款 宝藏版 301km 臻爱米 宁德",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 4.77,
+  "price": 5.89,
+  "_source": {
+   "price_src": "raw_small",
+   "cons_src": "https://www.autohome.com.cn/config/series/6674.html",
+   "cons_quote": "长安Lumin 2026款 宝藏版 301km 臻爱米 宁德 ... 电池能量(kWh):28.08 ... 百公里耗电量(kWh/100km):10",
+   "cons_trim": "2026款 宝藏版 301km 臻爱米 宁德"
+  }
+ },
+ "吉利熊猫mini": {
+  "kwh": 17.03,
+  "consumption": 9.1,
+  "cell_brand": "国轩高科",
+  "trend_sales": 4501,
+  "life_status": "active",
+  "scored_trim": "2025款 熊猫mini 210km 元气熊",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 3.41,
+  "price": 4.99,
+  "_source": {
+   "price_src": "raw_small",
+   "cons_src": "https://www.autohome.com.cn/config/series/6924.html",
+   "cons_quote": "熊猫 2025款 熊猫mini 210km 元气熊 ... 电池能量(kWh):17.03 ... 百公里耗电量(kWh/100km):9.1",
+   "cons_trim": "2025款 熊猫mini 210km 元气熊"
+  }
+ },
+ "比亚迪海鸥": {
+  "kwh": 39.2,
+  "consumption": 9.9,
+  "cell_brand": "弗迪",
+  "trend_sales": 10134,
+  "life_status": "active",
+  "scored_trim": "2027款 420km 后驱自在版",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 5.16,
+  "price": 7.59,
+  "_source": {
+   "price_src": "raw_small",
+   "cons_src": "https://car.m.yiche.com/haiou/peizhi/?from=ybm",
+   "cons_quote": "420km 后驱自在版|2027|在售|7.59万|...|磷酸铁锂电池|39.2|...|420|弗迪|95|9.9",
+   "cons_trim": "2027款 420km 后驱自在版"
+  },
+  "cell_gen": "二代(高配)/一代(低配)",
+  "cell_flash": "仅高配闪充",
+  "cell_gen_basis": "第二代海鸥自在/飞翔/智趣二代刀片，活力/自由版一代（domain_search 2026-11-20）"
+ },
+ "比亚迪海豚": {
+  "kwh": 44.93,
+  "consumption": 11.2,
+  "cell_brand": "弗迪",
+  "trend_sales": 17160,
+  "life_status": "active",
+  "scored_trim": "2025款 420km 自由版",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 4.21,
+  "price": 10.68,
+  "_source": {
+   "price_src": "raw_small",
+   "cons_src": "https://car.m.yiche.com/biyadiea1/peizhi/?from=ybm",
+   "cons_quote": "420km 自由版|2025|在售|10.68万|...|磷酸铁锂电池|44.93|...|420|弗迪|11.2|70|-",
+   "cons_trim": "2025款 420km 自由版"
+  },
+  "cell_gen": "一代",
+  "cell_flash": "非闪充",
+  "cell_gen_basis": "在售款弗迪一代（domain_search 2026-11-20）"
+ },
+ "吉利星愿": {
+  "kwh": 47.14,
+  "consumption": 10.9,
+  "cell_brand": "宁德时代",
+  "trend_sales": 50190,
+  "life_status": "active",
+  "scored_trim": "2026款 480km 探索版",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 5.43,
+  "price": 8.68,
+  "_source": {
+   "price_src": "raw_small",
+   "cons_src": "https://car.m.yiche.com/xingyuan/peizhi/?from=ybm",
+   "cons_quote": "480km 探索版|2026|在售|8.68万|...|磷酸铁锂电池|47.14|...|480|宁德时代|10.9|85",
+   "cons_trim": "2026款 480km 探索版"
+  }
+ },
+ "五菱缤果": {
+  "kwh": 31.9,
+  "consumption": 10.6,
+  "cell_brand": "欣旺达/瑞浦赛克",
+  "life_status": "active",
+  "scored_trim": "2025款 333km 悦享款",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 4.51,
+  "price": 7.08,
+  "_source": {
+   "price_src": "raw_small",
+   "cons_src": "https://www.autohome.com.cn/config/series/7045.html",
+   "cons_quote": "五菱缤果 2025款 333km 悦享款 ... 电芯品牌:欣旺达 瑞浦赛克 ... 电池能量(kWh):31.9 ... 百公里耗电量(kWh/100km):10.6",
+   "cons_trim": "2025款 333km 悦享款",
+   "flags": [
+    "销量未知"
+   ]
+  }
+ },
+ "欧拉好猫": {
+  "kwh": 45.99,
+  "consumption": 13.3,
+  "cell_brand": "蜂巢能源",
+  "trend_sales": 2108,
+  "life_status": "active",
+  "scored_trim": "2023款 401km 尊贵型 三元锂",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 3.07,
+  "price": 14.98,
+  "_source": {
+   "price_src": "raw_small",
+   "cons_src": "https://car.m.yiche.com/oulahaomao/m162471/peizhi",
+   "cons_quote": "欧拉好猫 23款 401km 尊贵型 三元锂 14.98万 ... 级别 小型车 ... 电池电量[kWh] 45.99 ... 百公里耗电量[kWh/100km] 13.3 ... 电芯品牌 蜂巢能源",
+   "cons_trim": "2023款 401km 尊贵型 三元锂",
+   "flags": [
+    "月销<3000"
+   ]
+  }
+ },
+ "东风纳米01": {
+  "kwh": 31.45,
+  "consumption": 10.6,
+  "cell_brand": "欣旺达",
+  "trend_sales": 1262,
+  "life_status": "active",
+  "scored_trim": "2026款 初心款 330 Air",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 4.78,
+  "price": 6.58,
+  "_source": {
+   "price_src": "raw_small",
+   "cons_src": "https://car.m.yiche.com/nami01/peizhi/?from=ybm",
+   "cons_quote": "初心款 330Air|2026|在售|6.58万|...|磷酸铁锂电池|31.45|...|330|欣旺达|10.6|70",
+   "cons_trim": "2026款 初心款 330 Air",
+   "flags": [
+    "月销<3000"
+   ]
+  }
+ },
+ "奇瑞小蚂蚁": {
+  "kwh": 25.05,
+  "consumption": 10.0,
+  "cell_brand": "国轩高科",
+  "life_status": "active",
+  "scored_trim": "2026款 271km 喜爱版 25.05kWh",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 4.56,
+  "price": 5.49,
+  "_source": {
+   "price_src": "raw_small",
+   "cons_src": "https://car.m.yiche.com/qiruieq1/peizhi/?from=ybm",
+   "cons_quote": "271km 喜爱版|2026|在售|5.49万|...|磷酸铁锂电池|25.05|...|271|国轩高科|10|36",
+   "cons_trim": "2026款 271km 喜爱版 25.05kWh",
+   "flags": [
+    "销量未知"
+   ]
+  }
+ },
+ "比亚迪元UP": {
+  "kwh": 45.12,
+  "consumption": 12.2,
+  "cell_brand": "弗迪",
+  "life_status": "active",
+  "scored_trim": "飞驰版 401km 活力型",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 5.02,
+  "price": 8.98,
+  "_source": {
+   "price_src": "raw_suvlarge",
+   "cons_src": "https://car.m.yiche.com/yuanup/peizhi/?from=ybm",
+   "cons_quote": "飞驰版 401km 活力型|2027|在售|8.98万|纯电|...|磷酸铁锂电池|45.12|...|401|弗迪|12.2",
+   "cons_trim": "飞驰版 401km 活力型",
+   "flags": [
+    "销量未知"
+   ]
+  },
+  "cell_gen": "一代",
+  "cell_flash": "非闪充",
+  "cell_gen_basis": "在售款弗迪一代（domain_search 2026-11-20）"
+ },
+ "AION Y Plus": {
+  "kwh": 58.9,
+  "consumption": 12.9,
+  "cell_brand": "宁德时代(时代广汽)/因湃电池",
+  "cltc": 510,
+  "life_status": "active",
+  "scored_trim": "2026款 Plus 510智享版",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 4.31,
+  "price": 13.68,
+  "_source": {
+   "price_src": "raw_suvlarge",
+   "cons_src": "https://www.aion.com.cn/vehicle/config/table?cid=NDc%3D",
+   "cons_quote": "2026款 510智享版 13.68万 ... 动力电池类型 磷酸铁锂动力电池 电池能量(kWh)² 58.9/58.4 百公里耗电量(kwh/100km) 12.9 ... CLTC续航里程(km) 510",
+   "cons_trim": "2026款 Plus 510智享版",
+   "flags": [
+    "销量未知"
+   ]
+  }
+ },
+ "宝骏悦也Plus": {
+  "kwh": 42,
+  "consumption": 12.6,
+  "cell_brand": "国轩高科",
+  "life_status": "active",
+  "scored_trim": "401km 旗舰版",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 4.78,
+  "price": 8.78,
+  "_source": {
+   "price_src": "raw_suvlarge",
+   "cons_src": "https://car.m.yiche.com/baojunyueyeplus/peizhi/?from=ybm",
+   "cons_quote": "401km 旗舰版|2026|在售|8.78万|纯电|...|磷酸铁锂电池|42|...|401|国轩高科|12.6",
+   "cons_trim": "401km 旗舰版",
+   "flags": [
+    "销量未知"
+   ]
+  }
+ },
+ "东风纳米06": {
+  "kwh": 51.87,
+  "consumption": 12.6,
+  "cell_brand": "东昱欣晟",
+  "cltc": 471,
+  "life_status": "active",
+  "scored_trim": "471Pro",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 4.72,
+  "price": 10.99,
+  "_source": {
+   "price_src": "raw_suvlarge",
+   "cons_src": "https://car.m.yiche.com/nami06/m179142/peizhi/?from=ybm",
+   "cons_quote": "纳米06 25款 471Pro 10.99万 ... 电池类型 磷酸铁锂电池 电芯品牌 东昱欣晟 ... 电池电量[kWh] 51.87 百公里耗电量[kWh/100km] 12.6 ... CLTC纯电续航[km] 471",
+   "cons_trim": "471Pro",
+   "flags": [
+    "销量未知"
+   ]
+  }
+ },
+ "蔚来ET7": {
+  "kwh": 100,
+  "consumption": 16,
+  "cell_brand": "江苏时代",
+  "life_status": "active",
+  "scored_trim": "705km 行政版 100kWh",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 2.34,
+  "price": 42.8,
+  "_source": {
+   "price_src": "raw_suvlarge",
+   "cons_src": "https://car.m.yiche.com/weilaiet7/peizhi/?from=ybm",
+   "cons_quote": "705km 行政版 100kWh|2024|在售|42.80万|纯电|...|三元锂电池|100|...|705|江苏时代|16",
+   "cons_trim": "705km 行政版 100kWh",
+   "flags": [
+    "销量未知"
+   ]
+  }
+ },
+ "蔚来ES8": {
+  "kwh": 102,
+  "consumption": 16.3,
+  "cell_brand": "宁德时代",
+  "life_status": "active",
+  "scored_trim": "655km 行政豪华版 102kWh 5座",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 2.66,
+  "price": 38.28,
+  "_source": {
+   "price_src": "raw_suvlarge",
+   "cons_src": "https://car.m.yiche.com/weilaies8/peizhi/?from=ybm",
+   "cons_quote": "655km 行政豪华版 102kWh 5座|2026|在售|38.28万|纯电|...|三元锂电池|102|...|宁德时代(宁德时代/江苏时代/中州时代)|16.3",
+   "cons_trim": "655km 行政豪华版 102kWh 5座",
+   "flags": [
+    "销量未知"
+   ]
+  }
+ },
+ "问界M9纯电版": {
+  "kwh": 100,
+  "consumption": 17.4,
+  "cell_brand": "宁德时代",
+  "cltc": 630,
+  "life_status": "active",
+  "scored_trim": "纯电版 630km Ultra 6座",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 1.76,
+  "price": 56.98,
+  "_source": {
+   "price_src": "raw_suvlarge",
+   "cons_src": "https://car.yiche.com/wenjiem9/m169698/peizhi/",
+   "cons_quote": "问界M9 24款 纯电版 630km Ultra 6座 56.98万 ... 电芯品牌 宁德时代 电池电量[kWh] 100 百公里耗电量[kWh/100km] 17.4 CLTC纯电续航[km] 630",
+   "cons_trim": "纯电版 630km Ultra 6座",
+   "flags": [
+    "销量未知"
+   ]
+  }
+ },
+ "奔驰EQS": {
+  "kwh": 111.8,
+  "consumption": 14.6,
+  "cell_brand": "宁德时代",
+  "cltc": 813,
+  "life_status": "active",
+  "scored_trim": "450+ 先锋版",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 1.27,
+  "price": 88.1,
+  "_source": {
+   "price_src": "raw_suvlarge",
+   "cons_src": "https://www.mercedes-benz.com.cn/vehicles/eq/eqs.html",
+   "cons_quote": "电池总容量111.8千瓦时,百公里综合电耗低至14.6千瓦时,CLTC纯电续航高达813公里",
+   "cons_trim": "450+ 先锋版",
+   "flags": [
+    "电耗为官宣口径非参数表",
+    "销量未知"
+   ]
+  }
+ },
+ "宝马i7": {
+  "kwh": 105.7,
+  "consumption": 17.9,
+  "cltc": 650,
+  "life_status": "active",
+  "scored_trim": "xDrive60L M运动套装",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 0.8,
+  "price": 132.8,
+  "_source": {
+   "price_src": "raw_suvlarge",
+   "cons_src": "https://car.yiche.com/baomai7-8095/m184863/peizhi/",
+   "cons_quote": "26款 xDrive60L M运动套装 132.80万 ... CLTC纯电续航里程[km] 650 ... 电池能量 105.7 百公里耗电量[kWh/100km] 17.9",
+   "cons_trim": "xDrive60L M运动套装",
+   "flags": [
+    "销量未知"
+   ]
+  }
+ },
+ "乐道L90": {
+  "kwh": 85,
+  "consumption": 14.6,
+  "cell_brand": "中创新航",
+  "life_status": "active",
+  "scored_trim": "600km 后驱Pro版 85kWh 6座",
+  "consumption_std": "CLTC",
+  "kwh_per_wan": 3.2,
+  "price": 26.58,
+  "_source": {
+   "price_src": "raw_suvlarge",
+   "cons_src": "https://car.m.yiche.com/ledaol80/peizhi/?from=ybm",
+   "cons_quote": "600km 后驱Pro版 85kWh 6座|2026|在售|26.58万|纯电|...|三元锂电池|85|...|600|中创新航|14.6",
+   "cons_trim": "600km 后驱Pro版 85kWh 6座",
+   "flags": [
+    "销量未知"
+   ]
+  }
+ },
+ "奔驰CLA新能源": {
+  "cell_brand": "宁德时代",
+  "source": "domain_search_20261120"
+ },
+ "羿驰05": {
+  "cell_brand": "孚能科技/宁德时代",
+  "source": "domain_search_20261120"
+ },
+ "秦新能源": {
+  "cell_brand": "弗迪",
+  "source": "domain_search_20261120",
+  "cell_gen": "一代",
+  "cell_flash": "非闪充",
+  "cell_gen_basis": "秦纯电老平台（domain_search 2026-11-20）"
+ },
+ "e爱丽舍": {
+  "cell_brand": "江苏正力",
+  "source": "domain_search_20261120"
+ },
+ "updated": "2026-11-20",
+ "_meta": {
+  "synced_from": "all_data.json",
+  "sync_tool": "facts_sync.py",
+  "field_map": {
+   "kwh": "kwh",
+   "consumption": "consumption",
+   "cell": "cell_brand",
+   "sales": "trend_sales",
+   "life": "life_status",
+   "life_note": "life_note",
+   "note": "note",
+   "trim": "scored_trim",
+   "consumption_std": "consumption_std",
+   "kwh_per_wan": "kwh_per_wan",
+   "price": "price"
+  },
+  "source_fields": [
+   "price_src",
+   "cons_src",
+   "cons_quote",
+   "cons_trim",
+   "sales_src",
+   "flags"
+  ],
+  "note": "本段由原始库自动同步；手工核验值优先，不被覆盖。"
+ },
+ "领汇e5": {
+  "cell_brand": "弗迪(刀片)",
+  "cell_gen": "一代",
+  "cell_flash": "非闪充",
+  "cell_gen_basis": "比亚迪e5平台弗迪刀片老款（domain_search 2026-11-20）",
+  "source": "候选池 cell_brand"
+ },
+ "比亚迪e3": {
+  "cell_brand": "弗迪",
+  "cell_gen": "一代",
+  "cell_flash": "非闪充",
+  "cell_gen_basis": "2021款43.2kWh弗迪一代（domain_search 2026-11-20）",
+  "source": "候选池补采"
+ },
+ "AION N60": {
+  "cell_brand": "因湃电池"
+ },
+ "领克20": {
+  "cell_brand": "吉曜通行"
+ },
+ "MG 4X": {
+  "cell_brand": "宁德时代(时代一汽)"
+ },
+ "欧拉5 EV": {
+  "cell_brand": "蜂巢能源"
+ },
+ "宝骏云海": {
+  "cell_brand": "江苏正力"
+ },
+ "钛3": {
+  "cell_brand": "弗迪(第二代刀片)"
+ },
+ "AION Y": {
+  "cell_brand": "亿纬动力"
+ },
+ "睿蓝7": {
+  "cell_brand": "国轩高科"
+ },
+ "极氪X": {
+  "cell_brand": "衢州极电"
+ },
+ "MG ES5": {
+  "cell_brand": "时代上汽(宁德时代)"
+ },
+ "五菱星光S": {
+  "cell_brand": "江苏正力"
+ },
+ "悦意03": {
+  "cell_brand": "中创新航/武汉楚能(混装)"
+ },
+ "AION S": {
+  "cell_brand": "因湃/中创新航",
+  "source": "候选池 cell_brand"
+ }
+}

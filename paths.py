@@ -40,12 +40,9 @@ DIST_DIR = ROOT / "dist"
 #   能重建 → 不打包，让用户随代码逐步生成（版本一变本来就该重算）；
 #   不能重建（人工采集/核验的事实库）→ 必须随包，否则新装包功能残缺。
 GENERATED_JSON = {
-    "trims.json",                            # auto_trims.py（联网采集逐配置阶梯）
-    "master_pool.json",                      # master_pool.py --intake（联网销量建池）
-    "ice_crash.json",                        # ice_crash.py（联网碰撞证据）
-    "cell_facts.json",                       # build_cell_facts.py（联网电芯事实）
-    "universe_car_midsedan_allprice.json",   # universe_build.py（半自动：需先 discover）
-    "fact_library.json",                     # facts_sync.py --apply（半自动：需原始库）
+    "trims.json",        # auto_trims.py（seed 随包人工条目 + 联网补录自动条目）
+    "ice_crash.json",    # ice_crash.py --pool <池>（联网碰撞证据）
+    "cell_facts.json",   # build_cell_facts.py（联网电芯事实）
 }
 
 # 人工采集/核验的事实库：无法用代码重建，必须随包发布（合计约 143KB，在 3MB 限额内）
@@ -53,6 +50,15 @@ CURATED_JSON = {
     "baseline_car_ev.json",     # 纯电基线候选池（214 款，一次性数据集）
     "airbags.json",             # 被动安全气囊配置核验表（逐车带 url+quote）
     "vehicle_physics.json",     # 整备质量/风阻/电压/换电参数（汽车之家逐车采集）
+    # 2026-11-21 分类修正：这两个原来当"可重建生成物"，实测重建不了——
+    # fact_library 需要 car_all 原始库（不在项目内），universe 需要 discover 输出，
+    # 且 trims 里的人工条目联网也抓不回来（车系库查无）。按"能不能重建"的判据，它们必须随包。
+    "trims_manual.json",        # 人工核验的逐配置条目（auto_trims 生成时会合并）
+    "fact_library.json",        # 真实电耗/电池事实库（从 car_all 提炼，源库不在项目内）
+    "universe_car_midsedan_allprice.json",  # 中型轿车全价位权威清单（盘点产物，手工维护）
+    # 2026-11-21 实测后追加：master_pool 用 --intake 能"跑通"，但产出 291 车 / 0 车有分数
+    # （纯骨架）。它靠逐车采集+打分累积而来，不是一条命令能还原的 → 判据上是"数据仓库"而非"缓存"。
+    "master_pool.json",         # 总候选池（累积型，随包；新增车型用 --intake 增量摄入）
 }
 
 # 每个不打包的生成物都必须有重建规格——否则新装包里它永远缺，功能静默降级。
@@ -60,34 +66,21 @@ CURATED_JSON = {
 # semi: 需要前置输入（不能一条命令跑完），见 note。
 GENERATED_SPEC: dict[str, dict] = {
     "trims.json": {
-        "cmd": "python3 auto_trims.py --apply",
-        "needs_net": True, "semi": False,
-        "note": "从汽车之家逐配置页补录阶梯；耗时较长，可只补指定车型",
-    },
-    "master_pool.json": {
-        "cmd": "python3 master_pool.py --intake --month <YYYYMM> --apply",
-        "needs_net": True, "semi": False,
-        "note": "按销量榜建总池；月份换成当期，数据随版本重算",
+        "cmd": "python3 auto_trims.py --seed-only",
+        "needs_net": False, "semi": False,
+        "note": "先用随包的 categories/trims_manual.json 生成基础库（人工核验条目，开箱可用）；"
+                "要补齐自动条目再跑 auto_trims.py --candidates <池> --index <索引> --out data/gen/trims.json",
     },
     "ice_crash.json": {
-        "cmd": "python3 ice_crash.py",
+        "cmd": "python3 ice_crash.py --pool categories/master_pool.json",
         "needs_net": True, "semi": False,
-        "note": "C-IASI/C-NCAP 官方碰撞记录",
+        "note": "需车型集合（读随包 master_pool.json）；重抓 C-IASI 加 --fetch。"
+                "原命令漏了 --pool，实测直接报错（2026-11-21 删缓存重建时暴露）",
     },
     "cell_facts.json": {
         "cmd": "python3 build_cell_facts.py",
         "needs_net": True, "semi": False,
         "note": "电芯品牌/容量核验事实表",
-    },
-    "universe_car_midsedan_allprice.json": {
-        "cmd": "python3 universe_build.py --discover <discover输出.json> --out <目标.json>",
-        "needs_net": True, "semi": True,
-        "note": "前置：先跑 discover.py 拿联网销量榜 JSON",
-    },
-    "fact_library.json": {
-        "cmd": "python3 facts_sync.py --apply",
-        "needs_net": False, "semi": True,
-        "note": "前置：需 car_all 原始库（环境变量 CAR_ALL_DATA 指向）",
     },
 }
 

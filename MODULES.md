@@ -112,11 +112,15 @@ regress ────────────────────────
 
 | 类别 | 位置 | 打包 | 举例 |
 |---|---|---|---|
-| 可重建的生成物 | `data/gen/` | 排除 | `trims.json`、`master_pool.json`、`ice_crash.json`、`cell_facts.json` |
-| 人工事实库（不可重建） | `categories/` | **随包** | `airbags.json`、`vehicle_physics.json`、`baseline_car_ev.json` |
+| 可重建的生成物 | `data/gen/` | 排除 | `trims.json`、`ice_crash.json`、`cell_facts.json` |
+| 人工事实库（不可重建） | `categories/` | **随包** | `master_pool.json`、`trims_manual.json`、`fact_library.json`、`airbags.json`、`vehicle_physics.json`、`baseline_car_ev.json` |
 | 人工口径配置 | `categories/` | 随包 | `rank_v2_policy.json`、`experience_facts.json` |
 | 跑批产物 | `runs/` | 排除 | 榜单 HTML、summary.json |
 | 发行 zip | `dist/` | 排除 | `car-recommendation-vX.Y.Z.zip` |
+
+> 2026-11-21 用「删光 data/gen 再重建」实测校准过这条线：`master_pool` 虽然能跑 `--intake`，
+> 但产出 291 车 / 0 车有分数（空骨架）——它靠逐车采集+打分累积，不是缓存，故改判随包。
+> `ice_crash` 的重建命令原来漏了 `--pool`（实测直接报错），已修正。
 
 为什么这么切：生成物带口径与版本指纹，版本一升、口径一变本来就该重算；
 把它们打进包，等于把**过期数据**发给用户，还会让新装包看上去"有数据"却算不对。

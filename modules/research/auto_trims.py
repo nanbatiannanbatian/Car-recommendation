@@ -82,6 +82,37 @@ ALIASES = {
 }
 
 
+def load_db_merged(path):
+    """读取 trims 库，并把随包的人工核验条目合并进来（manual 优先）。
+
+    为什么：trims.json 是「可重建生成物」不打包，但里面混着人工核验条目
+    （逐配置表来自媒体/官网交叉核对，汽车之家车系库查无，联网也抓不回来）。
+    不合并的话，新装包重建 = 人工条目全丢（2026-11-21 用户指出的隐患）。
+    现在 categories/trims_manual.json 随包，生成时作为底座叠加自动补录。
+    """
+    db = None
+    if path and os.path.exists(path):
+        db = json.load(open(path, encoding="utf-8"))
+    if not db:
+        db = {"scoring_enabled": False, "entries": [], "out_of_board_examples": []}
+    mp = paths.CAT_DIR / "trims_manual.json"
+    if mp.exists():
+        m = json.load(open(mp, encoding="utf-8"))
+        have = {e.get("model") for e in db.get("entries", [])}
+        db["entries"] = [e for e in m.get("entries", []) if e.get("model") not in have] + db.get("entries", [])
+        if not db.get("out_of_board_examples"):
+            db["out_of_board_examples"] = m.get("out_of_board_examples", [])
+    return db
+
+
+def seed_from_manual(out_path):
+    """只把人工条目落成基础 trims 库（不联网、不需候选池）。新装包 bootstrap 用。"""
+    db = load_db_merged(None)
+    os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
+    json.dump(db, open(out_path, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    return len(db.get("entries") or [])
+
+
 def find_sid(model, index):
     nidx = {norm(k): (k, v) for k, v in index.items()}
     # 别名优先：候选池带品牌前缀，索引不带；走显式白名单，不做模糊匹配
@@ -332,15 +363,25 @@ def make_entry(c, sid, ah_name, how, trims_list, pure_ev_only=True):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--candidates", required=True)
-    ap.add_argument("--index", required=True, help="build_ice_pool 缓存的 ah_grade_index.json")
+    ap.add_argument("--candidates")
+    ap.add_argument("--index", help="build_ice_pool 缓存的 ah_grade_index.json")
     ap.add_argument("--db", default=str(paths.cat("trims.json")))
     ap.add_argument("--out")
+    ap.add_argument("--seed-only", action="store_true",
+                    help="只从 categories/trims_manual.json 生成基础库（不联网、不需候选池）")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--no-pure-ev-filter", action="store_true",
                     help="不按能源类型过滤款型（仅用于调试，纯电榜禁止使用）")
     a = ap.parse_args()
-    db = json.load(open(a.db, encoding="utf-8"))
+    if not getattr(a, "seed_only", False) and not a.candidates:
+        ap.error("--candidates 必填（或用 --seed-only）")
+    if not getattr(a, "seed_only", False) and not a.index:
+        ap.error("--index 必填（或用 --seed-only）")
+    if getattr(a, "seed_only", False):
+        n = seed_from_manual(a.out or a.db)
+        print(f"[seed] 从 trims_manual.json 生成基础库 {n} 条 → {a.out or a.db}")
+        return 0
+    db = load_db_merged(a.db)
     index = json.load(open(a.index, encoding="utf-8"))
     cands = json.load(open(a.candidates, encoding="utf-8"))["candidates"]
     have = {e["model"] for e in db["entries"]}

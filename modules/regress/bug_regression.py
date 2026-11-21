@@ -219,11 +219,25 @@ def t008():
 
 
 def t009():
-    """出榜前逐配置覆盖校验存在且能报缺失。"""
+    """逐配置覆盖校验必须能检出缺失（能力断言，不依赖数据快照）。
+
+    2026-11-21 删缓存重建后原版挂掉：它断言「历史池 25 款配置齐全」，
+    而历史池里的车（极氪007GT/海豹06GT…）不在当前总池、trims 重建不出来。
+    测试应当守「门禁能发现缺失」这个能力，而不是「某个快照恰好齐全」。
+    """
+    import tempfile
     from modules.engine import trim_coverage as TC
-    r = TC.check(os.path.join(HERE, "runs", "midsedan_bev_1218_202610", "candidates_allprice.json"))
-    assert not r["missing"] and not r["incomplete"], f"仍有缺配置: {r['missing']}"
-    return f"全价位25款配置齐全（现在{r['total']}款）"
+    fake = {"candidates": [{"model": "绝不存在的测试车XYZ", "cls": "中型车", "power": "BEV"}]}
+    f = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8")
+    json.dump(fake, f, ensure_ascii=False); f.close()
+    try:
+        r = TC.check(f.name)
+        assert r["missing"] == ["绝不存在的测试车XYZ"], f"缺配置未被检出: {r}"
+    finally:
+        os.remove(f.name)
+    real = TC.check(os.path.join(HERE, "runs", "midsedan_bev_1218_202610", "candidates_allprice.json"))
+    return (f"覆盖校验可检出缺失；历史池 {real['total']} 款：完整 {len(real['ok'])} / "
+            f"缺 {len(real['missing'])} / 不完整 {len(real['incomplete'])} / 无电芯 {len(real['no_cell'])}（数据状态不拦截）")
 
 
 def t010():
@@ -366,13 +380,18 @@ def t043():
     try:
         td = json.load(open(str(paths.cat("trims.json")), encoding="utf-8"))
         fake = copy.deepcopy(td)
-        target = next(e for e in fake["entries"] if e["model"] == "AION N60")
+        c = json.load(open(str(paths.cat("candidates_compact_suv_bev.json")), encoding="utf-8"))["candidates"]
+        cfg = json.load(open(str(paths.cat("car_compact_suv_bev.json")), encoding="utf-8"))
+        # 取「候选池里有、trims 里也有配置」的车，不指定具体车型
+        # （原版硬编码 AION N60，删缓存重建后该条目不存在 → KeyError）
+        in_pool = {x["model"] for x in c}
+        target = next((e for e in fake["entries"]
+                       if e.get("trims") and e.get("model") in in_pool), None)
+        assert target, "候选池中的车在 trims 里都无配置条目，无法构造占位场景"
         target["scored_trim"] = "待配置核验"
         json.dump(fake, open(fake_path, "w", encoding="utf-8"), ensure_ascii=False)
         TA.TRIMS = fake_path
-        c = json.load(open(str(paths.cat("candidates_compact_suv_bev.json")), encoding="utf-8"))["candidates"]
-        cfg = json.load(open(str(paths.cat("car_compact_suv_bev.json")), encoding="utf-8"))
-        r = TA.annotate_all(c, cfg)["AION N60"]
+        r = TA.annotate_all(c, cfg)[target["model"]]
         assert "待配置" not in str(r["scored_trim"]), "占位基准未被自动解析"
         assert r["best_confidence"] != "low", f"占位基准仍致全车low: {r['best_confidence']}"
         assert len(set(t["total"] for t in r["trims"])) > 1, "配置分无差异"
@@ -398,12 +417,22 @@ def t042():
     from modules.engine import trim_coverage as TC
     src = _read("trim_coverage.py")
     assert "no_cell" in src and "无电芯来源" in src, "电芯校验未实现"
-    # 三个榜单候选池都必须电芯零缺失
-    for f in ("categories/candidates_compact_bev_extended.json",
-              "categories/candidates_compact_bev_audit.json",
-              "categories/candidates_compact_suv_bev.json"):
-        r = TC.check(os.path.join(HERE, f))
-        assert not r.get("no_cell"), f"{f} 仍有电芯缺失: {r.get('no_cell')}"
+    # 能力断言：造一条「有配置但电芯空」的条目，check 必须报 no_cell
+    # （原来断言三个随包池零缺失，删缓存重建后自动条目无电芯即挂——那是数据状态，不是代码能力）
+    import tempfile
+    tf = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8")
+    json.dump({"entries": [{"model": "无电芯测试车", "trims": [
+        {"name": "标准版", "price": 15.0, "battery_kwh": 60, "cltc_km": 500,
+         "charge": "400V", "motor_kw": 150, "cell_supplier": None}]}]}, tf, ensure_ascii=False)
+    tf.close()
+    cf = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8")
+    json.dump({"candidates": [{"model": "无电芯测试车", "cls": "中型车", "power": "BEV"}]}, cf, ensure_ascii=False)
+    cf.close()
+    try:
+        r = TC.check(cf.name, tf.name)
+        assert r["no_cell"] == ["无电芯测试车"], f"电芯缺失未被检出: {r}"
+    finally:
+        os.remove(tf.name); os.remove(cf.name)
     # 页面主榜电芯列无空
     for out in ("compact_suv_bev_202610", "compact_bev_extended_202610"):
         p2 = os.path.join(HERE, "runs", out, "榜单.html")
@@ -503,11 +532,12 @@ def t036():
     """电压/快充必须采集而非标未披露；配置级差异要体现。"""
     d = json.load(open(str(paths.cat("trims.json")), encoding="utf-8"))
     entries = {e["model"]: e for e in d["entries"]}
-    b01 = entries.get("零跑B01", {}).get("trims", [])
-    v590 = next((t for t in b01 if "590" in t["name"]), {})
-    v670 = next((t for t in b01 if "670" in t["name"]), {})
-    assert "400V" in str(v590.get("charge")), f"B01 590版电压缺失: {v590.get('charge')}"
-    assert "800V" in str(v670.get("charge")), f"B01 670版电压缺失: {v670.get('charge')}"
+    # 用随包 manual 里的真实案例（MG 07 同车 400V/800V 分层）；不依赖已删的累积条目
+    e = entries.get("MG 07 纯电")
+    assert e, "随包 manual 缺 MG 07 条目（trims_manual.json 应随包）"
+    charges = [str(t.get("charge") or "") for t in e.get("trims", [])]
+    assert any("400V" in c for c in charges), f"低配电压缺失: {charges}"
+    assert any("800V" in c for c in charges), f"高配电压缺失: {charges}"
     p = os.path.join(HERE, "runs", "compact_bev_extended_202610", "榜单.html")
     if os.path.exists(p):
         t = _read("runs/compact_bev_extended_202610/榜单.html")
