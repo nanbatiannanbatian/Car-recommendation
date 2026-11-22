@@ -167,6 +167,31 @@ def dim_breakdown(r: dict, tb_entry: dict, dims: list) -> str:
             + "".join(parts) + "</ul></details>") if parts else ""
 
 
+def sales_tip(r: dict) -> str:
+    """v10.28.0：月销单元格 hover 说明——写出趋势月销的计算公式与本车口径。
+
+    公式（来自 SKILL 出榜口径 + monthly.probe_month）：
+      稳态车 = 最近 N 个月（默认 6）逐月销量的中位数（抗清库/换代异常月）；
+      新车爬坡 = 「逐月中位 vs 最新月」取较大值（避免爬坡首月低估）；
+      sales_scope=series_total 时是车系合计（含其他动力），纯电值 ≤ 该上界。
+    只读候选已核验字段，不猜不编造；无 sales_note 也给出通用公式。
+    """
+    scope = r.get("sales_scope")
+    parts = [
+        "趋势月销（判档/打分用，非单月）：",
+        "最近 6 个月逐月销量取中位数（抗清库/换代异常月）；",
+        "新车爬坡取「中位 vs 最新月」较大值。",
+    ]
+    if scope == "series_total":
+        parts.append("本车为车系合计上界（含其他动力），纯电实际销量 ≤ 此值，仅作参考列不参与分位。")
+    elif scope == "pure_bev":
+        parts.append("本车为纯电单独销量口径。")
+    note = str(r.get("sales_note") or "").strip()
+    if note:
+        parts.append("本车注记：" + note)
+    return "".join(parts)
+
+
 def risk_flags(r: dict) -> str:
     """v9.7.16：主表风险标记——估算/插补、营运车、缺官方碰撞报告。只读事实字段，不编造。"""
     out = []
@@ -524,7 +549,8 @@ def render(data, summary, title, as_of):
                 elif k == "cell_brand":
                     H.append(f"<td class='ref c-cell'>{e(val)}</td>")
                 elif k == "sales":
-                    H.append(f"<td>{e(val)}</td>")   # 月销不随配置变
+                    # v10.28.0：hover 给出趋势月销计算公式 + 本车口径（纯电/车系合计上界/异常注记）
+                    H.append(f'<td title="{e(sales_tip(r))}" style="cursor:help">{e(val)}</td>')
                 elif k == "verdict":
                     v = BV.car_verdict(r, r)
                     # v9.7.12：营运/网约车为主——醒目前置标识，让私人购车者一眼看出场景不同

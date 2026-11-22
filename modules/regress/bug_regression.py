@@ -150,6 +150,7 @@ CASES = [
     ("BUG-127", "max_power_kw/motor_kw字段错配64处+charge被填纯电压12处致功率/电压/快充项静默缺席", "v10.25.0"),
     ("BUG-128", "三电阈值配置化后无复核到期信号+车型参数/申报库/候选池无统一新鲜度体检，2027三电升级后静默用旧档", "v10.26.0"),
     ("BUG-129", "页面展示两处失真：未入池车型及原因整段外露(用户要剔除)+主榜写死历史版本号v9.7.x被误读为当前版本", "v10.27.0"),
+    ("BUG-130", "T1卡点「综合证据A未达A(非碰撞)」自相矛盾且错误归因(展示用原始ev/判据用降级ev_for_t1)+月销列无公式说明", "v10.28.0"),
 ]
 
 
@@ -4562,8 +4563,8 @@ def t129():
     from modules.engine.score_fingerprint import skill_version
     ver = skill_version()
     assert ver, "读不到当前 skill 版本"
-    for run in ("midsedan_bev_allprice_202611_v30", "midsuv_bev_202611_v30",
-                "midsuv_bev_u18_202611_v30"):
+    for run in ("midsedan_bev_allprice_202611_v31", "midsuv_bev_202611_v31",
+                "midsuv_bev_u18_202611_v31"):
         p = os.path.join(HERE, "runs", run, "榜单.html")
         if not os.path.exists(p):
             continue
@@ -4583,8 +4584,59 @@ def t129():
             "三榜 HTML 验证 + 反向注入可检出")
 
 
+def t130():
+    """BUG-130：T1 卡点文案矛盾 + 月销无公式说明（v10.28.0）。
+    ① 人工标A但无碰撞实锤的车（MG07），判据用降级后的 ev_for_t1=B，
+       展示却用原始 ev=A → 「综合证据 A 未达 A（口碑样本/上市时长，非碰撞）」
+       自相矛盾且错误归因（真因是缺碰撞实锤）。改为展示 ev_for_t1 并写实归因。
+    ② 月销列 hover 给出趋势月销计算公式（近6月中位/新车取较大值/车系合计上界）。
+    锁死：①源码展示用 ev_for_t1 + 两种归因；②score_rows 透传月销口径字段；
+    ③sales_tip 含公式与纯电/车系合计区分；④v31 三榜 HTML 无矛盾串、有 hover；
+    ⑤反向注入还原旧文案即 FAIL。
+    """
+    lsrc = _read("leaderboard.py")
+    rsrc = _read("render_board_html.py")
+    # ① 源码级：T1 卡点展示降级后等级，且按降级原因分两写实归因
+    assert "综合证据 {ev_for_t1} 未达" in lsrc, "T1卡点仍展示原始 ev（矛盾文案未修）"
+    assert "人工标A但无权威碰撞实锤" in lsrc and "按规则降级为B" in lsrc, \
+        "缺碰撞实锤降级的正确归因缺失"
+    assert "非口碑问题" in lsrc, "未标注非口碑问题（仍可能误导为口碑）"
+    # ② score_rows 透传月销口径字段（只读，不进分）
+    for fld in ("trend_sales", "sales_scope", "sales_note"):
+        assert f'"{fld}": c.get(' in lsrc, f"score_rows 未透传 {fld}"
+    assert '"lifecycle_status":' in lsrc, "score_rows 未透传 lifecycle_status"
+    # ③ sales_tip 含公式 + 纯电/车系合计区分
+    assert "def sales_tip" in rsrc, "月销 hover 说明函数缺失"
+    assert "中位数" in rsrc and "较大值" in rsrc, "趋势月销公式说明不全"
+    assert "series_total" in rsrc and "上界" in rsrc, "车系合计上界口径未说明"
+    from modules.board.render_board_html import sales_tip
+    tip_total = sales_tip({"sales_scope": "series_total", "trend_sales": 4640,
+                           "sales_note": "懂车帝未拆分动力"})
+    assert "中位数" in tip_total and "上界" in tip_total and "懂车帝未拆分动力" in tip_total, \
+        "车系合计口径 hover 内容不全"
+    tip_bev = sales_tip({"sales_scope": "pure_bev", "trend_sales": 11166})
+    assert "纯电单独" in tip_bev and "上界" not in tip_bev, "纯电口径 hover 不应说上界"
+    # ④ 真实 v31 三榜 HTML：无矛盾串、月销格有 title hover
+    for run in ("midsedan_bev_allprice_202611_v31", "midsuv_bev_202611_v31",
+                "midsuv_bev_u18_202611_v31"):
+        p = os.path.join(HERE, "runs", run, "榜单.html")
+        if not os.path.exists(p):
+            continue
+        html = open(p, encoding="utf-8").read()
+        assert "综合证据 A 未达 A" not in html, f"{run} 仍有矛盾文案「A 未达 A」"
+        assert "非碰撞）" not in html or "口碑样本/上市时长维度，非碰撞" not in html, \
+            f"{run} 仍有错误归因「非碰撞」"
+        assert "title=\"趋势月销（判档/打分用" in html, f"{run} 月销列无公式 hover"
+    # ⑤ 反向注入：把展示改回原始 ev，检测必须触发
+    injected = lsrc.replace("综合证据 {ev_for_t1} 未达", "综合证据 {ev} 未达", 1)
+    assert "综合证据 {ev} 未达" in injected, "反向注入未生效"
+    assert "综合证据 {ev} 未达" not in lsrc, "反向注入对照失败：真实源码仍含旧文案"
+    return ("T1卡点展示降级后等级+两种写实归因 + 月销hover公式(纯电/车系合计) + "
+            "score_rows透传口径 + 三榜HTML验证 + 反向注入可检出")
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120, t121, t122, t123, t124, t125, t126, t127, t128, t129]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120, t121, t122, t123, t124, t125, t126, t127, t128, t129, t130]
 
 
 def run():

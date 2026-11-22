@@ -13,7 +13,7 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 10.27.0
+version: 10.28.0
 author: "nanbatiannanbatian"
 ---
 
@@ -3662,3 +3662,10 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
 - **改动（根治在生成链路，非产物补丁）**：`modules/board/render_board_html.py` ①删掉 `pool_excluded` 的 HTML 提示块（约原 323-328 行）；数据在 `summary.pool_excluded` 与 report.md 落榜名单中保留，仍可逐条审计，不违背"不能比则说明"数据纪律。②render() 顶部经 `score_fingerprint.skill_version()` 单一真相源读 SKILL.md 当前版本 `_ver`，三处旧标记改 `v{_ver}` 动态输出；Render 缺依赖时优雅降级为空串。三榜重出后页面显示 `v10.27.0`。
 - **回归**：新增 BUG-129（渲染源码无未入池 HTML 输出/无写死 v9.7.x/`v{_ver}`≥3/走 skill_version/pipeline 数据层 pool_excluded 保留/三榜 v30 HTML 验证/反向注入 `v{_ver}` 可检出）；negative_regression 加 `t129: ["v{_ver}"]` 探针。全套 bug 127/127、反向注入 103/103、midsuv 46/46、layout 16/16、release 39/39、compare 20/20、router 32/32、各 selftest 全绿。
 - **零分数影响**：纯展示层改动，未动打分代码与权重——score_fingerprint 指纹 48478d21 不变（版本号按设计不进指纹）；三榜重出 v30 仅为刷新 HTML 展示，跨榜同车总分与八维 0 差异。
+
+## v10.28.0 · T1卡点矛盾文案根因修 + 月销公式hover（2026-11-22）
+- 用户看轿车榜提六问，逐条辨析：①月销 hover 要出计算公式（合理展示需求）；②MG07 生命周期没展示（非bug——生命周期表只列特殊状态车，MG07正常在售无事件，按设计过滤）；③MG07 kWh/万元高是否＝性价比高（否——kWh/万元是"每万元买多少度电"事实列不计分，性价比是产品力残差法；MG07三电7.7/达成率53.6%，性价比7.9低于中性，电池多≠整车值）；④深蓝L06/ET5/Model3 家族命中0/6（非算法错——二值"进前三"截断盲区，看八维分即知：L06三电8.4偏低但均衡平均5.6、ET5空间7.7安全8.3+月销482落T3、Model3空间7.5性价比7.1车机8.0短板但三电9.2智驾9.3强）；⑤Model3没强推（按规则正确落选——家族0/6、平均第7.9>6、区间4-12跨度8>5，两个OR路径都没过，且有销量口径异常标记）；⑥极狐S5碰撞成绩（用户觉得应有，联网权威核查：中汽测评官网查无S5，网传98.7%/92.8%是自媒体编造或张冠李戴——92.7%实为姊妹车阿尔法T5，北汽蓝谷投资者平台只称S5为"2024中国十佳车身"。当前"无权威碰撞成绩"判断正确，不编造分数，用户拍板不改）。
+- **根因修一（矛盾文案）**：`leaderboard.py` T1卡点展示用原始人工等级 ev、判据却用降级后 ev_for_t1——MG07（人工标A但无碰撞实锤，ev_for_t1降B）显示成自相矛盾的「综合证据 A 未达 A（口碑样本/上市时长维度，非碰撞）」，既矛盾又错误归因（真因是缺碰撞实锤）。改为展示 ev_for_t1，并按降级原因分两种写实归因：人工A无碰撞实锤→「人工标A但无权威碰撞实锤，按规则降级为B（非口碑问题）」；其余→口碑维度。
+- **根因修二（月销公式 hover）**：`score_rows` 透传 trend_sales/sales_scope/sales_note/lifecycle_status 只读口径字段（不进分）；`render_board_html.sales_tip()` 生成 hover：趋势月销=近6月逐月中位（新车取中位vs最新月较大值），sales_scope=series_total 标车系合计上界、pure_bev 标纯电单独，sales_note 带出口集中等异常注记；月销单元格 title 挂该说明。
+- **回归**：新增 BUG-130（源码展示用 ev_for_t1+两种写实归因+score_rows透传+sales_tip公式/口径+三榜v31 HTML无矛盾串有hover+反向注入还原旧文案可检出）+ negative_regression `t130` 探针。全套 bug 128/128、注入 104/104、各 selftest 全绿。
+- **指纹**：leaderboard.py 在指纹代码清单内（虽本次两处改动均只读/展示不改分），按纪律重打三候选池指纹 48478d21→ccd8c169，三榜重出 v31，跨榜同车分数 0 差异（展示层改动）。

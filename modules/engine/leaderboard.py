@@ -226,6 +226,14 @@ def score_rows(cands: list[dict], cfg: dict, weights: list[float] | None = None)
             "crash": c.get("crash"),
             "safety_basis": c.get("safety_basis"),
             "safety_confidence": c.get("safety_confidence"),
+            # v10.28.0：月销口径字段透传给页面 hover 说明（只读，不进打分）。
+            # 趋势月销=近N月中位数/新车取较大值；sales_scope 标纯电单独 vs 车系合计上界；
+            # sales_note 记异常原因（出口集中/促销透支等），都在候选池已核验。
+            "trend_sales": c.get("trend_sales"),
+            "sales_scope": c.get("sales_scope"),
+            "sales_note": c.get("sales_note"),
+            "lifecycle_status": (c.get("lifecycle") or {}).get("status")
+                                if isinstance(c.get("lifecycle"), dict) else None,
         })
     rows.sort(key=lambda r: -r["total"])
     return rows
@@ -1093,11 +1101,19 @@ def tier_report(cands: list[dict], cfg: dict, weights: list[float] | None = None
         if a["topk_freq"] < rules["t1_min_joint_freq"]:
             blockers.append(f"全情景命中 {a['topk_freq']:.0%}<{rules['t1_min_joint_freq']:.0%}")
         # 2026-11-21：拆开两条，不再混写。原来是一句「证据 B 未达 A（无权威碰撞成绩）」，
-        # 把「综合证据等级」和「碰撞实锤」两件事塞进一句，读起来像自我矛盾
-        # （证据 A 的车也显示「证据 A 未达 A」）；且「在测」也被说成「无成绩」。
+        # 把「综合证据等级」和「碰撞实锤」两件事塞进一句。
+        # v10.28.0 根因修：此前这里展示用原始人工等级 ev、判据用降级后的 ev_for_t1，
+        # MG07（人工标A但无碰撞实锤，ev_for_t1 降为B）就显示成自相矛盾的
+        # 「综合证据 A 未达 A（口碑样本/上市时长维度，非碰撞）」——既矛盾又错误归因
+        # （降级的真因是缺碰撞实锤，不是口碑）。改为展示实际判据等级 ev_for_t1，
+        # 并按降级原因分两种写实归因，不再张冠李戴。
         if ev_for_t1 not in rules["t1_evidence"]:
-            blockers.append(f"综合证据 {ev} 未达 {'/'.join(rules['t1_evidence'])}"
-                            f"（口碑样本/上市时长维度，非碰撞）")
+            if ev == "A" and not has_crash_evidence:
+                _ev_why = "人工标A但无权威碰撞实锤，按规则降级为B（非口碑问题）"
+            else:
+                _ev_why = "口碑样本/上市时长维度"
+            blockers.append(f"综合证据 {ev_for_t1} 未达 {'/'.join(rules['t1_evidence'])}"
+                            f"（{_ev_why}）")
         if not has_crash_evidence:
             _short = CS.display_short(c.get("crash"))
             if _short == "在测":
