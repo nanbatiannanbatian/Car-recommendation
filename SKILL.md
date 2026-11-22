@@ -13,7 +13,7 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 10.16.0
+version: 10.16.1
 author: "nanbatiannanbatian"
 ---
 
@@ -3509,3 +3509,15 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
 **B 类真 bug**：主榜三电仍有满分（海狮06EV/小鹏G6 = 10.0）。上轮只给规则分/逐配置分加软上限，漏了主榜「候选池 scores→电耗效率→续航达成率」链路，`range_achievement` 用 `min(10,..)` 硬顶。修：`spec_score.main_board_powertrain_cap` 复用同一个 `soft_ceiling`（knee 9.3→渐近 9.5），pipeline 在两修正后统一过一遍，单调保序、满分归零、审计留痕。
 
 **验收**：四模块 selftest 全绿；bug_regression 109/109（t109 锁锚点快照单一源、四模块固定锚接口、同车封顶一致、主榜三电软上限保序，反向注入 103/103 检出）；v14 两榜 11 款同车逐维一致、两榜主榜三电均无 10.0。
+
+## v10.16.1 · bZ5 碰撞成绩被覆盖 + 页面自相矛盾（用户："丰田BZ4有碰撞成绩但是现实缺权威碰撞成绩，代码层面修改"；确认车型=bZ5，全修）
+
+**诊断**：v14 榜单 bZ5 同一行既显示绿色「C-IASI G」徽标、又标黄「缺权威碰撞成绩」。深挖两处真 bug：
+- **数据裁决**：候选池 bZ5 原本是权威一手「C-NCAP 86.7%」（中汽测评官网 2025 年详情页核实存在），但 `sync_safety_scores._sort_scores` 用 `score is not None` 判"有具体分值"，而 `build_ssot` 构建 C-NCAP 条目时 86.7 只写 display、score 留空 → 判据失效 → 同 tier 退化为按体系名字母序（C-IASI < C-NCAP）→ 证据不全的 C-IASI G（该批次稿件 assist 维度未点名、crash 核验 note"官网当期批次无此车"）抢走 primary，覆盖真实 C-NCAP。
+- **展示判定**：`render_board_html.risk_flags` 自写体系白名单 + 关键词正则，认不出 "C-IASI G" 的单字母 G（正则是 `[Gg]+`，无 "+" 不匹配），而 `crash_badge` 走 crash_systems 认得 → 同一行两判定打架。
+
+**修法（根因、单一真相源）**：
+- `_has_concrete_value()` 判据改为「score 有值 或 display 含得分率%」，回到注释已写明但实现失效的「一手分值优先于等级」口径；`build_ssot` 给 C-NCAP 条目写 `score=float(val)` 双保险。影响 6 款车（银河M9/尚界H5/理想i6/小鹏P7+/bZ5/小米YU7）从 C-IASI 等级切回真实 C-NCAP 得分率，C-IASI 降级为次要留档。
+- `risk_flags` 改用 `CS.is_official(basis) or CS.parse_score(crash)`，与 `crash_badge` 同一 crash_systems 真相源，删掉硬编码白名单和关键词正则。
+
+**验收**：sync/render selftest 全绿；bug_regression 110/110（t110 锁排序判据/bZ5 恢复/6 类展示判据一致，反向注入旧判据→t110 FAIL、恢复→全绿）；v15 两榜 bZ5 显示 C-NCAP 86.7% 徽标、无「缺权威」标记。

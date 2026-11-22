@@ -177,19 +177,17 @@ def risk_flags(r: dict) -> str:
     # v9.7.43：销量口径异常标注（季度初出口集中/促销透支/清库等导致的单月异常低值，非产品力问题）
     if any(k in note for k in ("销量口径异常", "出口集中", "季度初出口", "促销透支")):
         out.append('<span class="flag flag-est" title="该车型当月销量为口径性异常低值（如季度初出口集中、促销透支、清库），非产品力问题，不改档位；见生命周期提示与逐车取证依据">⚠销量口径异常</span>')
-    # v9.7.43 修复：此前用 `any(k in crash for k in ("无","未查到","未披露"))`，
-    # "无"字过宽（"无正式C-NCAP星级"会被误判），且 score_rows 没透传 crash 导致全池误标。
-    # 改为结构化判断：有官方成绩体系 basis 即视为有实锤；否则看 crash 是否明确有成绩。
-    basis = str(r.get("safety_basis") or "").lower()
-    has_official_basis = basis in ("cncap", "ciasi", "c-ncap", "ciasi_checked",
-                                   "euro_ncap", "ancap", "iihs")
+    # 权威判定统一走 crash_systems 唯一真相源——与 crash_badge() 同一套判据，
+    # 杜绝「既标缺权威、又显示 C-IASI G 徽标」的自相矛盾（bZ5 事故）。
+    # 原实现自己写体系白名单 + 关键词正则，既漏别名（ciasi_checked/Euro NCAP）
+    # 又认不出单字母等级（"C-IASI G" 的 G 不在 [Gg]+ 里）→ 与徽标判定打架。
+    from modules.engine import crash_systems as CS
+    basis = str(r.get("safety_basis") or "")
     crash = str(r.get("crash") or "")
-    # 明确无成绩的措辞：句首 无/未查到/未披露 + 碰撞/NCAP/成绩 等。
-    # 注意优先于 has_result——"未查到C-NCAP成绩"含 NCAP 字样但不是成绩。
-    no_result = bool(re.match(r"^\s*(无官方|无\s*(官方)?碰撞|无\s*c-?ncap|无\s*中保研|未查到|未披露|暂无)", crash))
-    # 成绩标志（仅当没被判 no_result 时才认）：NCAP/C-IASI/IIHS 星级或等级
-    has_result = bool(re.search(r"(?i)(ncap|cias[i]?|iihs|五星|5星|四星|4星|[Gg]\+)", crash)) and not no_result
-    if not has_official_basis and (not crash or no_result or not has_result):
+    # is_official 已覆盖 12 个权威体系 + 全部别名；parse_score 兜底 basis 缺失
+    # 但 crash 文本里带一手成绩的车。两者都不认才算无权威成绩。
+    has_official = CS.is_official(basis) or CS.parse_score(crash) is not None
+    if not has_official:
         out.append('<span class="flag flag-warn" title="无中保研(C-IASI)/中汽研(C-NCAP)/Euro NCAP/IIHS 可查的权威碰撞成绩；安全分基于配置与口碑，非实测实锤；不等于不安全，但证据等级较低">缺权威碰撞成绩</span>')
     return "".join(out)
 

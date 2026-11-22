@@ -37,6 +37,10 @@ SCORE_CODE_FILES = [
     "leaderboard.py",
     "quality_score.py",
     "experience_score.py",
+    # v10.16.1：安全成绩裁决直接决定 crash/basis → safety 实锤判定与分数，
+    # 漏了它则「C-IASI G 覆盖 C-NCAP 86.7%」这类改动手指纹纹丝不动，
+    # 老分数不会被判过期（与上轮哈希薄壳同一类门禁漏洞）。
+    "sync_safety_scores.py",
 ]
 STAMP_KEY = "_generated_by"
 

@@ -60,6 +60,23 @@ def _canon(model: str) -> str:
     return canon(model)
 
 
+def _has_concrete_value(r: dict) -> int:
+    """该成绩是否带「可量化的具体分值」（0=有，1=只有等级/奖项）。
+
+    2026-11-22 修（bZ5 事故）：原判据只看 `score is not None`，但
+    build_ssot 构建 C-NCAP 条目时 86.7 只写在 display 文本里、score 留空，
+    于是 C-NCAP 一手得分率被误判成「只有等级」，与 C-IASI G 同 tier 时
+    退化为按体系名字母序（C-IASI < C-NCAP），证据不全的 C-IASI G 抢走
+    primary、覆盖真实权威的 C-NCAP 86.7%——页面随即出现
+    「有 C-IASI G 徽标」却「缺权威碰撞成绩」的自相矛盾。
+    判据改为「score 有值 或 display 含得分率%」，回到既定口径本意。
+    """
+    if r.get("score") is not None:
+        return 0
+    import re as _re
+    return 0 if _re.search(r"\d+(?:\.\d+)?\s*%", str(r.get("display") or "")) else 1
+
+
 def _sort_scores(scores: list, tier_rules: dict) -> list:
     """统一排序口径（构建 SSOT 与读 SSOT 必须用同一个规则，否则两处不一致）。
 
@@ -70,7 +87,7 @@ def _sort_scores(scores: list, tier_rules: dict) -> list:
         scores,
         key=lambda r: (
             -tier_rules.get(r.get("source_type"), 0),
-            0 if r.get("score") is not None else 1,
+            _has_concrete_value(r),
             r.get("system", ""),
         ))
 
@@ -109,10 +126,10 @@ def _index(ssot: dict) -> dict[str, dict]:
         # 主成绩 = SSOT 已裁决的第一条（按 tier 排序）；这里再按 tier 复核一次，
         # 防止有人手改 SSOT 的顺序
         tier_rules = ssot.get("tier_rules") or {}
-        # 同 tier 时不能只按体系名排——「C-IASI」字面排在「C-NCAP」前，
-        # 但那不代表 C-IASI 更权威。同一 tier 的多条按「有具体分值优先」处理：
-        # C-NCAP 百分制 > C-IASI 等级制（等级之间不可比，分值之间也不可比，
-        # 但有分值的那条对读者信息量更大）。
+        # 同 tier 按「有具体分值优先于只有等级」处理（见 _has_concrete_value）：
+        # C-NCAP 百分制 > C-IASI 等级制。等级之间不可比、分值之间也不可比，
+        # 但有一手得分率的那条信息量更大、更权威。不能按体系名字母序——
+        # 「C-IASI」字面排在「C-NCAP」前，不代表它更权威（bZ5 曾因此被覆盖）。
         scores = _sort_scores(scores, tier_rules)
         primary = scores[0]
         if not CS.is_official(primary.get("basis")) and primary.get("source_type") != "verified_web":
@@ -261,7 +278,10 @@ def build_ssot(sources: dict, out_path: str | None = None, dry_run: bool = False
     cn_meta = sources.get("cncap_meta") or {}
     for model, val in (sources.get("cncap") or {}).items():
         meta = cn_meta.get(model) or {}
+        # score 必须带值：_sort_scores 用它判「有一手得分率优先于只有等级」。
+        # 此前只写 display 不写 score，导致 C-NCAP 86.7% 被 C-IASI G 盖掉（bZ5 事故）。
         put(model, system="C-NCAP", basis="C-NCAP", display=f"C-NCAP {val}%",
+            score=float(val),
             url=str(meta.get("url") or ""), date=str(meta.get("date") or ""),
             quote=f"C-NCAP 官方得分 {val}%", source_type="official_table")
     for model, r in (sources.get("ciasi") or {}).items():

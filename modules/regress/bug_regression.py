@@ -132,6 +132,7 @@ CASES = [
     ("BUG-107", "三电缺电池容量项+三电未拆电池/补能+配置匹配数字粘连致42款评分配置错配", "v10.15.0"),
     ("BUG-108", "三电规则项堆满被clamp成10.0满分:65/427逐配置并列顶格,顶配失去区分度", "v10.15.9"),
     ("BUG-109", "同车跨榜分数漂移(榜内锚点随子池变)+主榜三电满分残留(效率+达成率硬顶10)", "v10.16.0"),
+    ("BUG-110", "bZ5一手C-NCAP86.7%被证据不全C-IASI G覆盖+页面同时标缺权威与C-IASI徽标", "v10.16.1"),
 ]
 
 
@@ -3667,8 +3668,8 @@ def t109():
                                 for d in ("powertrain", "safety", "adas", "space", "value",
                                           "control", "cabin", "quality")}
         return out
-    p_full = os.path.join(HERE, "runs", "midsuv_bev_202611_v14", "榜单.html")
-    p_sub = os.path.join(HERE, "runs", "midsuv_bev_1218_202611_v14", "榜单.html")
+    p_full = os.path.join(HERE, "runs", "midsuv_bev_202611_v15", "榜单.html")
+    p_sub = os.path.join(HERE, "runs", "midsuv_bev_1218_202611_v15", "榜单.html")
     if os.path.exists(p_full) and os.path.exists(p_sub):
         A, B = scores(p_full), scores(p_sub)
         common = set(A) & set(B)
@@ -3685,8 +3686,89 @@ def t109():
     return (detail + "锚点快照单一源、四模块固定锚接口、同车封顶一致、主榜三电软上限保序")
 
 
+def t110():
+    """BUG-110：bZ5 有一手 C-NCAP 86.7% 却被证据不全的 C-IASI G 覆盖，
+    且页面同时标「缺权威碰撞成绩」+「C-IASI G」自相矛盾。"""
+    from modules.engine import sync_safety_scores as SSS
+    from modules.engine import crash_systems as CS
+    from modules.board import render_board_html as RH
+
+    # 1) 排序判据：有一手得分率(display 含 % 或 score 有值)必须优先于只有等级。
+    #    反向证明旧判据只看 score 会失效（C-NCAP 条目 score 常为空、值在 display 里）。
+    both = [
+        {"system": "C-IASI", "basis": "C-IASI", "display": "C-IASI G",
+         "source_type": "official_published_decoded", "score": None},
+        {"system": "C-NCAP", "basis": "C-NCAP", "display": "C-NCAP 86.7%",
+         "source_type": "official_table", "score": None},   # score 空，值只在 display
+    ]
+    tr = {"official_table": 2, "official_published_decoded": 2}
+    assert SSS._sort_scores(both, tr)[0]["display"] == "C-NCAP 86.7%", \
+        "一手得分率应盖过只有等级（旧判据会因 score 空而退化为字母序）"
+    # 同 tier 但 C-IASI 有分值也应能主导（判据不偏向某体系）
+    b2 = [
+        {"system": "C-NCAP", "basis": "C-NCAP", "display": "C-NCAP 85.0%", "source_type": "official_table", "score": None},
+        {"system": "C-IASI", "basis": "C-IASI", "display": "C-IASI G+", "source_type": "official_table", "score": 9.2},
+    ]
+    assert SSS._sort_scores(b2, tr)[0]["display"] == "C-IASI G+", "判据不应按体系名硬编码"
+
+    # 2) 真实 SSOT 裁决：bZ5 恢复 C-NCAP 86.7%，C-IASI G 降级为次要留档
+    ssot = SSS.load_ssot()
+    idx = SSS._index(ssot)
+    rec = SSS._lookup(idx, SSS._canon("丰田bZ5"))
+    assert rec and rec["primary"]["display"].startswith("C-NCAP 86.7"), \
+        f"bZ5 主成绩应是 C-NCAP 86.7%: {rec and rec['primary']}"
+    assert any(s["display"] == "C-IASI G" for s in rec["all"][1:]), "C-IASI G 应留档为次要"
+
+    # 3) sync 后候选池字段：crash/basis 为 C-NCAP，不残留 C-IASI 主成绩
+    import copy as _cp
+    pool = json.load(open(os.path.join(HERE, "runs", "midsuv_bev_pool_202611_final.json"),
+                          encoding="utf-8"))["candidates"]
+    cc = _cp.deepcopy(pool)
+    SSS.sync(cc)
+    bz = next(c for c in cc if c["model"] == "丰田bZ5")
+    assert "C-NCAP 86.7" in str(bz.get("crash")), f"sync 后 bZ5 应恢复 C-NCAP: {bz.get('crash')}"
+    assert CS.is_official(bz.get("safety_basis")), "恢复后 basis 应为权威体系"
+
+    # 4) 展示判定一致：risk_flags 与 crash_badge 不得对同一车矛盾
+    for name, r in [
+        ("bZ5 C-NCAP", {"crash": "C-NCAP 86.7%", "safety_basis": "C-NCAP"}),
+        ("C-IASI G 单字母", {"crash": "C-IASI G", "safety_basis": "C-IASI"}),
+        ("别名 ciasi_checked", {"crash": "C-IASI G", "safety_basis": "ciasi_checked"}),
+        ("Euro NCAP", {"crash": "Euro NCAP 五星", "safety_basis": "euro_ncap"}),
+        ("无成绩", {"crash": None, "safety_basis": None}),
+        ("无官方成绩说明", {"crash": "无官方成绩", "safety_basis": None}),
+    ]:
+        flagged = "缺权威" in re.sub(r"<[^>]+>", "", RH.risk_flags(r))
+        badged = bool(re.sub(r"<[^>]+>", "", RH.crash_badge(r)).strip())
+        assert (not flagged) == badged, f"展示判定矛盾 [{name}]: 缺权威={flagged} 徽标={badged}"
+    # 源码层：risk_flags 必须复用 crash_systems，不再自写体系白名单
+    rsrc = _read("modules/board/render_board_html.py")
+    assert "CS.is_official(basis)" in rsrc and "CS.parse_score(crash)" in rsrc, \
+        "risk_flags 未复用 crash_systems 唯一真相源"
+    assert 'basis in ("cncap", "ciasi"' not in rsrc, "risk_flags 仍留硬编码体系白名单"
+
+    # 5) build_ssot 给 C-NCAP 写 score（生成源也要带值，双保险）
+    bsrc = _read("modules/engine/sync_safety_scores.py")
+    assert "score=float(val)" in bsrc, "build_ssot 的 C-NCAP 条目仍未写 score"
+
+    # 6) 真实榜单产物：bZ5 显示 C-NCAP 徽标且无「缺权威」矛盾标记
+    for rel in ["runs/midsuv_bev_202611_v15/榜单.html",
+                "runs/midsuv_bev_1218_202611_v15/榜单.html"]:
+        pp = os.path.join(HERE, rel)
+        if os.path.exists(pp):
+            html = _read(rel)
+            i = html.find("data-model='丰田bZ5'")
+            j = html.find("</tr>", i)
+            assert i >= 0 and j > i, f"{rel} 找不到 bZ5 行"
+            row = html[i:j]
+            assert "缺权威碰撞成绩" not in row, f"{rel} bZ5 仍标缺权威"
+            assert "C-NCAP 86.7%" in row, f"{rel} bZ5 未显示 C-NCAP 86.7% 徽标"
+    return ("bZ5 恢复 C-NCAP 86.7%（C-IASI G 降级留档）、排序判据按一手分值优先、"
+            "risk_flags 复用 crash_systems 消除缺权威+徽标矛盾、6 类展示判据一致")
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110]
 
 
 def run():
