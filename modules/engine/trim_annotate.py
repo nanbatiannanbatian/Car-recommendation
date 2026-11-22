@@ -129,8 +129,18 @@ def deltas_for(trim: dict, ref: dict) -> list[dict]:
     # 激光雷达
     # BUG-021：auto_trims 自动补录的 key_configs 常为空，但配置名里有「激光雷达」。
     # 只看 key_configs 会把激光雷达版和非激光版判成一样，配置分失真。
-    lidar = lambda t: ("激光雷达" in str(t.get("name") or "")) or \
-                      any("激光雷达" in str(x) for x in (t.get("key_configs") or []))
+    # v10.16.2：有些车型的配置名**不含**「激光雷达」但硬件确实有（如乐道L60 Max+/Ultra+
+    # 用神玑NX9031+1颗激光雷达，配置名只写 Max+/Ultra+）。现在优先读配置级结构化字段
+    # adas_lidar（0/1/true/false），没有该字段再退回名称/key_configs 文本判断，
+    # 避免「有硬件但名字没写」被判成低配。
+    def lidar(t):
+        v = t.get("adas_lidar")
+        if v is not None:
+            if isinstance(v, str):
+                return v.strip().lower() in ("1", "true", "yes", "有", "标配")
+            return bool(v)
+        return ("激光雷达" in str(t.get("name") or "")) or \
+               any("激光雷达" in str(x) for x in (t.get("key_configs") or []))
     if lidar(trim) and not lidar(ref):
         out.append({"dim": "adas", "delta": 0.8, "conf": "high", "why": "新增激光雷达"})
     elif lidar(ref) and not lidar(trim):

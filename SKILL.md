@@ -13,7 +13,7 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 10.16.1
+version: 10.16.2
 author: "nanbatiannanbatian"
 ---
 
@@ -3521,3 +3521,20 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
 - `risk_flags` 改用 `CS.is_official(basis) or CS.parse_score(crash)`，与 `crash_badge` 同一 crash_systems 真相源，删掉硬编码白名单和关键词正则。
 
 **验收**：sync/render selftest 全绿；bug_regression 110/110（t110 锁排序判据/bZ5 恢复/6 类展示判据一致，反向注入旧判据→t110 FAIL、恢复→全绿）；v15 两榜 bZ5 显示 C-NCAP 86.7% 徽标、无「缺权威」标记。
+
+## v10.16.2 · 乐道L60 低分辨析：高配智驾被低配数据拖累 + PPH 小样本证据不对称（用户问智驾/操纵/品控低分是否合理、蔚来工厂标准与换电是否算分）
+
+**诊断（先辨析再动手）**：用户质疑乐道L60 智驾7.0/操纵7.5/品控7.7 是否偏低，并举「蔚来工厂全系德系设备、品控好过比亚迪」「换电三电应有利」。逐条回溯：
+- 智驾7.0 对 60kWh Pro 成立（Orin-X 254TOPS、纯视觉无激光雷达、城区 NOA 订阅制）；但 `data/gen/trims.json` 乐道全系**没有配置级智驾字段**，Max+/Ultra+ 实际是神玑NX9031（>1000TOPS）+1颗激光雷达+城区/高速 NOA（乐道官网 20260611001、汽车之家 config/series/7687、易车摘要 10720-951 三源一致），却被 `trim_annotate.deltas_for` 只按配置名/key_configs 文本判断而全部算成无激光雷达 → 高配被低配数据拖累。
+- 操纵7.5 不是惩罚前麦弗逊：v10.15.2 起悬架形式已不加分（好结构不加、仅后扭力梁−0.3），7.5 = 6.8基线 + 后驱0.4 + 零百5.9s 0.2；低是因为无麋鹿/制动第三方实测，不判劣。
+- 品控7.73 的结构性问题：`quality_score._pph_adjust` 只要口碑样本≥30 就按原始幅度满扣，乐道 PPH 127 但样本仅 44 → −0.27；而比亚迪宋L EV/海狮07EV 等 10 款样本不足取中性 8.0 → 形成「有数据者被罚、无数据者中性」的证据不对称，不能直接解读为「品控比比亚迪差」。
+- 工厂与换电：可核验的是新桥二工厂灯塔工厂/与ES9共线/941台库卡机器人/0.05mm精度/5000+质检点（央广网、新华社、新浪、e-works），属**制造过程证据**，与 PPH/投诉的交付结果口径不同，J.D. Power 惯例不直接互换；换电在 `spec_score.powertrain_parts` 里**完全无项**，只在事实列展示。业内可横比口径是 GB/T 40032-2021（卡扣式≥5000次/螺栓式≥1500次换电耐久、绝缘电阻）、电芯循环寿命、换电站每次外部扫描+脉冲检测、网络规模；大众认知的换电价值是补能快+电池健康有人管，不等于电池材料更优。
+
+**用户拍板**：选「保守修根因」——补齐配置级智驾数据 + PPH 样本收缩 + 工厂/换电只披露不计分（不加分，避免公关稿刷分和跨品牌不可比）。
+
+**修法（根因、全池统一、不针对单车）**：
+- `data/gen/trims.json` 乐道L60 六配置补结构化 `adas_lidar/adas_tops/adas_chip/adas_city_noa/adas_highway_noa` 与来源注记；`trim_annotate.deltas_for` 的 `lidar()` 优先读 `adas_lidar` 字段，缺失才回退名称/key_configs 文本 → 任意车系通用，不写死车型。
+- `quality_score._pph_adjust` 调整幅度乘 `n/(n+50)`，样本越大越接近原幅度；置信与样本数继续披露。
+- `board_view.method_boundary_text()` 增两条固定披露：PPH 样本收缩口径；制造体系属过程证据不直接换算加分、换电三电不计分并列出业内横比标准。
+
+**验收**：bug_regression 111/111（新增 t111 锁配置级字段/PPH收缩/披露/v16产物，反向注入 PPH 收缩→t111 FAIL、恢复→全绿）；比较器20/20、结构16/16、derive4/4、midsuv46/46、release39/39、各模块 selftest 全过。v16 两榜：乐道 Pro 智驾7.0 / Max+·Ultra+ 7.8，评分配置由 85kWh Pro 变 85kWh Max+、总分 83.4→84.5；品控 7.73→7.87；11 款同车跨榜 0 差异。

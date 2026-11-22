@@ -133,6 +133,7 @@ CASES = [
     ("BUG-108", "三电规则项堆满被clamp成10.0满分:65/427逐配置并列顶格,顶配失去区分度", "v10.15.9"),
     ("BUG-109", "同车跨榜分数漂移(榜内锚点随子池变)+主榜三电满分残留(效率+达成率硬顶10)", "v10.16.0"),
     ("BUG-110", "bZ5一手C-NCAP86.7%被证据不全C-IASI G覆盖+页面同时标缺权威与C-IASI徽标", "v10.16.1"),
+    ("BUG-111", "乐道L60高配智驾被低配数据拖累+PPH小样本证据不对称", "v10.16.2"),
 ]
 
 
@@ -3767,8 +3768,64 @@ def t110():
             "risk_flags 复用 crash_systems 消除缺权威+徽标矛盾、6 类展示判据一致")
 
 
+
+def t111():
+    """BUG-111：乐道L60 Max+/Ultra+ 有激光雷达+神玑NX9031，逐配置智驾却与纯视觉Pro同为7.0；
+    品控 PPH 仅44样本按满扣，而样本不足的车取中性8.0——有数据反被罚。"""
+    from modules.engine import quality_score as Q
+    from modules.engine import trim_annotate as TA
+    from modules.board import board_view as BV
+
+    # 1) PPH 按样本量收缩：同 pph 样本越大越接近原始幅度（单调），且披露写明口径。
+    small = Q._pph_adjust({"ah_pph_usable": True, "ah_pph": 127, "ah_review_users": 44})
+    large = Q._pph_adjust({"ah_pph_usable": True, "ah_pph": 127, "ah_review_users": 200})
+    assert abs(small[0] - (-0.27 * 44 / 94)) < 0.02, f"小样本未按 n/(n+50) 收缩: {small}"
+    assert large[0] < small[0] < 0, f"样本越大惩罚越接近满额（更负）: small={small} large={large}"
+    assert "n/(n+50)" in small[1], "PPH 披露未写样本收缩口径"
+    d = Q.score_one({"ah_pph_usable": True, "ah_pph": 127, "ah_review_users": 44}, {})
+    assert d["score"] == 7.87, f"乐道口径品控应 7.87（旧满扣为 7.73）: {d['score']}"
+
+    # 2) 逐配置激光雷达：配置名不含关键词但结构化字段 adas_lidar=1 必须识别。
+    ref = {"name": "乐道L60 2026款 60kWh Pro", "adas_lidar": 0}
+    high = {"name": "乐道L60 2026款 85kWh Max+", "adas_lidar": 1, "adas_tops": 1000}
+    ds = TA.deltas_for(high, ref)
+    adas = [x for x in ds if x["dim"] == "adas"]
+    assert adas and adas[0]["delta"] == 0.8, f"Max+ 应因激光雷达 +0.8: {ds}"
+    # 反向注入：抹掉结构化字段且配置名无关键词 → 不得加分（证明不是硬编码车型）
+    blind = {"name": "乐道L60 2026款 85kWh Max+"}
+    assert not [x for x in TA.deltas_for(blind, ref) if x["dim"] == "adas"],         "无字段无关键词时不应加分（旧逻辑静默漏掉新硬件）"
+    # 通用性：任意车系同字段都能生效，不绑死乐道
+    d2 = [x for x in TA.deltas_for({"name": "某品牌 四驱旗舰", "adas_lidar": 1},
+                                   {"name": "某品牌 入门版", "adas_lidar": 0}) if x["dim"] == "adas"]
+    assert d2 and d2[0]["delta"] == 0.8, "配置级字段应通用，不得写死车型"
+
+    # 3) 真实配置库：6 款乐道 L60 — Pro 2 款无激光雷达，Max+/Ultra+ 4 款有。
+    tdb = json.load(open(os.path.join(HERE, "data", "gen", "trims.json"), encoding="utf-8"))
+    entry = next(e for e in tdb["entries"] if e.get("model") == "乐道L60")
+    lid = {t["name"]: t.get("adas_lidar") for t in entry["trims"]}
+    assert sum(1 for v in lid.values() if v == 1) == 4 and            sum(1 for v in lid.values() if v == 0) == 2, f"配置级智驾字段不全: {lid}"
+    assert all("神玑NX9031" in str(t.get("note") or "") or "Orin-X" in str(t.get("note") or "")
+               for t in entry["trims"]), "配置级智驾字段缺来源注记"
+
+    # 4) 页面/报告披露：样本收缩 + 制造体系过程证据与换电不计分口径。
+    text = chr(10).join(BV.method_boundary_text())
+    assert "n/(n+50)" in text and "GB/T 40032-2021" in text and "不直接换算加分" in text,         "方法与边界缺样本收缩/换电标准/过程证据披露"
+    assert "n/(n+50)" in _read("modules/engine/quality_score.py"), "生成源缺收缩口径"
+
+    # 5) 真实 v16 产物：高配智驾 7.8 / Pro 7.0，且高配成为评分配置；两榜同车仍一致。
+    html = _read("runs/midsuv_bev_202611_v16/榜单.html")
+    assert "乐道L60 2026款 85kWh Max+" in html and "7.8" in html, "v16 高配智驾分未生效"
+    assert "n/(n+50)" in html and "GB/T 40032-2021" in html, "v16 页面缺新披露"
+    if os.path.exists(os.path.join(HERE, "runs", "midsuv_bev_1218_202611_v16", "榜单.html")):
+        sub = _read("runs/midsuv_bev_1218_202611_v16/榜单.html")
+        assert "n/(n+50)" in sub and "GB/T 40032-2021" in sub, "v16 子榜缺新披露"
+    return ("乐道L60 高配智驾经配置级 adas_lidar 字段 +0.8（Pro 7.0 / Max+ 7.8）、"
+            "PPH 44样本按 n/(n+50) 收缩（-0.27→-0.13，品控 7.73→7.87）、"
+            "制造体系/换电只披露不计分、v16 两榜口径一致")
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111]
 
 
 def run():
