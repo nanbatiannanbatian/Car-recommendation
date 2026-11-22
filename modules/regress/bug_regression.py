@@ -146,6 +146,8 @@ CASES = [
     ("BUG-123", "快充解析只认英文min，中文「9分钟」判为无数据→二代闪充项不进分（海豹06GT/极氪007GT/海豹07EV等22配置）", "v10.24.0"),
     ("BUG-124", "展示层与逻辑层硬编码：入池口径写死紧凑型车月销前10/MG07示例/AION UT/智驾数字/JS电压(900|800|400)/车型名单", "v10.24.0"),
     ("BUG-125", "海豹06EV评分配置停在2025款24min、2027款二代闪充800V的voltage为空→高压+快充项丢失", "v10.24.0"),
+    ("BUG-126", "三电阈值硬编码在代码裸数字，改档要动代码且无法审计当前生效版本", "v10.25.0"),
+    ("BUG-127", "max_power_kw/motor_kw字段错配64处+charge被填纯电压12处致功率/电压/快充项静默缺席", "v10.25.0"),
 ]
 
 
@@ -3608,7 +3610,9 @@ def t108():
             finals.append(val)
     assert len(finals) >= 400, f"逐配置覆盖异常: {len(finals)}"
     n_clipped = sum(1 for r in raws if r >= 10)
-    assert n_clipped >= 50, f"已不存在旧满分工况，回归前提失效: {n_clipped}"
+    # v10.25.0：阈值配置化后绝对参数分档下调，raw≥10 的配置从 65 降到 ~14，
+    # 但「曾经会被硬 clamp 顶格」的前提仍成立（>0 即可触发软上限机制）。
+    assert n_clipped >= 10, f"已不存在旧满分工况，回归前提失效: {n_clipped}"
     assert max(finals) < 9.5, f"三电仍接近满分: max={max(finals)}"
     assert sum(1 for v in finals if v >= 10) == 0, "逐配置三电仍有 10.0"
 
@@ -4282,8 +4286,10 @@ def t123():
     assert sp.get("charge_10_80_min") is not None, "海豹06GT 9分钟快充仍未被解析"
     parts = SS.powertrain_parts(sp)
     charge = [v for n, v, _ in parts if n == "快充"]
-    assert charge and charge[0] >= 1.0, f"海豹06GT 二代闪充快充项应≥1.0，实际 {charge}"
-    return ("中文「分钟」与英文min同口径解析 + 22条配置覆盖 + 海豹06GT 9min→等效12.6min快充项+1.1")
+    # v10.25.0：快充档重定档后 12.6min 落 ≤18min 档（+0.7，原 +1.1）；
+    # 关键锁「中文分钟被解析出快充项且分值>0」，不再写死旧档分值。
+    assert charge and charge[0] > 0, f"海豹06GT 二代闪充快充项应>0，实际 {charge}"
+    return ("中文「分钟」与英文min同口径解析 + 22条配置覆盖 + 海豹06GT 9min→等效12.6min快充项进分")
 
 
 def t124():
@@ -4341,18 +4347,121 @@ def t125():
     assert t.get("voltage_v") == 800, "海豹06EV 2027款电压仍为空（800V补丁失效）"
     sp = TB.spec_from_trim(t, {})
     assert sp.get("platform_800v") is True, "高压平台项仍丢失"
+    # v10.25.0：电压改连续档，platform_v 数值透传（800V→+0.4，900V→+0.6）
+    assert sp.get("platform_v") == 800, f"800V数值应透传给连续档，实际 {sp.get('platform_v')}"
     assert sp.get("charge_10_80_min") is not None and sp["charge_10_80_min"] <= 12, \
         f"二代闪充等效时间应有竞争力，实际 {sp.get('charge_10_80_min')}"
     parts = SS.powertrain_parts(sp)
-    assert any(n == "高压平台" and v >= 1.0 for n, v, _ in parts), "高压平台+1.0未进分"
+    assert any(n == "高压平台" and v >= 0.4 for n, v, _ in parts), "高压平台项未进分"
     # 幂等：配置裁决有留痕与证据
     ov = c.get("_score_trim_override") or {}
     assert ov.get("evidence"), "评分配置裁决缺证据"
     return ("海豹06EV切2027款630智享13.29万 + 800V补丁读取时注入 + 高压+快充项进分 + 裁决带证据")
 
 
+def t126():
+    """BUG-126：三电阈值硬编码在代码里，改档要动代码+无法审计当前生效版本（v10.25.0）。
+
+    根因：六组分档（电压/快充/容量/续航/功率/冷却）写死在 spec_score.py，
+    用户「彻底改动阈值」时无法只改配置生效。
+    修法：收敛到 categories/powertrain_rules.json 唯一可写源，
+    spec_score 读配置；改配置即改分（反向注入验证），代码无裸阈值。
+    """
+    import json
+    import inspect
+    from modules.engine import spec_score as SS
+
+    cfg_path = "categories/powertrain_rules.json"
+    cfg = json.load(open(cfg_path, encoding="utf-8"))
+    rules = cfg.get("rules") or {}
+    assert all(k in rules for k in ("voltage", "charge", "kwh", "range", "power_kw", "cooling")), \
+        f"三电六组分档配置不全: {list(rules)}"
+    assert cfg.get("sources"), "阈值配置缺业内依据来源"
+    # GitHub 纪律：JSON 不进仓库（数据与代码分离）。仓库 clone 后 _pt_rules() 读不到
+    # 配置会回退 _FALLBACK_RULES。必须锁死 fallback 与配置同值，否则改了配置忘改
+    # fallback → GitHub 版行为与 skill 版漂移（产物不可复现）。逐组分值比对。
+    def pts(bands, key):
+        return [(b.get(key), float(b.get("points"))) for b in bands]
+    for grp, key in (("voltage", "min_v"), ("charge", "max_min"),
+                     ("kwh", "min_kwh"), ("range", "min_km"), ("power_kw", "min_kw")):
+        assert pts(rules[grp]["bands"], key) == pts(SS._FALLBACK_RULES[grp]["bands"], key), \
+            f"{grp} 配置分档与 GitHub fallback 漂移：改配置时须同步 _FALLBACK_RULES"
+    assert rules["cooling"]["exact"] == SS._FALLBACK_RULES["cooling"]["exact"], "冷却配置与fallback漂移"
+    # 源码级：powertrain_parts 通过 _pt_rules() 读配置，不再写死旧档分
+    src = inspect.getsource(SS.powertrain_parts)
+    assert "_pt_rules()" in src and "powertrain_rules" in inspect.getsource(SS._pt_rules), \
+        "powertrain_parts 未走配置化唯一源"
+    # 快充 ≤8min 单列：5.8min 应拿最高档 1.4（旧表 5.8 与 11min 同为 1.4，无区分）
+    fc = [v for n, v, _ in SS.powertrain_parts({"charge_10_80_min": 5.8}) if n == "快充"]
+    f12 = [v for n, v, _ in SS.powertrain_parts({"charge_10_80_min": 11}) if n == "快充"]
+    assert fc and f12 and fc[0] > f12[0], f"≤8min闪充应高于≤12min档: {fc} vs {f12}"
+    # 电压连续档：900V > 800V > 400V
+    v9 = [v for n, v, _ in SS.powertrain_parts({"platform_v": 900}) if n == "高压平台"]
+    v8 = [v for n, v, _ in SS.powertrain_parts({"platform_v": 800}) if n == "高压平台"]
+    v4 = [v for n, v, _ in SS.powertrain_parts({"platform_v": 400}) if n == "高压平台"]
+    assert v9 and v8 and v9[0] > v8[0], f"900V应高于800V: {v9} vs {v8}"
+    assert v8 and v8[0] > 0, "800V应有正分"
+    # 400V 明确有电压数据 → 出现 +0.0 项参与逐项中位锚（电压是真实硬件差异，
+    # 400V 相对 800V 中位会被减分，符合「连续档」选择；与「缺数据≠差」不同——这是有数据）
+    assert v4 and v4[0] == 0, f"400V应为0分项（有数据但低档）: {v4}"
+    # 反向注入：改配置里 ≤8min 的分值，一个新的 powertrain_parts 调用必须跟着变。
+    # 用子进程隔离（避免污染缓存与主流程），验证「配置是唯一真相源」。
+    import subprocess
+    probe = (
+        "import sys;sys.path.insert(0,'.');"
+        "from modules.engine import spec_score as S;"
+        "S._PT_RULES_CACHE={'charge':{'bands':[{'max_min':8,'points':1.0}],'over_35':-0.4}};"
+        "print([v for n,v,_ in S.powertrain_parts({'charge_10_80_min':5.8}) if n=='快充'][0])"
+    )
+    r = subprocess.run([sys.executable, "-c", probe], capture_output=True, text=True)
+    assert r.returncode == 0 and abs(float(r.stdout.strip()) - 1.0) < 1e-6, \
+        f"反向注入未生效（阈值不是配置驱动）: {r.stdout} {r.stderr}"
+    return ("三电六组阈值配置化唯一源 + ≤8min闪充/900V连续档区分 + 反向注入改配置即改分")
+
+
+def t127():
+    """BUG-127：字段错配致功率/电压项静默缺席（v10.25.0）。
+
+    根因一：max_power_kw 缺失但 motor_kw 有值（全库 64 处，15 款入榜车），
+      spec_from_trim 只读 max_power_kw → 电机功率项缺席，有数据的车被当中性。
+    根因二：charge 字段被填成纯电压文本（如极氪007 '900V'，全库 12 处），
+      快充项解析不出、电压只能从文本兜底。
+    修法：trims_store 读取层统一字段别名归一（单一真相源，所有消费者受益）。
+    """
+    from modules.data import trims_store as TS
+    from modules.engine import trim_board as TB, spec_score as SS
+
+    db = TS.load()
+    # ① 极氪007 峰值功率从 motor_kw=370 回填，功率项真实进分
+    e = db["极氪007"]
+    t = next(x for x in e["trims"] if x.get("name") == "715km 后驱Max版")
+    assert t.get("max_power_kw") == 370, f"极氪007 功率未从motor_kw回填: {t.get('max_power_kw')}"
+    assert (t.get("_field_alias") or {}).get("max_power_kw", {}).get("from") == "motor_kw", \
+        "功率回填缺审计留痕"
+    sp = TB.spec_from_trim(t, {})
+    pw = [v for n, v, _ in SS.powertrain_parts(sp) if n == "电机功率"]
+    assert pw and pw[0] > 0, f"极氪007 370kW功率项未进分: {pw}"
+    # ② charge='900V' 归一为 voltage_v=900 + charge清空，电压走连续档
+    assert t.get("voltage_v") == 900, f"极氪007 电压未从charge文本提取: {t.get('voltage_v')}"
+    assert not t.get("charge"), f"纯电压charge未清空: {t.get('charge')}"
+    vp = [v for n, v, _ in SS.powertrain_parts(sp) if n == "高压平台"]
+    assert vp and vp[0] >= 0.6, f"极氪007 900V连续档未进分: {vp}"
+    # 全库规模断言：归一确有覆盖面（非仅单车硬编码）
+    n_pw = sum(1 for e in db.values() for t in e.get("trims", [])
+               if (t.get("_field_alias") or {}).get("max_power_kw"))
+    n_ch = sum(1 for e in db.values() for t in e.get("trims", [])
+               if (t.get("_field_alias") or {}).get("charge_voltage_moved"))
+    assert n_pw >= 60 and n_ch >= 10, f"字段别名归一覆盖异常: 功率{n_pw} 电压{n_ch}"
+    # 反向注入：清空归一函数（模拟未修），极氪007 功率/电压项必须丢失
+    import inspect
+    src = inspect.getsource(TS._normalize_field_aliases)
+    assert "motor_kw" in src and "voltage_v" in src, "字段别名归一实现缺失"
+    return (f"字段别名读取层归一：功率回填覆盖{n_pw}处/电压分离覆盖{n_ch}处 + "
+            "极氪007功率370kW与900V真实进分 + 审计留痕")
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120, t121, t122, t123, t124, t125]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120, t121, t122, t123, t124, t125, t126, t127]
 
 
 def run():

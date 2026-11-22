@@ -105,8 +105,15 @@ def charge_minutes(t: dict) -> tuple[float | None, str]:
 def deltas_for(trim: dict, ref: dict) -> list[dict]:
     """该配置相对参考配置的客观差异 → 维度调整（带置信度）。"""
     out = []
-    # 电压
-    c800 = lambda t: ("800V" in str(t.get("charge") or "") or "900V" in str(t.get("charge") or ""))
+    # 电压：v10.25.0 统一走 voltage_v 数值字段 + charge 文本双来源。
+    # 此前只读 charge 文本，而 trims_store 已把纯电压文本（'900V'）归一到 voltage_v
+    # 并清空 charge，故这里必须补上 voltage_v，否则同车系高压平台 delta 丢失。
+    def _c800(t):
+        if isinstance(t.get("voltage_v"), (int, float)) and t["voltage_v"] >= 800:
+            return True
+        c = str(t.get("charge") or "")
+        return ("800V" in c or "900V" in c)
+    c800 = _c800
     if c800(trim) and not c800(ref):
         out.append({"dim": "powertrain", "delta": 0.8, "conf": "high",
                     "why": "800V高压平台（配置表明确）"})

@@ -13,7 +13,7 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 10.24.0
+version: 10.25.0
 author: "nanbatiannanbatian"
 ---
 
@@ -3638,3 +3638,12 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
   - 车型/别名名单移到配置：`fleet_models.json`（FLEET_HINT，同时修掉裸 'e7' 子串误伤海豹07EV/深蓝L07）、`brand_aliases.json`（cross_verify 品牌剥离+希腊别名）、`cell_brand_aliases.json`（电芯别名，与 cell_tier 分级表分工）、`export_aliases.json`（crash_systems 同源车出口名 EL6）。均由代码在读时加载，配置是唯一数据源。
 - 回归：新增 BUG-123（中文分钟解析+22配置覆盖+反向注入）、BUG-124（源码级断言硬编码清除+配置存在）、BUG-125（海豹06EV切27款+电压补丁+裁决带证据）；更新 t030（不再检查写死的「车系月销前10」，改查动态 criteria 读取）。全套 bug 123/123、反向注入 102/102、midsuv 46/46、layout 16/16、release 39/39、compare 20/20、router 32/32、derive 4/4、各 selftest 全绿。
 - 产物：三榜全池重算 `runs/midsedan_bev_allprice_202611_v28`、`runs/midsuv_bev_202611_v28`、`runs/midsuv_bev_u18_202611_v28`（锚点 path 前移 v28）。SUV 跨榜同车 5 款总分 0 差异。轿车榜前二仍极氪007GT 88.3/极氪007 88.0（海豹06EV 三电提升未改总分结构——只一维变化不足以进前10，合理）。页面 0 处旧硬编码文案残留。
+
+## v10.25.0 · 三电阈值彻底改（配置化 + 两处字段错配根因，2026-11-22）
+- 用户推翻上轮「打分阈值裸数字不动」的拍板：「要按照彻底改的方向，要动打分阈值，根因改」。用户四项全选：快充档重定档、电压改连续档、修功率字段错位、修电压误填快充字段；交付选「全量改+重出三榜」。
+- **业内调研依据（联网核验，2025-2026 中国市场）**：2026 年三电硬件（800V/5C/大电池/高峰值）快速平权下沉——800V 渗透率 1-5 月约 33%（盖世汽车），已是主流非领先；6C/兆瓦闪充做到 7-11min、主流 5C 12-18min（中国质量新闻网 2026 北京车展、新浪汽车）；GB/T 18488 峰值功率仅维持约 10s、水分约 70%。业内共识从「堆绝对参数」转向「达成率/衰减率/效率」（懂车帝 6+2 评测、C-AHI 2026、J.D. Power）。达成率/额定功率/效率MAP 本池结构化覆盖极低，本榜已用独立模块（range_achievement、powertrain_efficiency）计入，不从绝对档重复扣。
+- **根因一（阈值硬编码裸数字）**：六组分档写死在 `spec_score.powertrain_parts`，改档要动代码+回归+文档且无法审计当前生效版本。新建 `categories/powertrain_rules.json` 唯一可写源（六组 bands + 业内来源 URL），`spec_score` 经 `_pt_rules()` 读配置、`_band_points()` 统一判档；配置缺失回退内置同值保证离线不崩。档位调整：①快充 ≤8min 单列闪充档 +1.4 / ≤12 +1.1 / ≤18 +0.7 / ≤25 +0.3 / ≤35 0 / >35 −0.4（解决 7.2min 二代闪充与 11min 普通快充同为 +1.4 的失真）；②电压布尔 +1.0 改连续档 900V +0.6 / 800V +0.4 / 400V 0（`platform_v` 数值透传，兼容旧布尔调用按 800V）；③容量/续航/功率绝对值分档下调（90kWh 0.8→0.6、700km 0.8→0.6、300kW 1.2→0.8 等），跨价位可比性仍由 rule_adjust 中位锚解决，不引入价格分母双计。
+- **根因二（字段错配静默缺席，比阈值更大）**：①全库 64 处 `max_power_kw` 缺失但 `motor_kw` 有值（含 15 款入榜车，极氪007=370kW），`spec_from_trim` 只读 `max_power_kw` → 电机功率项缺席、有数据的车被当中性；②12 处 `charge` 字段被填成纯电压文本（极氪007 全系 '900V'、银河E5、腾势N7），快充项解析不出、电压只能从文本兜底。修法：`trims_store.load()` 读取层统一 `_normalize_field_aliases()`——功率从 motor_kw 回填（留 `_field_alias` 审计）、纯电压 charge 把电压提到 `voltage_v` 并清空 charge（快充时间确实未披露，不编造）；单一真相源，rule_adjust/trim_annotate/逐配置所有消费者自动受益。`trim_annotate.deltas_for` 的 c800 判定同步补 voltage_v 来源（否则归一后同车系高压 delta 丢失）。
+- 修复效果（逐项，评分配置层）：极氪007 三电项从 3 项（容量/续航/800V）→ 4 项且含 370kW 功率 +0.8、900V 连续档 +0.6——二代闪充与高压的客观差距终于进分；400V 车明确进 +0 项参与中位锚（有数据≠缺数据）。
+- 回归：新增 BUG-126（阈值配置化唯一源+≤8min/900V区分+子进程反向注入改配置即改分）、BUG-127（功率回填64处/电压分离12处+极氪007功率电压进分+审计留痕）；更新 t108（阈值下调后 raw≥10 从 65→14，前提阈值 50→10）、t123（快充项断言不再写死旧档分值）、t125（高压 +1.0→+0.4 并锁 platform_v=800）。全套 bug 125/125、反向注入 102/102、midsuv 46/46、layout 16/16、release 39/39、compare 20/20、router 32/32、derive 4/4、各 selftest 全绿。
+- 产物：三榜全池重算 `runs/midsedan_bev_allprice_202611_v29`、`runs/midsuv_bev_202611_v29`、`runs/midsuv_bev_u18_202611_v29`（锚点 path 前移 v29），跨榜同车 0 差异校验通过。

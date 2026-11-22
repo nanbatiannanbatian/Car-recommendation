@@ -197,28 +197,77 @@ def score_adas(s):
     return base, why
 
 
+# ---------------------------------------------------------------- 三电阈值配置
+# v10.25.0 根因改造（2026-11-22 用户「彻底改，动打分阈值，根因改」）：
+#   六组分档原为硬编码裸数字，改一次要动代码+回归+文档且无法审计当前生效版本。
+#   现收敛到 categories/powertrain_rules.json 唯一可写源，带业内依据与来源。
+#   配置缺失时回退 _FALLBACK_RULES（与配置同值），保证离线/新装包不崩。
+_PT_RULES_CACHE: dict | None = None
+_FALLBACK_RULES = {
+    "voltage": {"bands": [{"min_v": 900, "points": 0.6}, {"min_v": 800, "points": 0.4}], "default": 0.0},
+    "charge": {"bands": [{"max_min": 8, "points": 1.4}, {"max_min": 12, "points": 1.1},
+                         {"max_min": 18, "points": 0.7}, {"max_min": 25, "points": 0.3},
+                         {"max_min": 35, "points": 0.0}], "over_35": -0.4},
+    "kwh": {"bands": [{"min_kwh": 90, "points": 0.6}, {"min_kwh": 75, "points": 0.45},
+                      {"min_kwh": 65, "points": 0.3}, {"min_kwh": 55, "points": 0.15}], "under_45": -0.3},
+    "range": {"bands": [{"min_km": 700, "points": 0.6}, {"min_km": 600, "points": 0.4}], "under_500": -0.4},
+    "power_kw": {"bands": [{"min_kw": 300, "points": 0.8}, {"min_kw": 240, "points": 0.5},
+                           {"min_kw": 200, "points": 0.25}], "default": 0.0},
+    "cooling": {"exact": {"液冷": 0.3, "直冷": 0.2}, "other_known": -0.2},
+}
+
+
+def _pt_rules() -> dict:
+    """读三电阈值配置（唯一可写源），失败回退内置同值。"""
+    global _PT_RULES_CACHE
+    if _PT_RULES_CACHE is None:
+        try:
+            import paths
+            with open(str(paths.cat("powertrain_rules.json")), encoding="utf-8") as f:
+                cfg = json.load(f)
+            _PT_RULES_CACHE = cfg.get("rules") or _FALLBACK_RULES
+        except (OSError, ValueError, ImportError):
+            _PT_RULES_CACHE = _FALLBACK_RULES
+    return _PT_RULES_CACHE
+
+
+def _band_points(value: float, bands: list, key: str, cmp: str = "min"):
+    """按有序 bands 取首个命中档 (points, label)。cmp=min 降序匹配>=，max 升序匹配<=。"""
+    for b in bands:
+        thr = b.get(key)
+        if thr is None:
+            continue
+        if (cmp == "min" and value >= thr) or (cmp == "max" and value <= thr):
+            return float(b.get("points", 0.0)), b.get("label", "")
+    return None
+
+
 def powertrain_parts(s):
     """三电各加减项的**分解**（规则唯一出处，score_powertrain 与 rule_adjust 共用）。
 
     返回 [(项名, 分值, 展示文本)]。**参数缺失的项不出现**——这样 rule_adjust
     可以逐项做「该项有数据的车」的中位锚点：缺某一项的车在该项上既不加分
     也不扣分（缺数据 ≠ 差），不会因为没采到电压就被判三电弱。
+
+    六组分档阈值全部来自 categories/powertrain_rules.json（v10.25.0 配置化）。
     """
+    R = _pt_rules()
     parts = []
-    if s.get("platform_800v") is True:
-        parts.append(("高压平台", 1.0, "800V +1.0"))
+    # ── 高压平台：连续档（900V > 800V），兼容旧布尔调用方 ────────────────
+    vv = _n(s.get("platform_v"))
+    if vv is None and s.get("platform_800v") is True:
+        vv = 800.0  # 只有布尔时按 800V 处理（旧单测/外部兼容）
+    if vv is not None:
+        hit = _band_points(vv, (R.get("voltage") or {}).get("bands") or [], "min_v", "min")
+        pts, label = hit if hit else (float((R.get("voltage") or {}).get("default", 0.0)), "")
+        parts.append(("高压平台", pts, f"{vv:g}V {label} +{pts:g}"))
+    # ── 快充：≤8min 单列闪充档 ────────────────────────────────────────
     t = _n(s.get("charge_10_80_min"))
     if t is not None:
-        if t <= 12:
-            parts.append(("快充", 1.4, f"10–80% {t:g}min +1.4"))
-        elif t <= 18:
-            parts.append(("快充", 1.1, f"10–80% {t:g}min +1.1"))
-        elif t <= 25:
-            parts.append(("快充", 0.6, f"10–80% {t:g}min +0.6"))
-        elif t <= 35:
-            parts.append(("快充", 0.1, f"10–80% {t:g}min +0.1"))
-        else:
-            parts.append(("快充", -0.4, f"10–80% {t:g}min −0.4"))
+        cr = R.get("charge") or {}
+        hit = _band_points(t, cr.get("bands") or [], "max_min", "max")
+        pts, label = hit if hit else (float(cr.get("over_35", -0.4)), ">35min")
+        parts.append(("快充", pts, f"10–80% {t:g}min {label} +{pts:g}"))
     cell = str(s.get("cell_brand") or "")
     ct = cell_tier_of(cell, s.get("cell_route"))
     if ct["tier"] != "unknown":
@@ -237,24 +286,27 @@ def powertrain_parts(s):
     # （board_v2.kwh_per_wan 不动）——打分归打分，披露归披露，各司其职。
     kwh = _n(s.get("kwh"))
     if kwh is not None:
-        if kwh >= 90:
-            parts.append(("电池容量", 0.8, f"{kwh:g}kWh +0.8（绝对电量，硬件素质）"))
-        elif kwh >= 75:
-            parts.append(("电池容量", 0.6, f"{kwh:g}kWh +0.6（绝对电量，硬件素质）"))
-        elif kwh >= 65:
-            parts.append(("电池容量", 0.4, f"{kwh:g}kWh +0.4（绝对电量，硬件素质）"))
-        elif kwh >= 55:
-            parts.append(("电池容量", 0.2, f"{kwh:g}kWh +0.2（绝对电量，硬件素质）"))
+        kr = R.get("kwh") or {}
+        hit = _band_points(kwh, kr.get("bands") or [], "min_kwh", "min")
+        if hit:
+            pts, label = hit
         elif kwh < 45:
-            parts.append(("电池容量", -0.4, f"{kwh:g}kWh −0.4（绝对电量，硬件素质）"))
+            pts, label = float(kr.get("under_45", -0.3)), "<45kWh"
+        else:
+            pts, label = 0.0, "45–55kWh"
+        parts.append(("电池容量", pts, f"{kwh:g}kWh {label} +{pts:g}（绝对电量，硬件素质）"))
     rg = _n(s.get("range_km"))
     if rg is not None:
-        if rg >= 700:
-            parts.append(("续航", 0.8, f"{rg:g}km +0.8"))
-        elif rg >= 600:
-            parts.append(("续航", 0.5, f"{rg:g}km +0.5"))
+        rr = R.get("range") or {}
+        hit = _band_points(rg, rr.get("bands") or [], "min_km", "min")
+        if hit:
+            pts, label = hit
         elif rg < 500:
-            parts.append(("续航", -0.5, f"{rg:g}km −0.5"))
+            pts, label = float(rr.get("under_500", -0.4)), "<500km"
+        else:
+            pts = None  # 500–600 中性：不加不扣也不进组（不参与该项中位锚）
+        if pts is not None:
+            parts.append(("续航", pts, f"{rg:g}km {label} +{pts:g}"))
     # ── 电机功率（2026-11-22 新增，用户诉求「三电=电池+电机+电控，别只看电池」）──
     # 【为什么加】此前三电规则 6 项全是电池，电机/电控零专属因子，实测功率与
     # 当前三电分相关系数仅 +0.03（完全没进分）——三电名不副实。
@@ -279,14 +331,10 @@ def powertrain_parts(s):
         # 业内依据：GB/T 18488 与多家横评共识——峰值只维持约 10s，家用车
         # 160kW 零百七秒级完全够用，功率低不构成产品缺陷；真正该看额定功率/
         # 效率 MAP 本池 0/20 覆盖，既无数据就不能据峰值低倒扣。
-        if kw >= 300:
-            parts.append(("电机功率", 1.2, f"{kw:g}kW +1.2（电机硬件规格参考）"))
-        elif kw >= 240:
-            parts.append(("电机功率", 0.8, f"{kw:g}kW +0.8（电机硬件规格参考）"))
-        elif kw >= 200:
-            parts.append(("电机功率", 0.4, f"{kw:g}kW +0.4（电机硬件规格参考）"))
-        else:
-            parts.append(("电机功率", 0.0, f"{kw:g}kW +0（够用功率不扣分，仅高规格加分）"))
+        pr = R.get("power_kw") or {}
+        hit = _band_points(kw, pr.get("bands") or [], "min_kw", "min")
+        pts, label = hit if hit else (float(pr.get("default", 0.0)), "够用功率不扣分")
+        parts.append(("电机功率", pts, f"{kw:g}kW {label} +{pts:g}（电机硬件规格参考）"))
     # 电池冷却方式（2026-11-22 接入；v10.20.2 修正方向）：液冷 +0.3 > 直冷 +0.2。
     # 【为什么反转】初版按「直冷换热效率高 20–50%、适配超快充」给直冷更高分，
     # 但①快充速度已由「快充时间」项单独计分（10–80% min 分档），再给直冷加分
@@ -296,12 +344,15 @@ def powertrain_parts(s):
     # 行业共识「液冷稳、直冷快、无绝对优劣」，故直冷仍保留正分（主流合格方案），
     # 只按独立价值让液冷略高；风冷基本退出主流仍扣分。
     cool = str(s.get("battery_cooling") or "")
-    if "液冷" in cool:
-        parts.append(("冷却", 0.3, "液冷 +0.3"))
-    elif "直冷" in cool:
-        parts.append(("冷却", 0.2, "直冷 +0.2"))
-    elif cool:
-        parts.append(("冷却", -0.2, f"{cool} −0.2"))
+    if cool:
+        exact = (R.get("cooling") or {}).get("exact") or {}
+        matched = next((k for k in exact if k in cool), None)
+        if matched:
+            pts = float(exact[matched])
+            parts.append(("冷却", pts, f"{matched} +{pts:g}"))
+        else:
+            pts = float((R.get("cooling") or {}).get("other_known", -0.2))
+            parts.append(("冷却", pts, f"{cool} {pts:g}"))
     return parts
 
 

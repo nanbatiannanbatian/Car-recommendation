@@ -107,6 +107,43 @@ def load(manual_path: str | None = None, auto_path: str | None = None) -> dict[s
     # v10.24.0：配置级字段证据补丁在读取时注入（唯一数据源 = score_trim_overrides.json）。
     # 不写进 data/gen 生成物：自动采集重跑不会冲掉人工核验的电压/快充文本补丁。
     out = _apply_field_patches(out)
+    # v10.25.0：字段别名归一（根因修复，读取层单一真相源，所有消费者自动受益）。
+    out = _normalize_field_aliases(out)
+    return out
+
+
+def _normalize_field_aliases(out: dict[str, dict]) -> dict[str, dict]:
+    """统一两个长期字段错配——在读取视图归一，不改生成物/人工库文件。
+
+    ① max_power_kw 缺失但 motor_kw 有值（全库 64 处，含 15 款入榜车）：
+       两者是同一物理量「峰值功率」，auto_trims 与人工采集用了不同字段名。
+       spec_from_trim 只读 max_power_kw → 这些车的「电机功率」项直接缺席，
+       不参与中位锚（等于被当中性），而实际有明确功率数据。回填并留审计标记。
+
+    ② charge 字段被填成纯电压文本（如 '800V'/'900V'，全库 12 处）：
+       快充时间字段被电压值误占。trim_board 靠 charge 文本解析快充分钟 →
+       解析不出 → 快充项缺席；电压反而只能从文本兜底读。
+       根因修：把纯电压文本里的电压值提到 voltage_v（仅当其为空），
+       charge 清空（快充时间确实未披露，不编造）。电压改走 voltage_v 数值，
+       快充项如实缺席（缺数据≠差），不再被错误文本污染。
+    """
+    import re as _re
+    for _model, e in out.items():
+        for t in (e.get("trims") or []):
+            # ① 峰值功率别名
+            if t.get("max_power_kw") in (None, "") and isinstance(t.get("motor_kw"), (int, float)):
+                t["max_power_kw"] = t["motor_kw"]
+                t.setdefault("_field_alias", {})["max_power_kw"] = {
+                    "from": "motor_kw", "value": t["motor_kw"]}
+            # ② charge 纯电压文本
+            c = str(t.get("charge") or "").strip()
+            if c and _re.fullmatch(r"\d{3,4}\s*V", c, _re.I):
+                volt = int(_re.sub(r"\D", "", c))
+                if t.get("voltage_v") in (None, ""):
+                    t["voltage_v"] = volt
+                t.setdefault("_field_alias", {})["charge_voltage_moved"] = {
+                    "from": c, "voltage_v": volt}
+                t["charge"] = ""
     return out
 
 

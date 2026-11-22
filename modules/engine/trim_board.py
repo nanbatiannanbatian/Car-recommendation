@@ -70,6 +70,19 @@ def spec_from_trim(trim: dict, base_spec: dict | None = None) -> dict:
     s["platform_800v"] = (("800V" in charge) or ("900V" in charge)
                           or (isinstance(vv, (int, float)) and vv >= 800)
                           or bool(s.get("platform_800v")))
+    # v10.25.0：电压数值透传给 spec_score 的连续档（900V>800V>400V）。
+    # 来源优先级：显式 voltage_v 字段 > charge 文本里的 V 数字。
+    # 旧调用方只用布尔 platform_800v 时，spec_score 按 800V 兼容处理。
+    plat_v = None
+    if isinstance(vv, (int, float)) and vv > 0:
+        plat_v = float(vv)
+    else:
+        import re as _re
+        _m = _re.search(r"(\d{3,4})\s*V", charge, _re.I)
+        if _m:
+            plat_v = float(_m.group(1))
+    if plat_v is not None:
+        s["platform_v"] = plat_v
     # 续航：配置表 cltc_km → spec_score range_km
     if trim.get("cltc_km") is not None:
         s["range_km"] = trim["cltc_km"]
