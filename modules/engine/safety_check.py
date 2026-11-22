@@ -143,6 +143,20 @@ def selftest():
         c["scores"]["safety"] = 7.0
     r3 = check(fake2)
     assert not r3["passed"], "单调性破坏未检出"
+    # BUG-112：Euro NCAP 文本含乘员得分率 93.95% 时必须取本体系 ≥90 档 8.8，
+    # 不能因"表外"落保守档 8.3（ES6 曾因此低于 C-NCAP 89.2% 的 L60）。
+    from modules.engine import crash_systems as CS
+    tab = load_table()
+    spec = tab["systems"]["Euro NCAP"]["map_spec"]
+    p = CS.parse_score("Euro NCAP 93.95% 五星")
+    sc, rule = score_from_crash(spec, p)
+    assert sc == 8.8 and "93.95" in rule, f"乘员分档未生效: {sc} {rule}"
+    # 反向注入：抹掉 pct 只能取保守档 8.3（证明确实读了分而非硬编码车型）
+    sc2, _ = score_from_crash(spec, {"system_cn": "Euro NCAP", "stars": 5, "score": None})
+    assert sc2 == 8.3, f"无乘员分应回退保守档: {sc2}"
+    # C-NCAP 得分率公式不受影响（L60 89.2% 仍为 8.4）
+    cn = tab["systems"]["C-NCAP"]["map_spec"]
+    assert score_from_crash(cn, CS.parse_score("C-NCAP 89.2% 五星"))[0] == 8.4
     return 0
 
 
@@ -166,7 +180,7 @@ def score_from_crash(spec: dict, parsed: dict) -> tuple:
     kind = spec.get("kind")
     # 换算算法统一在 contracts/safety_score（research 侧也用同一份，避免两套公式）
     from modules.contracts.safety_score import (
-        score_from_grade, score_from_pct, score_from_stars)
+        score_from_grade, score_from_pct, score_from_stars, score_from_star_occupant)
     if kind == "pct":
         pct = parsed.get("score")
         if pct is None:
@@ -183,6 +197,14 @@ def score_from_crash(spec: dict, parsed: dict) -> tuple:
         return (sc, f"{parsed.get('system_cn')} {g} → {sc}") if sc is not None else (None, "")
     if kind == "star":
         stars = parsed.get("stars")
+        # BUG-112：成绩文本里已知乘员保护得分率时，按【本体系】grades 精确分档，
+        # 不能因为"表外"就当作只有星级、一律落保守档（ES6 Euro NCAP 93.95% 被算成 8.3）。
+        pct = parsed.get("score")
+        if stars == 5 and pct is not None:
+            sc = score_from_star_occupant(pct, spec)
+            if sc is not None:
+                return sc, (f"{parsed.get('system_cn')} 五星·乘员保护{pct:g}% → {sc}"
+                            f"（按本体系 occupant 分档，不跨体系套得分率公式）")
         sc = score_from_stars(stars, spec)
         return (sc, f"{parsed.get('system_cn')} {stars}星 → {sc}（无乘员分项取保守档）") if sc is not None else (None, "")
     return None, ""
@@ -227,7 +249,7 @@ def apply_auto_scores(cands, table=None, apply=True):
 def score_from_record(system: str, rec: dict, table: dict | None = None) -> tuple:
     """按体系规则复算「表内一条记录」的分数。
 
-    优先级：精确 grade（含乘员分项的复合等级）→ 得分率 pct → 星级保守档。
+    优先级：精确 grade（含乘员分项的复合等级）→ 乘员分档/得分率 pct → 星级保守档。
     这是 car_scores 的唯一合法来源：表里的 score 必须能被这条规则复算出来。
     """
     table = table or load_table()
@@ -238,6 +260,12 @@ def score_from_record(system: str, rec: dict, table: dict | None = None) -> tupl
     if grade and spec.get("grades") and grade in spec["grades"]:
         v = spec["grades"][grade]
         return v, f"{system} {grade} → {v}"
+    # BUG-112：表内若只写 occupant_pct（没写复合 grade），同样按体系分档复算，
+    # 与表外成绩文本走同一条规则，避免"表内按分档、表外落保守档"两套口径。
+    if rec.get("occupant_pct") is not None and spec.get("kind") == "star":
+        parsed = {"score": rec["occupant_pct"], "stars": rec.get("stars") or 5,
+                  "system_cn": system, "grade": None, "year": rec.get("year")}
+        return score_from_crash(spec, parsed)
     if rec.get("value") is not None and spec.get("kind") == "pct":
         parsed = {"score": rec["value"], "year": rec.get("year"),
                   "system_cn": system, "stars": rec.get("stars"), "grade": None}

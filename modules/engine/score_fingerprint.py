@@ -41,6 +41,11 @@ SCORE_CODE_FILES = [
     # 漏了它则「C-IASI G 覆盖 C-NCAP 86.7%」这类改动手指纹纹丝不动，
     # 老分数不会被判过期（与上轮哈希薄壳同一类门禁漏洞）。
     "sync_safety_scores.py",
+    # v10.16.3：安全成绩 → 分数的映射本身也是打分代码。
+    # 漏了它们则「Euro NCAP 93.95% 落保守档 8.3」这类映射 bug 改完指纹不变，
+    # 老候选池的旧安全分不会被判过期（与之前 sync_safety_scores 同类门禁漏洞）。
+    "safety_check.py",
+    "safety_score.py",
 ]
 STAMP_KEY = "_generated_by"
 

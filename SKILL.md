@@ -13,7 +13,7 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 10.16.2
+version: 10.16.3
 author: "nanbatiannanbatian"
 ---
 
@@ -3538,3 +3538,14 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
 - `board_view.method_boundary_text()` 增两条固定披露：PPH 样本收缩口径；制造体系属过程证据不直接换算加分、换电三电不计分并列出业内横比标准。
 
 **验收**：bug_regression 111/111（新增 t111 锁配置级字段/PPH收缩/披露/v16产物，反向注入 PPH 收缩→t111 FAIL、恢复→全绿）；比较器20/20、结构16/16、derive4/4、midsuv46/46、release39/39、各模块 selftest 全过。v16 两榜：乐道 Pro 智驾7.0 / Max+·Ultra+ 7.8，评分配置由 85kWh Pro 变 85kWh Max+、总分 83.4→84.5；品控 7.73→7.87；11 款同车跨榜 0 差异。
+
+
+## v10.16.3 Euro NCAP 乘员得分率被当未知：ES6 安全倒挂 L60（用户质疑 ES6 总分低于 L60 不可能、除性价比外每项都该更高）
+
+**诊断**：用户看到 v16 ES6 79.7 < L60 84.5，认为评分体系有问题。逐维回溯：ES6 智驾8.7/操控8.2/车机8.8 均高于 L60，性价比6.5 低属预期（33.8万 vs 23.18万），真正异常在**安全 8.3 < L60 8.7**：ES6 有同源出口版 EL6 的 Euro NCAP 五星、成人乘员保护 93.95%（一手权威），L60 是 C-NCAP 89.2%。`crash_systems.parse_score("Euro NCAP 93.95% 五星")` 已正确解析出 `score=93.95`，但 `safety_check.score_from_crash` 的 star 分支只调用 `score_from_stars()` 读 stars，**完全没读 parsed.score**，把已知乘员分当未知，一律落「表外五星保守档 8.3」；而 C-NCAP 走得分率公式 89.2%→8.4。结果「Euro NCAP 93.95% < C-NCAP 89.2%」的证据倒挂。
+
+**排除的伪因**（不刷分、只按事实）：① ES6 三电 7.3 < L60 8.3 是客观硬件差距——L60 900V/10–80% 25min/电耗12.1/CLTC730km，ES6 400V/36min/16.1/650km（新浪、汽车之家、myroncars 参数页三源一致）；ES6 优势仅在 100kWh 容量与 360kW 电机，电控（高压平台+快充）明显弱。② 空间 8.3<8.8：L60 轴距2950/后备箱763L/离地175mm，ES6 2915/582L/172mm（SSOT 逐车核验），后备箱容积大按既定规则不加分、偏小才压。③ 离地间隙 SSOT 已覆盖 ES6 172mm（常规档0）与 L60 175mm（≥175 +0.3），非漏采。
+
+**修法（根因、全池统一、不针对单车）**：`modules/contracts/safety_score.py` 新增 `score_from_star_occupant(pct, spec)`，按 **Euro NCAP 体系自己的 grades 分档键**（`5star_occupant>=90`→8.8 / `85-90`→8.5 / `<85`→8.3）取分，**不跨体系套 C-NCAP 得分率公式**（各国 NCAP 不可直接互换）；`safety_check.score_from_crash` 的 star 分支在 stars=5 且 parsed.score 已知时优先精确分档，缺 pct 才回退星级保守档；`score_from_record` 对表内只有 `occupant_pct` 的记录走同一规则，杜绝「表内精确/表外保守」两套口径。`score_fingerprint.SCORE_CODE_FILES` 补入 `safety_check.py`/`safety_score.py`（否则改映射代码指纹不变、老安全分不被判过期，与 sync_safety_scores 同类门禁漏洞）。
+
+**验收**：bug_regression 112/112（新增 t112 锁乘员分档、反向注入抹 pct 回退 8.3、C-NCAP 89.2% 仍 8.4、表内外同规则、v17 产物），反向注入 103/103 全检出；比较器20/20、结构16/16、derive4/4、midsuv46/46、release39/39、各模块 selftest 全过。v17 两榜：ES6 安全 8.3→8.8、总分 79.7→80.5，L60 84.5 不变，11 款同车跨榜 0 差异。仍低于 L60 的三电/空间两项为客观参数差距，未刷分。

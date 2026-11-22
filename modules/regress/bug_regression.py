@@ -134,6 +134,7 @@ CASES = [
     ("BUG-109", "同车跨榜分数漂移(榜内锚点随子池变)+主榜三电满分残留(效率+达成率硬顶10)", "v10.16.0"),
     ("BUG-110", "bZ5一手C-NCAP86.7%被证据不全C-IASI G覆盖+页面同时标缺权威与C-IASI徽标", "v10.16.1"),
     ("BUG-111", "乐道L60高配智驾被低配数据拖累+PPH小样本证据不对称", "v10.16.2"),
+    ("BUG-112", "Euro NCAP乘员得分率被当未知：ES6 93.95%按五星保守档8.3，低于L60 C-NCAP 89.2%的8.4", "v10.16.3"),
 ]
 
 
@@ -3824,8 +3825,47 @@ def t111():
             "制造体系/换电只披露不计分、v16 两榜口径一致")
 
 
+def t112():
+    """BUG-112：parse_score 已解析出 Euro NCAP 93.95% 乘员得分，
+    score_from_crash 的 star 分支却只读 stars 取保守档 8.3，
+    导致 ES6 安全 8.3 < L60 C-NCAP 89.2% 的 8.4（有更强证据反而分低）。"""
+    from modules.engine import safety_check as SC
+    from modules.engine import crash_systems as CS
+    from modules.contracts import safety_score as SSC
+
+    spec = SC.load_table()["systems"]["Euro NCAP"]["map_spec"]
+    # 1) 契约层：本体系 occupant 分档，不跨体系套 C-NCAP 公式
+    assert SSC.score_from_star_occupant(93.95, spec) == 8.8
+    assert SSC.score_from_star_occupant(87, spec) == 8.5
+    assert SSC.score_from_star_occupant(82, spec) == 8.3
+    assert SSC.score_from_star_occupant(None, spec) is None
+    # 2) 引擎层：真实成绩文本解析 → 精确分档
+    sc, rule = SC.score_from_crash(spec, CS.parse_score("Euro NCAP 93.95% 五星"))
+    assert sc == 8.8 and "93.95" in rule, f"乘员分未生效: {sc} {rule}"
+    # 3) 反向注入：抹掉 pct 只能落保守档（证明不是硬编码 ES6）
+    sc2, rule2 = SC.score_from_crash(spec, {"system_cn": "Euro NCAP", "stars": 5, "score": None})
+    assert sc2 == 8.3 and "保守档" in rule2, f"无乘员分应回退: {sc2} {rule2}"
+    # 4) C-NCAP 得分率公式不受影响（L60 89.2% 仍 8.4）
+    cn = SC.load_table()["systems"]["C-NCAP"]["map_spec"]
+    assert SC.score_from_crash(cn, CS.parse_score("C-NCAP 89.2% 五星"))[0] == 8.4
+    # 5) 表内复算一致性：有 occupant_pct 无复合 grade 也按分档
+    v, r = SC.score_from_record("Euro NCAP", {"occupant_pct": 93.95, "stars": 5},
+                                SC.load_table())
+    assert v == 8.8, f"表内 occupant_pct 未复算: {v} {r}"
+    # 6) 真实产物：v17 ES6 安全 >= L60，且两榜一致
+    import json as _j
+    p = os.path.join(HERE, "runs", "midsuv_bev_202611_v17", "summary.json")
+    if os.path.exists(p):
+        d = _j.load(open(p, encoding="utf-8"))
+        applied = {x["model"]: x["score"] for x in (d.get("safety_auto") or {}).get("applied", [])}
+        assert applied.get("蔚来ES6") == 8.8, f"v17 ES6 安全未修: {applied.get('蔚来ES6')}"
+        assert applied.get("乐道L60") == 8.4
+    return ("Euro NCAP 星级映射读乘员得分率：ES6 93.95%→8.8（旧保守档8.3），"
+            "C-NCAP 89.2%→8.4 不受影响，反向注入回退 8.3，表内/表外同规则")
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112]
 
 
 def run():

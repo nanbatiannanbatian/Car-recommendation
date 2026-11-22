@@ -48,6 +48,40 @@ def score_from_stars(stars, spec: dict) -> float | None:
     return spec.get(key) if key else None
 
 
+def score_from_star_occupant(pct, spec: dict) -> float | None:
+    """五星 + 已知乘员保护得分率 → 按【本体系】grades 分档取分（v10.16.3）。
+
+    BUG-112 根因：Euro NCAP 93.95% 被 parse_score 解析出 score=93.95，
+    但 score_from_crash 的 star 分支只调用 score_from_stars()，把已知乘员分当未知，
+    一律落保守档 8.3；而 L60 的 C-NCAP 89.2% 走得分率公式拿 8.4 →
+    「Euro NCAP 五星 93.95% 低于 C-NCAP 89.2%」的倒挂。
+
+    这里不跨体系套 C-NCAP 得分率公式（各国 NCAP 不可直接互换），
+    只使用 spec.grades 里该体系自己的分档键：
+      '5star_occupant>=90' / '5star_occupant85-90' / '5star_occupant<85'
+    无匹配键或 pct 缺失时返回 None，由调用方回退星级保守档。
+    """
+    if pct is None:
+        return None
+    grades = spec.get("grades") or {}
+    p = float(pct)
+    import re
+    # 降序匹配：先 >= 阈值，再区间，最后 < 阈值
+    for key, val in grades.items():
+        m = re.fullmatch(r"5star_occupant>=(\d+(?:\.\d+)?)", str(key))
+        if m and p >= float(m.group(1)):
+            return val
+    for key, val in grades.items():
+        m = re.fullmatch(r"5star_occupant(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)", str(key))
+        if m and float(m.group(1)) <= p < float(m.group(2)):
+            return val
+    for key, val in grades.items():
+        m = re.fullmatch(r"5star_occupant<(\d+(?:\.\d+)?)", str(key))
+        if m and p < float(m.group(1)):
+            return val
+    return None
+
+
 def selftest() -> None:
     assert score_from_pct(90.7) == 8.7
     assert score_from_pct(92.7) == 9.0
@@ -58,6 +92,13 @@ def selftest() -> None:
     assert score_from_pct(None) is None
     assert score_from_grade("G+", {"G+": 9.3}) == 9.3
     assert score_from_stars(5, {"five": 8.3}) == 8.3
+    spec = {"five": 8.3, "grades": {"5star_occupant>=90": 8.8,
+                                    "5star_occupant85-90": 8.5,
+                                    "5star_occupant<85": 8.3}}
+    assert score_from_star_occupant(93.95, spec) == 8.8, "93.95%应取≥90档，不能落保守档"
+    assert score_from_star_occupant(87, spec) == 8.5
+    assert score_from_star_occupant(82, spec) == 8.3
+    assert score_from_star_occupant(None, spec) is None
     print("safety_score selftest OK")
 
 
