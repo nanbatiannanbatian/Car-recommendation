@@ -131,6 +131,7 @@ CASES = [
     ("BUG-106", "人工条目与自动条目存储层双副本:人工证据链(source/quote/note含口径冲突披露)被自动模板覆盖345字段", "v10.13.0"),
     ("BUG-107", "三电缺电池容量项+三电未拆电池/补能+配置匹配数字粘连致42款评分配置错配", "v10.15.0"),
     ("BUG-108", "三电规则项堆满被clamp成10.0满分:65/427逐配置并列顶格,顶配失去区分度", "v10.15.9"),
+    ("BUG-109", "同车跨榜分数漂移(榜内锚点随子池变)+主榜三电满分残留(效率+达成率硬顶10)", "v10.16.0"),
 ]
 
 
@@ -3156,7 +3157,7 @@ def t103():
     # 顺序：必须排在 with_config_scores 的**实际调用**之前，否则会被 best_trim 分数覆盖。
     # 按行比较且带括号，避免命中注释里的同名词。
     _lines = src.splitlines()
-    _ra_line = next(i for i, l in enumerate(_lines) if "_RA.apply_rule_adjust(cands)" in l)
+    _ra_line = next(i for i, l in enumerate(_lines) if "_RA.apply_rule_adjust(" in l)
     _wc_line = next(i for i, l in enumerate(_lines) if "with_config_scores(" in l)
     assert _ra_line < _wc_line, \
         f"规则增量必须排在 with_config_scores 之前（行 {_ra_line} vs {_wc_line}）"
@@ -3594,8 +3595,98 @@ def t108():
             f"现最高 {max(finals)}（页面人工口径 {max(av)}），满/中/低={full}/{mid}/{low} 保序，"
             f"两条链路共用软上限、主榜规则增量口径不变")
 
+def t109():
+    """跨榜同分 + 主榜三电满分（v10.16.0）。
+
+    根因：四个榜内相对锚点模块各自从当前池算中位/回归，12-18万子池样本一变
+    锚点就漂——同车全价位 83.8 vs 子榜 86.9。另：主榜三电链路（候选池 scores
+    →电耗效率→续航达成率）用 min(10,..) 硬顶，海狮06EV/G6 又顶到 10.0。
+    修：全价位 summary.json 作唯一锚点快照，子榜读固定锚；主榜三电过 soft_ceiling。
+    """
+    import statistics as _st
+    from modules.engine import anchor_pool as AP
+    from modules.engine import spec_score as SS
+    from modules.engine import evidence_gate as EG
+    from modules.engine import space_consistency as SP
+    from modules.engine import powertrain_efficiency as PE
+    from modules.board import range_achievement as RCH
+
+    # 1) 锚点快照：唯一来源=全价位产物，提取正确且畸形输入回退
+    snap = AP.load("car_midsuv_bev")
+    assert snap and abs(snap["evidence_cap"]["adas"]["capped"] - 8.54) < 1e-9, "adas 锚点错"
+    assert abs(snap["range_median"] - 0.499) < 1e-9, "达成率中位错"
+    assert abs(snap["efficiency"]["slope"] - 0.006572) < 1e-9, "回归斜率错"
+    assert AP.extract({}) is None, "空摘要必须回退 None"
+    src = _read("categories/car_midsuv_bev.json")
+    assert '"anchor_pool"' in src and "summary.json" in src, "category 未配锚点快照源"
+
+    # 2) 四模块固定锚点接口存在且被 pipeline 调用
+    for f, kw in [("modules/engine/evidence_gate.py", "anchor=None"),
+                  ("modules/engine/space_consistency.py", "fixed_caps=None"),
+                  ("modules/engine/powertrain_efficiency.py", "fixed: dict | None = None"),
+                  ("modules/board/range_achievement.py", "fixed_median: float | None = None"),
+                  ("modules/engine/rule_adjust.py", "fixed_medians=None")]:
+        assert kw in _read(f), f"{f} 缺少固定锚点参数 {kw}"
+    psrc = _read("modules/board/pipeline.py")
+    for token in ["AP.load(a.category)", "_anchor or {}", "main_board_powertrain_cap"]:
+        assert token in psrc, f"pipeline 未接固定锚点/软上限: {token}"
+
+    # 3) evidence_gate 固定锚点：同一组无证据车，子池样本变化不影响封顶值
+    lib = {"entries": [{"model": "有证据A", "dimension": "cabin", "source_type": "independent_test"}]}
+    base = [{"model": "有证据A", "scores": {"cabin": 8.3}},
+            {"model": "无证据1", "scores": {"cabin": 9.5}},
+            {"model": "无证据2", "scores": {"cabin": 9.2}}]
+    import copy as _cp
+    a1 = _cp.deepcopy(base)
+    a2 = _cp.deepcopy(base[:2])            # 子池少一款无证据车
+    fixed = {"cabin": {"capped": 8.3, "anchor": "全价位中位（5 款）", "n": 5}}
+    EG.apply_all(a1, experience_lib=lib, anchor=fixed)
+    EG.apply_all(a2, experience_lib=lib, anchor=fixed)
+    c1 = next(c for c in a1 if c["model"] == "无证据1")["scores"]["cabin"]
+    c2 = next(c for c in a2 if c["model"] == "无证据1")["scores"]["cabin"]
+    assert c1 == c2 == 8.3, f"固定锚点下同车封顶应一致: {c1}/{c2}"
+
+    # 4) 主榜三电软上限：无满分、单调、knee 以下不变
+    assert SS.main_board_powertrain_cap(10.0) <= 9.5, "满分未被压到 9.5 上界"
+    assert SS.main_board_powertrain_cap(10.0) < 10.0, "仍有 10.0 满分"
+    assert SS.main_board_powertrain_cap(9.98) >= SS.main_board_powertrain_cap(9.5), "软上限非单调"
+    assert SS.main_board_powertrain_cap(8.5) == 8.5, "knee 以下不应改动"
+
+    # 5) 真实两榜产物：11 款同车逐车分数一致（允许 0.05 四舍五入差）
+    def scores(path):
+        import re as _re
+        s = _read(path)
+        i = s.find('<table id="scoreBoard"')
+        j = s.find("</table>", i)
+        out = {}
+        for row in _re.findall(r"<tr data-model=.*?</tr>", s[i:j], _re.S):
+            mm = _re.search(r"data-model='([^']+)'", row)
+            if not mm:
+                continue
+            out[mm.group(1)] = {d: float(_re.search(r"data-dim='" + d + r"'>([\d.]+)<", row).group(1))
+                                for d in ("powertrain", "safety", "adas", "space", "value",
+                                          "control", "cabin", "quality")}
+        return out
+    p_full = os.path.join(HERE, "runs", "midsuv_bev_202611_v14", "榜单.html")
+    p_sub = os.path.join(HERE, "runs", "midsuv_bev_1218_202611_v14", "榜单.html")
+    if os.path.exists(p_full) and os.path.exists(p_sub):
+        A, B = scores(p_full), scores(p_sub)
+        common = set(A) & set(B)
+        assert len(common) >= 10, f"两榜共同车型异常: {len(common)}"
+        diffs = [(m, d, A[m][d], B[m][d]) for m in common for d in A[m]
+                 if abs(A[m][d] - B[m][d]) > 0.05]
+        assert not diffs, f"同车跨榜分数仍不一致: {diffs[:6]}"
+        # 主榜无三电满分
+        assert all(v["powertrain"] < 10 for v in A.values()), "全价位榜主榜三电仍有满分"
+        assert all(v["powertrain"] < 10 for v in B.values()), "子榜主榜三电仍有满分"
+        detail = f"真实两榜 {len(common)} 款同车逐维一致；"
+    else:
+        detail = "产物未生成，跳过实榜交叉校验（仅逻辑/接口断言）；"
+    return (detail + "锚点快照单一源、四模块固定锚接口、同车封顶一致、主榜三电软上限保序")
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109]
 
 
 def run():

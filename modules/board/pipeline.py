@@ -162,6 +162,9 @@ def main():
                     help="强制重扫已缓存车型的新闻稿（人工刷新时用）")
     ap.add_argument("--force-stale", action="store_true",
                     help="强制使用旧指纹候选池出榜（仅调试/回测用，报告会标注数据过期）")
+    ap.add_argument("--no-anchor-pool", action="store_true",
+                    help="不读全价位榜固定锚点快照，四个榜内模块改用本池现算（A/B 对照；"
+                         "正常出子榜必须开锚点池，否则同车跨榜分数不一致）")
     a = ap.parse_args()
 
     cfg = L.load_category(a.category)
@@ -187,6 +190,20 @@ def main():
     # 这是契约层的事，不归一化会在 trim_annotate / auto_trims 里 TypeError。
     from modules.contracts.candidate_schema import normalize_pool
     cands = normalize_pool(cands)
+
+    # 固定锚点快照（v10.16.0）：子榜用全价位榜算好的榜内锚点，避免同车跨榜分数漂移。
+    # 全价位榜自身没配 anchor_pool（或 --no-anchor-pool）→ 四个模块仍用本池现算。
+    from modules.engine import anchor_pool as AP
+    _anchor = None if getattr(a, "no_anchor_pool", False) else AP.load(a.category)
+    # 全价位榜自身（本池款数≥快照源池）不应用锚点——它本就是锚点来源，用快照会循环。
+    _src_n = (_anchor or {}).get("source_n")
+    if _anchor and isinstance(_src_n, int) and len(cands) >= _src_n:
+        _anchor = None
+    if _anchor:
+        print(f"[固定锚点] 读全价位快照：证据封顶 {len(_anchor.get('evidence_cap') or {})} 维 / "
+              f"空间封顶 {len(_anchor.get('space_caps') or {})} 款 / "
+              f"达成率中位 {_anchor.get('range_median')} / "
+              f"回归斜率 {(_anchor.get('efficiency') or {}).get('slope')}")
 
     # C-IASI 数字图标车联网救回（v10.5.0）：候选池里出现「数字图标/等级未文字化」且
     # 随包事实库还没有该车文字等级时，调用 research 唯一网络出口解析官网结果发布稿，
@@ -389,7 +406,7 @@ def main():
     # 必须排在 with_config_scores 之前——那个函数用 best_trim 的 scores 覆盖
     # c["scores"]，排在它后面会被整体盖掉。
     from modules.engine import rule_adjust as _RA
-    _rule_rep = _RA.apply_rule_adjust(cands)
+    _rule_rep = _RA.apply_rule_adjust(cands, fixed_medians=(_anchor or {}).get("rule_medians"))
     # 逐车规则增量明细（供页面三电子维度分组展示）
     _rule_detail = {c["model"]: c["rule_adjust"]
                      for c in cands if c.get("rule_adjust")}
@@ -415,7 +432,7 @@ def main():
     from modules.engine import powertrain_efficiency as _PE
     _eff_applied = 0
     if not getattr(a, "no_powertrain_efficiency", False):
-        _PE.apply_efficiency(cands)
+        _PE.apply_efficiency(cands, fixed=(_anchor or {}).get("efficiency"))
         _eff_applied = sum(1 for c in cands
                            if (c.get("powertrain_efficiency") or {}).get("status") == "applied")
         print(f"[电耗效率修正] {_eff_applied} 款有电耗+车重一手数据"
@@ -427,15 +444,33 @@ def main():
     from modules.board import range_achievement as _RCH
     _ach_report = {"status": "skipped"}
     if not getattr(a, "no_range_achievement", False):
-        _ach_report = _RCH.apply(cands)
+        _ach_report = _RCH.apply(cands, fixed_median=(_anchor or {}).get("range_median"))
         print(f"[续航达成率] 覆盖 {_ach_report['covered']}/{_ach_report['n'] if 'n' in _ach_report else len(cands)} 款 / "
               f"调整 {len(_ach_report['applied'])} 款 / {_ach_report['method']}")
+
+    # 主榜三电软上限（v10.16.0）：效率+达成率叠加后由 min(10,..) 硬顶出的 10.0 满分
+    # 与上轮「三电不可能满分」要求冲突。统一过 soft_ceiling（knee 9.3 → 渐近 9.5），
+    # 单调保序、消除并列满分。审计字段留痕供报告披露。
+    from modules.engine import spec_score as _SS
+    _pt_capped = []
+    for _c in cands:
+        _s = (_c.get("scores") or {}).get("powertrain")
+        if isinstance(_s, (int, float)) and _s > _SS.MAIN_PT_KNEE:
+            _new = _SS.main_board_powertrain_cap(_s)
+            if _new < _s:
+                _c["scores"]["powertrain"] = _new
+                _c.setdefault("score_cap_reasons", []).append(
+                    f"powertrain 主榜软上限 {_s:g}→{_new:g}（渐近 {_SS.MAIN_PT_CAP:g}，不硬顶满分）")
+                _pt_capped.append({"model": _c["model"], "prev": _s, "to": _new})
+    if _pt_capped:
+        print(f"[主榜三电软上限] {len(_pt_capped)} 款满分/近满分收敛：" +
+              "、".join(f"{x['model']} {x['prev']:g}→{x['to']:g}" for x in _pt_capped[:5]))
 
     from modules.engine import evidence_gate as EG
     if getattr(a, "no_evidence_cap", False):
         _ev_adj = []
     else:
-        _ev_adj = EG.apply_all(cands)
+        _ev_adj = EG.apply_all(cands, anchor=(_anchor or {}).get("evidence_cap"))
     _ev_sum = EG.summarize(_ev_adj)
     _cap_adj = [x for x in _ev_adj if x["dim"] == "safety"]
     _dim_cap = [x for x in _ev_adj if x["dim"] != "safety"]
@@ -451,7 +486,8 @@ def main():
     if getattr(a, "no_space_cap", False):
         _space_adj, _space_uncal = [], []
     else:
-        _space_adj, _space_uncal = SP.calibrate_space(cands)
+        _space_adj, _space_uncal = SP.calibrate_space(
+            cands, fixed_caps=(_anchor or {}).get("space_caps"))
     _space_sum = SP.summarize(_space_adj, _space_uncal)
 
     # 空间要素结构化（2026-11-21 用户问「空间要考虑前备箱/下沉后备箱/储物/真实表现吗」）：
@@ -617,7 +653,19 @@ def main():
             + f"；差异 {_sa_audit['diff_count']} 项（只审计不改分）")
 
     _pool_data = json.load(open(a.candidates, encoding="utf-8"))
-    parts = [f"# {cfg.get('label')} · 出榜报告", ""]
+    # v10.16.0：标题去硬编码。cfg.label 写死了「全价位 · 21款候选」，子榜复用同一
+    # category 就会误标（12-18万 11 款也写"全价位·21款"）。改为按本池实际款数与
+    # 锚点来源动态生成标题，事实与文案一致。
+    _label_raw = str(cfg.get("label") or "榜单")
+    import re as _re
+    _label_base = _re.sub(r"（[^）]*(?:全价位|款候选)[^）]*）", "", _label_raw).strip()
+    _pl = sorted(float(c["price"]) for c in cands
+                 if isinstance((c.get("price")), (int, float)))
+    _price_desc = (f"{_pl[0]:g}-{_pl[-1]:g}万" if len(_pl) >= 2 and _pl[0] != _pl[-1]
+                   else (f"{_pl[0]:g}万" if _pl else "价位未标注"))
+    _scope = "固定锚点子榜" if _anchor else "全价位主榜"
+    _title = f"{_label_base}（{_price_desc} · {len(cands)}款候选 · {_scope}）"
+    parts = [f"# {_title} · 出榜报告", ""]
     parts.append(f"> 来源：`{os.path.basename(a.candidates)}`；"
                  f"链路 取数→闸门→打分→稳健性→三档→审查。**全程无辩论。**")
     # v9.7.36：数据版本可追溯——读者知道分数是哪个 skill 版本/指纹生成的
@@ -797,6 +845,15 @@ def main():
         "category": a.category, "source": os.path.basename(a.candidates),
         "in": len(cands), "passed": 0, "dropped": 0, "sliders": custom,
         "boards": {}, "tiers": {}, "review": {},
+        # v10.16.0：榜内相对锚点来源（固定锚点=跨榜同分；无=本池现算）
+        "anchor_pool": {"enabled": bool(_anchor),
+                        "source": (cfg.get("anchor_pool") or {}).get("path") if _anchor else None,
+                        "evidence_cap": (_anchor or {}).get("evidence_cap"),
+                        "range_median": (_anchor or {}).get("range_median"),
+                        "efficiency": (_anchor or {}).get("efficiency"),
+                        "space_caps_n": len((_anchor or {}).get("space_caps") or {})},
+        # v10.16.0：主榜三电软上限审计（消除效率+达成率叠加的满分）
+        "main_powertrain_cap": _pt_capped,
         # v9.7.23：未入池车型及原因（用户要求"能比就比，不能比说明原因"）
         "pool_excluded": (_pool_data.get("pool_excluded") if isinstance(_pool_data, dict) else []),
         # 2026-11-21：价格回流审计（回填了哪些、哪些 trims 也没价）

@@ -13,7 +13,7 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 10.15.9
+version: 10.16.0
 author: "nanbatiannanbatian"
 ---
 
@@ -3496,3 +3496,16 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
 **顺带根因修复**：`score_fingerprint` 原用 `HERE/f` 哈希的是根目录 10 行薄壳转发文件，改了真实现（modules/engine/*）指纹纹丝不动，"老分数作废"门禁失效。改为 `paths.src(f)` 解析真实现。
 
 **验收**：spec_score / trim_annotate / score_fingerprint selftest 全绿；bug_regression 108/108（t108 两条链路合计 427+98 个逐配置样本，反向注入验证 103/103 检出）。v13 榜单：逐配置三电 10.0 由 51 个降为 **0 个**、最高 9.3（规则链路 9.29），T1 仍极氪7X；因主榜总分取"最优配置分"，各车加权分随三电压缩小幅下调、T2 内位次微调，档位集合不变。
+
+## v10.16.0 · 跨榜同分 + 主榜三电满分残留（用户："这个榜单和12-18万纯电中型SUV榜单对比，相同车型分数是否相同，不同为什么，有bug直接改"）
+
+**诊断**：用同引擎重出 12-18 万子榜（11 款），11 款同车分数**全部不同**（+0.4~+3.1，小鹏MONA L05 83.8→86.9）。拆到维度：空间 +0.3~0.9、车机 +0.5~0.7、智驾 +0.9、三电 +0.1。根因是四个「榜内相对锚点」模块各自从当前候选池算统计锚，子池样本一变锚点就漂——`evidence_gate`（证据车中位 + min_proven=3）、`space_consistency`（尺寸 peer 中位）、`powertrain_efficiency`（车重~电耗回归）、`range_achievement`（达成率中位）。这些是统计锚不是车的固有属性，子榜换的是「展示哪几款车」，不该换尺子。
+
+**修法（单一事实源，不打补丁）**：
+- 新增 `anchor_pool.py`：从全价位榜产物 `summary.json` 提取固定锚点（证据封顶中位、按车空间封顶值、回归斜率/中位残差、达成率中位），不落第二份可写快照；category 配置 `anchor_pool.path` 指向该产物。
+- 四模块加可选固定锚参数（`anchor` / `fixed_caps` / `fixed` / `fixed_median`）：锚点从快照取、调整只写当前榜 cands；全价位榜自身不读快照（anchor=None），行为完全不变（历史可比）。pipeline 加 `--no-anchor-pool` 供 A/B 对照。
+- 报告标题去硬编码：`cfg.label` 写死「全价位·21款候选」，子榜复用会误标；改为按本池实际款数/价格带动态生成。
+
+**B 类真 bug**：主榜三电仍有满分（海狮06EV/小鹏G6 = 10.0）。上轮只给规则分/逐配置分加软上限，漏了主榜「候选池 scores→电耗效率→续航达成率」链路，`range_achievement` 用 `min(10,..)` 硬顶。修：`spec_score.main_board_powertrain_cap` 复用同一个 `soft_ceiling`（knee 9.3→渐近 9.5），pipeline 在两修正后统一过一遍，单调保序、满分归零、审计留痕。
+
+**验收**：四模块 selftest 全绿；bug_regression 109/109（t109 锁锚点快照单一源、四模块固定锚接口、同车封顶一致、主榜三电软上限保序，反向注入 103/103 检出）；v14 两榜 11 款同车逐维一致、两榜主榜三电均无 10.0。

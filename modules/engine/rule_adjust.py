@@ -131,12 +131,16 @@ def _powertrain_groups(c: dict, trims_db: dict) -> dict:
 
 
 def apply_rule_adjust(cands: list[dict], dims=DIMS, alpha=ALPHA, cap=CAP,
-                       min_peers=MIN_PEERS) -> dict:
+                       min_peers=MIN_PEERS, fixed_medians=None) -> dict:
     """原地给 cands 的目标维度加规则增量，写审计字段。返回逐维摘要。
 
     逐项中位锚点：每个规则项各自在「该项有数据的车」里取中位做基准，
     缺该项的车在该项上不参与（既不加分也不扣分）。
+
+    fixed_medians：可选全价位固定中位 {dim: {item: median}}（v10.16.0）。给定时
+      跳过本池中位统计，子榜与全价位榜共用同一逐项基准 → 同车同分。
     """
+    fixed_medians = fixed_medians or {}
     summary: dict[str, dict] = {}
     for dim in dims:
         parts = rule_parts(cands, dim)
@@ -151,9 +155,13 @@ def apply_rule_adjust(cands: list[dict], dims=DIMS, alpha=ALPHA, cap=CAP,
                 for (n, v, t) in ps:
                     if n == item:
                         vals[m] = (v, t)
-            if len(vals) < min_peers:
-                continue
-            med = statistics.median([v for v, _t in vals.values()])
+            fixed_item = (fixed_medians.get(dim) or {}).get(item)
+            if isinstance(fixed_item, (int, float)):
+                med = float(fixed_item)
+            else:
+                if len(vals) < min_peers:
+                    continue
+                med = statistics.median([v for v, _t in vals.values()])
             for m, (v, t) in vals.items():
                 d = (v - med) * alpha
                 adj[m] += d

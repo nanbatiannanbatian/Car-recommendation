@@ -180,7 +180,7 @@ def calibrate_space(cands, physics=None, tol=TOL, min_peers=MIN_PEERS,
                     eff_gap=EFF_GAP, eff_tol=EFF_TOL, min_eff_peers=MIN_EFF_PEERS,
                     high_eff_relief=HIGH_EFF_RELIEF,
                     storage_ratio=STORAGE_RATIO, storage_tol=STORAGE_TOL,
-                    min_storage_peers=MIN_STORAGE_PEERS):
+                    min_storage_peers=MIN_STORAGE_PEERS, fixed_caps=None):
     """空间分一致性封顶，原地修改 cands。
 
     两级信号：
@@ -194,6 +194,31 @@ def calibrate_space(cands, physics=None, tol=TOL, min_peers=MIN_PEERS,
       uncalibrated = [model, ...]  # 缺尺寸数据，research 待补
     """
     from modules.engine.space_features import efficiency_of
+
+    # 固定锚点（v10.16.0）：全价位榜已算好的按车封顶值。子榜直接复用 → 同车同分；
+    # 未命中的车不校准（保守，且避免子池 peer 噪声产生全价位榜没有的封顶）。
+    if fixed_caps:
+        out, uncal = [], []
+        for c in cands:
+            m = c.get("model")
+            row = fixed_caps.get(m)
+            if not row or not isinstance(row.get("capped"), (int, float)):
+                continue
+            s = (c.get("scores") or {}).get("space")
+            if not isinstance(s, (int, float)):
+                continue
+            prev = float(s)
+            to = float(row["capped"])
+            if prev <= to + 1e-9:
+                continue
+            c["scores"]["space"] = to
+            c.setdefault("score_cap_reasons", []).append(
+                f"space 尺寸一致性（全价位固定锚 {row.get('anchor')}）封顶至 {to:g}")
+            out.append({"model": m, "dim": "space", "prev": prev, "capped": to,
+                        "anchor": row.get("anchor"), "peers": 0, "size": None,
+                        "basis": row.get("basis") or "fixed_anchor", "tol": tol,
+                        "signal": "fixed_anchor"})
+        return out, uncal
 
     phys = physics if physics is not None else _load_physics()
     scored = []

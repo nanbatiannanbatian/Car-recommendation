@@ -361,6 +361,18 @@ def powertrain_soft_score(raw: float) -> float:
                         POWERTRAIN_BASE + POWERTRAIN_SOFT_SPAN, POWERTRAIN_BASE)
 
 
+# 主榜车系三电分（10 分制绝对分）的软上限。v10.16.0：上轮只给规则分/逐配置分加了
+# soft_ceiling，主榜「候选池 scores → 电耗效率 → 续航达成率」这条链路仍用 min(10,..)
+# 硬顶，海狮06EV/小鹏G6 又顶到 10.0。同一把尺子：knee 9.3 以下原样，以上渐近 9.5。
+MAIN_PT_KNEE = 9.3
+MAIN_PT_CAP = 9.5
+
+
+def main_board_powertrain_cap(score: float) -> float:
+    """主榜车系三电分软上限：消除效率+达成率叠加后的满分，单调保序。"""
+    return round(soft_ceiling(float(score), MAIN_PT_CAP, MAIN_PT_KNEE), 2)
+
+
 def score_powertrain(s):
     """三电：补能速度 > 电池容量 > 电芯品牌；合计走软上限，不硬顶满分。"""
     raw, why = 0.0, []

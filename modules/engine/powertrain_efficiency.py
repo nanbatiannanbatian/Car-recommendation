@@ -245,11 +245,16 @@ def residual_adjust(residual: float, median_residual: float) -> tuple[float, str
 
 def apply_efficiency(cands: list[dict], table: dict[str, dict] | None = None,
                      physics_path: str | None = None,
-                     weight_table: dict[str, float] | None = None) -> list[dict]:
+                     weight_table: dict[str, float] | None = None,
+                     fixed: dict | None = None) -> list[dict]:
     """原地调整 cands 的 scores.powertrain，写审计字段。返回 cands。
 
     v10.15.3：改为车重归一化残差法。仅对同时有电耗+车重的车做榜内回归；
     缺任一项的车不插补、不调整。回归退化（车重全同/样本<3）时退回绝对电耗中位法。
+
+    v10.16.0 fixed：可选全价位固定锚点 {slope, intercept, median_residual}。给定后
+      回归参数不再从本池算，子榜与全价位榜共用同一条车重~电耗基准线 → 同车同分；
+      车辆自身的残差仍用本车电耗/车重算，不随池变。
     """
     raw = table if table is not None else load_consumption(physics_path)
     tbl = _norm_table(raw)
@@ -264,10 +269,16 @@ def apply_efficiency(cands: list[dict], table: dict[str, dict] | None = None,
         if rec and w and isinstance(rec.get("consumption"), (int, float)):
             paired.append((key, w, float(rec["consumption"])))
 
-    slope, intercept = regression_slope([p[1] for p in paired], [p[2] for p in paired])
+    use_fixed = bool(fixed) and all(isinstance(fixed.get(k), (int, float))
+                                    for k in ("slope", "intercept", "median_residual"))
+    if use_fixed:
+        slope, intercept = float(fixed["slope"]), float(fixed["intercept"])
+    else:
+        slope, intercept = regression_slope([p[1] for p in paired], [p[2] for p in paired])
     residuals = {key: cons - (slope * w + intercept) for key, w, cons in paired}
     use_residual = slope != 0.0 and bool(residuals)
-    med_res = statistics.median(residuals.values()) if use_residual else 0.0
+    med_res = float(fixed["median_residual"]) if use_fixed else (
+        statistics.median(residuals.values()) if use_residual else 0.0)
     mid_cons = None   # 退化兜底时再算
 
     for c in cands:

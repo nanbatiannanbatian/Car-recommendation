@@ -86,10 +86,13 @@ def _experience_models(lib) -> dict:
     return out
 
 
-def apply_all(cands, experience_lib=None, policy=None, only=None) -> list[dict]:
+def apply_all(cands, experience_lib=None, policy=None, only=None, anchor=None) -> list[dict]:
     """按 DIM_POLICY 对所有维度做证据封顶。返回调整明细。
 
     only：只处理指定维度（调试/A/B 用）。
+    anchor：可选固定锚点快照（anchor_pool.load() 的 evidence_cap）。给定后该维
+      cap/anchor 直接取快照值，跳过本池 proven 统计——子榜与全价位榜共用同一把尺子，
+      同车同分。车自身「有无证据」仍按本车数据判定，不随池变。
     返回 [{"model","dim","prev","capped","anchor","rule"}]
     """
     from modules.engine import experience_score as ES
@@ -97,6 +100,7 @@ def apply_all(cands, experience_lib=None, policy=None, only=None) -> list[dict]:
     policy = policy or DIM_POLICY
     lib = experience_lib if experience_lib is not None else ES.load_library()
     exp = _experience_models(lib)
+    anchor = anchor or {}
 
     out: list[dict] = []
     for dim, rule in policy.items():
@@ -116,21 +120,26 @@ def apply_all(cands, experience_lib=None, policy=None, only=None) -> list[dict]:
                 return _has_pph(c)
             return False
 
-        proven = [(c["model"], float((c.get("scores") or {})[dim]))
-                  for c in cands
-                  if has(c) and isinstance((c.get("scores") or {}).get(dim), (int, float))]
-        if not proven:
-            continue                      # 全池都无证据 → 没有可校准的锚，不封顶
-        # 小样本不封顶：2 款车的最低值不是"全池天花板"，是噪声
-        if len(proven) < int(rule.get("min_proven") or 1):
-            continue
-
-        if cap_to == "min":
-            cap = min(v for _, v in proven)
-            anchor = min(proven, key=lambda x: x[1])[0]
-        else:                             # median
-            cap = round(statistics.median([v for _, v in proven]), 2)
-            anchor = f"有证据车中位（{len(proven)} 款）"
+        # 固定锚点快照优先：全价位榜算好的 cap 直接用，不再从子池重算
+        fixed = anchor.get(dim)
+        if fixed and isinstance(fixed.get("capped"), (int, float)):
+            cap = float(fixed["capped"])
+            anchor_label = fixed.get("anchor") or f"全价位榜锚点（{fixed.get('n', '?')} 款）"
+        else:
+            proven = [(c["model"], float((c.get("scores") or {})[dim]))
+                      for c in cands
+                      if has(c) and isinstance((c.get("scores") or {}).get(dim), (int, float))]
+            if not proven:
+                continue                  # 全池都无证据 → 没有可校准的锚，不封顶
+            # 小样本不封顶：2 款车的最低值不是"全池天花板"，是噪声
+            if len(proven) < int(rule.get("min_proven") or 1):
+                continue
+            if cap_to == "min":
+                cap = min(v for _, v in proven)
+                anchor_label = min(proven, key=lambda x: x[1])[0]
+            else:                         # median
+                cap = round(statistics.median([v for _, v in proven]), 2)
+                anchor_label = f"有证据车中位（{len(proven)} 款）"
 
         force = bool(rule.get("force"))
         for c in cands:
@@ -149,9 +158,9 @@ def apply_all(cands, experience_lib=None, policy=None, only=None) -> list[dict]:
                 continue
             c["scores"][dim] = cap
             c.setdefault("score_cap_reasons", []).append(
-                f"{dim} 无{rule['why']}，封顶至 {cap:g}（锚点 {anchor}）")
+                f"{dim} 无{rule['why']}，封顶至 {cap:g}（锚点 {anchor_label}）")
             out.append({"model": c["model"], "dim": dim, "prev": prev,
-                        "capped": cap, "anchor": anchor, "rule": rule["why"],
+                        "capped": cap, "anchor": anchor_label, "rule": rule["why"],
                         "forced": force})
     return out
 

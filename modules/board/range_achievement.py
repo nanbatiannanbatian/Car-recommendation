@@ -130,8 +130,12 @@ def estimate_achievement(c: dict, phys: dict) -> tuple[float | None, str]:
     return ach, f"物理模型高速估算达成率 {ach*100:.0f}%（kwh={kwh:g} w={w:g} cd={cd}）"
 
 
-def apply(cands: list[dict]) -> dict:
-    """对榜内达成率做中位锚双向调整。原地改 scores.powertrain，返回审计 report。"""
+def apply(cands: list[dict], fixed_median: float | None = None) -> dict:
+    """对达成率做中位锚双向调整。原地改 scores.powertrain，返回审计 report。
+
+    fixed_median：可选固定中位（全价位榜算好）。给定时跳过本池中位统计，
+      子榜与全价位榜共用同一锚点 → 同车同分；达成率仍是车自身物理量，不随池变。
+    """
     phys = _physics_map()
     ach_map, basis_map = {}, {}
     for c in cands:
@@ -140,8 +144,9 @@ def apply(cands: list[dict]) -> dict:
             ach_map[c["model"]] = ach
             basis_map[c["model"]] = basis
     applied, skipped = [], []
-    if len(ach_map) >= MIN_PEERS:
-        med = statistics.median(ach_map.values())
+    use_fixed = isinstance(fixed_median, (int, float))
+    if use_fixed or len(ach_map) >= MIN_PEERS:
+        med = float(fixed_median) if use_fixed else statistics.median(ach_map.values())
         for c in cands:
             m = c.get("model")
             if m not in ach_map:
@@ -164,9 +169,10 @@ def apply(cands: list[dict]) -> dict:
         for c in cands:
             c["range_achievement"] = {"status": "not_enough_peers",
                                       "reason": f"有达成率数据 {len(ach_map)} 款 < {MIN_PEERS}"}
-    return {"status": "applied" if len(ach_map) >= MIN_PEERS else "skipped",
+    anchor_kind = "全价位固定中位锚" if use_fixed else "榜内中位锚"
+    return {"status": "applied" if (use_fixed or len(ach_map) >= MIN_PEERS) else "skipped",
             "covered": len(ach_map), "applied": applied, "skipped": skipped,
-            "method": f"高速达成率榜内中位锚，每{STEP*100:.0f}个百分点{STEP_PT:+.1f}分，±{CAP}封顶"}
+            "method": f"高速达成率{anchor_kind}，每{STEP*100:.0f}个百分点{STEP_PT:+.1f}分，±{CAP}封顶"}
 
 
 def selftest() -> int:
