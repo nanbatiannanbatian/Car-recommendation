@@ -1189,11 +1189,14 @@ def main():
                     if _pd_r.get("with_promo") else "本期无官方优惠数据。")
                  + "优惠按月变动、有截止日，且金融贴息/保险/置换/选装/BaaS 不可比，故不进主分。")
     _rec_r = summary.get("recall") or {}
+    _ota_n = sum(int(x.get("ota_skipped") or 0) for x in (_rec_r.get("detail") or []))
     parts.append("> **召回事件**：来源国家市场监管总局缺陷产品召回公告，"
                  + (f"注入 {_rec_r.get('injected')} 款（"
                     + "、".join(x["model"] for x in _rec_r.get("detail") or []) + "），"
                     if _rec_r.get("injected") else "本期无召回数据，")
-                 + "按严重度有限扣分（high -1.5 / normal -0.5 / 封顶 -3）。"
+                 + "线下物理/混合措施按严重度有限扣分（high -1.5 / normal -0.5 / 封顶 -3），"
+                 + f"纯软件 OTA 修复的召回（本榜 {_ota_n} 起）按 v10.19.0 口径暂不纳入扣分——"
+                   "软件缺陷经 OTA 无损修复不等同于硬件安全隐患，避免多起软件召回机械触顶。"
                  + (f"跳过 {len(_rec_r.get('skipped_uncertain') or [])} 款批次不覆盖在售款存疑项（如换代ES6不套用一代平台召回）。"
                     if _rec_r.get("skipped_uncertain") else "")
                  + "未查到召回公告≠无召回。")

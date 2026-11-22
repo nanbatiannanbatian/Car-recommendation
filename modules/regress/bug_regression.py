@@ -141,6 +141,7 @@ CASES = [
     ("BUG-116", "官方召回事件字段全缺致质量维召回因子形同虚设；换代ES6却误套一代平台召回", "v10.18.0"),
     ("BUG-117", "官方优惠价高频变动/口径混杂不可复算；应双口径对照而非替换指导价主分", "v10.18.0"),
     ("BUG-118", "保值率库名「零跑C11纯电版」与候选池「零跑C11」精确匹配漏配→微调从未生效", "v10.18.0"),
+    ("BUG-119", "Model Y 4起软件召回机械触顶-3；纯OTA修复应按处置方式排除而非按车型硬编码", "v10.19.0"),
 ]
 
 
@@ -4029,16 +4030,19 @@ def t116():
     # 2) coverage_uncertain 跳过：换代ES6不扣一代平台召回
     assert RI.events_for("蔚来ES6", lib) == [], "ES6 换代车不应套用一代召回"
     assert len(RI.events_for("特斯拉 Model Y", lib)) == 4
-    # 3) 严重度扣分可复算：G6 1起normal -0.5；Model Y 1high+3normal 触顶 -3
+    # 3) 严重度扣分可复算（v10.19.0 OTA口径）：G6 物理1起 -0.5；
+    #    Model Y 4起中3起纯OTA不纳入、仅RVC混合1起 -0.5（不再机械触顶-3）
     # 用注入后的候选验证（score_one 读 recall_events 字段）
     cands = [{"model": "小鹏G6"}, {"model": "特斯拉 Model Y"}, {"model": "蔚来ES6"}]
     RI.apply(cands, lib)
     for c in cands:
         d = QS.score_one(c, None)
         if c["model"] == "小鹏G6":
-            assert "召回 1 次，扣分 -0.5" in d["note"], d["note"]
+            assert "召回 1 次计入，扣分 -0.5" in d["note"], d["note"]
         if c["model"] == "特斯拉 Model Y":
-            assert "召回 4 次，扣分 -3" in d["note"], d["note"]
+            assert "召回 1 次计入，扣分 -0.5" in d["note"], d["note"]
+            assert "3 起纯软件OTA按口径不纳入" in d["note"], d["note"]
+            assert d["recall_ota_excluded"] == 3, d
         if c["model"] == "蔚来ES6":
             assert "召回 1 次" not in d["note"] and "扣分 -" not in d["note"], "ES6 存疑召回不得扣分"
     # 4) 接进 pipeline 且在 QS.apply 之前
@@ -4051,7 +4055,8 @@ def t116():
     d = _J.load(open(os.path.join(HERE, "runs", "midsuv_bev_202611_v20", "summary.json"), encoding="utf-8"))
     rec = d.get("recall") or {}
     assert rec.get("injected") == 3 and len(rec.get("skipped_uncertain") or []) == 1, f"v20 召回异常: {rec}"
-    return ("召回入质量维度：SAMR官方公告注入3款、严重度扣分可复算(high-1.5/normal-0.5/封顶-3)，"
+    return ("召回入质量维度：SAMR官方公告注入3款、严重度扣分可复算(high-1.5/normal-0.5/封顶-3)；"
+            "v10.19.0 OTA口径纯软件不纳入(Model Y 3起ota排除仅RVC混合-0.5)、"
             "换代ES6不套一代召回、指纹门禁纳入")
 
 
@@ -4126,8 +4131,62 @@ def t118():
             "A/B级进分C级仅展示，不误并不同品牌")
 
 
+def t119():
+    """BUG-119：Model Y 4起软件召回曾机械触顶 -3。用户拍板纯OTA不纳入。
+    根因修复需证明是「规则驱动」而非「按车型名硬编码」：
+    ① 单一真相源 is_ota_recall 结构化字段优先、文本兜底；
+    ② 反向注入：把事件 remedy 从 ota 改成 physical 就恢复扣分、改回 ota 又排除；
+    ③ 无 remedy 时按措施文本判定（加贴/更换=计入、纯OTA升级=排除）；
+    ④ 开关 OTA_RECALL_EXCLUDED 一处可切换全链路。"""
+    from modules.engine import quality_score as QS
+    is_ota = QS.is_ota_recall
+    # 1) 结构化字段优先：ota→排除，physical/mixed→计入
+    ev_ota = {"reason": "软件问题", "remedy": "ota"}
+    ev_phys = {"reason": "软件问题", "remedy": "physical"}
+    assert is_ota(ev_ota) is True and is_ota(ev_phys) is False, "remedy 字段应优先判定"
+    # 2) 文本兜底：无 remedy 时按措施段判定
+    assert is_ota({"reason": "缺陷描述含更换字样。措施：OTA升级"}) is True
+    assert is_ota({"reason": "措施：OTA升级并加贴警示标识"}) is False
+    assert is_ota({"reason": "措施：更换行车电脑"}) is False
+    assert is_ota({"reason": "措施：线下检修"}) is False
+    # 3) 反向注入：同一批事件，改 remedy 即翻转扣分（证明非硬编码车型）
+    evs = [
+        {"id": "A", "severity": "high", "remedy": "ota", "reason": "软件，OTA升级"},
+        {"id": "B", "severity": "normal", "remedy": "physical", "reason": "加贴标识"},
+    ]
+    pen_excl, note_excl = QS._recall_penalty({"recall_events": evs})
+    assert abs(pen_excl - (-0.5)) < 1e-9 and "1 起纯软件OTA按口径不纳入" in note_excl, (pen_excl, note_excl)
+    # 把 A 改成 physical → high 恢复扣分 → 合计 high1.5+normal0.5=2.0
+    evs_flip = [dict(evs[0], remedy="physical"), evs[1]]
+    pen_flip, note_flip = QS._recall_penalty({"recall_events": evs_flip})
+    assert abs(pen_flip - (-2.0)) < 1e-9 and "纯软件OTA" not in note_flip, (pen_flip, note_flip)
+    # 把 B 也改成 ota → 全部排除 → 0 扣分
+    evs_all_ota = [dict(evs[0]), dict(evs[1], remedy="ota")]
+    pen_all, _ = QS._recall_penalty({"recall_events": evs_all_ota})
+    assert pen_all == 0.0, pen_all
+    # 4) 开关：关掉 OTA 排除后，4起软件召回应恢复按严重度累加
+    old = QS.OTA_RECALL_EXCLUDED
+    try:
+        QS.OTA_RECALL_EXCLUDED = False
+        four_ota = [{"severity": "normal", "remedy": "ota", "reason": "OTA升级"} for _ in range(4)]
+        pen_on, _ = QS._recall_penalty({"recall_events": four_ota})
+        assert abs(pen_on - (-2.0)) < 1e-9, "关闭开关应恢复扣分(4×0.5=2)"
+    finally:
+        QS.OTA_RECALL_EXCLUDED = old
+    # 5) 数据层 remedy 已显式标注 + 注入透传 + 报告披露接线
+    from modules.engine import recall_ingest as _RI
+    lib = _RI.load_library()  # 内部走 paths.cat，不硬编码 categories 拼接
+    for m in ["小鹏G6", "零跑C11", "蔚来ES6", "特斯拉 Model Y"]:
+        for e in lib["events"][m]:
+            assert "remedy" in e, f"{m} 缺 remedy 标注"
+    ps = _read("modules/board/pipeline.py")
+    assert "纯软件 OTA" in ps and "暂不纳入扣分" in ps, "报告未披露 OTA 口径"
+    return ("OTA召回按处置方式排除为规则驱动：is_ota_recall单一真相源、反向改remedy即翻转扣分、"
+            "文本兜底、开关一处可切换，非车型硬编码")
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t115, t116, t117, t118]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t115, t116, t117, t118, t119]
 
 
 def run():

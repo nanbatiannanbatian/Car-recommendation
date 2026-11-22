@@ -21,6 +21,39 @@ HIGH = 9.5
 HIGH_TAGS = {"转向", "制动", "刹车", "电池", "失灵", "失效", "无法启动", "无法充电"}
 MID_TAGS = {"充电", "车机", "黑屏", "续航", "悬挂", "变速箱", "生锈", "爆漆"}
 
+# v10.19.0（用户 2026-11-22 拍板）：纯软件 OTA 修复的召回暂不纳入质量扣分。
+# 根因而非补丁：旧逻辑按「召回次数 × 严重度」机械累加、触顶 -3，会把
+# 「软件缺陷经 OTA 无损修复」等同于「硬件安全隐患」，与本项目「召回不等于质量差」
+# 的既定边界冲突（Model Y 4 起软件召回曾一次扣满 3 分）。改为按处置方式(remedy)
+# 区分，任何车型的新召回只要标 ota 即自动跳过，不按车型名硬编码。
+# 恢复口径只需把此开关改 False——一处开关、全链路生效。
+OTA_RECALL_EXCLUDED = True
+
+# 纯软件 OTA 的特征词；出现线下物理作业词即判为非纯 OTA（仍需扣分）。
+_OTA_WORDS = ("OTA", "ota", "远程升级", "软件升级")
+_PHYSICAL_WORDS = ("加贴", "粘贴", "标签", "标识", "更换", "换件", "加装",
+                   "返厂", "线下", "检修", "维修", "拧紧", "重装")
+
+
+def is_ota_recall(event: dict) -> bool:
+    """判定单条召回是否为「纯软件 OTA 修复」（暂不纳入扣分）。
+
+    这是 OTA 判定的唯一真相源，供扣分与审计共用：
+      · 结构化字段 remedy 优先：'ota' → True；'physical'/'mixed'/... → False；
+      · remedy 缺失时文本兜底：措施段含 OTA 词且不含任何线下物理作业词 → True。
+    只检查「措施：」之后的文本，避免缺陷描述里的词误伤判定。
+    """
+    remedy = str(event.get("remedy") or "").strip().lower()
+    if remedy == "ota":
+        return True
+    if remedy in ("physical", "mixed", "hardware", "line", "offline", "物理", "线下", "混合"):
+        return False
+    reason = str(event.get("reason") or "")
+    if not any(w in reason for w in _OTA_WORDS):
+        return False
+    measures = reason.split("措施：")[-1] if "措施：" in reason else reason
+    return not any(w in measures for w in _PHYSICAL_WORDS)
+
 
 def _clamp(x: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, x))
@@ -65,12 +98,27 @@ def _recall_penalty(c: dict) -> tuple[float, str]:
     events = c.get("recall_events") or []
     if not events:
         return 0.0, "本期无结构化召回事件，不扣分"
-    pen = 0.0
+    # v10.19.0：纯软件 OTA 召回按用户口径暂不纳入扣分；物理/混合仍按严重度扣。
+    # 判定统一走 is_ota_recall（结构化 remedy 优先、文本兜底），不按车型名硬编码。
+    counted, ota_skipped = [], []
     for e in events:
+        if OTA_RECALL_EXCLUDED and is_ota_recall(e):
+            ota_skipped.append(e)
+        else:
+            counted.append(e)
+    pen = 0.0
+    for e in counted:
         sev = str(e.get("severity") or "normal").lower()
         pen += 1.5 if sev in ("high", "严重", "高危") else 0.5
     pen = min(3.0, pen)
-    return -pen, f"召回 {len(events)} 次，扣分 -{pen:g}"
+    note = f"召回 {len(counted)} 次计入"
+    if counted:
+        note += f"，扣分 -{pen:g}"
+    else:
+        note += "，不扣分"
+    if ota_skipped:
+        note += f"（另有 {len(ota_skipped)} 起纯软件OTA按口径不纳入）"
+    return -pen, note
 
 
 def score_one(c: dict, complaint: dict | None) -> dict:
@@ -102,6 +150,9 @@ def score_one(c: dict, complaint: dict | None) -> dict:
         "pph": c.get("ah_pph") if has_pph else None,
         "pph_usable": has_pph,
         "recall_events": c.get("recall_events") or [],
+        # v10.19.0：审计用——有几起纯软件OTA召回按口径不纳入（单一真相源判定）
+        "recall_ota_excluded": sum(1 for e in (c.get("recall_events") or [])
+                                   if OTA_RECALL_EXCLUDED and is_ota_recall(e)),
         "note": "；".join([comp_note, pph_note, rec_note]),
     }
     return detail
@@ -149,7 +200,10 @@ def report(cands: list[dict]) -> str:
         "「无投诉」只代表**没证据**（低置信），不等于质量好——见置信列；"
         "④ v9.7.0 温和平衡：投诉密度封顶 2.6→2.2、性质扣分上限 1.2→0.8；PPH 正向空间 0.6→1.0，让口碑有实质对冲但不反转（刷口碑仍难盖过高投诉）；"
         "⑤ v10.16.2 样本收缩：PPH 调整按 n/(n+50) 缩放，样本不足的车保持中性 8.0 不因「有数据」反被重罚——"
-        "小样本不等于质量差，置信列与样本数必须一起读。",
+        "小样本不等于质量差，置信列与样本数必须一起读；"
+        "⑥ v10.19.0 OTA 口径：召回按处置方式区分，**纯软件 OTA 修复（remedy=ota）暂不纳入扣分**，"
+        "线下物理/混合措施（加贴标识、换件等）仍按严重度扣。判定统一走 is_ota_recall（结构化字段优先、文本兜底），"
+        "不按车型硬编码；开关 OTA_RECALL_EXCLUDED 一处可切换。",
         "",
         f"> 覆盖：{cov['total']} 款；车质网投诉≥5 条 {cov['complaint_ge5']} 款；"
         f"PPH 可用 {cov['pph_usable']} 款；召回事件 {cov['recall']} 款；"

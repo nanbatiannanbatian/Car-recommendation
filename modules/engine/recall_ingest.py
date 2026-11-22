@@ -58,6 +58,8 @@ def events_for(model: str, lib: dict | None = None) -> list[dict]:
         kept.append({
             "id": e.get("id"), "date": e.get("date"), "count": e.get("count"),
             "reason": e.get("reason"), "severity": e.get("severity", "normal"),
+            # v10.19.0：透传处置方式，供 quality_score.is_ota_recall 判定是否扣分
+            "remedy": e.get("remedy"),
             "source_url": e.get("source_url"),
         })
     return kept
@@ -65,6 +67,8 @@ def events_for(model: str, lib: dict | None = None) -> list[dict]:
 
 def apply(cands: list[dict], lib: dict | None = None) -> dict:
     """原地注入 recall_events；返回审计统计。同输入重复执行结果一致（幂等）。"""
+    # v10.19.0：OTA 判定复用 quality_score 的单一真相源，避免两处判定漂移
+    from modules.engine.quality_score import is_ota_recall as _is_ota
     lib = lib if lib is not None else load_library()
     injected = []
     skipped = []
@@ -75,7 +79,8 @@ def apply(cands: list[dict], lib: dict | None = None) -> dict:
             c["recall_events"] = evs
             c["recall_source"] = lib.get("source")
             injected.append({"model": model, "n": len(evs),
-                             "ids": [e["id"] for e in evs]})
+                             "ids": [e["id"] for e in evs],
+                             "ota_skipped": sum(1 for e in evs if _is_ota(e))})
         # coverage_uncertain 的条目单独披露（有召回但批次不覆盖在售款）
         table = lib.get("events") or {}
         for m, all_evs in table.items():
@@ -95,6 +100,7 @@ def coverage(cands: list[dict]) -> dict:
 
 
 def selftest() -> int:
+    from modules.engine.quality_score import is_ota_recall as _is_ota
     lib = load_library()
     # 1) 特斯拉Model Y：1 high + 3 normal，全部覆盖
     tesla = events_for("特斯拉 Model Y", lib)
@@ -107,7 +113,13 @@ def selftest() -> int:
     assert len(events_for("零跑C11", lib)) == 1
     # 4) 未查到的车型留空
     assert events_for("丰田bZ5", lib) == []
-    # 5) 幂等 + 不直接打分
+    # 5) v10.19.0 remedy 透传 + OTA 判定：Model Y 4起中3起ota、1起mixed
+    assert sum(1 for e in tesla if _is_ota(e)) == 3, "Model Y 应有3起纯OTA"
+    g6 = events_for("小鹏G6", lib)[0]
+    c11 = events_for("零跑C11", lib)[0]
+    assert g6.get("remedy") == "physical" and not _is_ota(g6), "G6 物理标识应计入"
+    assert c11.get("remedy") == "mixed" and not _is_ota(c11), "C11 物理+OTA混合应计入"
+    # 6) 幂等 + 不直接打分
     cands = [{"model": "小鹏G6", "scores": {"quality": 8.0}},
              {"model": "特斯拉 Model Y", "scores": {"quality": 8.0}},
              {"model": "蔚来ES6", "scores": {"quality": 8.0}}]
@@ -116,6 +128,8 @@ def selftest() -> int:
     apply(cands, lib)
     assert [c["scores"]["quality"] for c in cands] == q1, "注入不得改分数"
     assert r1["injected"] == 2 and len(r1["skipped_uncertain"]) == 1, "ES6应跳过并披露"
+    my_audit = next(x for x in r1["injected_detail"] if x["model"] == "特斯拉 Model Y")
+    assert my_audit["ota_skipped"] == 3, f"Model Y OTA统计错误: {my_audit}"
     return 0
 
 
