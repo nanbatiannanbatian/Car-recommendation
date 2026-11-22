@@ -130,6 +130,7 @@ CASES = [
     ("BUG-105", "空间维从未接入配置驱动规则+后备厢容积被标仅披露不进分,车长与轴距重复计数", "v10.12.2"),
     ("BUG-106", "人工条目与自动条目存储层双副本:人工证据链(source/quote/note含口径冲突披露)被自动模板覆盖345字段", "v10.13.0"),
     ("BUG-107", "三电缺电池容量项+三电未拆电池/补能+配置匹配数字粘连致42款评分配置错配", "v10.15.0"),
+    ("BUG-108", "三电规则项堆满被clamp成10.0满分:65/427逐配置并列顶格,顶配失去区分度", "v10.15.9"),
 ]
 
 
@@ -3530,8 +3531,71 @@ def t107():
     return (f"三电电池容量进分(绝对kWh，价格归value防双计；kWh/万元仅披露) + 电池/电机/电控三组拆分(电机功率进分) + "
             f"配置匹配不粘连({checked} 款抽样通过) + scored_trim_ref 优先")
 
+
+def t108():
+    """三电满分回归（v10.15.9）：逐配置三电不得硬顶 10.0，且必须保序。
+
+    根因：7 项规则合计理论 12.1，旧实现 score_car 直接 clamp(0,10)，
+    65/427 个配置并列 10.0。修复只在 spec_score.score_powertrain 的
+    「规则项合计 → 最终分」处做边际递减映射，powertrain_parts 与
+    rule_adjust 的中位锚口径都不动（主榜名次不受影响）。
+    """
+    from modules.engine import spec_score as SS
+    from modules.engine import trim_board as TB
+
+    ss_src = _read("modules/engine/spec_score.py")
+    assert "POWERTRAIN_SOFT_SPAN" in ss_src and "math.tanh" in ss_src, \
+        "三电软上限实现缺失（回退到硬 clamp 会重现满分）"
+    ra_src = _read("modules/engine/rule_adjust.py")
+    assert "SS.powertrain_parts" in ra_src and "SS.score_powertrain" not in ra_src, \
+        "主榜规则增量必须继续读原始规则项，不能误接软上限分"
+    ta_src = _read("modules/engine/trim_annotate.py")
+    assert "soft_ceiling" in ta_src and "ANNOTATED_PT_CEILING" in ta_src, \
+        "页面逐配置表走 trim_annotate，必须共用软上限函数（只修 spec_score 不够）"
+
+    # 真实逐配置数据：先证明「不修就会顶格」，再证明「修后无满分且保序」
+    tdb = TB.load_trims()
+    raws, finals = [], []
+    for e in tdb.values():
+        for t in e.get("trims", []):
+            spec = TB.spec_from_trim(t, None)
+            raw = 6.0 + sum(v for _n, v, _t in SS.powertrain_parts(spec))
+            val, _why = SS.score_powertrain(spec)
+            raws.append(raw)
+            finals.append(val)
+    assert len(finals) >= 400, f"逐配置覆盖异常: {len(finals)}"
+    n_clipped = sum(1 for r in raws if r >= 10)
+    assert n_clipped >= 50, f"已不存在旧满分工况，回归前提失效: {n_clipped}"
+    assert max(finals) < 9.5, f"三电仍接近满分: max={max(finals)}"
+    assert sum(1 for v in finals if v >= 10) == 0, "逐配置三电仍有 10.0"
+
+    full = SS.score_powertrain({"platform_800v": True, "charge_10_80_min": 10,
+                                "cell_brand": "宁德时代", "kwh": 103,
+                                "range_km": 750, "max_power_kw": 320,
+                                "battery_cooling": "直冷"})[0]
+    mid = SS.score_powertrain({"platform_800v": True, "charge_10_80_min": 15,
+                               "cell_brand": "中创新航", "kwh": 75,
+                               "range_km": 650, "max_power_kw": 250,
+                               "battery_cooling": "液冷"})[0]
+    low = SS.score_powertrain({"charge_10_80_min": 40, "kwh": 55,
+                               "range_km": 480, "max_power_kw": 150})[0]
+    assert full > mid > low, f"软上限必须保序: {full}/{mid}/{low}"
+
+    # 页面逐配置表实际数据源：trim_annotate（人工基准 + delta），也必须无满分
+    from modules.engine import trim_annotate as TA
+    pool = json.load(open(os.path.join(HERE, "runs", "midsuv_bev_pool_202611_final.json"),
+                          encoding="utf-8"))
+    ann = TA.annotate_all(pool.get("candidates") or [], {})
+    av = [t["scores"]["powertrain"] for d in ann.values() for t in d.get("trims", [])]
+    assert len(av) >= 80, f"人工口径逐配置覆盖异常: {len(av)}"
+    assert max(av) < 9.5, f"页面逐配置三电仍接近满分: {max(av)}"
+    assert sum(1 for v in av if v >= 10) == 0, "页面逐配置三电仍有 10.0"
+    return (f"逐配置 {len(finals)} 款：旧口径 {n_clipped} 个会顶格 10.0 → "
+            f"现最高 {max(finals)}（页面人工口径 {max(av)}），满/中/低={full}/{mid}/{low} 保序，"
+            f"两条链路共用软上限、主榜规则增量口径不变")
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108]
 
 
 def run():

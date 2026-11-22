@@ -23,6 +23,7 @@
 """
 import argparse
 import json
+import math
 import os
 import re
 import statistics
@@ -328,13 +329,50 @@ def powertrain_group_parts(s) -> dict:
     return out
 
 
+# ── 三电软上限（2026-11-22，用户「有些车型三电满分太夸张」）──────────────────
+# 【根因】三电规则项从 6 项扩到 7 项（新增电池容量 +0.8 / 电机功率 +1.2 / 冷却 +0.3）
+# 后，理论合计上限 6.0+6.1=12.1。427 个逐配置样本里有 65 个原始分 ≥10，
+# score_car 的 clamp(0,10) 把它们全压成 10.0——顶配之间丧失区分度，且
+# 「硬件堆满 = 满分」与业内认知不符（额定功率/效率 MAP/真实快充倍率/耐久都没进分）。
+# 【改法】只改「规则项合计 → 最终分」的映射，不改 powertrain_parts（唯一规则出处），
+# 也不改 rule_adjust 的逐项中位锚（主榜增量口径原样保留）：
+#     score = 6.0 + 3.5 × tanh(Σ项 / 3.5)
+# 单调不减，理论渐近 9.5，给实测达成率/能效修正/体验证据留 0.5 余量。
+# 为什么不用「正项按比例压到 +3.0」：那会让所有顶配并列 9.0，仍是无区分度的天花板。
+POWERTRAIN_BASE = 6.0
+POWERTRAIN_SOFT_SPAN = 3.5
+
+
+def soft_ceiling(score: float, cap: float, knee: float) -> float:
+    """单调软上限：knee 以下原样，knee 以上渐近 cap（永远不到 cap）。
+
+    两条逐配置打分链路共用这一个函数——spec_score 的规则项合计与
+    trim_annotate 的人工基准+delta 都曾各自 clamp 到 10.0 制造满分并列。
+    """
+    if score <= knee:
+        return score
+    span = cap - knee
+    return knee + span * math.tanh((score - knee) / span)
+
+
+def powertrain_soft_score(raw: float) -> float:
+    """三电规则项合计 → 0–10 分；边际递减、单调，渐近 9.5 而非硬顶 10.0。"""
+    return soft_ceiling(POWERTRAIN_BASE + raw,
+                        POWERTRAIN_BASE + POWERTRAIN_SOFT_SPAN, POWERTRAIN_BASE)
+
+
 def score_powertrain(s):
-    """三电：补能速度 > 电池容量 > 电芯品牌。"""
-    base, why = 6.0, []
+    """三电：补能速度 > 电池容量 > 电芯品牌；合计走软上限，不硬顶满分。"""
+    raw, why = 0.0, []
     for _name, v, desc in powertrain_parts(s):
-        base += v
+        raw += v
         why.append(desc)
-    return base, why
+    score = powertrain_soft_score(raw)
+    why.append(
+        f"硬件项合计 {raw:+.2f}，边际递减映射 {score - POWERTRAIN_BASE:+.2f}"
+        f"（软上限 {POWERTRAIN_BASE + POWERTRAIN_SOFT_SPAN:.1f}，实测/达成率另行计入）"
+    )
+    return round(score, 2), why
 
 
 def control_parts(s):
@@ -602,6 +640,21 @@ def selftest() -> int:
     va = sum(v for n, v, _ in cap_a if n == "电池容量")
     vb = sum(v for n, v, _ in cap_b if n == "电池容量")
     assert va == vb, f"电池容量项不应含价格分母（价格归 value），15万={va} 35万={vb}"
+    # ⑥ 三电软上限（用户「三电满分太夸张」）：硬件项堆满也不能硬顶 10.0，
+    #    且必须保序（顶配分 > 中配分 > 低配分）。
+    full = score_powertrain({"platform_800v": True, "charge_10_80_min": 10,
+                             "cell_brand": "宁德时代", "kwh": 103, "range_km": 750,
+                             "max_power_kw": 320, "battery_cooling": "直冷"})[0]
+    mid = score_powertrain({"platform_800v": True, "charge_10_80_min": 15,
+                            "cell_brand": "中创新航", "kwh": 75, "range_km": 650,
+                            "max_power_kw": 250, "battery_cooling": "液冷"})[0]
+    low = score_powertrain({"charge_10_80_min": 40, "kwh": 55, "range_km": 480,
+                            "max_power_kw": 150})[0]
+    assert full < 9.5, f"满配三电不应到 10.0 硬顶，实际 {full}"
+    assert full > mid > low, f"软上限必须保序：full={full} mid={mid} low={low}"
+    assert powertrain_soft_score(0.0) == POWERTRAIN_BASE, "零项应为基线 6.0"
+    assert powertrain_soft_score(3.0) > powertrain_soft_score(2.0) > POWERTRAIN_BASE, \
+        "软上限必须单调递增"
     return 0
 
 

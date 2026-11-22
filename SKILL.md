@@ -13,7 +13,7 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 10.15.8
+version: 10.15.9
 author: "nanbatiannanbatian"
 ---
 
@@ -3480,3 +3480,19 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
 - `adjust_budget.py` 纳入 safety 预算（safety: {airbags:0.3, ground_clearance:0.3}），并补历史字段兼容读取（空气囊模块写 airbag_delta、审计原读 airbags_adjust，补 airbag_delta 兼容）。
 
 **验收**：gc selftest 12/12（分档/幂等/单调性/数据校验）、bug 107/107（t107 加 6 条离地间隙断言 + 反向注入验证）、比较器 20/20、结构 16/16、derive 4/4、render selftest、adjust_budget selftest 全绿。v12 榜单（runs/midsuv_bev_202611_v12）：18/20 覆盖、5 款调整、5 款冲突取低、2 款待核；海狮06EV 因无碰撞成绩触发单调性保护 +0.3→0（报告如实披露）；基准 top3「极氪7X/海狮06EV/阿维塔07」不变、T1 极氪7X。
+
+## v10.15.9 · 三电满分根因修复（用户："有些车型三电满分太夸张，不可能完全满分"）
+
+用户指出逐配置表里一批车三电显示 10.0。查证发现**两条链路各自硬顶**，只修一条必然退化：
+
+- `spec_score.score_powertrain`：7 项规则合计理论 6.0+6.1=12.1，427 个逐配置样本中 65 个原始分 ≥10，`score_car` 的 `clamp(0,10)` 把它们全压成 10.0。
+- `trim_annotate.annotate_all`（**页面逐配置表真正的数据源**）：人工基准 9.0~9.2 加配置 delta 后同样 `clamp(0,10)`，极氪7X 103kWh、海狮06EV 多档全部顶格；51 个页面配置显示 10.0。
+
+**根因修法（不是改显示层）**：在 `spec_score` 新增唯一软上限函数 `soft_ceiling(score, cap, knee)`（knee 以下原样、以上 `tanh` 单调压缩、渐近 9.5），两条链路共用：
+- `score_powertrain`：基线 6.0 + `soft_ceiling`，渐近 9.5（留 0.5 给实测/达成率/能效修正）。
+- `trim_annotate`：knee=8.0、cap=9.5，只压三电；delta 本身不改，写入 `score_cap` 审计字段；最优配置排序因函数单调而不变。
+- `rule_adjust` 主榜增量仍读原始 `powertrain_parts`，口径不动；不靠压显示数字糊弄。
+
+**顺带根因修复**：`score_fingerprint` 原用 `HERE/f` 哈希的是根目录 10 行薄壳转发文件，改了真实现（modules/engine/*）指纹纹丝不动，"老分数作废"门禁失效。改为 `paths.src(f)` 解析真实现。
+
+**验收**：spec_score / trim_annotate / score_fingerprint selftest 全绿；bug_regression 108/108（t108 两条链路合计 427+98 个逐配置样本，反向注入验证 103/103 检出）。v13 榜单：逐配置三电 10.0 由 51 个降为 **0 个**、最高 9.3（规则链路 9.29），T1 仍极氪7X；因主榜总分取"最优配置分"，各车加权分随三电压缩小幅下调、T2 内位次微调，档位集合不变。

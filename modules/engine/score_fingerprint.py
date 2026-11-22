@@ -58,10 +58,13 @@ def compute_fingerprint(config_path: str | None = None) -> str:
     # 只有打分代码文件内容或配置权重变化才触发"老分数作废"。
     payload = {"code": {}}
     for f in SCORE_CODE_FILES:
-        p = os.path.join(HERE, f)
+        # v10.15.9：原来直接拼 HERE/f，读到的是根目录 10 行薄壳转发文件——
+        # 真正实现早迁到 modules/engine/ 了，于是改了打分代码指纹却纹丝不动，
+        # 「老分数作废」门禁形同虚设。统一走 paths.src() 解析真实现。
+        p = paths.src(f)
         payload["code"][f] = (
             hashlib.sha256(open(p, "rb").read()).hexdigest()
-            if os.path.exists(p) else "MISSING"
+            if p.exists() else "MISSING"
         )
     if config_path and os.path.exists(config_path):
         cfg = json.load(open(config_path, encoding="utf-8"))
@@ -107,6 +110,10 @@ def check(cands_path: str, config_path: str | None = None) -> dict:
 def selftest() -> int:
     fp = compute_fingerprint()
     assert len(fp) == 16 and skill_version(), f"指纹/版本异常: {fp} / {skill_version()}"
+    # v10.15.9：必须哈希真实现而不是根目录薄壳，否则改代码不触发过期门禁
+    for f in SCORE_CODE_FILES:
+        p = paths.src(f)
+        assert p.exists() and paths.MODULES in p.parents, f"指纹源文件解析到薄壳/缺失: {f} -> {p}"
     # 改配置应改变指纹
     cfg1 = {"dimensions": [{"key": "value", "weight": 0.1}]}
     cfg2 = {"dimensions": [{"key": "value", "weight": 0.2}]}

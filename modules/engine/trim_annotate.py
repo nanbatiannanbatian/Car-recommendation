@@ -37,6 +37,13 @@ TRIMS = str(paths.cat("trims.json"))
 W = {"powertrain": 0.18, "safety": 0.162, "adas": 0.135, "space": 0.126,
      "value": 0.117, "control": 0.09, "cabin": 0.09, "quality": 0.1}
 
+# v10.15.9：页面逐配置表走本模块（人工基准 + delta），不走 spec_score.score_trim。
+# 旧实现 clamp(0,10) 让 65/427 个配置并列三电 10.0（极氪7X 9.0+1.0、海狮06EV
+# 9.2+0.8…），顶配失去区分度。改用 spec_score.soft_ceiling 的**同一函数**：
+# 8.0 以下不动、8.0 以上单调压缩、渐近 9.5，给"参数满分≠体验满分"留余量。
+ANNOTATED_PT_CEILING = 9.5
+ANNOTATED_PT_KNEE = 8.0
+
 
 def load_trims(path: str | None = None) -> dict[str, dict]:
     """读逐配置事实。**统一走 trims_store**（人工库 + 自动库合并读视图）。
@@ -298,6 +305,20 @@ def annotate_all(cands: list[dict], cfg: dict) -> dict:
             sc = dict(base)
             for d in ds:
                 sc[d["dim"]] = round(max(0, min(10, sc.get(d["dim"], 8) + d["delta"])), 2)
+            # 三电软上限：与 spec_score 共用同一函数，消除逐配置 10.0 满分并列。
+            # 只压三电，不动其他维；仅记录被压幅度，不改 delta 本身（delta 仍是客观差异）。
+            from modules.engine import spec_score as _SS
+            _pt_raw = sc.get("powertrain")
+            _pt_cap = None
+            if isinstance(_pt_raw, (int, float)):
+                _pt_soft = round(_SS.soft_ceiling(float(_pt_raw),
+                                                  ANNOTATED_PT_CEILING,
+                                                  ANNOTATED_PT_KNEE), 2)
+                if _pt_soft < _pt_raw:
+                    _pt_cap = {"dim": "powertrain", "before": round(float(_pt_raw), 2),
+                               "after": _pt_soft, "ceiling": ANNOTATED_PT_CEILING,
+                               "knee": ANNOTATED_PT_KNEE}
+                    sc["powertrain"] = _pt_soft
             conf = min((d["conf"] for d in ds), key=lambda x: CONF_ORDER[x]) if ds else "high"
             # v9.7.35：占位基准已由 resolve_ref 主动解析成真实代表配置，不再全车降 low
             # （旧逻辑把所有配置打 low→主榜低置信刷屏=BUG-043）。基准偏差只在 ref_basis 说明，
@@ -317,6 +338,7 @@ def annotate_all(cands: list[dict], cfg: dict) -> dict:
                 "charge_power_kw": t.get("charge_power_kw"), "swap": t.get("swap"),
                 "scores": sc, "total": weighted_total(sc), "power_score": pp_score,
                 "confidence": conf, "deltas": ds,
+                "score_cap": _pt_cap,
                 "note": t.get("note", ""), "score_source": "annotated",
             })
         valid = [t for t in trims if t.get("total") is not None]
@@ -355,6 +377,16 @@ def selftest() -> int:
             bad.append(f"845三电应高于610: {t845['scores']['powertrain']} vs {t610['scores']['powertrain']}")
         if t845["total"] <= t610["total"]:
             bad.append("845总分应高于610")
+    # v10.15.9：人工基准再高（9.8）也不许逐配置三电顶到 10.0；低分配置不动。
+    hot_base = {"powertrain": 9.8, "safety": 8.2, "adas": 8.6, "space": 8.0,
+                "value": 9.4, "control": 8.8, "cabin": 8.6, "quality": 8.0}
+    hot = annotate_all([{"model": "MG 07 纯电", "scores": hot_base}], cfg)
+    hot_vals = [t["scores"]["powertrain"] for t in (hot.get("MG 07 纯电") or {}).get("trims", [])]
+    if not hot_vals or max(hot_vals) >= ANNOTATED_PT_CEILING:
+        bad.append(f"人工口径三电仍顶格: max={max(hot_vals) if hot_vals else None}")
+    from modules.engine import spec_score as _SS
+    if abs(_SS.soft_ceiling(7.5, ANNOTATED_PT_CEILING, ANNOTATED_PT_KNEE) - 7.5) > 1e-9:
+        bad.append("软上限不应改动 knee 以下的分数")
     if bad:
         print("[selftest FAIL]", bad)
         return 1
