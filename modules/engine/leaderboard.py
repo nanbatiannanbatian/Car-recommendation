@@ -926,6 +926,17 @@ def tier_rules(cfg: dict) -> dict:
         # 只拦第一档，绝不进第三档：名次不稳是算法精度问题，不是产品硬伤。
         "t1_max_norm_swing": int(t.get("t1_max_norm_swing", 2)),
         "norm_audit_enabled": bool(t.get("norm_audit_enabled", True)),
+        # v10.30.0：水桶车稳健通道——全维≥min_dim 且名次极稳(区间≤max_span、均值≤max_mean)，
+        # 其余第一档门槛全过时，即使没进前三也入第一档（标"安心首选·水桶无短板"）。
+        # 依据 VIKOR 妥协解(最小化最大遗憾保护均衡车)+SMAA 名次稳健性+业内对无短板的认可。
+        # 默认关闭，只有配置显式启用的品类才走；只扩清单不改分数/权重/名次。
+        "t1_robust": {
+            "enabled": bool((t.get("t1_robust") or {}).get("enabled", False)),
+            "min_dim": float((t.get("t1_robust") or {}).get("min_dim", 8.0)),
+            "max_rank_span": int((t.get("t1_robust") or {}).get("max_rank_span", 5)),
+            "max_rank_mean": float((t.get("t1_robust") or {}).get("max_rank_mean", 7.0)),
+            "label": str((t.get("t1_robust") or {}).get("label") or "安心首选·水桶无短板"),
+        },
     }
 
 
@@ -1081,6 +1092,7 @@ def tier_report(cands: list[dict], cfg: dict, weights: list[float] | None = None
                "trim": (c.get("scored_trim_used") or trim_name(c) or "")}
 
         blockers = []
+        rank_blockers = []  # v10.30.0：只记「进前三」类卡点，稳健通道只豁免这两条、其余门槛不放水
         # v9.7.43：第一档用家族去重命中率（同家族算法算1票，防MG07那种6票全抱团虚高）
         _ff = a.get("family_freq")
         _ff_hits = a.get("family_hits")
@@ -1097,9 +1109,11 @@ def tier_report(cands: list[dict], cfg: dict, weights: list[float] | None = None
             _pass_hit = _ff >= rules["t1_min_method_freq"]
         if not _pass_hit:
             _need = f"{_min_hits}/{_ff_n}票" if _min_hits is not None else f"{rules['t1_min_method_freq']:.0%}"
-            blockers.append(f"独立算法家族命中 {_ff_hits}/{_ff_n}={_ff:.0%}<{_need}")
+            _b = f"独立算法家族命中 {_ff_hits}/{_ff_n}={_ff:.0%}<{_need}"
+            blockers.append(_b); rank_blockers.append(_b)
         if a["topk_freq"] < rules["t1_min_joint_freq"]:
-            blockers.append(f"全情景命中 {a['topk_freq']:.0%}<{rules['t1_min_joint_freq']:.0%}")
+            _b = f"全情景命中 {a['topk_freq']:.0%}<{rules['t1_min_joint_freq']:.0%}"
+            blockers.append(_b); rank_blockers.append(_b)
         # 2026-11-21：拆开两条，不再混写。原来是一句「证据 B 未达 A（无权威碰撞成绩）」，
         # 把「综合证据等级」和「碰撞实锤」两件事塞进一句。
         # v10.28.0 根因修：此前这里展示用原始人工等级 ev、判据用降级后的 ev_for_t1，
@@ -1165,14 +1179,41 @@ def tier_report(cands: list[dict], cfg: dict, weights: list[float] | None = None
                 f"不满足「换算法也稳」，不进第一档；这不是产品缺陷，不降第三档")
         rec["t1_blockers"] = blockers
 
+        # v10.30.0：水桶车稳健通道——VIKOR 妥协解/SMAA 名次稳健性 + 业内对"没有明显短板"的认可。
+        # 全8维≥min_dim(无短板) + 名次区间≤max_span且均值≤max_mean(极稳) + 无硬风险 +
+        # 除「进前三」外的其余第一档门槛全过（证据A/碰撞实锤/月销/归一化稳），
+        # 则即使没进前三也入第一档。只豁免 rank_blockers 两条，不放水任何质量/证据门槛。
+        _rb = rules["t1_robust"]
+        _non_rank_blockers = [b for b in blockers if b not in rank_blockers]
+        _sc_all = (by.get(nm, {}).get("scores") or {})
+        _dims_all = [_sc_all.get(d["key"]) for d in dims]
+        _dims_ok = all(isinstance(v, (int, float)) and v >= _rb["min_dim"] for v in _dims_all)
+        _span = a.get("rank_span") or (0, 99)
+        _span_ok = (_span[1] - _span[0]) <= _rb["max_rank_span"]
+        _mean = a.get("rank_mean")
+        _mean_ok = _mean is not None and _mean <= _rb["max_rank_mean"]
+        _robust_pass = bool(
+            _rb["enabled"] and not risks and not _non_rank_blockers
+            and _dims_ok and _span_ok and _mean_ok
+            and rank_blockers)   # 必须确实是被"进前三"卡住，否则走正常路径
+        rec["robust_t1"] = _robust_pass
+        if _robust_pass:
+            rec["robust_t1_note"] = (
+                f"稳健通道·{_rb['label']}：全{len(dims)}维≥{_rb['min_dim']:.1f}、"
+                f"名次区间{_span[0]}–{_span[1]}（跨度≤{_rb['max_rank_span']}）、均值第{_mean:.1f}；"
+                f"除「进前三」外其余第一档门槛全过，按 VIKOR 妥协解/SMAA 稳健性纳入")
+
         if risks:
             tiers["T3"].append(rec)
-        elif not blockers:
+        elif not blockers or _robust_pass:
             if ev_soft:
                 rec.setdefault("t1_notes", []).extend(ev_soft)
             # v9.7.43：非国内体系碰撞成绩的含金量提示（不阻断T1，只是披露）
             if crash_basis_note:
                 rec.setdefault("t1_notes", []).append(crash_basis_note)
+            if _robust_pass:
+                rec.setdefault("t1_notes", []).append(rec["robust_t1_note"])
+                rec["t1_blockers"] = rank_blockers  # 保留卡点说明但标注已由稳健通道覆盖
             tiers["T1"].append(rec)
         else:
             if ev_soft:
@@ -1236,6 +1277,12 @@ def tier_report(cands: list[dict], cfg: dict, weights: list[float] | None = None
     L.append(f"| **第一档** | {_hit_cond}（10算法按原理去重成6家族、同家族只算1票）、"
              f"全情景命中 ≥{rules['t1_min_joint_freq']:.0%}、证据 ∈ {rules['t1_evidence']}、"
              f"趋势月销 ≥{int(rules['t1_min_sales']):,}{ab_cond}{norm_cond} | 换算法换权重都在前列，不用取舍 |")
+    _rb_rpt = rules["t1_robust"]
+    if _rb_rpt["enabled"]:
+        L.append(f"| **第一档·稳健通道** | 全{len(dims)}维 ≥{_rb_rpt['min_dim']:.1f}（无短板）、"
+                 f"名次区间跨度 ≤{_rb_rpt['max_rank_span']} 且均值 ≤{_rb_rpt['max_rank_mean']}、"
+                 f"其余第一档门槛（证据/碰撞/月销/归一化）全过 | 不用取舍——"
+                 f"均衡无短板型，依据 VIKOR 妥协解/SMAA 稳健性（{_rb_rpt['label']}） |")
     L.append("| **第二档** | 不触发第三档风险，但未达第一档 | 强弱项分明，取舍交给滑杆 |")
     L.append(f"| **第三档** | 硬风险：停产 / 无交付 / 月销极低 / 营运为主 "
              f"<{int(rules['risk_low_sales']):,} / 人工标注硬伤 | 不是车差，是现在没资格被推荐 |")
@@ -1267,6 +1314,8 @@ def tier_report(cands: list[dict], cfg: dict, weights: list[float] | None = None
             _g = crossboard.get(r["model"])
             if _g and _g != tier_cn:
                 bits.append(f"全榜{_g}")
+        if r.get("robust_t1"):
+            bits.append(f"★{rules['t1_robust']['label']}（全维无短板+名次极稳，稳健通道入档）")
         return " ｜ ".join(bits)
 
     # 生命周期单列一节：这是「销量下滑」与「车不行」的分界线，必须让读者先看到

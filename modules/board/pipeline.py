@@ -1084,6 +1084,11 @@ def main():
                                               "blockers": _x["t1_blockers"],
                                               "sales": _x.get("sales")}
         summary.setdefault("t1_blockers", {})[label] = _blockers
+        # v10.30.0：稳健通道入第一档的车（水桶无短板），供页面给徽标说明
+        summary.setdefault("robust_t1", {})[label] = {
+            x["model"]: x.get("robust_t1_note") or ""
+            for _tk in ("T1",) for x in (_tr.get("detail") or {}).get(_tk, [])
+            if x.get("robust_t1")}
         summary["review"][label] = L.review_report(passed, cfg, wv)["verdict"]
 
     # 1b 被动安全配置事实列（全局一节，逐条带来源；不计入加权）
@@ -1227,6 +1232,11 @@ def main():
                 # v9.7.10：页面与报告一致——只把通过闸门的候选（有档位的）传给渲染，
                 # 否则被生命周期闸门淘汰的停产车（如秦L EV）会出现在主榜却没档位。
                 _passed = set(_tiers_v2.keys())
+                # v9.7.10：只把通过闸门的候选传给渲染。
+                # v10.30.0 注：页面维度分用原始候选（车系分），判档用配置锚定分——
+                # 二者存在落差，但页面总分/名次经 board_v2 另一路径已与 report.md 对齐，
+                # 强行改用 graded_by_model 会让 HTML 总分与 report 打架（实测 23/28 变动），
+                # 故此处保持原取数，维度落差作为已知边界另案处理。
                 cands_for_html = [c for c in cands if c.get("model") in _passed] if _passed else cands
                 # v10.9.0：电池来源联网核验（research 唯一出口）——事实库缺电芯的车
                 # 逐台联网查线索；查不到/仅线索的写入候选 _cell_verify，页面电池来源栏

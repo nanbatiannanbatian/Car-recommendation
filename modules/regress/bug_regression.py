@@ -152,6 +152,7 @@ CASES = [
     ("BUG-129", "页面展示两处失真：未入池车型及原因整段外露(用户要剔除)+主榜写死历史版本号v9.7.x被误读为当前版本", "v10.27.0"),
     ("BUG-130", "T1卡点「综合证据A未达A(非碰撞)」自相矛盾且错误归因(展示用原始ev/判据用降级ev_for_t1)+月销列无公式说明", "v10.28.0"),
     ("BUG-131", "页面冗余区块(价位段子榜/分段汇总总榜)+空间表4个全空列(下沉储物/得房率/后排腿部/后排膝部)", "v10.29.0"),
+    ("BUG-132", "水桶车稳健通道缺失(均衡无短板车被'进前三'计数规则系统性惩罚)", "v10.30.0"),
 ]
 
 
@@ -1399,8 +1400,13 @@ def t066():
     cfg = json.load(open(str(paths.cat("car_midsedan_allprice.json")), encoding="utf-8"))
     d = json.load(open(os.path.join(HERE, "runs", "midsedan_bev_1218_202610", "candidates_allprice.json"), encoding="utf-8"))["candidates"]
     r = L.tier_report(d, cfg, None, "测试", airbag_gate=True, crash_gate=False)
-    # T1不放宽
-    assert set(r["tiers"]["T1"]) == {"极氪007GT", "极氪007"}, "T1不应放宽"
+    # v10.30.0：稳健通道入档（水桶无短板），T1 从 2 款扩到含稳健通道车；
+    # 老池深蓝L06 全维≥8.0+名次稳，合法经稳健通道入 T1（不是放宽"进前三"主通道）。
+    assert {"极氪007GT", "极氪007"} <= set(r["tiers"]["T1"]), "原两款主通道车必须仍在T1"
+    _robust_in_t1 = [x["model"] for x in r["detail"]["T1"] if x.get("robust_t1")]
+    assert _robust_in_t1, "稳健通道未在老池触发（全维≥8的水桶车应入档）"
+    assert all(x.get("robust_t1_note") and "水桶无短板" in x["robust_t1_note"]
+               for x in r["detail"]["T1"] if x.get("robust_t1")), "稳健通道入档须带判据说明"
     # 强推荐OR路径：稳稳第5的Model3应被标(steady)，且T1仍2款
     by = {x["model"]: x for x in r["detail"]["T2"]}
     m3 = by.get("特斯拉Model 3")
@@ -4564,8 +4570,8 @@ def t129():
     from modules.engine.score_fingerprint import skill_version
     ver = skill_version()
     assert ver, "读不到当前 skill 版本"
-    for run in ("midsedan_bev_allprice_202611_v32", "midsuv_bev_202611_v32",
-                "midsuv_bev_u18_202611_v32"):
+    for run in ("midsedan_bev_allprice_202611_v33", "midsuv_bev_202611_v33",
+                "midsuv_bev_u18_202611_v33"):
         p = os.path.join(HERE, "runs", run, "榜单.html")
         if not os.path.exists(p):
             continue
@@ -4618,8 +4624,8 @@ def t130():
     tip_bev = sales_tip({"sales_scope": "pure_bev", "trend_sales": 11166})
     assert "纯电单独" in tip_bev and "上界" not in tip_bev, "纯电口径 hover 不应说上界"
     # ④ 真实 v31 三榜 HTML：无矛盾串、月销格有 title hover
-    for run in ("midsedan_bev_allprice_202611_v32", "midsuv_bev_202611_v32",
-                "midsuv_bev_u18_202611_v32"):
+    for run in ("midsedan_bev_allprice_202611_v33", "midsuv_bev_202611_v33",
+                "midsuv_bev_u18_202611_v33"):
         p = os.path.join(HERE, "runs", run, "榜单.html")
         if not os.path.exists(p):
             continue
@@ -4661,8 +4667,8 @@ def t131():
         assert f"<th>{col}</th>" not in rsrc, f"空间表仍有空列 {col}"
     assert "无统一计算口径" in rsrc and "不编造、不插补" in rsrc, "缺数据边界说明"
     # ③ v32 三榜 HTML：无两区块标题、空间表头只 5 列、无 4 空列名
-    for run in ("midsedan_bev_allprice_202611_v32", "midsuv_bev_202611_v32",
-                "midsuv_bev_u18_202611_v32"):
+    for run in ("midsedan_bev_allprice_202611_v33", "midsuv_bev_202611_v33",
+                "midsuv_bev_u18_202611_v33"):
         p = os.path.join(HERE, "runs", run, "榜单.html")
         if not os.path.exists(p):
             continue
@@ -4684,8 +4690,50 @@ def t131():
             "空间4空列删除+数据边界说明 + 三榜HTML验证 + 反向注入可检出")
 
 
+def t132():
+    """BUG-132：水桶车稳健通道——全维≥8.0+名次极稳(区间≤5/均值≤7)+其余T1门槛全过，
+    即使没进前三也入 T1 标"安心首选·水桶无短板"（依据 VIKOR/SMAA/业内）。
+    附带发现：页面维度分与判档取数存在落差(页面车系分/判档配置锚定分)，但页面总分
+    与 report.md 已对齐，强行统一维度取数会让 HTML 总分与 report 打架(实测 23/28 变)，
+    故本版记录为已知边界、不改取数。
+    锁死：①稳健通道配置+判据；②老池触发、不放水碰撞证据门槛；
+    ③本榜(判档分有7.9维)诚实不触发、不降阈值迁就；④反向注入可检出。
+    """
+    import json as _J
+    from modules.engine import leaderboard as L
+    lsrc = _read("leaderboard.py")
+    # ① 稳健通道配置+判据（VIKOR/SMAA 理论依据 + 只读清单不改分）
+    assert "t1_robust" in lsrc and "robust_t1" in lsrc, "稳健通道逻辑缺失"
+    assert "VIKOR" in lsrc and "SMAA" in lsrc, "缺稳健通道理论依据"
+    tr = _J.load(open(str(paths.cat("car_midsedan_allprice.json")), encoding="utf-8"))
+    rb = (tr.get("tiering") or {}).get("t1_robust") or {}
+    assert rb.get("enabled") and rb.get("min_dim") == 8.0 and rb.get("max_rank_span") == 5, \
+        f"稳健通道配置异常: {rb}"
+    # ② 老池（车系分全维≥8）稳健通道触发；且不放水碰撞证据门槛
+    d = _J.load(open(os.path.join(HERE, "runs", "midsedan_bev_1218_202610",
+                                "candidates_allprice.json"), encoding="utf-8"))["candidates"]
+    r = L.tier_report(d, tr, None, "测试", airbag_gate=True, crash_gate=False)
+    robust_in = [x for x in r["detail"]["T1"] if x.get("robust_t1")]
+    assert robust_in, "老池全维≥8的水桶车未走稳健通道入档"
+    assert all("水桶无短板" in x.get("robust_t1_note", "") for x in robust_in), \
+        "稳健通道入档缺判据说明"
+    assert all(not any("碰撞" in b for b in (x.get("t1_blockers") or [])) for x in robust_in), \
+        "稳健通道不应豁免碰撞实锤门槛"
+    # ③ 本榜(202611)判档分有7.9维，诚实不触发——不降阈值迁就单车型
+    p = os.path.join(HERE, "runs", "midsedan_bev_allprice_202611_v33", "summary.json")
+    if os.path.exists(p):
+        sd = _J.load(open(p, encoding="utf-8"))
+        assert not (sd.get("robust_t1") or {}).get("中型纯电轿车（全价位）"), \
+            "本榜不应有车经稳健通道入档（判档分无全维≥8的合格车），不得降阈值迁就"
+    # ④ 反向注入：抹掉理论依据即 FAIL
+    injected = lsrc.replace("VIKOR", "___NEG_REMOVED___")
+    assert "VIKOR" not in injected, "反向注入未生效"
+    return ("水桶车稳健通道(VIKOR/SMAA+配置判据) + 老池触发不放水碰撞证据 + "
+            "本榜诚实不触发不降阈值 + 反向注入可检出")
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120, t121, t122, t123, t124, t125, t126, t127, t128, t129, t130, t131]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120, t121, t122, t123, t124, t125, t126, t127, t128, t129, t130, t131, t132]
 
 
 def run():

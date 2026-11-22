@@ -774,12 +774,20 @@ document.addEventListener('change',function(ev){
         names = {"T1": "第一档 · 可直接买", "T2": "第二档 · 按偏好取舍", "T3": "第三档 · 证据不足/暂缓"}
         _tcb = (summary or {}).get("tier_crossboard") or {}
         _tcn = {"T1": "第一档", "T2": "第二档", "T3": "第三档"}
+        _robust = {}
+        for _v in ((summary or {}).get("robust_t1") or {}).values():
+            if isinstance(_v, dict):
+                _robust.update(_v)
         # v10.20.0：只给跨榜变档的车加「全榜第X档」小标；判档仍以本榜 tiers 为准
         for k in ("T1", "T2", "T3"):
             models = tiers.get(k) or []
             lis = []
             for m in models:
                 _nm = e(m)
+                # v10.30.0：稳健通道入档的水桶车标「安心首选」（hover 给判据）
+                if k == "T1" and m in _robust:
+                    _nm += (f'<b class="strong-main" title="{e(_robust[m])}">'
+                            '★水桶无短板</b>')
                 _g = _tcb.get(m)
                 if _g and _g != _tcn[k]:
                     _nm += ('<span class="xboard-tier" title="档位按本榜候选池判定，'
