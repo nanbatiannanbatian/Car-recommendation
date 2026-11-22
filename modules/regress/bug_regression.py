@@ -151,6 +151,7 @@ CASES = [
     ("BUG-128", "三电阈值配置化后无复核到期信号+车型参数/申报库/候选池无统一新鲜度体检，2027三电升级后静默用旧档", "v10.26.0"),
     ("BUG-129", "页面展示两处失真：未入池车型及原因整段外露(用户要剔除)+主榜写死历史版本号v9.7.x被误读为当前版本", "v10.27.0"),
     ("BUG-130", "T1卡点「综合证据A未达A(非碰撞)」自相矛盾且错误归因(展示用原始ev/判据用降级ev_for_t1)+月销列无公式说明", "v10.28.0"),
+    ("BUG-131", "页面冗余区块(价位段子榜/分段汇总总榜)+空间表4个全空列(下沉储物/得房率/后排腿部/后排膝部)", "v10.29.0"),
 ]
 
 
@@ -4563,8 +4564,8 @@ def t129():
     from modules.engine.score_fingerprint import skill_version
     ver = skill_version()
     assert ver, "读不到当前 skill 版本"
-    for run in ("midsedan_bev_allprice_202611_v31", "midsuv_bev_202611_v31",
-                "midsuv_bev_u18_202611_v31"):
+    for run in ("midsedan_bev_allprice_202611_v32", "midsuv_bev_202611_v32",
+                "midsuv_bev_u18_202611_v32"):
         p = os.path.join(HERE, "runs", run, "榜单.html")
         if not os.path.exists(p):
             continue
@@ -4617,8 +4618,8 @@ def t130():
     tip_bev = sales_tip({"sales_scope": "pure_bev", "trend_sales": 11166})
     assert "纯电单独" in tip_bev and "上界" not in tip_bev, "纯电口径 hover 不应说上界"
     # ④ 真实 v31 三榜 HTML：无矛盾串、月销格有 title hover
-    for run in ("midsedan_bev_allprice_202611_v31", "midsuv_bev_202611_v31",
-                "midsuv_bev_u18_202611_v31"):
+    for run in ("midsedan_bev_allprice_202611_v32", "midsuv_bev_202611_v32",
+                "midsuv_bev_u18_202611_v32"):
         p = os.path.join(HERE, "runs", run, "榜单.html")
         if not os.path.exists(p):
             continue
@@ -4635,8 +4636,56 @@ def t130():
             "score_rows透传口径 + 三榜HTML验证 + 反向注入可检出")
 
 
+def t131():
+    """BUG-131：①用户要求 HTML 去掉「价位段子榜」「分段汇总总榜」两个区块（连根删注册表+
+    渲染分支，数据仍留 board_v2_data.json 供跨价位提示判 multi_band）；
+    ②空间表 4 列（下沉储物/得房率/后排腿部/后排膝部）联网核实是数据边界——
+    官方参数页无此字段、得房率系营销话术，全空列误导，改为只展示有官方数据的列。
+    锁死：①两区块不在注册表/不渲染，但跨价位提示仍在；②空间表头无 4 列、有说明；
+    ③v32 三榜 HTML 验证；④反向注入可检出。
+    """
+    import re as _re
+    from modules.board import board_view as BV
+    rsrc = _read("render_board_html.py")
+    # ① 注册表无两区块（18 项）
+    bids = {b["id"] for b in BV.BLOCKS}
+    assert "band_subboards" not in bids and "segmented_summary" not in bids, \
+        "两区块仍在 BLOCKS 注册表"
+    assert BV.selftest() == 0, "board_view 契约自检失败（删区块不得破坏 11 项必要契约）"
+    # 渲染源码无两区块的 <h2> 输出，但保留 bands 判 multi_band 的跨价位提示
+    assert '<h2>价位段子榜' not in rsrc and '<h2>分段汇总总榜' not in rsrc, \
+        "渲染器仍输出两区块标题"
+    assert "len(bands) >= 2" in rsrc and "跨价位提示" in rsrc, "跨价位提示依赖被误删"
+    # ② 空间表：渲染源码无 4 空列，有数据边界说明
+    for col in ("下沉储物", "后排腿部", "后排膝部"):
+        assert f"<th>{col}</th>" not in rsrc, f"空间表仍有空列 {col}"
+    assert "无统一计算口径" in rsrc and "不编造、不插补" in rsrc, "缺数据边界说明"
+    # ③ v32 三榜 HTML：无两区块标题、空间表头只 5 列、无 4 空列名
+    for run in ("midsedan_bev_allprice_202611_v32", "midsuv_bev_202611_v32",
+                "midsuv_bev_u18_202611_v32"):
+        p = os.path.join(HERE, "runs", run, "榜单.html")
+        if not os.path.exists(p):
+            continue
+        html = open(p, encoding="utf-8").read()
+        # 只查真实区块标题/表头，不查说明文字里"为何不列"的提及
+        assert "<h2>价位段子榜" not in html and "<h2>分段汇总总榜" not in html, \
+            f"{run} 两区块标题未删净"
+        assert "<th>后排膝部</th>" not in html and "<th>下沉储物</th>" not in html, \
+            f"{run} 空间空列表头未删净"
+        assert "统一榜单策略：打分榜唯一主榜 + 事实列参考 + 价位段子榜" not in html, \
+            f"{run} 页面标题仍引用已删区块"
+        if "u18" not in run:  # 全价位混排榜才有跨价位提示；U18 单价位段无提示
+            assert "跨价位提示" in html, f"{run} 跨价位提示被误删"
+    # ④ 反向注入：把空间表的数据边界说明抹掉，检测必须触发（证明断言非摆设）
+    assert "无统一计算口径" in rsrc, "反向注入对照失败：源码本就缺数据边界说明"
+    injected = rsrc.replace("无统一计算口径", "___NEG_REMOVED___", 1)
+    assert "无统一计算口径" not in injected, "反向注入未生效"
+    return ("两区块连根删(注册表18项/渲染无输出)+跨价位提示保留 + "
+            "空间4空列删除+数据边界说明 + 三榜HTML验证 + 反向注入可检出")
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120, t121, t122, t123, t124, t125, t126, t127, t128, t129, t130]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120, t121, t122, t123, t124, t125, t126, t127, t128, t129, t130, t131]
 
 
 def run():

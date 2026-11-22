@@ -39,10 +39,6 @@ BLOCKS = [
      "desc": "每车8维原始分+权重，让用户看穿总分怎么来的"},
     {"id": "tiers", "title": "三档分级", "when": "has_tiers",
      "desc": "能不能买/要不要取舍/现在该不该看——与名次两套逻辑"},
-    {"id": "band_subboards", "title": "价位段子榜", "when": "multi_band",
-     "desc": "多段全价位榜才有；同分数按预算分组，不重新打分"},
-    {"id": "segmented_summary", "title": "分段汇总总榜", "when": "multi_band",
-     "desc": "多段全价位榜才有；各段前N按主榜分数汇总"},
     {"id": "product_power", "title": "纯产品力总榜", "when": "has_product_power",
      "desc": "辅助榜，剔除性价比、全池混排，不改主榜名次"},
     {"id": "experience_adjust", "title": "体验证据修正", "when": "has_experience",
@@ -643,8 +639,7 @@ def selftest() -> int:
                 "method_boundary", "reproduce"):
         if rid not in act:
             bad.append(f"最小数据下缺区块 {rid}")
-    if "band_subboards" in act:
-        bad.append("单段榜不应出价位段子榜")
+    # v10.29.0：价位段子榜/分段汇总总榜已从注册表删除，不再有此区块。
     # 体验修正区块：有审计数据时必须渲染
     data_exp = dict(data)
     data_exp["meta"] = dict(data["meta"])

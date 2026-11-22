@@ -301,8 +301,7 @@ def render(data, summary, title, as_of):
     except (OSError, ValueError, ImportError):
         _narr = {}
     rows = data.get("main_board", [])
-    bands = data.get("band_subboards", [])
-    seg = data.get("segmented_summary", {})
+    bands = data.get("band_subboards", [])  # v10.29.0：仅用于跨价位提示判 multi_band，不再渲染子榜
     pp = data.get("product_power_board", {})
     title = title or meta.get("title") or "统一榜单"
     active = BV.active_blocks(data, summary)
@@ -321,7 +320,7 @@ def render(data, summary, title, as_of):
     # ---- v9.7.14 本榜导航：从 BLOCKS 单一来源生成，只列本次实际渲染的区块
     NAV_BY_TITLE = {
         "打分主榜": "main_board", "逐配置对比": "trim_compare", "总分构成": "score_breakdown",
-        "三档分级": "tiers", "价位段子榜": "band_subboards", "分段汇总总榜": "segmented_summary",
+        "三档分级": "tiers",
         "纯产品力总榜": "product_power", "体验证据修正": "experience_adjust",
         "逐车取证依据": "evidence_notes", "生命周期提示": "lifecycle",
         "落榜与待核名单": "dropped", "方法与边界": "method_boundary", "复现说明": "reproduce",
@@ -366,7 +365,7 @@ def render(data, summary, title, as_of):
                  '<b>参考列 · 不计分</b>；纯产品力榜为并列辅助视角，不改主榜名次。</p>'
                  '<div class="rule"><b>三条规则：</b>① 主榜＝打分榜，唯一权威名次；'
                  '② kWh、电耗、电芯、月销等＝参考列，<b>只看不计分</b>；'
-                 '③ 多段全价位榜额外给价位段子榜与分段汇总；「不看价格比产品力」看纯产品力榜。</div>')
+                 '③ 「不看价格比产品力」看纯产品力榜（全价位混排时价格越高性价比分天然越低，见下方提示）。</div>')
 
     # ---- 事实列覆盖披露
     if "fact_coverage" in ids:
@@ -397,10 +396,11 @@ def render(data, summary, title, as_of):
             _tau_txt = (f'算法一致性 τ=<b>{_tau:.3f}</b>（越接近1越一致，本次一致性'
                         f'<b>{_tau_grade}</b>；τ&lt;0.9 时请勿严格按数字先后选车）')
         _cross_band_txt = ''
-        # v10.15.4：多价位混排时提示「性价比随价格下降≠产品力弱」，引导看纯产品力榜/价位段子榜。
-        # 复用 band_subboards 的 active 判定（= multi_band），单价位榜不显示，避免噪音。
+        # v10.15.4：多价位混排时提示「性价比随价格下降≠产品力弱」，引导看纯产品力榜。
+        # v10.29.0：价位段子榜/分段汇总已删除，改由 band_subboards 数据本身判 multi_band
+        # （>=2 段即全价位混排），不再依赖被删的区块 id。单价位榜不显示，避免噪音。
         # 权重从 meta.dimensions 动态读取，不写死 11.7%——权重调整后文案自动同步。
-        if "band_subboards" in ids:
+        if len(bands) >= 2:
             _vdim = next((d for d in (meta.get("dimensions") or [])
                           if d.get("key") == "value"), None)
             _vpct = (f"{float(_vdim.get('weight'))*100:.1f}%"
@@ -408,7 +408,7 @@ def render(data, summary, title, as_of):
             _cross_band_txt = (
                 ' <b style="color:#b42318">⚠ 跨价位提示：</b>本榜为全价位混排，含「性价比」维度'
                 f'（权重 {_vpct}），价格越高该项天然越低——<b>高价车总分偏低≠产品力更弱</b>；'
-                '「不看价格比硬件」请看下方「纯产品力总榜」，或按预算看「价位段子榜」。')
+                '「不看价格比硬件」请看下方「纯产品力总榜」。')
         H.append('<div class="stability-tip"><b>怎么读这张榜：</b>同档位内各行已用底色分组——'
                  '<b>第二档是「按偏好取舍组」，组内名次会随算法权重变动，请勿严格按数字先后选车</b>，'
                  '结合档位、评价与逐配置对比做决定。' + _tau_txt + '。'
@@ -811,24 +811,8 @@ document.addEventListener('change',function(ev){
                      '一手证据不足（新上市/样本少/缺权威碰撞成绩）——已降低第一档资格，'
                      '<b>但不因此判劣或打入「暂缓」</b>；真正的硬风险（停产/无交付/营运为主）才进第三档。</div>')
 
-    # ---- 价位段子榜 / 分段汇总（多段才有）
-    if "band_subboards" in ids:
-        H.append("<h2>价位段子榜 <span>同一份分数按预算分组 · 复用主榜 · 不重新打分</span></h2>")
-        for b in bands:
-            items = b.get("items") or []
-            H.append(f"<div class='band'><h3>{e(b.get('band'))}（{len(items)} 款）</h3><ol>")
-            for it in items:
-                H.append(f"<li><b>{e(it.get('model'))}</b> — {num(it.get('score'))} 分 "
-                         f"<span style='color:#7b8590'>({e(it.get('price'))}万)</span></li>")
-            H.append("</ol></div>")
-    if "segmented_summary" in ids:
-        H.append(f"<h2>分段汇总总榜 <span>各段取前 {e(seg.get('per_band'))} → 按主榜分数汇总 · 不重新打分</span></h2>")
-        H.append("<table><thead><tr><th>#</th><th>车型</th><th>分数</th><th>来自价位段</th><th>段内名次</th></tr></thead><tbody>")
-        for i, it in enumerate(seg.get("items") or [], 1):
-            H.append(f"<tr><td>{rank_badge(i)}</td><td class='name'>{e(it.get('model'))}</td>"
-                     f"<td>{num(it.get('score'))}</td><td>{e(it.get('band'))}</td>"
-                     f"<td>{e(it.get('rank_in_band'))}</td></tr>")
-        H.append("</tbody></table>")
+    # v10.29.0：价位段子榜 / 分段汇总总榜已按用户要求从页面删除（数据仍保留在
+    # board_v2_data.json，跨价位提示仍用 bands 判定 multi_band，不影响打分/三档）。
 
     # ---- 纯产品力总榜
     if "product_power" in ids:
@@ -966,15 +950,15 @@ document.addEventListener('change',function(ev){
         def _l(v):
             return f"{v:g}L" if isinstance(v, (int, float)) else "—"
 
-        H.append("<h2>空间与储物 <span>车身尺寸与真实容积 · 后备箱大≠乘坐空间好</span></h2>")
-        H.append('<div class="rule">后备箱/前备箱/下沉储物容积与得房率，从各车取证文本结构化提取'
-                 '（保留原文片段，可逐条核）；车身尺寸来自汽车之家/易车参数页。'
-                 '空间维封顶的依据是<b>车身三维体积 + 得房率</b>；'
-                 '后备箱容积只作「储物明显不足却声称空间大」的旁证，'
+        H.append("<h2>空间与储物 <span>车身尺寸与官方容积 · 后备箱大≠乘坐空间好</span></h2>")
+        H.append('<div class="rule">轴距/长宽高/后备箱/前备箱均取自汽车之家/易车参数页官方字段（稳定可核）。'
+                 '<b>不列「下沉储物/得房率/后排腿部/后排膝部」</b>：官方参数页无这些标准字段，'
+                 '得房率系厂商自量自宣、无统一计算口径（行业共识），后排腿/膝部仅见口径不一的媒体实测，'
+                 '跨车型不可比——按「不编造、不插补」纪律不展示。'
+                 '空间维封顶的依据是<b>车身三维体积 + 少数车可得房率</b>；后备箱容积只作旁证，'
                  '<b>容积大不加分</b>——后备箱装东西、乘坐空间坐人，不是同一件事。</div>')
         H.append("<table><thead><tr><th style='text-align:left'>车型</th><th>轴距</th>"
-                 "<th>长×宽×高</th><th>后备箱</th><th>前备箱</th><th>下沉储物</th>"
-                 "<th>得房率</th><th>后排腿部</th><th>后排膝部</th></tr></thead><tbody>")
+                 "<th>长×宽×高</th><th>后备箱</th><th>前备箱</th></tr></thead><tbody>")
         for r in rows:
             f = sf.get(r.get("model")) or {}
             if not f:
@@ -982,16 +966,11 @@ document.addEventListener('change',function(ev){
             _L, _W, _H = f.get("length_mm"), f.get("width_mm"), f.get("height_mm")
             dims = (f"{_L:g}×{_W:g}×{_H:g}mm"
                     if all(isinstance(x, (int, float)) for x in (_L, _W, _H)) else "—")
-            eff = f.get("efficiency")
             H.append(f"<tr><td class='name'>{e(r.get('model'))}</td>"
                      f"<td>{_mm(f.get('wheelbase_mm'))}</td>"
                      f"<td>{e(dims)}</td>"
                      f"<td>{_l(f.get('trunk'))}</td>"
-                     f"<td>{_l(f.get('frunk'))}</td>"
-                     f"<td>{_l(f.get('under_floor'))}</td>"
-                     f"<td>{f'{eff:g}%' if isinstance(eff, (int, float)) else '—'}</td>"
-                     f"<td>{_mm(f.get('leg_room'))}</td>"
-                     f"<td>{_mm(f.get('knee_room'))}</td></tr>")
+                     f"<td>{_l(f.get('frunk'))}</td></tr>")
         H.append("</tbody></table>")
 
     # ---- 逐车取证依据（历史有、v8.x 漏掉，v9.0 补回）
@@ -1174,8 +1153,8 @@ def selftest():
         ("逐车取证", "逐车取证依据" in doc),
         ("方法与边界", "方法与边界" in doc),
         ("复现", "复现说明" in doc),
-        ("价位段", "入门段" in doc),
-        ("分段汇总", "分段汇总总榜" in doc),
+        ("v10.29.0价位段子榜已删", "价位段子榜" not in doc and "入门段" not in doc),
+        ("v10.29.0分段汇总已删", "分段汇总总榜" not in doc),
         ("产品力榜", "纯产品力总榜" in doc and "与性价比的关系" in doc),
         ("事实覆盖披露", "事实参考列覆盖" in doc),
         ("档位徽标class用英文T1/T2/T3", 'class="tier T1"' in doc and 'class="tier T2"' in doc),

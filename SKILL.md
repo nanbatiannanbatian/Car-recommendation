@@ -13,7 +13,7 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 10.28.0
+version: 10.29.0
 author: "nanbatiannanbatian"
 ---
 
@@ -3669,3 +3669,11 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
 - **根因修二（月销公式 hover）**：`score_rows` 透传 trend_sales/sales_scope/sales_note/lifecycle_status 只读口径字段（不进分）；`render_board_html.sales_tip()` 生成 hover：趋势月销=近6月逐月中位（新车取中位vs最新月较大值），sales_scope=series_total 标车系合计上界、pure_bev 标纯电单独，sales_note 带出口集中等异常注记；月销单元格 title 挂该说明。
 - **回归**：新增 BUG-130（源码展示用 ev_for_t1+两种写实归因+score_rows透传+sales_tip公式/口径+三榜v31 HTML无矛盾串有hover+反向注入还原旧文案可检出）+ negative_regression `t130` 探针。全套 bug 128/128、注入 104/104、各 selftest 全绿。
 - **指纹**：leaderboard.py 在指纹代码清单内（虽本次两处改动均只读/展示不改分），按纪律重打三候选池指纹 48478d21→ccd8c169，三榜重出 v31，跨榜同车分数 0 差异（展示层改动）。
+
+## v10.29.0 · 删除两个冗余榜单区块 + 空间表删4空列（2026-11-22）
+- 用户看榜提三点：①质疑算法对"水桶车"（稳定5-10）不友好；②「分段汇总总榜」「价位段子榜」从 HTML 去掉（"你直接改"）；③空间储物「下沉储物/得房率/后排腿部/后排膝部」4 列全空，能否联网获取或改进空间打分。
+- **删两区块（连根）**：`board_view.BLOCKS` 移除 band_subboards/segmented_summary（注册表 20→18，11 项必要契约不变）；`render_board_html` 删 NAV 两项、渲染分支、lede ③ 文案；跨价位提示改由 `len(bands)>=2` 数据判定（原依赖被删区块 id），保留"性价比随价格下降≠产品力弱"提示。board_v2 数据仍产出（供 multi_band 判定与复现），只是不渲染。
+- **删空间 4 空列**：联网权威核查（汽车之家/易车参数页无腿部/膝部/下沉储物标准字段；得房率=厂商自量自宣营销话术、无统一计算口径；C-NCAP 不评空间；懂车帝/CR 用固定身高体验者实测但口径不统一不可横比）——这 4 列是**数据边界非采集遗漏**。空间表只留轴距/长宽高/后备箱/前备箱（官方参数页稳定有值），表头下写清为何不列那 4 项（不编造、不插补）。
+- **回归**：新增 BUG-131（两区块不在注册表/不渲染但跨价位提示保留+空间表头无4空列+数据边界说明+v32三榜HTML+反向注入）+ t131 探针；board_view selftest 去单段断言、render selftest 两区块断言翻转。全套 bug 129/129、注入 105/105、各 selftest 全绿。
+- **零分数影响**：纯展示层，指纹 ccd8c169 不变，三榜重出 v32。
+- **水桶车算法**：联网调研 MCDA 理论（VIKOR 妥协解 R=单项最大偏离保护均衡车、SMAA 名次稳健性、TOPSIS 几何折中）与业内（Consumer Reports 综合分+安全否决、Car and Driver 10Best 整体协调感、懂车帝把"没有明显短板"写进推荐理由）——用户直觉有理论与业内支持。数据核查：真正全维≥8.0 的水桶车仅深蓝L06，且它已是强推；Model3(空间7.5/性价比7.1)、ET5(空间7.7/月销482)有真实短板且波动大，不是水桶车。待用户决定是否改推荐口径（本版未改算法，仅展示层改动）。
