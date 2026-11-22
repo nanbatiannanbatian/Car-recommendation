@@ -13,7 +13,7 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 10.22.0
+version: 10.23.0
 author: "nanbatiannanbatian"
 ---
 
@@ -3613,3 +3613,10 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
 - 回归测试跟随当前事实源：t048 基线从 202610 历史快照改指 202611 权威池（universe 已随联网盘点纳入两款新车），并新增「新车必须入池」断言——强化而非绕过门禁。
 - 验收：bug 118/118、反向注入 103/103、layout 16/16、release 39/39、router 32/32、compare 20/20、midsuv 46/46、derive 4/4、render/board_view/trim_annotate selftest 全过。指纹 4175c1dd→65a74206；按「逻辑变更全池重算」三榜重出（轿车全价位 29 款、SUV 全榜 v26、U18 v26），SUV 跨榜同车总分 0 差异；SUV 主榜少数车因最优配置按新权重重选变化 ±0.1~0.3，非评分口径回退。
 - 已知展示边界（未改渲染，待用户确认）：`render_board_html` 的「入池口径」文案仍硬编码「紧凑型车+纯电动月销榜前10」，在本轿车榜显示为旧口径，需确认后再改。
+
+## v10.23.0 · 比亚迪三电质疑 → 两处根因修复（2026-11-22）
+- 用户问「比亚迪车型三电为什么这么低，不合理吧」。核查发现比亚迪并非整体被压低（秦MAX 9.1、海豹07EV 8.95 中上），低分集中在几款低价车；但有两处真实的代码根因，用户拍板「代码层面全部根因修」。
+- **根因一（电机功率低功率倒扣）**：`spec_score.powertrain_parts` 对峰值功率 <170kW 一律 −0.4。这与本项设立注释自相矛盾（注释已承认峰值功率水分约 70%、只作硬件规格参考项）；且造成「记得全的吃亏」——比亚迪秦MAX(100kW)/海豹06EV/秦L/银河A7(160kW)、极狐贝塔S3(159kW) 因 trims 记了功率被扣，而极氪007GT/特斯拉Model 3 因未采 max_power_kw 这项缺席、不参与中位锚反而中性。修法：低功率(<200kW) 改为 0 中性，只奖高功率(≥200kW 递增正分)，保留硬件上限区分度。业内依据：GB/T 18488 与多家横评共识——峰值只维持约 10s，160kW 家用车零百七秒级够用，功率低不构成缺陷；真正该看的额定功率/效率MAP 本池 0/20 覆盖，无数据就不能据峰值低倒扣。全池仅 5 款受影响。
+- **根因二（评分配置解析盲信人工 ref 副本）**：`rule_adjust._spec_of` 与 `trim_annotate.annotate_all` 各自解析评分配置，都盲信 trims 库人工维护的 `scored_trim_ref`（独立副本会与候选池漂移）。秦MAX 候选池 trim「EV 630 超越型」价 13.29 万、配置表精确名「EV 630km 超越型」64.32kWh，人工 ref 却写「EV 530km 领先型」10.99 万 → 三电取到低配 52.87kWh/100kW 被系统性低估。修法：新增 `trim_annotate.resolve_score_ref` 唯一解析入口——候选池显式 `trim.price` 精确命中唯一配置为最高优先（价格是定价/value/闸门共用硬数据），同价多配置用配置名消歧，无显式价格时按候选池配置名匹配（比漂移的 ref 权威），占位名车回退人工 ref；两个消费者共用此入口。建池脚本 `runs/build_midsedan_pool_202611.py` 同步按候选池价回填 ref，避免重跑写回错值。修正 4 款同源漂移：秦MAX(630 超越型)、极氪7X(103kWh vs 旧 75)、零跑C11(640激光雷达 vs 智尊)、极狐阿尔法T5(660 vs 560)。
+  - 边界坑（已规避）：绝不能用 `price_of()` 做锚——它在 trim.price 缺失时回退 price_guide 下限（车系最低价），会把「带内主力配置」占位车锚到最低配，破坏人工代表配置（银河A7/极狐贝塔S3）。
+- 回归：新增 BUG-121（低功率中性+高功率递增+反向注入）、BUG-122（秦MAX锚630超越型64.32kWh+候选池名优先于漂移ref+占位名车回退+两消费者同源）；同步更新 t103/t105 的 selftest 依赖与 t107 的字面断言（改为锁统一入口）。全套回归 bug 120/120、反向注入 103/103、midsuv 46/46、layout 16/16、release 39/39、compare 20/20、router 32/32、derive 4/4、各 selftest 全绿。指纹 b8fc17c1，三榜按逻辑变更全池重算。

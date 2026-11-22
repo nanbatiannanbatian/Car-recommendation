@@ -141,6 +141,8 @@ CASES = [
     ("BUG-118", "保值率库名「零跑C11纯电版」与候选池「零跑C11」精确匹配漏配→微调从未生效", "v10.18.0"),
     ("BUG-119", "Model Y 4起软件召回机械触顶-3；纯OTA修复应按处置方式排除而非按车型硬编码", "v10.19.0"),
     ("BUG-120", "冷却分档直冷>液冷违背均温性共识且与快充二次计价；反转后锚点路径滞后又破坏跨榜同分", "v10.20.2"),
+    ("BUG-121", "电机功率<170kW一律−0.4使家用够用车被扣，且未采功率的车反而中性（记得全的吃亏）", "v10.23.0"),
+    ("BUG-122", "评分配置解析盲信人工scored_trim_ref副本，与候选池指导价漂移（秦MAX 630超越型错配530低配）", "v10.23.0"),
 ]
 
 
@@ -3554,10 +3556,15 @@ def t107():
                     f"参考配置 {e6.get('scored_trim_ref')!r} 仍有 delta（重复计数）: {_t.get('deltas')}"
     ta_src2 = _read("modules/engine/trim_annotate.py")
     assert "scored_trim_ref" in ta_src2, "trim_annotate 未使用 scored_trim_ref"
+    # v10.23.0：rule_adjust 不再自己解析 scored_trim_ref，而是与 annotate_all 共用
+    # resolve_score_ref 唯一入口（价格锚优先、ref 作回退）。断言改为锁「统一入口」而非字面量，
+    # 否则新根因会被旧的字面断言挡回。scored_trim_ref 的处理仍在 trim_annotate 里。
     ra_src2 = _read("modules/engine/rule_adjust.py")
-    assert "scored_trim_ref" in ra_src2, "rule_adjust 未使用 scored_trim_ref"
+    assert "resolve_score_ref" in ra_src2, "rule_adjust 未走统一评分配置解析入口 resolve_score_ref"
+    assert "TA.resolve_score_ref" in ra_src2 or "resolve_score_ref(c" in ra_src2, \
+        "rule_adjust 的 _spec_of 未调用统一入口"
     return (f"三电电池容量进分(绝对kWh，价格归value防双计；kWh/万元仅披露) + 电池/电机/电控三组拆分(电机功率进分) + "
-            f"配置匹配不粘连({checked} 款抽样通过) + scored_trim_ref 优先")
+            f"配置匹配不粘连({checked} 款抽样通过) + scored_trim_ref 回退/统一入口")
 
 
 def t108():
@@ -4156,8 +4163,91 @@ def t120():
             "（反向注入旧中位即失败，锚点路径滞后必检出）")
 
 
+def t121():
+    """BUG-121：电机功率低功率不再扣分（v10.23.0）。
+
+    根因：原分档 <170kW 一律 −0.4。160kW 家用车零百七秒级完全够用，
+    且规则注释自认「峰值水分70%、只作规格参考」——只是参考就不该罚。
+    更不公平的是未采 max_power_kw 的车这项缺席、不参与中位锚（中性），
+    造成「记得全的吃亏」（比亚迪多款低功率车被扣，极氪/特斯拉缺席反中性）。
+    修法：低功率 = 0（中性），只奖高功率（≥200kW 才给正分）。
+    """
+    from modules.engine import spec_score as SS
+
+    def mp(kw):
+        v = [x for n, x, _t in SS.powertrain_parts({"max_power_kw": kw}) if n == "电机功率"]
+        assert v, f"{kw}kW 电机功率项缺失"
+        return v[0]
+
+    # 家用够用功率段：一律 0，不得为负
+    for kw in (100, 120, 159, 160, 169):
+        assert abs(mp(kw)) < 1e-9, f"{kw}kW 应中性0，实际 {mp(kw)}（低功率被倒扣）"
+    # 高功率仍给正分，保留硬件上限区分度
+    assert mp(200) > 0 and mp(240) > mp(200) and mp(300) > mp(240), \
+        f"高功率档应递增: {mp(200)}/{mp(240)}/{mp(300)}"
+    # 反向注入：若恢复旧规则对160kW扣0.4，本断言必须能检出
+    assert not (mp(160) < 0), "反向注入低功率负分未被检出"
+    return "低功率(<200kW)中性0不扣分 + 高功率递增正分；家用车不再因记得全参数吃亏"
+
+
+def t122():
+    """BUG-122：评分配置解析以候选池指导价锚定，消除人工ref副本漂移（v10.23.0）。
+
+    根因：rule_adjust._spec_of 与 annotate_all 各自盲信 trims 库人工
+    scored_trim_ref。秦MAX 候选池 trim=「EV 630 超越型」价13.29万，
+    人工 ref 却写「EV 530km 领先型」10.99万 → 三电取到低配
+    52.87kWh/100kW，三电分被系统性低估。
+    修法：resolve_score_ref 以候选池显式 trim.price 精确命中唯一配置为最高优先；
+    占位名/无价车回退人工ref（防止 price_of 回退车系最低价锚到错配置）。
+    """
+    import json
+    from modules.engine import trim_annotate as TA, trim_board as TB
+    db = TB.load_trims()
+    pool = json.load(open("runs/midsedan_bev_pool_202611.json", encoding="utf-8"))
+    by = {c["model"]: c for c in pool["candidates"]}
+
+    # ① 秦MAX：价格锚必须解析到 630超越型（64.32kWh），不是 530 低配
+    c = by["秦MAX EV"]
+    ref, basis = TA.resolve_score_ref(c, db["秦MAX EV"])
+    assert ref and ref.get("name") == "EV 630km 超越型", \
+        f"秦MAX 应锚到630超越型，实际 {ref.get('name') if ref else None}（{basis}）"
+    from modules.engine import trim_board as _TB
+    sp = _TB.spec_from_trim(ref, {})
+    assert abs((sp.get("kwh") or 0) - 64.32) < 0.05, \
+        f"秦MAX 应取64.32kWh，实际 {sp.get('kwh')}（错配到低配）"
+
+    # ② 占位名车（无显式 trim.price）必须回退人工ref，不能被 price_of 的车系最低价锚走
+    for m in ("银河A7 EV", "极狐贝塔S3"):
+        c2 = by[m]
+        assert (c2.get("trim") or {}).get("price") is None, f"{m} 测试前提失效：已有显式价"
+        ref2, _ = TA.resolve_score_ref(c2, db[m])
+        assert ref2 and ref2.get("name") == db[m].get("scored_trim_ref"), \
+            f"{m} 占位名车应回退人工ref，实际锚到 {ref2.get('name') if ref2 else None}"
+
+    # ③ 无显式价格时，候选池配置名（主榜展示配置）应优先于漂移的人工ref。
+    #    极氪7X 候选池「103kWh 后驱MAX」vs 人工ref「2027款 75kWh Max」——后者漂移。
+    suv = json.load(open("runs/midsuv_bev_pool_202611_final.json", encoding="utf-8"))
+    bys = {c["model"]: c for c in suv["candidates"]}
+    c7 = bys["极氪7X"]
+    r7, _ = TA.resolve_score_ref(c7, db["极氪7X"])
+    assert r7 and "103kWh" in r7.get("name"), \
+        f"极氪7X 应按候选池配置名锚到 103kWh，实际 {r7.get('name') if r7 else None}"
+    c11 = bys["零跑C11"]
+    r11, _ = TA.resolve_score_ref(c11, db["零跑C11"])
+    assert r11 and "640激光雷达" in r11.get("name") and "智尊" not in r11.get("name"), \
+        f"零跑C11 应按候选池名锚到 640激光雷达（非智尊），实际 {r11.get('name') if r11 else None}"
+
+    # ④ 两消费者同源：_spec_of 与 annotate_all 都走 resolve_score_ref（源码级断言）
+    import inspect
+    from modules.engine import rule_adjust as RA
+    src = inspect.getsource(RA._spec_of)
+    assert "resolve_score_ref" in src, "_spec_of 未用统一评分配置解析入口"
+    return ("秦MAX锚到630超越型64.32kWh + 候选池名优先于漂移ref(极氪7X/零跑C11) "
+            "+ 占位名车回退人工ref + 两消费者同源")
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120, t121, t122]
 
 
 def run():

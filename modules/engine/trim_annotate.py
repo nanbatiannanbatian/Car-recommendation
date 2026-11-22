@@ -236,6 +236,66 @@ def find_ref(name: str, trims: list[dict]) -> dict | None:
     return best if score >= 2 else None
 
 
+def resolve_score_ref(c: dict, entry: dict) -> tuple[dict | None, str]:
+    """评分配置（打分基准 trim）的**唯一解析入口**——v10.23 根因修正 2026-11-22。
+
+    【为什么要它】此前两个消费者（rule_adjust._spec_of / annotate_all）各自解析，
+    且都盲信 trims 库人工维护的 scored_trim_ref。但 scored_trim_ref 是**独立副本**，
+    会与候选池评分配置漂移：秦MAX 候选池 trim=「EV 630 超越型」价 13.29 万，
+    配置表里精确名是「EV 630km 超越型」，人工 ref 却写成「EV 530km 领先型」
+    （10.99 万）——三电取参全落到低配 52.87kWh/100kW，三电分被系统性低估。
+
+    【判据】价格是主榜定价、value 维、价位闸门、页面展示共用的硬数据，比人工
+    ref 副本可靠。因此优先级：
+      ① 候选池 trim.price 在 trims 里**精确命中唯一配置** → 采用（价格锚）
+      ② 命中多个（同价不同配置）→ 用候选池配置名在命中的集合里 find_ref 消歧
+      ③ 价格缺失/未命中 → 回退 scored_trim_ref 精确名 → 再回退候选池名
+    任何一条路都写明 basis，供审计。缺价缺名才返回 None（不编造）。
+    """
+    trims = entry.get("trims") or []
+    if not trims:
+        return None, "无配置可选"
+    # 只用**候选池显式给出的 trim.price**做锚。不能用 price_of()——
+    # 后者在 trim.price 缺失时回退到 price_guide 下限（车系最低价），
+    # 会把「带内主力配置」这类占位名车锚到最低配，破坏人工代表配置（银河A7/极狐贝塔S3）。
+    ctrim = c.get("trim") or {}
+    tp = ctrim.get("price")
+    tp = float(tp) if isinstance(tp, (int, float)) else None
+    # ① 价格精确命中
+    hits = [t for t in trims if tp is not None
+            and abs((t.get("price") if t.get("price") is not None
+                     else t.get("price_wan") or 0) - tp) < 0.005]
+    if len(hits) == 1:
+        return hits[0], f"候选池指导价{tp:g}万精确命中唯一配置"
+    if len(hits) > 1:
+        # ② 同价多配置：用候选池配置名在命中集合内消歧
+        cname = (c.get("trim") or {}).get("name") or ""
+        if cname and not is_placeholder_ref(cname):
+            r = find_ref(cname, hits)
+            if r:
+                return r, f"指导价{tp:g}万命中{len(hits)}款，按配置名消歧"
+    # ③ 价格锚不可用时：候选池评分配置名（主榜展示/定价的配置，权威）模糊匹配优先，
+    #    再退人工 ref 精确名 / scored_trim 简称。
+    #    注意：有显式 trim.price 的车已在 ①② 被价格锚解析，不会走到这里——
+    #    海狮06EV（605 入门版 price=15.99）由价格锚命中 605领航 15.99，
+    #    不会被候选池简称「605 入门版」模糊配到 605领航Pro（v10.15 防的正是这个）。
+    cname = (c.get("trim") or {}).get("name")
+    if cname and not is_placeholder_ref(cname):
+        r = find_ref(cname, trims)
+        if r:
+            return r, f"价格未命中，按候选池配置名匹配「{cname}」"
+    for cand_name in (entry.get("scored_trim_ref"), entry.get("scored_trim")):
+        if not cand_name or is_placeholder_ref(cand_name):
+            continue
+        r = next((t for t in trims if str(t.get("name")) == str(cand_name)), None)
+        if r:
+            return r, f"价格与候选池名均未命中，回退人工基准名「{cand_name}」"
+        r = find_ref(cand_name, trims)
+        if r:
+            return r, f"回退人工基准名模糊匹配「{cand_name}」"
+    return None, "价格与配置名均未命中，不编造"
+
+
 def is_placeholder_ref(name: str) -> bool:
     """占位基准名（非真实配置名）——v9.7.35：这类值必须自动解析，不许静默 fallback 全车 low。"""
     s = str(name or "")
@@ -298,28 +358,17 @@ def annotate_all(cands: list[dict], cfg: dict) -> dict:
         base = dict(c.get("scores") or {})
         if not base:
             continue
-        ref_name = entry.get("scored_trim") or ""
-        # v10.15.0：**scored_trim_ref 优先**。
-        # 人工条目里 scored_trim 常写的是「简称+档位」（如「605 入门版」），
-        # 而 scored_trim_ref 存的是**配置表里的精确全名**（「06 2026款 EV 605领航」）。
-        # 此前只用 scored_trim，简称匹配不到就落到价格兜底 → 可能选到同型号的别的档次
-        # （海狮06EV 的「605 入门版」被配成 605领航Pro 15.38万，实际应是 605领航 15.99万）。
-        # ref 是人工核验的精确引用，比简称可靠，优先用它。
-        _ref_full = entry.get("scored_trim_ref") or ""
-        if _ref_full:
-            _hit = next((x for x in (entry.get("trims") or [])
-                         if str(x.get("name")) == str(_ref_full)), None)
-            if _hit:
-                ref_name = _ref_full
-        # v9.7.35（BUG-043 根治）：占位/匹配失败主动解析代表配置，写明依据；
-        # 不再静默 fallback 给全车打 low（曾致主榜20/20低置信刷屏）。
+        # v10.23 根因修正：评分配置解析统一走 resolve_score_ref——
+        # 候选池指导价精确锚定优先，避免 trims 人工 ref 副本漂移（秦MAX 曾把
+        # 630超越型 13.29万 错配到 530领先型）。ref 只在价格未唯一命中时回退。
         _same_model = [c for c in cands if c.get("model") == model]
-        ref, ref_fallback, ref_basis = resolve_ref(ref_name, entry["trims"], _same_model)
-        if ref_fallback:
-            # 把解析出的真实基准名写回（供 out 与页面展示），避免下游再读到占位值
-            ref_name_real = ref.get("name") if ref else None
-        else:
-            ref_name_real = ref_name
+        ref, ref_basis = resolve_score_ref(c, entry)
+        ref_fallback = False
+        if ref is None:
+            # 价格/config 名都没命中：沿用旧的代表配置兜底，不静默打 low。
+            ref_name = entry.get("scored_trim") or ""
+            ref, ref_fallback, ref_basis = resolve_ref(ref_name, entry["trims"], _same_model)
+        ref_name_real = ref.get("name") if ref else None
         trims = []
         for t in entry["trims"]:
             # v9.7.4：匹配不到参考配置时不下 delta（宁可不加分，不在错基准上加分）

@@ -81,15 +81,10 @@ def _spec_of(c: dict, trims_db: dict) -> dict:
     entry = trims_db.get(c.get("model"))
     if not entry or not entry.get("trims"):
         return base_spec
-    # v10.15.0：scored_trim_ref（人工核验的**精确配置全名**）优先于 scored_trim（简称）。
-    # 两者不一致时，简称的模糊匹配可能落到**同型号的别的档次**（海狮06EV 的
-    # 「605 入门版」被配成 605领航Pro 15.38万，实际应为 605领航 15.99万）。
-    _ref_name = entry.get("scored_trim") or ""
-    _ref_full = entry.get("scored_trim_ref") or ""
-    if _ref_full and any(str(x.get("name")) == str(_ref_full)
-                          for x in (entry.get("trims") or [])):
-        _ref_name = _ref_full
-    ref, _fallback, _basis = TA.resolve_ref(_ref_name, entry["trims"], [c])
+    # v10.23 根因修正：与 annotate_all 共用同一个评分配置解析入口，
+    # 候选池指导价精确锚定优先，消除 trims 人工 ref 副本漂移（秦MAX 错配 530/630）。
+    # 一处口径、两个消费者，避免 rule_adjust 与逐配置分取到不同配置。
+    ref, _basis = TA.resolve_score_ref(c, entry)
     if not ref:
         return base_spec
     return TB.spec_from_trim(ref, base_spec)
