@@ -92,10 +92,11 @@ def energy_facts(rows: list[dict], trim_data: dict | None,
             "charge": src.get("charge"),
             "charge_power_kw": src.get("charge_power_kw"),
             "consumption": src.get("consumption"),
+            "max_power_kw": src.get("max_power_kw"),  # v10.15.5 电机功率列（三电三分披露）
             "cell": src.get("cell_supplier"),
             "swap": src.get("swap"),
             "cltc_km": src.get("cltc_km"),
-            # v10.15.0：三电子维度分组（电池素质 / 补能能力）——从 rule_adjust
+            # v10.15.5：三电子维度分组（电池 / 电机 / 电控）——从 rule_adjust
             # 审计字段透传，渲染层直接展示，不另算一套。
             # rule_adjust_detail[model] = {dim: {..., "groups": {...}}}
             "groups": (((rule_adjust or {}).get(m) or {})

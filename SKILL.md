@@ -13,7 +13,7 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 10.15.4
+version: 10.15.5
 author: "nanbatiannanbatian"
 ---
 
@@ -3418,3 +3418,18 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
 **改动仅渲染层**（`modules/board/render_board_html.py`，不碰任何公式/权重/分数）："怎么读这张榜"提示末尾追加高亮句——"⚠ 跨价位提示：本榜为全价位混排，含性价比维度（权重从 `meta.dimensions` 动态读取，不写死百分比），价格越高该项天然越低——高价车总分偏低≠产品力更弱；不看价格比硬件请看纯产品力总榜，或按预算看价位段子榜"。复用 `band_subboards` 的 active 判定（= multi_band），单价位榜不显示避免噪音。`board_view.py` lede desc 同步。这是用户铁律"涉及渲染改动先说明方案等确认"下先提方案、经用户明确同意后实施。
 
 **验收**：render_board_html selftest 加 3 项断言（多段显示 / 权重动态读取 40%→25% / 单价位不显示），board_view selftest、bug 107/107、比较器 20/20、结构 16/16、11 模块 selftest 全绿。v8 榜单（`runs/midsuv_bev_202611_v8`）全门禁通过。
+
+## v10.15.5 · 三电补齐电机项 + 电池/电机/电控三组重组（用户："三电是电池电机电控，是不是太片面"）
+
+用户质疑三电维只看电池。审计确认 `powertrain_parts` 6 项规则因子全电池、电机/电控零专属因子，实测峰值功率与三电分相关系数仅 +0.03（完全没进分）。
+
+**业内对标**：三电=电池+电机+电控公认三支柱；电池占成本 40–50% 权重高有依据，但完全无电机/电控项属残缺。电机业内看额定功率/效率MAP/最高转速/扁线绕组，电控看 SiC/MCU 效率/BMS/能量回收——但本池这些字段结构化覆盖 0/20，唯一 20/20 覆盖的电机参数是峰值功率。业内明确反对堆峰值（GB/T 18488：峰值只维持约10s、水分约70%，主张看电耗/持续效率）——与 skill 既有"去堆料"纪律一致。
+
+**改动（不堆料、可回溯）**：
+- `spec_score.powertrain_parts` 加「电机功率」粗分档项（≥300kW +1.2 / ≥240 +0.8 / ≥200 +0.4 / ≥170 0 / <170 −0.4），粗分档避免 10kW 噪音；经 `rule_adjust` 逐项中位锚（α=0.5）后自然落 ±0.4，只是硬件规格参考不主导。零百仍在操控维（v10.15.2 已降权），功率~零百 −0.846 的交叉影响合计 <0.5 分，非全额双计。
+- `trim_board.spec_from_trim` 加 `max_power_kw` 映射（功率进 spec 的必经之路）。
+- `POWERTRAIN_GROUPS` 从两组扩为三组：电池（电芯/容量/续航/冷却）、电机（电机功率）、电控（高压平台/快充）；`POWERTRAIN_GROUP_WEIGHT` 0.55/0.20/0.25（仅披露占比，不参与打分）。修 `powertrain_group_parts` 兜底分支硬编码旧组名导致的潜在 KeyError（改动态首组）。
+- 展示层：三电表两列改三列 + 加「峰值功率」披露列（`render_board_html.py` / `board_v2.energy_facts`）；文案写明口径边界——额定功率/效率MAP/SiC/BMS 覆盖 0/20 未进分，电耗效率（车重残差）与续航达成率属"电控+整车系统效率"独立模块，不在规则分组内。
+- 三组名义权重与归属仅在披露层，三电总分算法不变（规则项分组求和只展示）。
+
+**验收**：bug 107/107（分组断言随三组口径更新 + 电机功率项正反向断言）、比较器 20/20、结构 16/16、12 模块 selftest 全绿。v9 榜单（`runs/midsuv_bev_202611_v9`）全门禁通过。

@@ -3393,18 +3393,28 @@ def t107():
     assert [p for p in SS.powertrain_parts({"kwh": 80.0}) if p[0] == "电池容量"], \
         "绝对kWh口径下缺价不影响电池容量项"
 
-    # ② 三电子维度拆分：电池素质 / 补能能力
+    # ② 三电子维度拆分：电池 / 电机 / 电控（v10.15.5 扩为三组，对齐业内三电定义）
     g = SS.powertrain_group_parts({"platform_800v": True, "charge_10_80_min": 10,
                                     "cell_brand": "宁德时代", "range_km": 800,
-                                    "battery_cooling": "液冷", "kwh": 100, "price": 20})
-    assert set(g) == {"电池素质", "补能能力"}, f"三电子维度分组不对: {set(g)}"
-    assert {i[0] for i in g["电池素质"]} == {"电芯", "电池容量", "续航", "冷却"}, \
-        f"电池素质归组错: {[i[0] for i in g['电池素质']]}"
-    assert {i[0] for i in g["补能能力"]} == {"高压平台", "快充"}, \
-        f"补能能力归组错: {[i[0] for i in g['补能能力']]}"
+                                    "battery_cooling": "液冷", "kwh": 100, "price": 20,
+                                    "max_power_kw": 300})
+    assert set(g) == {"电池", "电机", "电控"}, f"三电子维度分组不对: {set(g)}"
+    assert {i[0] for i in g["电池"]} == {"电芯", "电池容量", "续航", "冷却"}, \
+        f"电池归组错: {[i[0] for i in g['电池']]}"
+    assert {i[0] for i in g["电机"]} == {"电机功率"}, \
+        f"电机归组错: {[i[0] for i in g['电机']]}"
+    assert {i[0] for i in g["电控"]} == {"高压平台", "快充"}, \
+        f"电控归组错: {[i[0] for i in g['电控']]}"
     # 每一项只归一组（不重复计数）
     allitems = [i[0] for v in g.values() for i in v]
     assert len(allitems) == len(set(allitems)), f"规则项重复归组: {allitems}"
+    # 电机功率项：高功率分档 > 低功率，缺功率不出现（缺数据≠差）
+    hi = SS.powertrain_parts({"max_power_kw": 370})
+    lo = SS.powertrain_parts({"max_power_kw": 150})
+    assert [p for p in hi if p[0] == "电机功率"][0][1] > \
+           [p for p in lo if p[0] == "电机功率"][0][1], "高功率应高于低功率分档"
+    assert not [p for p in SS.powertrain_parts({}) if p[0] == "电机功率"], \
+        "缺功率时电机功率项应缺席"
 
     # ②-b 源码层断言：电池容量项与子维度分组必须真的写在规则文件里
     #     （_read 走源码断言型注入探针，失败回测靠它验证断言不形同虚设）
@@ -3471,7 +3481,7 @@ def t107():
     assert "scored_trim_ref" in ta_src2, "trim_annotate 未使用 scored_trim_ref"
     ra_src2 = _read("modules/engine/rule_adjust.py")
     assert "scored_trim_ref" in ra_src2, "rule_adjust 未使用 scored_trim_ref"
-    return (f"三电电池容量进分(绝对kWh，价格归value防双计；kWh/万元仅披露) + 电池素质/补能能力子维度拆分 + "
+    return (f"三电电池容量进分(绝对kWh，价格归value防双计；kWh/万元仅披露) + 电池/电机/电控三组拆分(电机功率进分) + "
             f"配置匹配不粘连({checked} 款抽样通过) + scored_trim_ref 优先")
 
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,

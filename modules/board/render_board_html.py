@@ -844,31 +844,33 @@ document.addEventListener('change',function(ev){
                  '<b>缺口披露</b>：电池/整车质保年限与充电循环次数，'
                  '汽车之家参数页<b>不提供该字段</b>（未采集，不推断、不编造）——'
                  '按质保年限横向比较只能人工核验厂商官网。</div>')
-        # v10.15.0：新增「电池素质 / 补能能力」两列——用户诉求「电池在三电占比高，
-        # 是不是要分开来」。三电一直是一个笼统的分数，读者看不出这辆车是电池好
-        # 还是补能快；拆开后两类硬件一目了然。
+        # v10.15.5：两列扩为三列「电池 / 电机 / 电控」——用户诉求「三电=电池+电机+电控，
+        # 别只看电池」。电池=电芯+容量+续航+冷却；电机=峰值功率（硬件规格参考）；
+        # 电控=高压平台+快充（补能通路）。三电规则项此前 6 项全电池，现补齐电机项。
         # 列的值来自 rule_adjust 的审计字段（逐项可复算），不是另算一套。
         H.append("<table><thead><tr><th style='text-align:left'>车型</th>"
                  "<th style='text-align:left'>评分配置</th><th>电量</th><th>高压平台</th>"
                  "<th style='text-align:left'>快充</th><th>最大充电功率</th><th>官方电耗</th>"
-                 "<th style='text-align:left'>电芯</th><th>换电</th><th>CLTC</th>"
-                 "<th>电池素质</th><th>补能能力</th></tr></thead><tbody>")
+                 "<th style='text-align:left'>电芯</th><th>换电</th><th>CLTC</th><th>峰值功率</th>"
+                 "<th>电池</th><th>电机</th><th>电控</th></tr></thead><tbody>")
         for r in rows:
             f = ef.get(r.get("model")) or {}
             if not f:
                 continue
             # 分组来自 energy_facts（rule_adjust 明细已透传到那里），不另找来源
             _g = f.get("groups") or {}
-            _bat = _g.get("电池素质") or {}
-            _chg = _g.get("补能能力") or {}
-            _bat_s = (f"{_bat.get('sum'):+.1f}" if _bat.get("sum") is not None else "—")
-            _chg_s = (f"{_chg.get('sum'):+.1f}" if _chg.get("sum") is not None else "—")
-            _tip = []
-            if _bat.get("items"):
-                _tip.append("电池素质：" + "、".join(i.get("text") or "" for i in _bat["items"]))
-            if _chg.get("items"):
-                _tip.append("补能能力：" + "、".join(i.get("text") or "" for i in _chg["items"]))
-            _title = e(" ｜ ".join(_tip)) if _tip else ""
+            _groups_txt = {}
+            for _gname in ("电池", "电机", "电控"):
+                _grp = _g.get(_gname) or {}
+                _groups_txt[_gname] = (
+                    f"{_grp.get('sum'):+.1f}" if _grp.get("sum") is not None else "—")
+            _title_parts = []
+            for _gname in ("电池", "电机", "电控"):
+                _grp = _g.get(_gname) or {}
+                if _grp.get("items"):
+                    _title_parts.append(_gname + "：" +
+                                        "、".join(i.get("text") or "" for i in _grp["items"]))
+            _title = e(" ｜ ".join(_title_parts)) if _title_parts else ""
             H.append(f"<tr><td class='name'>{e(r.get('model'))}</td>"
                      f"<td style='text-align:left'>{e(str(f.get('trim') or '—'))}</td>"
                      f"<td>{_num_unit(f.get('kwh'), ' kWh')}</td>"
@@ -879,15 +881,19 @@ document.addEventListener('change',function(ev){
                      f"<td style='text-align:left'>{e(str(f.get('cell') or '未披露'))}</td>"
                      f"<td>{e(str(f.get('swap') or '—'))}</td>"
                      f"<td>{_num_unit(f.get('cltc_km'), ' km')}</td>"
-                     f"<td title=\'{_title}\'>{_bat_s}</td>"
-                     f"<td title=\'{_title}\'>{_chg_s}</td></tr>")
+                     f"<td>{_num_unit(f.get('max_power_kw'), ' kW')}</td>"
+                     f"<td title=\'{_title}\'>{_groups_txt['电池']}</td>"
+                     f"<td title=\'{_title}\'>{_groups_txt['电机']}</td>"
+                     f"<td title=\'{_title}\'>{_groups_txt['电控']}</td></tr>")
         H.append("</tbody></table>")
-        H.append("<div class='rule'>「电池素质」= 电芯 + 电池容量 + 续航 + 热管理（电池本体）；"
-                 "「补能能力」= 高压平台 + 快充时间（补能通路）。两列是三电规则项的"
-                 "分组求和，<b>分组只用于披露、不改变三电总分的算法</b>（避免读者误以为"
-                 "换了权重）。悬停可看逐项依据。电池容量按 <b>kWh/万元</b> 判"
-                 "（每万元预算买到多少度电池）——本榜是 10–40 万全价位，"
-                 "电池度数的<b>绝对值跨价位不可比</b>，按绝对值判会系统性奖励高价车。")
+        H.append("<div class='rule'>三电按业内「<b>电池 / 电机 / 电控</b>」三分展示："
+                 "<b>电池</b>=电芯+容量+续航+热管理；<b>电机</b>=峰值功率（硬件规格参考，"
+                 "按榜内中位相对化、粗分档避免 10kW 噪音）；<b>电控</b>=高压平台+快充时间"
+                 "（补能通路）。三列是三电规则项的分组求和，<b>只用于披露、不改三电总分算法</b>。"
+                 "<b>口径边界</b>：业内更看重的额定功率/效率MAP/最高转速（电机）与 SiC/MCU 效率/"
+                 "BMS（电控）本池结构化覆盖 0/20，未进分；电耗效率修正（车重残差）与续航达成率修正"
+                 "属「电控+整车系统效率」，作为独立模块计入三电总分，不在上述规则分组内。"
+                 "峰值功率只维持约 10s、水分较大，故只作规格参考而非主导项。悬停可看逐项依据。")
         H.append("</div>")
 
     # ---- 空间与储物事实（v10.11.0）

@@ -100,6 +100,10 @@ def spec_from_trim(trim: dict, base_spec: dict | None = None) -> dict:
         s["trunk_l"] = trim["trunk_l"]
     if trim.get("battery_cooling") is not None:
         s["battery_cooling"] = trim["battery_cooling"]
+    # v10.15.5：峰值功率 → 三电「电机功率」项。20/20 覆盖的电机硬件规格参考，
+    # 走 spec_score 分档 + rule_adjust 逐项中位锚，高低功率得到温和相对差。
+    if trim.get("max_power_kw") is not None:
+        s["max_power_kw"] = trim["max_power_kw"]
     kcs = [str(x) for x in (trim.get("key_configs") or [])]
     if any("激光雷达" in x for x in kcs):
         s["adas_lidar"] = True

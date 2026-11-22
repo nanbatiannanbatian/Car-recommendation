@@ -112,7 +112,7 @@ def rule_parts(cands: list[dict], dim: str) -> dict:
 
 
 def _powertrain_groups(c: dict, trims_db: dict) -> dict:
-    """三电规则项的子维度分组披露：电池素质 / 补能能力。"""
+    """三电规则项的子维度分组披露：电池 / 电机 / 电控。"""
     from modules.engine import spec_score as SS
     try:
         g = SS.powertrain_group_parts(_spec_of(c, trims_db))
@@ -180,7 +180,7 @@ def apply_rule_adjust(cands: list[dict], dims=DIMS, alpha=ALPHA, cap=CAP,
                 "cap": cap, "alpha": alpha,
                 "items": detail[m],
             }
-            # 三电维：按「电池素质 / 补能能力」分组披露（2026-11-22）。
+            # 三电维：按「电池 / 电机 / 电控」分组披露（v10.15.5 扩为三组）。
             # 用户诉求「电池在三电占比高，是不是要分开来」——分开后读者能看清
             # 这辆车是电池好还是补能快，而不是只看到一个笼统的「三电 8.5」。
             if dim == "powertrain":
