@@ -148,6 +148,7 @@ CASES = [
     ("BUG-125", "海豹06EV评分配置停在2025款24min、2027款二代闪充800V的voltage为空→高压+快充项丢失", "v10.24.0"),
     ("BUG-126", "三电阈值硬编码在代码裸数字，改档要动代码且无法审计当前生效版本", "v10.25.0"),
     ("BUG-127", "max_power_kw/motor_kw字段错配64处+charge被填纯电压12处致功率/电压/快充项静默缺席", "v10.25.0"),
+    ("BUG-128", "三电阈值配置化后无复核到期信号+车型参数/申报库/候选池无统一新鲜度体检，2027三电升级后静默用旧档", "v10.26.0"),
 ]
 
 
@@ -4460,8 +4461,80 @@ def t127():
             "极氪007功率370kW与900V真实进分 + 审计留痕")
 
 
+def t128():
+    """BUG-128：配置化只解决「改档不改代码」，没解决「何时该改」——
+    2027 年三电全面升级后若无到期信号，阈值会静默停留在 2026 档位（v10.26.0）。
+
+    修法：powertrain_rules.json.review 加复核日期/周期，
+    research/data_freshness.py 纯读体检四类对象并出刷新计划，实现
+    「体检发现过期 → 定向重采 → 人工核验 → 重打指纹 → 重出榜」闭环。
+    本测试锁死：①配置有 review 块；②到期可检出；③纯读不改分；④反向注入翻转。
+    """
+    import json
+    import datetime as dt
+    from modules.research import data_freshness as DF
+
+    cfg = json.load(open("categories/powertrain_rules.json", encoding="utf-8"))
+    rv = cfg.get("review") or {}
+    assert rv.get("reviewed_at") and isinstance(rv.get("review_interval_days"), int), \
+        f"三电阈值缺复核到期元数据（2027升级无人提醒）: {rv}"
+    assert 30 <= rv["review_interval_days"] <= 365, "复核周期不合理"
+    assert rv.get("next_review") and rv.get("trigger"), "缺下次复核日/触发条件"
+    # 内核 selftest（多场景：fresh/due/overdue + 过期车刷新计划）
+    assert DF.selftest() == 0, "freshness selftest 失败"
+    # 纯读性：audit 前后三电关键数据文件字节不变（不改分、不落库、不联网）
+    import hashlib
+    watched = ["categories/powertrain_rules.json", "data/gen/trims.json",
+               "categories/filings_notes.json"]
+    def digests():
+        return {p: hashlib.sha256(open(p, "rb").read()).hexdigest() for p in watched}
+    before = digests()
+    r = DF.audit()  # 用真实文件体检
+    after = digests()
+    assert before == after, f"体检修改了数据文件: {[p for p in watched if before[p]!=after[p]]}"
+    assert r["overall"] in ("fresh", "due", "overdue") and r["refresh_plan"] is not None
+    assert all(k in r for k in ("thresholds", "specs", "pools", "filings"))
+    # 反向注入一：把复核日移到很久以前 → overdue + 出现 threshold_review 计划
+    old_cfg = dict(rv)
+    shifted = dict(cfg)
+    shifted["review"] = {**rv, "reviewed_at": "2020-01-01"}
+    r_bad = DF.audit(as_of="2026-11-22", cfg=shifted, pools=[],
+                     filings={"updated": "2026-11-20"})
+    assert r_bad["thresholds"]["state"] == "overdue", \
+        f"过期复核日未检出: {r_bad['thresholds']}"
+    assert any(x["kind"] == "threshold_review" for x in r_bad["refresh_plan"]), \
+        "阈值过期未进入刷新计划"
+    # 反向注入二：去掉 review 块 → unknown（不能静默当 fresh）
+    no_rv = dict(cfg); no_rv.pop("review", None)
+    r_norv = DF.audit(as_of="2026-11-22", cfg=no_rv, pools=[],
+                      filings={"updated": "2026-11-20"})
+    assert r_norv["thresholds"]["state"] == "unknown", "缺 review 块不应静默判 fresh"
+    # 反向注入三：车型参数过期 → spec_refresh 计划
+    trims = {"entries": [{"model": "旧参数车", "date": "2026-01-01",
+                          "trims": [{"battery_kwh": 60, "cltc_km": 500, "motor_kw": 150}]}]}
+    r_sp = DF.audit(as_of="2026-11-22", cfg=cfg, trims=trims, pools=[],
+                    filings={"updated": "2026-11-20"})
+    assert r_sp["specs"]["stale_count"] == 1 and \
+        any(x["kind"] == "spec_refresh" for x in r_sp["refresh_plan"])
+    # 源码级：体检模块不 import engine/board（遵守 research 包契约：不改分）。
+    # 用 AST 只看真实 import 语句，避免 docstring/注释里提及而被字符串匹配误伤。
+    import ast
+    import inspect
+    tree = ast.parse(inspect.getsource(DF))
+    imported = set()
+    for n in ast.walk(tree):
+        if isinstance(n, ast.Import):
+            imported |= {a.name.split(".")[0] for a in n.names}
+        elif isinstance(n, ast.ImportFrom) and n.module:
+            imported.add(n.module.split(".")[0])
+    assert "engine" not in imported and "board" not in imported, \
+        f"体检模块越界进打分层: {sorted(imported)}"
+    return ("三电阈值复核到期元数据 + 数据新鲜度体检(阈值/参数/指纹/申报) + "
+            "纯读不改分 + 三类反向注入翻转 + 刷新计划闭环")
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120, t121, t122, t123, t124, t125, t126, t127]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120, t121, t122, t123, t124, t125, t126, t127, t128]
 
 
 def run():

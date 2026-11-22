@@ -13,7 +13,7 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 10.25.0
+version: 10.26.0
 author: "nanbatiannanbatian"
 ---
 
@@ -3647,3 +3647,11 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
 - 修复效果（逐项，评分配置层）：极氪007 三电项从 3 项（容量/续航/800V）→ 4 项且含 370kW 功率 +0.8、900V 连续档 +0.6——二代闪充与高压的客观差距终于进分；400V 车明确进 +0 项参与中位锚（有数据≠缺数据）。
 - 回归：新增 BUG-126（阈值配置化唯一源+≤8min/900V区分+子进程反向注入改配置即改分）、BUG-127（功率回填64处/电压分离12处+极氪007功率电压进分+审计留痕）；更新 t108（阈值下调后 raw≥10 从 65→14，前提阈值 50→10）、t123（快充项断言不再写死旧档分值）、t125（高压 +1.0→+0.4 并锁 platform_v=800）。全套 bug 125/125、反向注入 102/102、midsuv 46/46、layout 16/16、release 39/39、compare 20/20、router 32/32、derive 4/4、各 selftest 全绿。
 - 产物：三榜全池重算 `runs/midsedan_bev_allprice_202611_v29`、`runs/midsuv_bev_202611_v29`、`runs/midsuv_bev_u18_202611_v29`（锚点 path 前移 v29），跨榜同车 0 差异校验通过。
+
+## v10.26.0 · 数据时效机制（阈值复核到期 + 新鲜度体检闭环，2026-11-22）
+- 用户问：「打分逻辑是不是可以不硬编码，比如 27 年以后厂家三电全部升级了，三电评分是不是就要修改了。是不是在 research 增加模块查询数据填入打分，然后这些数据每隔一个月就过期需要重新填入，你觉得怎么样好直接改」。
+- **判断（向用户讲透的架构分叉）**：用户直觉对一半。①打分逻辑已配置化（v10.25.0 的 powertrain_rules.json 六组唯一源），2027 三电升级改配置即可不改代码——但**缺「何时该改」的到期信号**，无人盯着就静默用 2026 档。②research 联网采集模块**早已存在**（fetch_specs/auto_trims/trim_ingest 等整套），数据带 date 字段，不用新增查询能力——缺的是统一体检。③「research 实时查数直接填分 + 每月自动重填」**不能走**：本榜铁律「无模型调用、同一输入必得同一输出、出榜只读快照」，实时联网进分会让同一天两次出榜结果不同、跨榜同分碎裂、回归无法稳定。正确闭环 = 体检发现过期 → 定向重采 → 人工核验落库 → 重打指纹 → 重出榜。
+- **改动一（阈值到期信号）**：`categories/powertrain_rules.json` 加 `review` 块（reviewed_at=2026-11-22 / review_interval_days=180 / next_review=2027-05-21 / trigger 触发条件 / why）。半年周期理由：阈值要看业内多源趋势，属结构性判断，逐月重审会把打分变噪声驱动；高频的销量/价格/优惠另有月度机制不在此表。版本 1.0→1.1。
+- **改动二（新鲜度体检模块）**：新建 `modules/research/data_freshness.py`，**纯读、不联网、不改任何数据文件、不改分**（AST 锁死不 import engine/board）。体检四类：①阈值复核到期（fresh/due/overdue，due=周期 80% 后提醒）；②车型三电参数采集日期（data/gen/trims.json 各车 date，默认 90 天过期，列出过期车+已采字段+重采命令）；③候选池指纹（只读 stamp，真判定交 score_fingerprint --check）；④申报库缓存（3 天，与 filings_board.STALE_DAYS 一致）。输出结构化 JSON + 人读刷新计划（4 类 kind：threshold_review/spec_refresh/filings_refresh/pool_restamp）。CLI：`--json`/`--strict`(overdue 退 2)/`--as-of YYYY-MM-DD`(模拟未来体检)/`--spec-days`。遵守 research 包契约（只返回 dict、不 import engine）。
+- **回归**：新增 BUG-128（review 元数据存在+周期合理+selftest 多场景+**纯读性 SHA256 前后比对**+三类反向注入：改 reviewed_at→overdue/去 review 块→unknown(不静默 fresh)/车型 date 过期→spec_refresh 计划+AST 锁不越界进打分层）。全套 bug 126/126、反向注入 102/102、midsuv 46/46、layout 16/16、release 39/39、compare 20/20、router 32/32、derive 4/4、各 selftest 全绿。
+- **零分数影响**：本次只加元数据+体检模块+回归，未动打分代码与权重配置——三候选池指纹 `--check` 均「一致」(48478d21)，v29 三榜分数不变，**不重出榜**。
