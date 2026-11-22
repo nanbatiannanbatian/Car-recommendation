@@ -402,9 +402,12 @@ def main():
     if not getattr(a, "no_experience", False):
         _ES.apply_experience(cands, enabled=True)
 
-    # 电耗效率修正（v10.6.0）：三电维度此前只看车端硬件（容量/电压/充电/电芯），
-    # 忽略了「同样电量跑更远」的系统能效——特斯拉电耗全榜最低却三电垫底即源于此。
-    # 全榜统一、以榜内中位为基准双向调整（±0.4封顶），无电耗数据不插补。
+    # 电耗效率修正（v10.6.0 引入，v10.15.3 改车重归一残差法）：
+    # 三电维度此前只看车端硬件（容量/电压/充电/电芯），忽略系统能效。
+    # v10.15.3：电耗~车重相关+0.839，绝对电耗中位法系统性冤枉重车
+    # （蔚来16.1中15.3是车重必然、极氪7X真高效却被扣）→ 改为榜内对
+    # (车重→电耗) 回归后按残差（实际−车重预测）双向调整，±0.4封顶，
+    # 缺电耗或车重不插补。同口径见 modules/engine/powertrain_efficiency.py。
     # 必须放在 experience 之后、evidence_gate 之前：证据封顶读的是最终分。
     from modules.engine import powertrain_efficiency as _PE
     _eff_applied = 0
@@ -412,7 +415,8 @@ def main():
         _PE.apply_efficiency(cands)
         _eff_applied = sum(1 for c in cands
                            if (c.get("powertrain_efficiency") or {}).get("status") == "applied")
-        print(f"[电耗效率修正] {_eff_applied} 款有电耗一手数据（榜内中位为基准，±0.4封顶）")
+        print(f"[电耗效率修正] {_eff_applied} 款有电耗+车重一手数据"
+              f"（车重归一残差法，±0.4封顶）")
 
     # 续航达成率调整（v10.15.2 · 审计 P0-1）：三电此前只看 CLTC 标称，达成率零散在体验库。
     # 现在用 physics.ev_range_model 从 kwh/电耗/车重/Cd 估算高速达成率（一手实测优先），

@@ -2875,16 +2875,24 @@ def t096():
     #    v10.11.0：不再钉死「深蓝S07」这一辆。官方 CLTC 电耗接入后，
     #    每车取的是**评分配置对应值**（深蓝S07 = 12.6，低于榜内中位 13.5），
     #    旧断言钉死的那辆车不再成立——那是数据口径变了，不是机制坏了。
-    #    改为**机制断言**：榜内官方电耗高于中位的车必须减分（双向性是纪律本身）。
-    mid = PE.median(cands, tbl)
-    assert mid, "电耗中位算不出"
-    over = [c for c in cands
-            if (c.get("powertrain_efficiency") or {}).get("status") == "applied"
-            and (c.get("powertrain_efficiency") or {}).get("consumption", 0) > mid]
-    assert over, "榜内应有电耗高于中位的车（否则中位锚点本身有问题）"
-    for c in over:
-        assert c["powertrain_efficiency"]["adjust"] < 0, \
-            f"高电耗车应减分: {c['model']} {c['powertrain_efficiency']}"
+    #    v10.15.3：改为车重归一残差法。绝对电耗高 ≠ 效率低（电耗~车重相关+0.839），
+    #    极氪7X 13.9kWh 因车重2280kg 归一后是真高效(残差−1.03)应加分。
+    #    新机制断言：**残差高于榜内中位残差**的车必须减分（双向性纪律本身）。
+    applied = [c for c in cands
+               if (c.get("powertrain_efficiency") or {}).get("status") == "applied"]
+    assert applied, "榜内应有已应用的车"
+    assert all((c["powertrain_efficiency"].get("method") == "residual") for c in applied), \
+        "全榜应走车重残差法"
+    med_res = applied[0]["powertrain_efficiency"]["median_residual"]
+    assert med_res is not None, "缺中位残差"
+    over = [c for c in applied if c["powertrain_efficiency"]["residual"] > med_res]
+    if over:
+        for c in over:
+            assert c["powertrain_efficiency"]["adjust"] < 0, \
+                f"残差高于中位（比同重车费电）应减分: {c['model']} {c['powertrain_efficiency']}"
+    #    极端费电车（绝对电耗最高且车重不最大）应被减分——机制双向性兜底
+    assert any(c["powertrain_efficiency"]["adjust"] < 0 for c in applied), \
+        "榜内应有被减分的低效车（否则双向性失效）"
     #    官方口径优先：充电/电耗来源可追溯
     srcs = {(c.get("powertrain_efficiency") or {}).get("official") for c in cands
             if (c.get("powertrain_efficiency") or {}).get("status") == "applied"}
@@ -2892,7 +2900,8 @@ def t096():
     # 5) pipeline 接入 + 开关存在
     assert "powertrain_efficiency" in _read("pipeline.py"), "pipeline 未接电耗修正"
     assert "no-powertrain-efficiency" in _read("pipeline.py"), "缺 A/B 对照开关"
-    return ("三电能耗效率：全榜统一中位基准双向修正±0.4，特斯拉低电耗加分/高电耗车减分"
+    return ("三电能耗效率：车重归一残差法双向修正±0.4（v10.15.3，重车不被绝对电耗冤枉）"
+            "，特斯拉低电耗加分/低效车减分"
             "(+t096)")
 
 

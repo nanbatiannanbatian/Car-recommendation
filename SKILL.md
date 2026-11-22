@@ -13,7 +13,7 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 10.15.2
+version: 10.15.3
 author: "nanbatiannanbatian"
 ---
 
@@ -3391,3 +3391,22 @@ filings selftest OK（门禁+预估）、比较器 20/20、物理模型 selftest
 
 ### 验收
 全套回归全绿：bug 107/107、跨能源比较器 20/20、结构 16/16、11 个模块 selftest 全过；v6 榜单阿维塔07 显示 ≤984 落第二档（月销<2000 正确拦截）；adjust_budget 修复后读出 5 维累计、无超预算。出榜命令：`pipeline.py --category car_midsuv_bev --candidates runs/midsuv_bev_pool_202611_final.json --out runs/midsuv_bev_202611_v6 --as-of 202610 --quality --sales-snapshot runs/dcd_sales_snapshot_202610.json`。
+
+## v10.15.3 · 电耗效率改车重归一残差法（2026-11-22，用户质疑"电耗高就给三电低分不合理"）
+
+### 用户诉求与辨析
+用户提出：电耗高就给三电低分不合理，要结合电机/马力（"电机多操控好、四驱更安全"）。实证辨析：
+- **成立部分**：电耗~车重 Pearson **+0.839**（强），车重每+100kg 电耗+0.66；电耗~功率仅 +0.205、~零百 −0.097（无关）。绝对电耗中位法系统性冤枉重车——蔚来ES6 16.1 电耗里 15.30 是车重必然（回归式 `电耗=0.0066×车重kg−0.05`），仅残差 +0.80 是自身效率，旧公式却按绝对电耗扣 −0.35；极氪7X/阿维塔07 这类高功率车残差为负（真高效）反被误扣。**该改。**
+- **不成立部分**：①按马力归一化会引噪音（相关性弱）；②"电机多操控好"工程上不成立——操控看悬架/驱动布局/调校，蔚来判词明确它"前五连杆规格低于双叉臂、无空悬"；③"四驱更安全"过于笼统——制动/碰撞成绩与四驱无关，且四驱结构化数据覆盖 **0/20**（只在文本判词里散落），无法进分；④给四驱加分等于奖励高电耗（四驱天生更重更费电），与电耗扣除逻辑打架。**不碰操控/安全/电机数。**
+
+### 根因修复（modules/engine/powertrain_efficiency.py）
+- 新增 `load_weight()`：车重与电耗同源优先级（trims 官方 `curb_weight_kg` 优先，physics `weight_kg` 兜底），避免"电耗取高配、车重取低配"错配。
+- 新增 `regression_slope()` / `residual_adjust()`：榜内对 (车重→电耗) 一元线性回归，`残差=实际电耗−车重预测电耗`，榜内残差中位为锚，残差高（比同重车费电）减分、低加分，`RESIDUAL_SPAN=2.0` 映射到 ±0.4 封顶。
+- `apply_efficiency()` 主链切残差法；缺电耗或缺车重不插补、不调整；回归退化（车重无方差/样本<3）退回绝对电耗中位兜底。审计字段保留 `adjust`（adjust_budget 读取不变），新增 `weight/residual/median_residual/regression/method`。
+- 只调 scores.powertrain 一维的Red Line 不变。
+
+### 效果（真实20款池）
+20/20 走残差法。蔚来ES6 `−0.35→−0.17`、极氪7X `−0.05→+0.19`、阿维塔07 `−0.13→+0.12`；纯产品力 TOP10 名次几乎不变（仅阿维塔07 与海狮06EV 互换 2/3）。榜单更公平但排序稳定。BUG-096 机制断言随新口径更新（"绝对电耗>中位减分"→"残差>中位残差减分"）。
+
+### 验收
+bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency selftest 加 6 项新断言（重车不冤枉/高效车识别/同电耗重车占优/无数据不动/封顶±0.4/退化兜底/只改三电）。v7 榜单（`runs/midsuv_bev_202611_v7`）全门禁通过，日志文案同步为"车重归一残差法"。
