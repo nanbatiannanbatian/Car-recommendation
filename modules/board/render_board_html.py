@@ -76,6 +76,7 @@ tr.tier-T1 td{background:#eef8f0}tr.tier-T2 td{background:#fffdf5}tr.tier-T3 td{
 .flag-fleet{background:#fdf0ee;color:#b42318;border:1px solid #d85a30;font-weight:500}
 .flag-crash{background:#eaf6ee;color:#17663a;border:1px solid #b7dfc6;font-weight:500}
 .flag-lowtier{background:#f2f4f7;color:#475467;border:1px solid #d0d5dd;font-weight:400;cursor:help}
+.xboard-tier{display:inline-block;margin-left:5px;font-size:11px;font-weight:400;padding:1px 6px;border-radius:4px;background:#f2f4f7;color:#475467;border:1px solid #d0d5dd;cursor:help}
 .stability-tip{background:#fff8e6;border-left:3px solid #BA7517;padding:10px 14px;
 border-radius:0 8px 8px 0;font-size:13px;color:#5c4518;margin:14px 0}
 .rk{display:inline-flex;width:25px;height:25px;align-items:center;justify-content:center;
@@ -714,17 +715,32 @@ document.addEventListener('change',function(ev){
         if review: H.append(f'<div class="warn">{e(review)}</div>')
         H.append('<div class="tier-grid">')
         names = {"T1": "第一档 · 可直接买", "T2": "第二档 · 按偏好取舍", "T3": "第三档 · 证据不足/暂缓"}
-        # v9.7.52：强推荐名单复用主表循环前已收集的 _strong/_strong_reason（不再重复读取）
+        _tcb = (summary or {}).get("tier_crossboard") or {}
+        _tcn = {"T1": "第一档", "T2": "第二档", "T3": "第三档"}
+        # v10.20.0：只给跨榜变档的车加「全榜第X档」小标；判档仍以本榜 tiers 为准
         for k in ("T1", "T2", "T3"):
             models = tiers.get(k) or []
-            lis = "".join(
-                f"<li>{e(m)}{('<b class=\"strong-tag\" title=\"' +
-                    ('有权威碰撞实锤+高分，家族命中不够稳压（换算法会换位）' if _strong_reason.get(m)=='family' else
-                     '有权威碰撞实锤+高分+连续名次稳定（稳定地排第5左右），只是未在多数算法进前三') +
-                    '\">强推荐</b>') if (k=='T2' and m in _strong) else ''}</li>"
-                for m in models) if models else "<li>—</li>"
-            H.append(f'<div class="tier-card {k}"><h3>{names[k]}（{len(models)} 款）</h3><ul>{lis}</ul></div>')
+            lis = []
+            for m in models:
+                _nm = e(m)
+                _g = _tcb.get(m)
+                if _g and _g != _tcn[k]:
+                    _nm += ('<span class="xboard-tier" title="档位按本榜候选池判定，'
+                            '跨榜不可直接比较；跨榜请直接比较总分与八维分">'
+                            + f"全榜{e(_g)}</span>")
+                # v9.7.52：强推荐名单复用主表循环前已收集的 _strong/_strong_reason
+                if k == "T2" and m in _strong:
+                    _tip = ('有权威碰撞实锤+高分，家族命中不够稳压（换算法会换位）'
+                            if _strong_reason.get(m) == 'family' else
+                            '有权威碰撞实锤+高分+连续名次稳定（稳定地排第5左右），只是未在多数算法进前三')
+                    _nm += f'<b class="strong-tag" title="{e(_tip)}">强推荐</b>'
+                lis.append(f"<li>{_nm}</li>")
+            H.append(f'<div class="tier-card {k}"><h3>{names[k]}（{len(models)} 款）</h3>'
+                     f'<ul>{"".join(lis) if lis else "<li>—</li>"}</ul></div>')
         H.append("</div>")
+        H.append('<div class="rule"><b>跨榜档位口径：</b>上面的「家族命中 / 进前三」'
+                 '按本榜候选池判定，不是绝对分数线；同一台车在不同价位榜可能档位不同，'
+                 '跨榜请直接比总分与八维分。</div>')
         if _strong:
             H.append('<div class="rule"><b>强推荐说明（与第一档共同构成"可优先看"清单）：</b>'
                      '第二档带「强推荐」的车，有权威碰撞实锤、总分高、无硬风险——'
@@ -830,8 +846,9 @@ document.addEventListener('change',function(ev){
                  '汽车之家参数页<b>不提供该字段</b>（未采集，不推断、不编造）——'
                  '按质保年限横向比较只能人工核验厂商官网。</div>')
         # v10.15.5：两列扩为三列「电池 / 电机 / 电控」——用户诉求「三电=电池+电机+电控，
-        # 别只看电池」。电池=电芯+容量+续航+冷却；电机=峰值功率（硬件规格参考）；
-        # 电控=高压平台+快充（补能通路）。三电规则项此前 6 项全电池，现补齐电机项。
+        # 别只看电池」。电池=电芯+容量+续航+冷却+快充（v10.20.1：快充倍率属电池本体
+        # 材料×热管理能力）；电机=峰值功率（硬件规格参考）；电控=高压平台（补能架构）。
+        # 三电规则项此前 6 项全电池，现补齐电机项。
         # 列的值来自 rule_adjust 的审计字段（逐项可复算），不是另算一套。
         H.append("<table><thead><tr><th style='text-align:left'>车型</th>"
                  "<th style='text-align:left'>评分配置</th><th>电量</th><th>高压平台</th>"
@@ -872,9 +889,10 @@ document.addEventListener('change',function(ev){
                      f"<td title=\'{_title}\'>{_groups_txt['电控']}</td></tr>")
         H.append("</tbody></table>")
         H.append("<div class='rule'>三电按业内「<b>电池 / 电机 / 电控</b>」三分展示："
-                 "<b>电池</b>=电芯+容量+续航+热管理；<b>电机</b>=峰值功率（硬件规格参考，"
-                 "按榜内中位相对化、粗分档避免 10kW 噪音）；<b>电控</b>=高压平台+快充时间"
-                 "（补能通路）。三列是三电规则项的分组求和，<b>只用于披露、不改三电总分算法</b>。"
+                 "<b>电池</b>=电芯+容量+续航+热管理+快充时间；<b>电机</b>=峰值功率（硬件规格参考，"
+                 "按榜内中位相对化、粗分档避免 10kW 噪音）；<b>电控</b>=高压平台（补能架构）。"
+                 "<b>快充归电池</b>：快充倍率的瓶颈是电芯材料体系×热管理（均为电池本体属性），"
+                 "800V 高压平台只是使能条件，避免把慢充车的电池列抬高。三列是三电规则项的分组求和，<b>只用于披露、不改三电总分算法</b>。"
                  "<b>口径边界</b>：业内更看重的额定功率/效率MAP/最高转速（电机）与 SiC/MCU 效率/"
                  "BMS（电控）本池结构化覆盖 0/20，未进分；电耗效率修正（车重残差）与续航达成率修正"
                  "属「电控+整车系统效率」，作为独立模块计入三电总分，不在上述规则分组内。"
@@ -917,52 +935,6 @@ document.addEventListener('change',function(ev){
                      f"<td>{f'{eff:g}%' if isinstance(eff, (int, float)) else '—'}</td>"
                      f"<td>{_mm(f.get('leg_room'))}</td>"
                      f"<td>{_mm(f.get('knee_room'))}</td></tr>")
-        H.append("</tbody></table>")
-
-    # ---- 经销商与服务体验（2026-11-22 用户要求展示；仅展示不进分）
-    if "dealer_experience" in ids:
-        dr = meta.get("dealer_experience") or {}
-        H.append("<h2>经销商与服务体验 <span>仅展示 · 不进评分 · 品牌级 · 1000 分制</span></h2>")
-        H.append('<div class="rule" style="background:#eef4fb">'
-                 '<b>口径边界：</b>' + e(dr.get("boundary") or "") + "</div>")
-        H.append("<table><thead><tr><th style='text-align:left'>车型</th>"
-                 "<th style='text-align:left'>J.D. Power 品牌级满意度</th>"
-                 "<th style='text-align:left'>覆盖说明</th></tr></thead><tbody>")
-        for row in (dr.get("rows") or []):
-            H.append(f"<tr><td class='name'>{e(row.get('model'))}</td>"
-                     f"<td>{e(row.get('display'))}</td>"
-                     f"<td class='ref'>{e(row.get('note'))}</td></tr>")
-        H.append("</tbody></table>")
-
-    # ---- 指导价 vs 官方优惠价双口径对照（2026-11-22 用户要求；仅展示不进分）
-    if "price_dual" in ids:
-        _pd = (summary or {}).get("price_dual_view") or {}
-        _pdsum = _pd.get("summary") or {}
-        H.append("<h2>指导价 vs 官方优惠价 <span>对照 · 不进评分 · 指导价仍为主口径</span></h2>")
-        H.append('<div class="rule" style="background:#fbf3e9">'
-                 "<b>为什么优惠不进主分：</b>优惠按月变动、有截止日，且金融贴息/保险/置换/选装/BaaS "
-                 "非直接车价不可比；直接进分会破坏可复算与跨榜同分。此处用与指导价同一价格档锚点，"
-                 "只算「若按官方现金优惠价」的性价比对照。"
-                 + (f"本榜 {_pd.get('with_promo')} 款有官方优惠，其中 {_pd.get('active')} 款当前有效，"
-                    f"{_pdsum.get('uplift_count')} 款性价比被指导价高估，最大 +{_pdsum.get('max_uplift')} 分。"
-                    if _pd.get("with_promo") else "") + "</div>")
-        H.append("<table><thead><tr><th style='text-align:left'>车型</th><th>指导价</th>"
-                 "<th>官方优惠后</th><th>性价比(指导价)</th><th>性价比(优惠价)</th>"
-                 "<th>差值</th><th style='text-align:left'>优惠形式 / 有效期 / 来源</th></tr></thead><tbody>")
-        for row in (_pd.get("rows") or []):
-            if row.get("delta") is None:
-                # 无有效数值（如 bZ5 待补、已过期无价）——文字标注不硬凑数字
-                H.append(f"<tr><td class='name'>{e(row.get('model'))}</td>"
-                         f"<td colspan='4' class='ref'>{e(row.get('type') or '—')}"
-                         f" · {e(row.get('note') or '')}</td>"
-                         f"<td>—</td><td class='ref'>{e(row.get('valid_until') or '—')}</td></tr>")
-                continue
-            H.append(f"<tr><td class='name'>{e(row.get('model'))}</td>"
-                     f"<td>{e(row.get('guide_price'))}</td><td>{e(row.get('promo_price'))}</td>"
-                     f"<td>{e(row.get('value_guide'))}</td><td>{e(row.get('value_promo'))}</td>"
-                     f"<td class='{'delta-up' if (row.get('delta') or 0) > 0 else ''}'>+{e(row.get('delta'))}</td>"
-                     f"<td class='ref'>{e(row.get('type'))} · {e(row.get('valid_until'))} · "
-                     f"{e(row.get('status'))}</td></tr>")
         H.append("</tbody></table>")
 
     # ---- 逐车取证依据（历史有、v8.x 漏掉，v9.0 补回）

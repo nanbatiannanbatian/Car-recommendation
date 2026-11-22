@@ -927,8 +927,12 @@ def cn_name(b):  # v9.7.44：统一走 crash_systems，加体系只改那一处
 
 def tier_report(cands: list[dict], cfg: dict, weights: list[float] | None = None,
                 label: str | None = None, airbag_gate: bool = False,
-                crash_gate: bool = False, norm_audit: bool | None = None) -> dict:
+                crash_gate: bool = False, norm_audit: bool | None = None,
+                crossboard: dict[str, str] | None = None) -> dict:
     """按「稳定性 × 证据 × 市场验证」判三档，不排名次。
+
+    crossboard: 全价位榜档位 {车型: 中文档位}，只供展示「全榜第X档」对照；
+        不参与判档、不改分数；档位相同的车不加注。
 
     为什么不分 1–10 名：名次的可解释性依赖于「分差大于算法噪声」。
     当 10 种算法只给出 7 种互不相同的排序、前几名分差不到 1 分时，
@@ -1220,8 +1224,12 @@ def tier_report(cands: list[dict], cfg: dict, weights: list[float] | None = None
     L.append(f"| **第三档** | 硬风险：停产 / 无交付 / 月销极低 / 营运为主 "
              f"<{int(rules['risk_low_sales']):,} / 人工标注硬伤 | 不是车差，是现在没资格被推荐 |")
     L.append("")
+    L.append("> **跨榜档位口径**：上表「家族命中 / 进前三」以**本榜候选池**为范围，"
+             "不是绝对分数线。同一款车在不同价位榜里因对手集合变化而档位不同，"
+             "属正常现象、不代表数据矛盾；档位只在本榜内可比，跨榜请直接看总分与八维分。")
+    L.append("")
 
-    def _line(r):
+    def _line(r, tier_cn=None):
         # 车系合计是纯电销量的**上界**（含同车系的插混/增程），必须用 ≤ 表示，
         # 否则会被读成「纯电卖了这个数」。
         if r["sales"] and r.get("sales_scope") == "series_total":
@@ -1239,6 +1247,10 @@ def tier_report(cands: list[dict], cfg: dict, weights: list[float] | None = None
             bits.append(LC_LABEL.get(lcs, lcs))
         if r["price"]:
             bits.append(f"{r['price']} 万")
+        if crossboard and tier_cn:
+            _g = crossboard.get(r["model"])
+            if _g and _g != tier_cn:
+                bits.append(f"全榜{_g}")
         return " ｜ ".join(bits)
 
     # 生命周期单列一节：这是「销量下滑」与「车不行」的分界线，必须让读者先看到
@@ -1272,7 +1284,7 @@ def tier_report(cands: list[dict], cfg: dict, weights: list[float] | None = None
         for r in tiers["T1"]:
             why = (f"{r.get('family_n', 6)} 个独立算法家族中 {r.get('family_hits', 0)} 个进前{top_k}"
                    f"（10算法按原理去重），{res['n_schemes']} 套权重情景下 {len(r['scenarios'])} 套进前{top_k}")
-            L.append(f"| **{r['model']}** | {r['trim'] or '—'} | {_line(r)} | {why} |")
+            L.append(f"| **{r['model']}** | {r['trim'] or '—'} | {_line(r, '第一档')} | {why} |")
     else:
         near = sorted([r for t in ("T2", "T3") for r in tiers[t]],
                       key=lambda r: -r["joint_freq"])[:3]
@@ -1311,7 +1323,7 @@ def tier_report(cands: list[dict], cfg: dict, weights: list[float] | None = None
             L.append("| 车型 | 判据 | 相对强项 | 什么偏好下它进前三 | 已知短板 |")
             L.append("|---|---|---|---|---|")
             for r in with_trig:
-                L.append(f"| {r['model']} | {_line(r)} | {r['best']} | "
+                L.append(f"| {r['model']} | {_line(r, '第二档')} | {r['best']} | "
                          f"{'、'.join(r['scenarios'])} | {r['note'] or '—'} |")
             L.append("")
         if no_trig:
@@ -1322,7 +1334,7 @@ def tier_report(cands: list[dict], cfg: dict, weights: list[float] | None = None
             L.append("| 车型 | 判据 | 相对强项 | 已知短板 |")
             L.append("|---|---|---|---|")
             for r in no_trig:
-                L.append(f"| {r['model']} | {_line(r)} | {r['best']} | {r['note'] or '—'} |")
+                L.append(f"| {r['model']} | {_line(r, '第二档')} | {r['best']} | {r['note'] or '—'} |")
     else:
         L.append("> 空。")
     L.append("")

@@ -149,8 +149,6 @@ def main():
                     help="不做空间硬数据一致性封顶（仅 A/B 对照，验证 space 虚高确实被压）")
     ap.add_argument("--no-value-residual", action="store_true",
                     help="不做性价比价格残差法（仅 A/B 对照，回退人工 value 分）")
-    ap.add_argument("--no-price-dual-view", action="store_true",
-                    help="不做指导价vs官方优惠价双口径对照（仅 A/B 对照；对照只读不进分）")
     ap.add_argument("--no-auto-safety", action="store_true",
                     help="不按官方成绩自动映射 safety 分（仅 A/B 对照；正常出榜不要关）")
     ap.add_argument("--no-backfill", action="store_true",
@@ -862,23 +860,6 @@ def main():
     # 1 逐榜：分榜 → 闸门 → 三档 → 审查 → 稳健性 → 权重审计 → 三榜并列
     #    顺序是「先分榜再闸门」，因为四个榜的价格带上限不同（16 万 / 18 万），
     #    gates 必须按榜取，不能全局一刀切。
-    # v10.18.0：经销商体验展示覆盖（仅展示不进分），报告与页面共用同一份统计
-    from modules.engine import dealer_satisfaction as _DS
-    _ds_lib = _DS.load_library()
-    summary_dealer = {"coverage": _DS.coverage(cands, _ds_lib),
-                      "source": _ds_lib.get("source")}
-
-    # v10.18.0：指导价 vs 官方优惠价双口径对照（只读，不改 scores）。
-    # 用本榜 value_residual 的同一锚点（bins/pool_mean）算"若按优惠价"的 value，
-    # 保证与指导价主分同一把尺子；价格档/公式复用 value_residual 纯函数。
-    from modules.engine import price_dual_view as _PDV
-    _pdv_report = None
-    if not getattr(a, "no_price_dual_view", False) and isinstance(_vr_report, dict) \
-            and _vr_report.get("bins") is not None:
-        _pdv_report = _PDV.build(cands, weights=_wv, fixed_bins=_vr_report)
-        print(f"[双口径对照] {_pdv_report['with_promo']} 款有官方优惠，"
-              f"其中 {_pdv_report['active']} 款有效、{_pdv_report['summary']['uplift_count']} 款性价比被指导价高估")
-
     # 调整预算审计（v10.15.2 · 审计 P1-5）：多模块叠加同维的总量暴露（只审计不截断）
     from modules.engine import adjust_budget as _AB
     _budget_report = _AB.audit(cands)
@@ -887,10 +868,32 @@ def main():
               + "、".join(f"{x['model']}/{x['dim']} {x['total_abs']}>{x['nominal_budget']}"
                          for x in _budget_report["exceeded"][:5]))
 
+    # v10.20.0：跨榜档位对照（只展示，不参与判档/打分）——子榜从锚点源全榜 summary
+    # 读取全榜档位；当前榜判档与全榜不同时，由报告/页面标注「全榜第X档」。
+    # 全榜自身 _anchor=None → 空表 → 不加任何标记。
+    _cross_global: dict[str, str] = {}
+    if _anchor:
+        _rel = (cfg.get("anchor_pool") or {}).get("path")
+        if _rel:
+            _gp = _rel if os.path.isabs(_rel) else str(paths.ROOT / _rel)
+            if os.path.exists(_gp):
+                try:
+                    _gs = json.load(open(_gp, encoding="utf-8"))
+                    for _tmap in (_gs.get("tiers") or {}).values():
+                        if not isinstance(_tmap, dict):
+                            continue
+                        for _tk, _cn in (("T1", "第一档"), ("T2", "第二档"), ("T3", "第三档")):
+                            for _nm in (_tmap.get(_tk) or []):
+                                _cross_global[str(_nm)] = _cn
+                except (OSError, ValueError):
+                    _cross_global = {}
+
     summary = {
         "category": a.category, "source": os.path.basename(a.candidates),
         "in": len(cands), "passed": 0, "dropped": 0, "sliders": custom,
         "boards": {}, "tiers": {}, "review": {},
+        # v10.20.0：全榜档位对照（只展示，判档结果仍以本榜 tiers 为准）
+        "tier_crossboard": _cross_global,
         # v10.16.0：榜内相对锚点来源（固定锚点=跨榜同分；无=本池现算）
         "anchor_pool": {"enabled": bool(_anchor),
                         "source": (cfg.get("anchor_pool") or {}).get("path") if _anchor else None,
@@ -904,11 +907,6 @@ def main():
         "value_residual": _VR.summarize(_vr_report)
             if isinstance(_vr_report, dict) and _vr_report.get("bins") is not None
             else {"status": "skipped"},
-        # v10.18.0：指导价 vs 官方优惠价双口径对照（用户拍板"双口径+敏感性"）。
-        # 主分仍用指导价；此处只用同一锚点公式算"若按优惠价"的 value 对照，只读不写。
-        "price_dual_view": _PDV.summarize(_pdv_report) if _pdv_report else {"status": "skipped"},
-        # v10.18.0：经销商体验展示覆盖（仅展示不进分）
-        "dealer_experience": summary_dealer,
         # v9.7.23：未入池车型及原因（用户要求"能比就比，不能比说明原因"）
         "pool_excluded": (_pool_data.get("pool_excluded") if isinstance(_pool_data, dict) else []),
         # 2026-11-21：价格回流审计（回填了哪些、哪些 trims 也没价）
@@ -1024,7 +1022,8 @@ def main():
         passed = L.with_config_scores(passed, cfg) if not a.no_config_anchor else passed
         parts.append(L.top_table(passed, cfg, wv, 10, band=_band)["report"])
         parts.append("")
-        _tier = L.tier_report(passed, cfg, wv, label, airbag_gate=a.airbag_gate, crash_gate=a.crash_gate)
+        _tier = L.tier_report(passed, cfg, wv, label, airbag_gate=a.airbag_gate,
+                              crash_gate=a.crash_gate, crossboard=_cross_global)
         parts.append(_tier["report"])
         parts.append("")
         # v9.7.18：证据 C 软提示（只降第一档资格、不判劣）——写入 summary 供页面展示
@@ -1062,7 +1061,8 @@ def main():
         if fdata:
             fitems = (fdata.get("boards") or {}).get(label) or []
             parts += FC.render_board(label, fitems, len(passed))
-        _tr = L.tier_report(passed, cfg, wv, label, airbag_gate=a.airbag_gate, crash_gate=a.crash_gate)
+        _tr = L.tier_report(passed, cfg, wv, label, airbag_gate=a.airbag_gate,
+                            crash_gate=a.crash_gate, crossboard=_cross_global)
         summary["tiers"][label] = _tr["tiers"]
         # v9.7.43：第二档"强推荐"名单（有碰撞实锤+高分+无硬风险，但换算法不够稳压）
         summary.setdefault("strong_picks", {})[label] = [
@@ -1171,23 +1171,8 @@ def main():
                        for m, v in models.items()},
         }
 
-    # v10.18.0：三项新增数据（用户 2026-11-22 要求）在报告正文披露，与页面自洽
+    # 召回/保值率等数据扩展在报告正文披露，与页面自洽
     parts += ["---", "", "# 数据扩展披露（2026-11-22）", ""]
-    _ds_cov_r = (summary.get("dealer_experience") or {}).get("coverage") or {}
-    parts.append("> **经销商与服务体验**：来源 J.D. Power 中国 2025 NEV-SSI/CSI 官方新闻稿，"
-                 "1000 分制品牌级，仅各分组前三名公开。"
-                 + (f"本榜 {_ds_cov_r.get('total')} 款中 {_ds_cov_r.get('covered')} 款品牌命中。"
-                    if _ds_cov_r else "")
-                 + "仅作展示不进任何评分——公开分覆盖不足 1/4，强行进分会造成"
-                 "「有数据的被奖励、没数据的中性」证据不对称。无公开分≠服务差。")
-    _pd_r = summary.get("price_dual_view") or {}
-    _pd_s = _pd_r.get("summary") or {}
-    parts.append("> **指导价 vs 官方优惠价**：主分仍用官方指导价（可复算、跨榜同分、不随时间漂移）。"
-                 + (f"本榜 {_pd_r.get('with_promo')} 款有官方优惠、{_pd_r.get('active')} 款当前有效，"
-                    f"{_pd_s.get('uplift_count')} 款性价比被指导价高估（最大 +{_pd_s.get('max_uplift')} 分），"
-                    "页面「指导价 vs 官方优惠价」区块给出同锚点对照。"
-                    if _pd_r.get("with_promo") else "本期无官方优惠数据。")
-                 + "优惠按月变动、有截止日，且金融贴息/保险/置换/选装/BaaS 不可比，故不进主分。")
     _rec_r = summary.get("recall") or {}
     _ota_n = sum(int(x.get("ota_skipped") or 0) for x in (_rec_r.get("detail") or []))
     parts.append("> **召回事件**：来源国家市场监管总局缺陷产品召回公告，"
@@ -1271,28 +1256,6 @@ def main():
                 data_v2 = BV.build(cands_for_html, cfg_v2, pol, facts_v2, tiers=_tiers_v2,
                                    rule_adjust_detail=_rule_detail,
                                    no_experience=True)  # 已在 pipeline 里调过，不重复累加
-                # v10.18.0：经销商与服务体验展示区（仅展示不进分）。从 DS 模块查品牌级
-                # J.D. Power 满意度，无公开分如实标注。写入 meta，两个渲染器共用。
-                from modules.engine import dealer_satisfaction as _DS
-                _ds_lib = _DS.load_library()
-                _ds_cov = _DS.coverage(cands_for_html, _ds_lib)
-                data_v2.setdefault("meta", {})["dealer_experience"] = {
-                    "boundary": (
-                        "来源：J.D. Power 中国 2025 NEV-SSI（销售）/ NEV-CSI（售后）官方新闻稿，"
-                        "1000 分制品牌级调研。仅各分组前三名公开，本榜 "
-                        f"{_ds_cov['total']} 款中 {_ds_cov['covered']} 款品牌命中；"
-                        "无公开分≠服务差，只是没有可核验公开数据。品牌级不代表具体门店/车型。"
-                        "乐道为蔚来子品牌未单独参评，不套用母品牌分。本项不进入任何评分维度。"),
-                    "source": _ds_lib.get("source"),
-                    "coverage": _ds_cov,
-                    "rows": [
-                        {"model": c.get("model"),
-                         "display": _DS.field_for(c.get("model", ""), _ds_lib),
-                         "note": ("品牌级公开分" if _DS.resolve(c.get("model", ""), _ds_lib)
-                                  else "该品牌无公开分或未单列，不估算")}
-                        for c in cands_for_html
-                    ],
-                }
                 _as_of = a.as_of
                 if not _as_of:
                     try:

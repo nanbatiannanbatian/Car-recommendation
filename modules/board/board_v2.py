@@ -758,12 +758,21 @@ def render_md(data: dict, summary: dict | None = None) -> str:
 
     if "tiers" in ids:
         t = (summary or {}).get("tiers") or {}
+        _tcb = (summary or {}).get("tier_crossboard") or {}
+        _tcn = {"T1": "第一档", "T2": "第二档", "T3": "第三档"}
+
+        def _tier_name(m, k):
+            # v10.20.0：只标注与全榜档位不同的车；判档仍以本榜 tiers 为准
+            _g = _tcb.get(m)
+            return f"{m}（全榜{_g}）" if _g and _g != _tcn.get(k) else m
+
         if t and all(k in t for k in ("T1", "T2", "T3")):
             names = {"T1": "第一档 · 可直接买", "T2": "第二档 · 按偏好取舍", "T3": "第三档 · 证据不足/暂缓"}
             L += ["", "## 三档分级", ""]
             for k in ("T1", "T2", "T3"):
                 models = t.get(k) or []
-                L.append(f"- **{names[k]}（{len(models)} 款）**：{'、'.join(models) if models else '—'}")
+                L.append(f"- **{names[k]}（{len(models)} 款）**："
+                         f"{'、'.join(_tier_name(m, k) for m in models) if models else '—'}")
         else:
             by = {"T1": [], "T2": [], "T3": []}
             for r in rows:
@@ -771,7 +780,8 @@ def render_md(data: dict, summary: dict | None = None) -> str:
                 if k in by: by[k].append(r["model"])
             L += ["", "## 三档分级", ""]
             for k in ("T1", "T2", "T3"):
-                L.append(f"- **{k}（{len(by[k])} 款）**：{'、'.join(by[k]) if by[k] else '—'}")
+                L.append(f"- **{k}（{len(by[k])} 款）**："
+                         f"{'、'.join(_tier_name(m, k) for m in by[k]) if by[k] else '—'}")
 
     if "band_subboards" in ids:
         L += ["", "## 价位段子榜（复用主榜分数，不重新打分）", ""]
@@ -816,34 +826,6 @@ def render_md(data: dict, summary: dict | None = None) -> str:
                     f"{s.get('source_type')} {s.get('date')} {s.get('url')}" for s in srcs)
                 L.append(f"| {model} | {dlabel} | {det.get('before')}→{det.get('after')} | "
                          f"{delta:+.2f} | {ref} |")
-
-    if "price_dual" in ids:
-        _pd = (summary or {}).get("price_dual_view") or {}
-        _pdsum = _pd.get("summary") or {}
-        _pd_intro = ("优惠按月变动、有截止日，且金融贴息/保险/置换/选装/BaaS 非直接车价不可比；"
-                     "直接进分会破坏可复算与跨榜同分。此处用与指导价同一价格档锚点，只算「若按官方现金优惠价」的性价比对照。"
-                     + (f"本榜 {_pd.get('with_promo')} 款有官方优惠，{_pdsum.get('uplift_count')} 款性价比被指导价高估。"
-                        if _pd.get("with_promo") else ""))
-        L += ["", "## 指导价 vs 官方优惠价（对照 · 不进评分）", "",
-              "> " + _pd_intro, "",
-              "| 车型 | 指导价 | 优惠后 | 性价比(指导) | 性价比(优惠) | 差值 | 优惠形式/有效期 |",
-              "|---|---:|---:|---:|---:|---:|---|"]
-        for row in (_pd.get("rows") or []):
-            if row.get("delta") is None:
-                L.append(f"| {row.get('model')} | — | — | — | — | — | {row.get('type')} · {row.get('note')} |")
-            else:
-                L.append(f"| {row.get('model')} | {row.get('guide_price')} | {row.get('promo_price')} | "
-                         f"{row.get('value_guide')} | {row.get('value_promo')} | +{row.get('delta')} | "
-                         f"{row.get('type')} · {row.get('valid_until')} |")
-
-    if "dealer_experience" in ids:
-        dr = meta.get("dealer_experience") or {}
-        L += ["", "## 经销商与服务体验（仅展示 · 不进评分）", "",
-              "> " + str(dr.get("boundary") or ""), "",
-              "| 车型 | J.D. Power 品牌级满意度 | 覆盖说明 |",
-              "|---|---|---|"]
-        for row in (dr.get("rows") or []):
-            L.append(f"| {row.get('model')} | {row.get('display')} | {row.get('note')} |")
 
     if "evidence_notes" in ids:
         L += ["", "## 逐车取证依据（点开可复核）", "",

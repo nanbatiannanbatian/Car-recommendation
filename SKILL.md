@@ -13,7 +13,7 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 10.19.0
+version: 10.21.0
 author: "nanbatiannanbatian"
 ---
 
@@ -3580,3 +3580,28 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
 **踩坑（均已根因修）**：①逐配置重算用逐配置 sc 算 pf → ref 受子池影响漂移（深蓝S 9.5 vs 7.6）→改用入池稳定基准；②summarize 漏 pool_mean → anchor_pool 提取 value_bins 失败返 None →子榜本池拟合漂移；③apply 与 value_for 各写一份 delta 公式 →反向注入检不出 →抽 delta_for 共用。
 
 **验收**：bug 114/114（新增 t114 锁死代码接入/指纹/剔除value不重复计分/单调/clamp/锚点提取/v19产物；反向注入 delta_for→FAIL、恢复→全绿）；反向注入 103/103；比较器20/20、结构16/16、derive4/4、midsuv46/46、release39/39、value_residual/anchor_pool/trim_annotate/spec_score/rule_adjust/powertrain_efficiency 等 selftest 全过。v19 两榜 20/20 与 11/11 覆盖，跨榜同车 0 差异，指纹一致。ES6 value 6.4（>25万档 delta 触底，客观判断）；Model Y 9.7（同档价格相对低）、宋Ultra 9.5（15-20万档产品力高）。
+
+
+## v10.18.0 → v10.21.0 演进补记（2026-11-22，此前「先不同步」本轮统一回填）
+
+> 说明：v10.18.0～v10.20.2 多轮改动当时按用户要求「先不同步 README/GitHub」，只改了 skill 代码与产物；本轮 v10.21.0 用户拍板「一并同步」，统一回填演进并升版。
+
+**v10.18.0 数据扩展四项**：经销商体验（J.D. Power 2025 NEV-SSI/CSI，品牌级仅分组前三公开、本榜命中 5/20）→ 用户拍板不进分只展示；官方优惠价（高频变动/口径混杂）→ 双口径对照、指导价仍主分；召回事件（SAMR 公告，新建 recall_events.json SSOT + recall_ingest）；保值率分级扩充 + 修 canon 漏配根因（零跑C11）。新增 t115–t118。
+
+**v10.19.0 OTA 召回排除**：Model Y 4 起软件召回机械触顶 −3。根因修法：`quality_score` 建单一真相源 `is_ota_recall`（按 `remedy` 字段 ota/physical/mixed 判定、措施文本兜底、非车型硬编码），纯 OTA 跳过、物理/混合仍扣；t119 反向注入证明改 remedy 即翻转。Model Y 79.1→81.6、名次 17→10。
+
+**v10.20.0 跨榜档位口径**：用户问深蓝S07 为何 U18 一档/全榜二档——根因是档位判据为本榜候选池「进前三」频次，非绝对分数线。只改展示：判档规则表加跨榜口径，子榜跨档车标「全榜第X档」，pipeline 从锚点源全榜读档位写 `tier_crossboard`，不动分数/算法/阈值。
+
+**v10.20.1 三电展示分组：快充从电控移入电池**：用户指出快充是电池×电控相互作用，慢充的 T6 电池列不该高于快充的海狮。根因：快充倍率瓶颈是电芯材料体系×热管理（电池本体），800V 只是使能条件。`POWERTRAIN_GROUPS` 把「快充」移入电池、电控只留高压平台——只换展示分组，七个规则项与总分不变。
+
+**v10.20.2 冷却分档反转 + 锚点滞后根因**：用户质疑直冷+0.3>液冷+0.2 不对。业内调研「液冷稳、直冷快、无绝对优劣、液冷主流」，且快充已单独计分、冷却项再奖直冷=二次计价。改为液冷+0.3>直冷+0.2>风冷−0.2。反转后暴露潜伏缺陷：跨榜同分破裂（子榜 9 款高 0.1），根因是 `anchor_pool.path` 停在 v21 旧冷却中位 0.2。修为锚点路径前移 + 新增 BUG-120 锁死「锚点规则中位==当前规则分值」，防复发。
+
+**v10.21.0 删除经销商与指导价两张展示表**（用户「经销商和指导价的表格去了吧」，拍板彻底删除 + 同步推送）：这两块都是 v10.18.0 加的「仅展示不进分」区块，用户要求连根删除。删除清单（全链路、无死代码）：
+- 引擎/数据：`modules/engine/dealer_satisfaction.py`、`price_dual_view.py`、`categories/dealer_satisfaction.json`、`official_promotions.json` 四文件删除。
+- 展示：`board_view.py` 删两个 BLOCK 与 `has_dealer`/`has_price_dual` 判定（区块 22→20）；`render_board_html.py` 与 `board_v2.py` 删两段渲染。
+- 数据链：`pipeline.py` 删 `--no-price-dual-view` 开关、两份数据生成、summary 两字段、report 数据扩展披露两段、HTML meta 写入。
+- 指纹：`score_fingerprint.py` 移除 `price_dual_view.py` 监控项。
+- 回归：删 t115/t117 及 CASES/TESTS 登记（bug 120→118）。
+- 保留：J.D. Power 在智驾权重说明里的独立引用（与两表无关）；v20+ 历史产物与历史版本文档记录（事实存档，不回改）。
+
+**验收**：v25 两榜（全榜 20 款、U18 11 款）对 v24 总分与八维 0 差异、跨榜同分 0 差异，两表与 summary 字段彻底消失；bug 118/118、反向注入 103/103、midsuv 46/46、layout 16/16、release 39/39、比较器 20/20、energy_router 32/32、render/board_view selftest 全过（区块 20/契约 11）。指纹 4175c1dd，锚点前移 v25。
