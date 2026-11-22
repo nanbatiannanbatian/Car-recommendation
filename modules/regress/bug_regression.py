@@ -137,6 +137,10 @@ CASES = [
     ("BUG-112", "Euro NCAP乘员得分率被当未知：ES6 93.95%按五星保守档8.3，低于L60 C-NCAP 89.2%的8.4", "v10.16.3"),
     ("BUG-113", "碰撞成绩在车名徽标与碰撞成绩列两处重复+ES6两处数字不一致(95% vs 93.95%)", "v10.16.4"),
     ("BUG-114", "性价比是人工裁决电池密度+死比价公式，名实不符不可复算", "v10.17.0"),
+    ("BUG-115", "经销商体验J.D.Power品牌级分覆盖不足1/4却塞进评分→证据不对称；应仅展示不进分", "v10.18.0"),
+    ("BUG-116", "官方召回事件字段全缺致质量维召回因子形同虚设；换代ES6却误套一代平台召回", "v10.18.0"),
+    ("BUG-117", "官方优惠价高频变动/口径混杂不可复算；应双口径对照而非替换指导价主分", "v10.18.0"),
+    ("BUG-118", "保值率库名「零跑C11纯电版」与候选池「零跑C11」精确匹配漏配→微调从未生效", "v10.18.0"),
 ]
 
 
@@ -3976,8 +3980,154 @@ def t114():
             "七维剔 value 不重复计分，可复算；锚点固定跨榜同车 0 差异，ES6 低分变客观判断")
 
 
+def t115():
+    """BUG-115：经销商体验满意度不能直接进评分。J.D. Power 品牌级分只公开各分组
+    前三名，本榜 20 款仅 5 款品牌命中；进分会造成「有数据的被奖励、没数据的中性」
+    证据不对称。用户拍板：仅展示不进分、标注来源与覆盖、子品牌不套母品牌。"""
+    from modules.engine import dealer_satisfaction as DS
+    import json as _J
+    assert DS.selftest() == 0, "dealer_satisfaction selftest 未过"
+    lib = DS.load_library()
+    # 1) 品牌级分数真实来自 J.D. Power 官方（1000分制、有来源URL/期别）
+    assert "jdpower.com" in str(lib.get("source_urls")), "缺 J.D. Power 官方来源"
+    assert lib.get("brand_scores", {}).get("蔚来", {}).get("NEV-SSI") == 806
+    assert lib.get("brand_scores", {}).get("小鹏", {}).get("NEV-CSI") == 787
+    # 2) 覆盖有限且如实标注；子品牌乐道不套蔚来
+    assert "乐道L60" not in lib.get("model_brand", {}), "乐道为子品牌不得映射蔚来分"
+    assert "无公开分" in DS.field_for("丰田bZ5", lib)
+    assert "800" in DS.field_for("小鹏G6", lib)
+    # 3) 展示查询绝不写 scores（核心回归）
+    c = {"model": "小鹏G6", "scores": {"value": 9.7, "quality": 7.5}}
+    snap = dict(c["scores"])
+    DS.field_for("小鹏G6", lib); DS.audit_for("小鹏G6", lib)
+    assert c["scores"] == snap, "展示查询修改了 scores"
+    # 4) 接进 pipeline 展示区 + 未进任何评分代码
+    ps = _read("modules/board/pipeline.py")
+    assert "dealer_satisfaction as _DS" in ps and "dealer_experience" in ps, "未接入展示"
+    dsrc = _read("modules/engine/dealer_satisfaction.py")
+    assert 'scores["' not in dsrc and "scores'[" not in dsrc, "展示模块不得写 scores"
+    bv = _read("modules/board/board_view.py")
+    assert '"id": "dealer_experience"' in bv, "展示区块未注册"
+    # 5) v20 产物：覆盖 5 款、不进分
+    d = _J.load(open(os.path.join(HERE, "runs", "midsuv_bev_202611_v20", "summary.json"), encoding="utf-8"))
+    cov = (d.get("dealer_experience") or {}).get("coverage") or {}
+    assert cov.get("covered") == 5 and cov.get("total") == 20, f"v20 经销商覆盖异常: {cov}"
+    return ("经销商体验仅展示不进分：J.D. Power 品牌级分覆盖5/20，标注来源/1000分制/子品牌不套用，"
+            "展示查询只读不改 scores，避免证据不对称")
+
+
+def t116():
+    """BUG-116：召回事件数据全缺致 quality 召回因子形同虚设；有数据后还需防止
+    批次不覆盖在售款被误扣（一代平台ES6召回不能扣换代ES6的分）。"""
+    from modules.engine import recall_ingest as RI
+    from modules.engine import quality_score as QS
+    import json as _J
+    assert RI.selftest() == 0, "recall_ingest selftest 未过"
+    lib = RI.load_library()
+    # 1) 召回来自 SAMR 官方公告（有 source_url）
+    assert "samrdprc.org.cn" in str(lib.get("events", {}).get("特斯拉 Model Y", [{}])[0].get("source_url"))
+    # 2) coverage_uncertain 跳过：换代ES6不扣一代平台召回
+    assert RI.events_for("蔚来ES6", lib) == [], "ES6 换代车不应套用一代召回"
+    assert len(RI.events_for("特斯拉 Model Y", lib)) == 4
+    # 3) 严重度扣分可复算：G6 1起normal -0.5；Model Y 1high+3normal 触顶 -3
+    # 用注入后的候选验证（score_one 读 recall_events 字段）
+    cands = [{"model": "小鹏G6"}, {"model": "特斯拉 Model Y"}, {"model": "蔚来ES6"}]
+    RI.apply(cands, lib)
+    for c in cands:
+        d = QS.score_one(c, None)
+        if c["model"] == "小鹏G6":
+            assert "召回 1 次，扣分 -0.5" in d["note"], d["note"]
+        if c["model"] == "特斯拉 Model Y":
+            assert "召回 4 次，扣分 -3" in d["note"], d["note"]
+        if c["model"] == "蔚来ES6":
+            assert "召回 1 次" not in d["note"] and "扣分 -" not in d["note"], "ES6 存疑召回不得扣分"
+    # 4) 接进 pipeline 且在 QS.apply 之前
+    ps = _read("modules/board/pipeline.py")
+    ir = ps.find("recall_ingest as _RI"); iq = ps.find("QS.apply(cands")
+    assert ir > 0 and iq > ir, "召回注入必须在 QS.apply 之前"
+    fs = _read("modules/engine/score_fingerprint.py")
+    assert "recall_ingest.py" in fs
+    # 5) v20 产物：3 款注入、1 款跳过
+    d = _J.load(open(os.path.join(HERE, "runs", "midsuv_bev_202611_v20", "summary.json"), encoding="utf-8"))
+    rec = d.get("recall") or {}
+    assert rec.get("injected") == 3 and len(rec.get("skipped_uncertain") or []) == 1, f"v20 召回异常: {rec}"
+    return ("召回入质量维度：SAMR官方公告注入3款、严重度扣分可复算(high-1.5/normal-0.5/封顶-3)，"
+            "换代ES6不套一代召回、指纹门禁纳入")
+
+
+def t117():
+    """BUG-117：官方优惠价高频变动、口径混杂（金融/保险/置换/BaaS非车价），直接
+    替换指导价会破坏可复算与跨榜同分。用户拍板：双口径对照+敏感性，指导价主分不变。"""
+    from modules.engine import price_dual_view as PDV
+    import json as _J
+    assert PDV.selftest() == 0, "price_dual_view selftest 未过"
+    lib = PDV.load_library()
+    # 1) 只收直接车价优惠，非现金权益单独标注不折算
+    pr = lib.get("direct_price_promo", {})
+    assert pr.get("特斯拉 Model Y", {}).get("amount_wan") == 0.4
+    assert pr.get("特斯拉 Model Y", {}).get("guide_price") == 26.35
+    assert pr.get("丰田bZ5", {}).get("status") == "needs_value", "无金额的不得硬凑"
+    assert "非直接车价" in str(lib.get("non_cash_only", {}))
+    # 2) 对照只读不改 scores
+    w = {"powertrain": 0.25, "safety": 0.177, "adas": 0.08, "space": 0.131,
+         "control": 0.075, "cabin": 0.07, "quality": 0.095, "value": 0.122}
+    cands = [
+        {"model": "特斯拉 Model Y", "price_guide": [26.35],
+         "scores": {**w, "value": 7.0}},
+        {"model": "极氪7X", "price_guide": [22.98], "scores": {**w, "value": 8.0}},
+    ]
+    snap = [dict(c["scores"]) for c in cands]
+    snapbins = {"bins": {">25万": 0.30, "20-25万": 0.40}, "pool_mean": 0.35}
+    rep = PDV.build(cands, w, fixed_bins=snapbins, lib=lib)
+    assert [c["scores"] for c in cands] == snap, "双口径对照修改了 scores"
+    tesla = next(r for r in rep["rows"] if "Model" in r["model"])
+    assert tesla["guide_price"] == 26.35 and tesla["promo_price"] == 25.95, "指导价应取官方库非候选池"
+    assert tesla["delta"] is not None and tesla["delta"] >= 0, "优惠价不应让性价比下降"
+    # 3) 主分仍用指导价：pipeline 里 value_residual 用 price_guide，PDV 只读
+    ps = _read("modules/board/pipeline.py")
+    assert "price_dual_view as _PDV" in ps and "_PDV.build" in ps, "未接入"
+    assert "no-price-dual-view" in ps, "缺 A/B 对照开关"
+    bv = _read("modules/board/board_view.py")
+    assert '"id": "price_dual"' in bv, "双口径展示区未注册"
+    # 4) v20 产物：12款有优惠、主口径仍是指导价
+    d = _J.load(open(os.path.join(HERE, "runs", "midsuv_bev_202611_v20", "summary.json"), encoding="utf-8"))
+    pd = d.get("price_dual_view") or {}
+    assert pd.get("with_promo") == 12 and "指导价" in str(pd.get("price_basis")), f"v20 双口径异常: {pd.get('with_promo')}"
+    assert (d.get("value_residual") or {}).get("status") == "applied", "主分残差法被破坏"
+    return ("双口径对照：指导价主分不变、优惠价仅同锚点对照(只读不改scores)，"
+            "非现金权益不折算、无金额不硬凑，12款覆盖、10款被指导价高估")
+
+
+def t118():
+    """BUG-118：保值率库 key「零跑C11 纯电版」与候选池「零跑C11」精确匹配漏配，
+    C11 三年保值率微调从未生效。修根因：residual_adjust 走 canon 归一化匹配。"""
+    from modules.engine import experience_score as ES
+    import json as _J
+    rv = ES.load_residual_values()
+    # 1) 两种写法都命中、且同值（归一化匹配）
+    a = ES.residual_adjust("零跑C11", rv)
+    b = ES.residual_adjust("零跑C11 纯电版", rv)
+    assert a[0] == b[0] != 0.0, f"C11 保值率应命中且非零: {a}/{b}"
+    assert a[1]["rate"] == 47.1, "C11 应按报告原文47.1（旧值47.0已修正）"
+    # 2) 归一化不得误并不同品牌
+    assert ES.residual_adjust("比亚迪宋L EV", rv)[0] != 0.0
+    assert ES.residual_adjust("某不存在车型XYZ", rv) == (0.0, None)
+    # 3) 分级：A/B级进 values，C级只 display_only 不进分
+    assert "display_only" in rv and "阿维塔07 纯电版" in (rv.get("display_only") or {})
+    assert "阿维塔07 纯电版" not in (rv.get("values") or {}), "C级口径不可比不得进分"
+    # 4) 主链确实调用 residual_adjust（产物 applied 为精简字段，故查源码接线）
+    vsrc = _read("modules/engine/value_residual.py")
+    assert "residual_adjust" in vsrc, "value_residual 未接保值率微调"
+    d = _J.load(open(os.path.join(HERE, "runs", "midsuv_bev_202611_v20", "summary.json"), encoding="utf-8"))
+    vr = d.get("value_residual") or {}
+    c11 = next((x for x in vr.get("applied", []) if x["model"] == "零跑C11"), None)
+    assert c11 and c11.get("after") is not None, f"v20 C11 未出 value: {c11}"
+    return ("保值率归一化匹配：canon 对齐库名与候选池车名，C11 微调(-0.11/47.1%)生效；"
+            "A/B级进分C级仅展示，不误并不同品牌")
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t115, t116, t117, t118]
 
 
 def run():

@@ -919,6 +919,52 @@ document.addEventListener('change',function(ev){
                      f"<td>{_mm(f.get('knee_room'))}</td></tr>")
         H.append("</tbody></table>")
 
+    # ---- 经销商与服务体验（2026-11-22 用户要求展示；仅展示不进分）
+    if "dealer_experience" in ids:
+        dr = meta.get("dealer_experience") or {}
+        H.append("<h2>经销商与服务体验 <span>仅展示 · 不进评分 · 品牌级 · 1000 分制</span></h2>")
+        H.append('<div class="rule" style="background:#eef4fb">'
+                 '<b>口径边界：</b>' + e(dr.get("boundary") or "") + "</div>")
+        H.append("<table><thead><tr><th style='text-align:left'>车型</th>"
+                 "<th style='text-align:left'>J.D. Power 品牌级满意度</th>"
+                 "<th style='text-align:left'>覆盖说明</th></tr></thead><tbody>")
+        for row in (dr.get("rows") or []):
+            H.append(f"<tr><td class='name'>{e(row.get('model'))}</td>"
+                     f"<td>{e(row.get('display'))}</td>"
+                     f"<td class='ref'>{e(row.get('note'))}</td></tr>")
+        H.append("</tbody></table>")
+
+    # ---- 指导价 vs 官方优惠价双口径对照（2026-11-22 用户要求；仅展示不进分）
+    if "price_dual" in ids:
+        _pd = (summary or {}).get("price_dual_view") or {}
+        _pdsum = _pd.get("summary") or {}
+        H.append("<h2>指导价 vs 官方优惠价 <span>对照 · 不进评分 · 指导价仍为主口径</span></h2>")
+        H.append('<div class="rule" style="background:#fbf3e9">'
+                 "<b>为什么优惠不进主分：</b>优惠按月变动、有截止日，且金融贴息/保险/置换/选装/BaaS "
+                 "非直接车价不可比；直接进分会破坏可复算与跨榜同分。此处用与指导价同一价格档锚点，"
+                 "只算「若按官方现金优惠价」的性价比对照。"
+                 + (f"本榜 {_pd.get('with_promo')} 款有官方优惠，其中 {_pd.get('active')} 款当前有效，"
+                    f"{_pdsum.get('uplift_count')} 款性价比被指导价高估，最大 +{_pdsum.get('max_uplift')} 分。"
+                    if _pd.get("with_promo") else "") + "</div>")
+        H.append("<table><thead><tr><th style='text-align:left'>车型</th><th>指导价</th>"
+                 "<th>官方优惠后</th><th>性价比(指导价)</th><th>性价比(优惠价)</th>"
+                 "<th>差值</th><th style='text-align:left'>优惠形式 / 有效期 / 来源</th></tr></thead><tbody>")
+        for row in (_pd.get("rows") or []):
+            if row.get("delta") is None:
+                # 无有效数值（如 bZ5 待补、已过期无价）——文字标注不硬凑数字
+                H.append(f"<tr><td class='name'>{e(row.get('model'))}</td>"
+                         f"<td colspan='4' class='ref'>{e(row.get('type') or '—')}"
+                         f" · {e(row.get('note') or '')}</td>"
+                         f"<td>—</td><td class='ref'>{e(row.get('valid_until') or '—')}</td></tr>")
+                continue
+            H.append(f"<tr><td class='name'>{e(row.get('model'))}</td>"
+                     f"<td>{e(row.get('guide_price'))}</td><td>{e(row.get('promo_price'))}</td>"
+                     f"<td>{e(row.get('value_guide'))}</td><td>{e(row.get('value_promo'))}</td>"
+                     f"<td class='{'delta-up' if (row.get('delta') or 0) > 0 else ''}'>+{e(row.get('delta'))}</td>"
+                     f"<td class='ref'>{e(row.get('type'))} · {e(row.get('valid_until'))} · "
+                     f"{e(row.get('status'))}</td></tr>")
+        H.append("</tbody></table>")
+
     # ---- 逐车取证依据（历史有、v8.x 漏掉，v9.0 补回）
     if "evidence_notes" in ids:
         H.append("<h2>逐车取证依据 <span>取证要点 / 证据等级 / 销量口径 · 可逐条质疑</span></h2>")

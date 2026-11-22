@@ -103,9 +103,22 @@ def load_residual_values() -> dict:
 
 
 def residual_adjust(model: str, rv: dict | None = None) -> tuple[float, dict | None]:
-    """保值率 → value 维调整（相对池内中位，封顶 ±max_adjust）。无数据返回 (0,None)。"""
+    """保值率 → value 维调整（相对池内中位，封顶 ±max_adjust）。无数据返回 (0,None)。
+
+    2026-11-22 修根因：车型名走 canon 归一化匹配。此前精确匹配让库名
+    「零跑C11 纯电版」与候选池「零跑C11」对不上，C11 的保值率微调从未生效
+    （与电芯/口碑同类的「精确匹配漏配」坑）。归一化后两种写法都能命中，
+    且不误并不同品牌（canon 保留品牌前缀）。
+    """
     rv = rv if rv is not None else load_residual_values()
-    rate = (rv.get("values") or {}).get(model)
+    from modules.contracts.model_names import canon
+    key = canon(model)
+    rate = None
+    matched_name = None
+    for name, val in (rv.get("values") or {}).items():
+        if canon(name) == key:
+            rate, matched_name = val, name
+            break
     if rate is None:
         return 0.0, None
     median = float(rv.get("pool_median", 48.0))

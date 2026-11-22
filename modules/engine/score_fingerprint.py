@@ -49,6 +49,11 @@ SCORE_CODE_FILES = [
     # v10.17.0：性价比价格残差法直接覆盖 scores.value（权重 12.2%），是打分代码。
     # 漏了它则改 value 公式指纹不变、老候选池的旧人工 value 分不会被判过期。
     "value_residual.py",
+    # v10.18.0：召回事件注入决定 quality 维 recall 扣分读不读得到数据；
+    # 漏了它则改召回注入逻辑指纹不变、老候选池缺召回分的分数不会被判过期。
+    "recall_ingest.py",
+    # 双口径对照只读不写分，但纳入指纹以防未来误接主链时老分数不更新。
+    "price_dual_view.py",
 ]
 STAMP_KEY = "_generated_by"
 

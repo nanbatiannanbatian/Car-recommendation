@@ -817,6 +817,34 @@ def render_md(data: dict, summary: dict | None = None) -> str:
                 L.append(f"| {model} | {dlabel} | {det.get('before')}→{det.get('after')} | "
                          f"{delta:+.2f} | {ref} |")
 
+    if "price_dual" in ids:
+        _pd = (summary or {}).get("price_dual_view") or {}
+        _pdsum = _pd.get("summary") or {}
+        _pd_intro = ("优惠按月变动、有截止日，且金融贴息/保险/置换/选装/BaaS 非直接车价不可比；"
+                     "直接进分会破坏可复算与跨榜同分。此处用与指导价同一价格档锚点，只算「若按官方现金优惠价」的性价比对照。"
+                     + (f"本榜 {_pd.get('with_promo')} 款有官方优惠，{_pdsum.get('uplift_count')} 款性价比被指导价高估。"
+                        if _pd.get("with_promo") else ""))
+        L += ["", "## 指导价 vs 官方优惠价（对照 · 不进评分）", "",
+              "> " + _pd_intro, "",
+              "| 车型 | 指导价 | 优惠后 | 性价比(指导) | 性价比(优惠) | 差值 | 优惠形式/有效期 |",
+              "|---|---:|---:|---:|---:|---:|---|"]
+        for row in (_pd.get("rows") or []):
+            if row.get("delta") is None:
+                L.append(f"| {row.get('model')} | — | — | — | — | — | {row.get('type')} · {row.get('note')} |")
+            else:
+                L.append(f"| {row.get('model')} | {row.get('guide_price')} | {row.get('promo_price')} | "
+                         f"{row.get('value_guide')} | {row.get('value_promo')} | +{row.get('delta')} | "
+                         f"{row.get('type')} · {row.get('valid_until')} |")
+
+    if "dealer_experience" in ids:
+        dr = meta.get("dealer_experience") or {}
+        L += ["", "## 经销商与服务体验（仅展示 · 不进评分）", "",
+              "> " + str(dr.get("boundary") or ""), "",
+              "| 车型 | J.D. Power 品牌级满意度 | 覆盖说明 |",
+              "|---|---|---|"]
+        for row in (dr.get("rows") or []):
+            L.append(f"| {row.get('model')} | {row.get('display')} | {row.get('note')} |")
+
     if "evidence_notes" in ids:
         L += ["", "## 逐车取证依据（点开可复核）", "",
               "> 承接主榜参考列之外的完整事实（指导价/电量/CLTC/月销/800V）。", ""]
