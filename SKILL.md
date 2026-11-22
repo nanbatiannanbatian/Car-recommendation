@@ -13,7 +13,7 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 10.15.0
+version: 10.15.1
 author: "nanbatiannanbatian"
 ---
 
@@ -3332,3 +3332,15 @@ python3 ev_range_model.py --demo              # 演示几款车的三场景续�
 ### 回归
 filings selftest OK（门禁+预估）、比较器 20/20、物理模型 selftest OK、主链 bug 47/47、SKILL 规则 6 项 PASS。
 模拟本地表停 11-14 → stale=True 告警生效；联网核实到当天 → 告警消除。
+
+---
+
+## v10.15.1 · 逐配置电芯覆盖校验的路径根因修复（2026-11-22，出榜自检抓出）
+
+**问题**：出纯电中型 SUV 榜时，`trim_coverage.py` 报 7 款车「无电芯来源」，但其中 4 款（马自达EZ-60/丰田bZ5/零跑C11/蔚来ES6）在人工事实库里明明有 `cell_brand`。
+
+**根因（非补丁）**：`modules/engine/trim_coverage.py::check()` 把电芯事实库路径硬拼成 `os.path.join(os.path.dirname(TRIMS), "fact_library.json")` → 指向 `data/gen/`（可重建生成物目录），而真实人工库在 `categories/fact_library.json`（`paths.cat()` 解析）。这违反 SKILL.md「读数据一律 paths.cat()，禁止拼路径」的落盘规则——同一条规则在别的模块已代码化，此处漏改。
+
+**修复**：改用 `paths.cat("fact_library.json")`。`selftest()` 加两层回归：①正断言「配置级无电芯、车系事实库有电芯」的车不被误报 `no_cell`；②反向篡改把路径换回错误目录，同一辆车必须被检出。另 4 款（乐道L60/小鹏G6/蔚来ES6/Model Y）确实缺电芯事实，联网补录进 `categories/fact_library.json`（唯一可写源，带 URL+引文+口径冲突披露），非写进会被重建覆盖的 `data/gen/`。
+
+**验收**：修复后 21 款池误报 7→4（真缺），补录后 20 款池严格校验 20/20 全绿；`trim_coverage --selftest` 正反向都过；bug 回归 107/107、跨能源 20/20、结构 16/16 全绿。

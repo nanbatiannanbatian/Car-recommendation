@@ -48,7 +48,11 @@ def check(cands_path: str, trims_path: str | None = None) -> dict:
     pool = json.load(open(cands_path, encoding="utf-8"))
     cands = pool.get("candidates", pool) if isinstance(pool, dict) else pool
     tdb = load_trims(trims_path)
-    facts_path = os.path.join(os.path.dirname(TRIMS), "fact_library.json")
+    # v10.15.1 根因修复：原来 os.path.join(os.path.dirname(TRIMS), "fact_library.json")
+    # 把人工事实库拼到 data/gen/（生成物目录），实际文件在 categories/ →
+    # 7 款配置级无电芯但车系级有值的车被误报"无电芯来源"。
+    # 数据落盘规则（SKILL.md）：读数据一律 paths.cat()，禁止拼路径。
+    facts_path = paths.cat("fact_library.json")
     facts = json.load(open(facts_path, encoding="utf-8")) if os.path.exists(facts_path) else {}
     missing, incomplete, ok, no_cell = [], [], [], []
     for c in cands:
@@ -146,9 +150,61 @@ def selftest() -> int:
     r = check(os.path.join(HERE, "runs", "midsedan_bev_1218_202610", "candidates.json"))
     if not r["missing"] and not r["incomplete"]:
         print("[selftest OK] 覆盖校验可运行")
-        return 0
-    print("[selftest FAIL]", report(r))
-    return 1
+    else:
+        print("[selftest FAIL]", report(r))
+        return 1
+
+    # v10.15.1 回归：电芯事实库路径必须走 paths.cat，防止硬拼 data/gen/ 复发。
+    # 正断言：配置级无电芯、车系事实库有电芯的车不该被误报 no_cell；
+    # 反向篡改：把事实库路径换回错误目录，同一辆车必须被检出 no_cell。
+    facts_path = paths.cat("fact_library.json")
+    wrong_path = os.path.join(os.path.dirname(TRIMS), "fact_library.json")
+    if not os.path.exists(facts_path):
+        print(f"[selftest FAIL] 事实库不存在: {facts_path}")
+        return 1
+    if os.path.normcase(os.path.abspath(facts_path)) == os.path.normcase(os.path.abspath(wrong_path)):
+        print("[selftest FAIL] 事实库与配置库同目录，路径硬拼 bug 复发")
+        return 1
+    facts = json.load(open(facts_path, encoding="utf-8"))
+    tdb = load_trims()
+    probe = None
+    for m, e in tdb.items():
+        trims = e.get("trims") or []
+        if not trims:
+            continue
+        trim_cell = any(t.get(CELL_FIELD) not in (None, "", "—") for t in trims)
+        fact_cell = str((facts.get(m) or {}).get("cell_brand") or "") not in ("", "—")
+        if not trim_cell and fact_cell:
+            probe = m
+            break
+    if probe is None:
+        print("[selftest FAIL] 找不到「配置无电芯/事实库有电芯」样本，回归无法验证")
+        return 1
+    tmp = os.path.join(HERE, "runs", "_ts_trimcoverage_probe.json")
+    json.dump({"candidates": [{"model": probe}]}, open(tmp, "w", encoding="utf-8"), ensure_ascii=False)
+    try:
+        good = check(tmp)
+        if probe in good["no_cell"]:
+            print(f"[selftest FAIL] 事实库电芯未生效: {probe}")
+            return 1
+        orig_cat = paths.cat
+        def _bad_cat(name, *a, **kw):
+            return wrong_path if name == "fact_library.json" else orig_cat(name, *a, **kw)
+        paths.cat = _bad_cat
+        try:
+            bad = check(tmp)
+            if probe not in bad["no_cell"]:
+                print("[selftest FAIL] 反向篡改未检出：路径回归失效")
+                return 1
+        finally:
+            paths.cat = orig_cat
+    finally:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+    print(f"[selftest OK] 事实库路径走 paths.cat + 反向篡改检出（样本 {probe}）")
+    return 0
 
 
 if __name__ == "__main__":
