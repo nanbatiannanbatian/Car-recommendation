@@ -177,63 +177,30 @@ def risk_flags(r: dict) -> str:
     # v9.7.43：销量口径异常标注（季度初出口集中/促销透支/清库等导致的单月异常低值，非产品力问题）
     if any(k in note for k in ("销量口径异常", "出口集中", "季度初出口", "促销透支")):
         out.append('<span class="flag flag-est" title="该车型当月销量为口径性异常低值（如季度初出口集中、促销透支、清库），非产品力问题，不改档位；见生命周期提示与逐车取证依据">⚠销量口径异常</span>')
-    # 权威判定统一走 crash_systems 唯一真相源——与 crash_badge() 同一套判据，
-    # 杜绝「既标缺权威、又显示 C-IASI G 徽标」的自相矛盾（bZ5 事故）。
-    # 原实现自己写体系白名单 + 关键词正则，既漏别名（ciasi_checked/Euro NCAP）
-    # 又认不出单字母等级（"C-IASI G" 的 G 不在 [Gg]+ 里）→ 与徽标判定打架。
-    from modules.engine import crash_systems as CS
-    basis = str(r.get("safety_basis") or "")
-    crash = str(r.get("crash") or "")
-    # is_official 已覆盖 12 个权威体系 + 全部别名；parse_score 兜底 basis 缺失
-    # 但 crash 文本里带一手成绩的车。两者都不认才算无权威成绩。
-    has_official = CS.is_official(basis) or CS.parse_score(crash) is not None
-    if not has_official:
-        out.append('<span class="flag flag-warn" title="无中保研(C-IASI)/中汽研(C-NCAP)/Euro NCAP/IIHS 可查的权威碰撞成绩；安全分基于配置与口碑，非实测实锤；不等于不安全，但证据等级较低">缺权威碰撞成绩</span>')
+    # v10.16.4：碰撞成绩相关信息（含"缺权威"提示）全部收敛到「碰撞成绩」列，
+    # 车名只保留估算/营运/销量口径等**非碰撞**风险标记。
+    # 原先车名既挂绿色成绩徽标、又挂"缺权威"红标，与碰撞成绩列三处重复；
+    # 且徽标自写正则会抓错分项（ES6 把 Euro NCAP 成人95% 当主成绩，碰撞列却是93.95%）。
     return "".join(out)
 
 
-def crash_badge(r: dict) -> str:
-    """v9.7.43：有官方碰撞成绩的车，车名后显示体系+关键数字徽标（绿色）。
-    数据来自 score_rows 透传的 safety_basis/crash，不额外读文件。
-    文案=体系+关键数字（得分率/星级/C-IASI等级），完整描述放 hover title。
+def crash_cell(r: dict, cand: dict) -> str:
+    """碰撞成绩列唯一出口：有成绩给体系+规范成绩，无成绩给"—（缺权威，非不安全）"。
+
+    v10.16.4（用户确认方案 A）：成绩只在这一列显示，数字统一取 crash_systems.parse_score
+    的规范 display（与 safety 打分、徽标旧逻辑解耦），避免车名徽标抓错分项。
+    权威判定同样复用 crash_systems 唯一真相源，与 safety_check 一致。
     """
-    basis = str(r.get("safety_basis") or "").lower()
-    # 中文名从 crash_systems 唯一真相源读（加体系只改那一处）
     from modules.engine import crash_systems as CS
-    sys_cn = CS.cn_name(basis) if CS.is_official(basis) else None
-    if not sys_cn:
-        return ""
-    crash = str(r.get("crash") or "")
-    _family = CS.family(basis)
-    # 关键数字：优先得分率(92.3%)，其次星级，再C-IASI等级串
-    key = ""
-    # C-IASI 是等级制(G/A/M/P)，不取百分号（如 ET5 的 96% 其实是 E-NCAP 分项非 C-IASI）
-    grade = (re.search(r"C-IASI\s+([GAPM][GAPM+]{1,5})", crash) or
-             re.search(r"(?:^|\s)([GAPM]{4,6})(?=\D|$)", crash)) if _family == "ciasi" else None
-    if grade:
-        key = grade.group(1)
-    else:
-        m = re.search(r"(\d{2}(?:\.\d)?)\s*%", crash)
-        if m:
-            if _family == "ncap":
-                # NCAP 星级制分项多且顺序不固定，按关键词取"乘员/碰撞保护"，
-                # 不能按位置（Model3=成人96/儿童86/行人74/安全94，007=安全79/避免89/保护93）
-                occ = re.search(r"(?:成人乘员|乘员|碰撞保护)[^\d]{0,6}(\d{2}(?:\.\d)?)\s*%", crash)
-                key = (occ.group(1) if occ else m.group(1)) + "%"
-            else:
-                key = m.group(1) + "%"
-    if not key:
-        star = re.search(r"(Top Safety Pick\+?|TSP\+|五星|四星|5星|4星)", crash, re.I)
-        if star:
-            k = star.group(1)
-            key = ("TSP+" if "+" in k else "TSP") if "safety pick" in k.lower() or "tsp" in k.lower() else k
-    if not key:
-        grade2 = re.search(r"\b([GAPM]\+?[GAPM]{0,3})\b", crash)
-        if grade2:
-            key = grade2.group(1)
-    label = f"{sys_cn} {key}".strip() if key else sys_cn
-    return (f'<span class="flag flag-crash" title="{e(crash or sys_cn + " 官方碰撞成绩")}">'
-            f'{e(label)}</span>')
+    crash = str(cand.get("crash") or "")
+    parsed = CS.parse_score(crash)
+    if parsed:
+        return f'<span class="flag flag-crash" title="{e(crash)}">{e(parsed["display"])}</span>'
+    basis = str(r.get("safety_basis") or "")
+    if CS.is_official(basis) or ("抽车" in crash) or ("在测" in crash) or ("测试中" in crash):
+        return f'<span class="flag flag-crash">{e(CS.display_short(crash))}</span>'
+    return ('<span class="flag flag-warn" title="无中保研(C-IASI)/中汽研(C-NCAP)/Euro NCAP/IIHS 可查的权威碰撞成绩；'
+            '安全分基于配置与口碑，非实测实锤；不等于不安全，但证据等级较低">—（缺权威，非不安全）</span>')
 
 
 def num(v, digits=1):
@@ -479,9 +446,11 @@ def render(data, summary, title, as_of):
                     sel = trim_selector(r["model"], td.get("trims") or [],
                                         r.get("best_trim"), width=160)
                     # v9.7.53：强推金标移到档位列（车名列不再重复显示）
-                    H.append(f"<td class='name'>{e(val)}{risk_flags(r)}{crash_badge(r)}{sel}</td>")
+                    H.append(f"<td class='name'>{e(val)}{risk_flags(r)}{sel}</td>")
                 elif k == "total":
                     H.append(f"<td class='c-total'><span class='score'>{e(val)}</span></td>")
+                elif k == "crash":
+                    H.append(f"<td>{crash_cell(r, cand)}</td>")
                 elif k == "tier":
                     _tier_cell = tier_badge(r.get("tier"))
                     _is_strong = r["model"] in _strong

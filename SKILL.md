@@ -13,7 +13,7 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 10.16.3
+version: 10.16.4
 author: "nanbatiannanbatian"
 ---
 
@@ -3549,3 +3549,14 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
 **修法（根因、全池统一、不针对单车）**：`modules/contracts/safety_score.py` 新增 `score_from_star_occupant(pct, spec)`，按 **Euro NCAP 体系自己的 grades 分档键**（`5star_occupant>=90`→8.8 / `85-90`→8.5 / `<85`→8.3）取分，**不跨体系套 C-NCAP 得分率公式**（各国 NCAP 不可直接互换）；`safety_check.score_from_crash` 的 star 分支在 stars=5 且 parsed.score 已知时优先精确分档，缺 pct 才回退星级保守档；`score_from_record` 对表内只有 `occupant_pct` 的记录走同一规则，杜绝「表内精确/表外保守」两套口径。`score_fingerprint.SCORE_CODE_FILES` 补入 `safety_check.py`/`safety_score.py`（否则改映射代码指纹不变、老安全分不被判过期，与 sync_safety_scores 同类门禁漏洞）。
 
 **验收**：bug_regression 112/112（新增 t112 锁乘员分档、反向注入抹 pct 回退 8.3、C-NCAP 89.2% 仍 8.4、表内外同规则、v17 产物），反向注入 103/103 全检出；比较器20/20、结构16/16、derive4/4、midsuv46/46、release39/39、各模块 selftest 全过。v17 两榜：ES6 安全 8.3→8.8、总分 79.7→80.5，L60 84.5 不变，11 款同车跨榜 0 差异。仍低于 L60 的三电/空间两项为客观参数差距，未刷分。
+
+
+## v10.16.4 碰撞成绩展示收敛到单一列（用户指出车名徽标与碰撞成绩列重复、ES6 两处数字还不一致）
+
+**诊断**：主榜车名后挂 `crash_badge` 绿色徽标（有成绩）/`risk_flags` 红标"缺权威碰撞成绩"（无成绩），「碰撞成绩」列又显示同一成绩——同一事实两处重复。且徽标自写正则从 NCAP 多分项文本里挑关键词，ES6 抓到"成人乘员95%"分项显示 `Euro NCAP 95%`，碰撞列却是规范主成绩 `Euro NCAP 93.95% 五星`，同页自相矛盾。
+
+**用户确认方案 A**：全部整合到「碰撞成绩」列。
+- `render_board_html.py`：删除 `crash_badge()` 与 `risk_flags()` 里的碰撞判定；新增 `crash_cell()` 作为碰撞列唯一出口——有成绩用 `crash_systems.parse_score()["display"]` 规范值（与 safety 打分同源），无成绩显示"—（缺权威，非不安全）"，在测/抽车显示"在测"；车名列只留车型名、非碰撞风险标（估算/营运/销量异常）与配置下拉。
+- 权威判定继续复用 `crash_systems`（is_official/parse_score 唯一真相源），不重写白名单，杜绝 bZ5 类"既标缺权威又显示 C-IASI"回潮。
+
+**验收**：bug_regression 113/113（t058/t055/t064/t110 全部改锁新契约；新增 t113 锁「车名零徽标+碰撞列唯一出口+ES6 93.95% 唯一口径」，反向注入重挂徽标可检出）；反向注入 103/103；比较器20/20、结构16/16、derive4/4、midsuv46/46、release39/39、各 selftest 全过。v18 两榜车名列已无碰撞字样、碰撞列唯一成绩，11 款同车跨榜 0 差异，分数未变。

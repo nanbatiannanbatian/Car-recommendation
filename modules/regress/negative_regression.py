@@ -58,7 +58,7 @@ NEG_TARGETS = {
     "t055": ['"crash": c.get("crash")'],
     "t056": ["has_crash_evidence"],
     "t057": ["strong_pick"],
-    "t058": ["def crash_badge"],
+    "t058": ["def crash_cell"],
     "t059": ["为何未进一档"],
     "t060": ["_lc = BView.check_lifecycle_coverage(cands)"],
     "t061": ["独立算法家族命中"],

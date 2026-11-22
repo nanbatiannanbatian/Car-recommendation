@@ -135,6 +135,7 @@ CASES = [
     ("BUG-110", "bZ5一手C-NCAP86.7%被证据不全C-IASI G覆盖+页面同时标缺权威与C-IASI徽标", "v10.16.1"),
     ("BUG-111", "乐道L60高配智驾被低配数据拖累+PPH小样本证据不对称", "v10.16.2"),
     ("BUG-112", "Euro NCAP乘员得分率被当未知：ES6 93.95%按五星保守档8.3，低于L60 C-NCAP 89.2%的8.4", "v10.16.3"),
+    ("BUG-113", "碰撞成绩在车名徽标与碰撞成绩列两处重复+ES6两处数字不一致(95% vs 93.95%)", "v10.16.4"),
 ]
 
 
@@ -1067,6 +1068,7 @@ def t054():
 
 def t055():
     """碰撞成绩标记：score_rows须透传crash；有权威成绩(含Euro NCAP)不误标。"""
+    import re
     import json as J
     from modules.engine import leaderboard as LB
     from modules.board import render_board_html as RH
@@ -1081,7 +1083,7 @@ def t055():
     j7 = by["极氪007"]
     assert "crash" in j7 and j7["crash"] and "Euro NCAP" in str(j7["crash"]), "007崩溃字段未透传"
     assert j7.get("safety_basis") == "euro_ncap", "basis未透传"
-    # risk_flags 8个case
+    # v10.16.4：缺权威判定已随成绩一起收敛到 crash_cell（车名不再挂徽标/红标）
     cases = [
         ({"crash": "Euro NCAP 2026五星93%；无正式C-NCAP星级", "safety_basis": "euro_ncap"}, False),
         ({"crash": "Euro NCAP 2026五星(93%)", "safety_basis": "euro_ncap"}, False),
@@ -1093,9 +1095,10 @@ def t055():
         ({"safety_basis": None}, True),
     ]
     for r, want in cases:
-        got = "缺权威碰撞成绩" in RH.risk_flags(r)
-        assert got == want, f"risk_flags误判: {r} → {got}, 期望{want}"
-    return "碰撞标记修复：score_rows透传crash+basis；8 case全对(Euro NCAP不误标、真无成绩仍标)"
+        txt = re.sub(r"<[^>]+>", "", RH.crash_cell(r, r))
+        got = "缺权威" in txt
+        assert got == want, f"crash_cell误判: {r} → {txt}, 期望缺权威={want}"
+    return "碰撞标记修复：score_rows透传crash+basis；8 case全对(Euro NCAP不误标、真无成绩仍标缺权威)"
 
 
 def t056():
@@ -1153,30 +1156,42 @@ def t057():
 
 
 def t058():
-    """有碰撞成绩的车，页面显示体系+关键数字徽标；C-IASI用等级不用百分号。"""
+    """v10.16.4：碰撞成绩只在「碰撞成绩」列显示，数字取 parse_score 规范值；
+    车名不再挂徽标/缺权威红标（原徽标自写正则会抓错分项，ES6 95% vs 93.95%）。"""
     import re
     from modules.board import render_board_html as RH
+    from modules.engine import crash_systems as CS
     src = _read("render_board_html.py")
-    assert "def crash_badge" in src and "flag-crash" in src, "碰撞徽标函数/CSS缺失"
-    assert "crash_badge(r)" in src, "name列未挂碰撞徽标"
+    assert "def crash_cell" in src and "flag-crash" in src, "碰撞列函数/CSS缺失"
+    assert "crash_badge" not in src, "车名徽标未清除（旧逻辑仍可能抓错分项）"
+    assert "risk_flags(r)}{sel}" in src, "车名应只保留车型+非碰撞风险标+配置下拉"
+    assert 'elif k == "crash":' in src and "crash_cell(r, cand)" in src, "碰撞列未接唯一出口"
     cases = [
-        ({"safety_basis": "cncap", "crash": "C-NCAP 2024 92.3%五星"}, "C-NCAP 92.3%"),
-        ({"safety_basis": "euro_ncap", "crash": "Euro NCAP 2026五星(安全驾驶79%/碰撞避免89%/碰撞保护93%)"}, "Euro NCAP 93%"),
-        # Euro NCAP分项顺序不固定：Model3是成人96/儿童86/行人74/安全94，不能按位置取
-        ({"safety_basis": "euro_ncap", "crash": "Euro NCAP 2019五星(成人乘员96%/儿童86%/行人74%/安全辅助94%)"}, "Euro NCAP 96%"),
-        ({"safety_basis": "ciasi", "crash": "E-NCAP 2023五星(乘员96%)+中保研C-IASI AGGG最优点评"}, "C-IASI AGGG"),
-        ({"safety_basis": None, "crash": "无官方成绩"}, ""),
+        ({"safety_basis": "cncap", "crash": "C-NCAP 2024 92.3%五星"}, "C-NCAP 92.3% 五星"),
+        ({"safety_basis": "euro_ncap", "crash": "Euro NCAP 2026五星(安全驾驶79%/碰撞避免89%/碰撞保护93%)"}, "Euro NCAP 79% 五星"),
+        # parse_score 规范 display 直接给体系+主成绩，不再靠正则挑分项
+        ({"safety_basis": "euro_ncap", "crash": "Euro NCAP 2019五星(成人乘员96%/儿童86%/行人74%/安全辅助94%)"}, "Euro NCAP 96% 五星"),
+        ({"safety_basis": "ciasi", "crash": "C-IASI G（三指数最低：辅助安全）"}, "C-IASI G"),
+        ({"crash": "无官方成绩"}, "—（缺权威，非不安全）"),
     ]
     for r, want in cases:
-        got = re.sub(r"<[^>]+>", "", RH.crash_badge(r))
-        assert got == want, f"碰撞徽标错: {r} → {got}, 期望{want}"
-    # 真实页面产物：有徽标且无成绩车不误标
-    p = os.path.join(HERE, "runs", "bev_midsedan_202610_full", "榜单.html")
+        txt = re.sub(r"<[^>]+>", "", RH.crash_cell(r, r))
+        assert txt == want, f"碰撞列错: {r} → {txt}, 期望{want}"
+    # ES6 反例：规范主成绩 93.95%，不得再出现徽标抓成 95% 的分项
+    es6 = {"safety_basis": "euro_ncap", "crash": "Euro NCAP 93.95% 五星"}
+    txt = re.sub(r"<[^>]+>", "", RH.crash_cell(es6, es6))
+    assert "93.95%" in txt and "95%" not in txt.replace("93.95%", ""), f"ES6 数字仍未统一: {txt}"
+    # 真实 v18 产物：无重复徽标、数字一致、无成绩车标缺权威在碰撞列
+    p = os.path.join(HERE, "runs", "midsuv_bev_202611_v18", "榜单.html")
     if os.path.exists(p):
-        h = _read("runs/bev_midsedan_202610_full/榜单.html")
-        assert h.count("flag-crash") >= 7, "页面碰撞徽标不足7个"
-    return "碰撞徽标：C-NCAP得分率/EuroNCAP碰撞保护/C-IASI等级全部正确，无成绩车不标"
-
+        h = _read("runs/midsuv_bev_202611_v18/榜单.html")
+        assert "crash_badge" not in h and "class='name'" in h
+        assert "Euro NCAP 93.95% 五星" in h and "缺权威" in h
+        # 车名列内不得有碰撞成绩/缺权威字样
+        m = re.search(r"<td class=['\"]name['\"](.*?)</td>", h, re.S)
+        if m:
+            assert "NCAP" not in m.group(1) and "缺权威" not in m.group(1), "车名仍重复碰撞成绩"
+    return "碰撞展示收敛到单列：C-NCAP/EuroNCAP/C-IASI规范值+缺权威提示；车名零重复徽标，ES6 93.95%唯一口径"
 
 def t059():
     """高分低档车：卡点导出到summary + 档位列'为何未进一档'标记(hover列全部卡点)。"""
@@ -1310,12 +1325,12 @@ def t064():
     # 全链路引用 crash_systems（不再各自硬编码白名单）
     for f in ("leaderboard.py", "evidence_consistency.py", "render_board_html.py"):
         assert "crash_systems" in _read(f), f"{f} 未引用单一真相源"
-    # 12体系徽标都能显示
+    # 12体系成绩都能在碰撞列显示（v10.16.4 徽标已并入单列）
     badge_cases = [("nhtsa", "NHTSA 5星"), ("jncap", "JNCAP五星(乘员95%)"),
-                   ("iihs", "IIHS Top Safety Pick+"), ("bharat_ncap", "Bharat NCAP五星")]
+                   ("iihs", "IIHS G"), ("bharat_ncap", "Bharat NCAP五星")]
     for b, cr in badge_cases:
-        out = re.sub(r"<[^>]+>", "", RH.crash_badge({"safety_basis": b, "crash": cr}))
-        assert out and CS.cn_name(b) in out, f"新体系徽标缺失: {b}→{out}"
+        out = re.sub(r"<[^>]+>", "", RH.crash_cell({"safety_basis": b, "crash": cr}, {"crash": cr}))
+        assert out and CS.cn_name(b) in out, f"新体系碰撞列缺失: {b}→{out}"
     # 映射表覆盖12体系
     tbl = json.load(open(os.path.join(HERE, "official_safety_scores.json"), encoding="utf-8"))
     assert len(tbl["systems"]) >= 12, "映射表未覆盖全部体系"
@@ -2356,8 +2371,8 @@ def t086():
     # 4) 展示层：回填后不再标「缺权威碰撞成绩」，且徽标显示 C-IASI
     row = {"safety_basis": my2["safety_basis"], "crash": my2["crash"]}
     assert "缺权威碰撞成绩" not in RH.risk_flags(row), "有 C-IASI 实锤仍被标缺成绩"
-    badge = re.sub(r"<[^>]+>", "", RH.crash_badge(row))
-    assert "C-IASI" in badge, f"徽标未显示 C-IASI: {badge}"
+    badge = re.sub(r"<[^>]+>", "", RH.crash_cell(row, row))
+    assert "C-IASI" in badge, f"碰撞列未显示 C-IASI: {badge}"
 
     # 5) 链路内置：回填函数必须调严格解析器（防以后退回宽松扫描）
     src = str(paths.src("facts_sync.py"))
@@ -3731,7 +3746,7 @@ def t110():
     assert "C-NCAP 86.7" in str(bz.get("crash")), f"sync 后 bZ5 应恢复 C-NCAP: {bz.get('crash')}"
     assert CS.is_official(bz.get("safety_basis")), "恢复后 basis 应为权威体系"
 
-    # 4) 展示判定一致：risk_flags 与 crash_badge 不得对同一车矛盾
+    # 4) 展示判定一致：缺权威与成绩展示不得对同一车矛盾（v10.16.4 统一在 crash_cell 唯一出口）
     for name, r in [
         ("bZ5 C-NCAP", {"crash": "C-NCAP 86.7%", "safety_basis": "C-NCAP"}),
         ("C-IASI G 单字母", {"crash": "C-IASI G", "safety_basis": "C-IASI"}),
@@ -3740,13 +3755,13 @@ def t110():
         ("无成绩", {"crash": None, "safety_basis": None}),
         ("无官方成绩说明", {"crash": "无官方成绩", "safety_basis": None}),
     ]:
-        flagged = "缺权威" in re.sub(r"<[^>]+>", "", RH.risk_flags(r))
-        badged = bool(re.sub(r"<[^>]+>", "", RH.crash_badge(r)).strip())
-        assert (not flagged) == badged, f"展示判定矛盾 [{name}]: 缺权威={flagged} 徽标={badged}"
-    # 源码层：risk_flags 必须复用 crash_systems，不再自写体系白名单
+        # v10.16.4：权威判定已从车名 risk_flags 收敛到 crash_cell 唯一出口
+        shown = re.sub(r"<[^>]+>", "", RH.crash_cell(r, r))
+        flagged = "缺权威" in shown
+        assert (not flagged) == (name not in ("无成绩", "无官方成绩说明")), f"展示判定矛盾 [{name}]: {shown}"
+    # 源码层：crash_cell 必须复用 crash_systems 唯一真相源，不再自写体系白名单
     rsrc = _read("modules/board/render_board_html.py")
-    assert "CS.is_official(basis)" in rsrc and "CS.parse_score(crash)" in rsrc, \
-        "risk_flags 未复用 crash_systems 唯一真相源"
+    assert "CS.is_official(basis)" in rsrc and "CS.parse_score(crash)" in rsrc, "crash_cell 未复用 crash_systems 唯一真相源"
     assert 'basis in ("cncap", "ciasi"' not in rsrc, "risk_flags 仍留硬编码体系白名单"
 
     # 5) build_ssot 给 C-NCAP 写 score（生成源也要带值，双保险）
@@ -3754,8 +3769,8 @@ def t110():
     assert "score=float(val)" in bsrc, "build_ssot 的 C-NCAP 条目仍未写 score"
 
     # 6) 真实榜单产物：bZ5 显示 C-NCAP 徽标且无「缺权威」矛盾标记
-    for rel in ["runs/midsuv_bev_202611_v15/榜单.html",
-                "runs/midsuv_bev_1218_202611_v15/榜单.html"]:
+    for rel in ["runs/midsuv_bev_202611_v18/榜单.html",
+                "runs/midsuv_bev_1218_202611_v18/榜单.html"]:
         pp = os.path.join(HERE, rel)
         if os.path.exists(pp):
             html = _read(rel)
@@ -3864,8 +3879,53 @@ def t112():
             "C-NCAP 89.2%→8.4 不受影响，反向注入回退 8.3，表内/表外同规则")
 
 
+def t113():
+    """BUG-113：碰撞成绩在车名徽标（含缺权威红标）与碰撞成绩列重复显示，
+    且车名徽标自写正则抓错分项（ES6 Euro NCAP 成人95% 当主成绩，碰撞列却是93.95%）。
+    用户确认方案 A：全部整合到碰撞成绩单一列。"""
+    import re
+    from modules.board import render_board_html as RH
+
+    src = _read("render_board_html.py")
+    # 1) 源码层：车名不再挂碰撞徽标/缺权威红标，碰撞列唯一出口
+    assert "def crash_badge" not in src and "def crash_cell" in src, "徽标未移除或碰撞列出口缺失"
+    assert "risk_flags(r)}{crash_badge(r)}" not in src, "车名仍重复挂碰撞成绩"
+    assert 'elif k == "crash":' in src and "crash_cell(r, cand)" in src, "碰撞列未接唯一出口"
+    # 反向注入：把徽标重新挂回车名 → 断言必须失败（证明锁的是真契约而非注释）
+    injected = src.replace("{e(val)}{risk_flags(r)}{sel}", "{e(val)}{risk_flags(r)}{crash_badge(r)}{sel}")
+    assert injected != src, "注入锚点未命中（测试已失效）"
+    assert "risk_flags(r)}{crash_badge(r)}" in injected, "反向注入未生效"
+
+    # 2) 单元层：有成绩给规范值，无成绩给缺权威提示；车名不再出碰撞字样
+    l60 = {"safety_basis": "cncap", "crash": "C-NCAP 89.2% 五星"}
+    es6 = {"safety_basis": "euro_ncap", "crash": "Euro NCAP 93.95% 五星"}
+    assert "C-NCAP 89.2%" in re.sub(r"<[^>]+>", "", RH.crash_cell(l60, l60))
+    es6_txt = re.sub(r"<[^>]+>", "", RH.crash_cell(es6, es6))
+    assert "93.95%" in es6_txt, f"ES6 未用规范主成绩: {es6_txt}"
+    assert "95%" not in es6_txt.replace("93.95%", ""), f"ES6 分项95%仍混入: {es6_txt}"
+    none_txt = re.sub(r"<[^>]+>", "", RH.crash_cell({"crash": None}, {"crash": None}))
+    assert "缺权威" in none_txt and "非不安全" in none_txt, f"无成绩提示错: {none_txt}"
+    assert "缺权威" not in RH.risk_flags({"crash": None}), "车名仍挂缺权威红标"
+
+    # 3) 真实 v18 产物：车名列无碰撞字样，碰撞列恰一处成绩
+    p = os.path.join(HERE, "runs", "midsuv_bev_202611_v18", "榜单.html")
+    if os.path.exists(p):
+        h = _read("runs/midsuv_bev_202611_v18/榜单.html")
+        for model in ("乐道L60", "蔚来ES6", "丰田bZ5"):
+            m = re.search(r"<tr[^>]*data-model=['\"]" + re.escape(model) + r"['\"][^>]*>(.*?)</tr>", h, re.S)
+            assert m, f"v18 找不到 {model}"
+            cells = re.findall(r"<td[^>]*>(.*?)</td>", m.group(1), re.S)
+            name_cell = re.sub(r"<[^>]+>", "", cells[1])
+            crash_cell = re.sub(r"<[^>]+>", "", cells[7])
+            assert "NCAP" not in name_cell and "缺权威" not in name_cell, f"{model} 车名重复碰撞: {name_cell[:80]}"
+            assert ("NCAP" in crash_cell) or ("缺权威" in crash_cell), f"{model} 碰撞列缺成绩: {crash_cell}"
+        assert "Euro NCAP 93.95% 五星" in h and "Euro NCAP 95%<" not in h, "ES6 数字仍未统一"
+    return ("碰撞成绩收敛单一列：车名零重复徽标/红标，规范成绩或缺权威提示只在碰撞列；"
+            "ES6 93.95% 唯一口径，反向注入重挂徽标可检出")
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113]
 
 
 def run():
