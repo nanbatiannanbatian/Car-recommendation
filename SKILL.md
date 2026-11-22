@@ -13,7 +13,7 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 10.16.4
+version: 10.17.0
 author: "nanbatiannanbatian"
 ---
 
@@ -3560,3 +3560,23 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
 - 权威判定继续复用 `crash_systems`（is_official/parse_score 唯一真相源），不重写白名单，杜绝 bZ5 类"既标缺权威又显示 C-IASI"回潮。
 
 **验收**：bug_regression 113/113（t058/t055/t064/t110 全部改锁新契约；新增 t113 锁「车名零徽标+碰撞列唯一出口+ES6 93.95% 唯一口径」，反向注入重挂徽标可检出）；反向注入 103/103；比较器20/20、结构16/16、derive4/4、midsuv46/46、release39/39、各 selftest 全过。v18 两榜车名列已无碰撞字样、碰撞列唯一成绩，11 款同车跨榜 0 差异，分数未变。
+
+
+## v10.17.0 性价比改价格残差法（用户问「性价比这一列怎么算、是否合适、业界怎么做、有无更好方式」；确认参考 J.D. Power + 全量重出）
+
+**诊断**：性价比列实为两物——页面事实列 kWh/万元（电池密度），八维 value 分（权重12.2%）则是候选池**人工裁决分**（依据主要是 kWh/万元+价格印象）。代码里 `spec_score.score_value` 有同榜比价公式却是**死代码没接主链**（score_audit 自标 wired:partial）。三硬伤：①名实不符（叫性价比实为电池密度）；②不可复算（人工分无公式）；③「贵=低分」粗糙（ES6 只因 33.8 万被压 6.6，差价买没买到额外产品力说不清）。
+
+**业界核对**：J.D. Power Ratings Methodology 不设单一性价比维，而是按价格档+尺寸分组取「车型属性与同级均值的距离」，由质量可靠40%/驾驶体验20%/保值率20%/经销商体验20%合成；配置密度法（中关村在线/易车）算 kW/万元、km/万元、kWh/万元按使用频率加权。本榜尺寸已固定只按价格档；经销商体验全缺、保值率仅3/20款→不作合成因子，保值率仅留有数据车既有微调。
+
+**用户拍板**：参考 J.D. Power，选「价格残差法」+全量重出回归同步。
+
+**修法（根因、可复算、不重复计分）**：
+- 新建 `modules/engine/value_residual.py`：产品力 pf = 其余七维（剔除 value 自身）按权重归一加权；ppw = pf/指导价；固定价格档（≤15/15-20/20-25/>25 万）；value = 中性8.0 + clamp((ppw/本档均−1)×12, ±1.5) + 保值率微调（有数据车）。`delta_for`（唯一公式）→ `value_for` → apply 单一真相源，消除两份公式漂移。`product_strength` 优先读入池原始分快照 `_value_pf_base`，避免中途联网回填让 pf 漂移。
+- `pipeline.py` 读候选池后即刻存 `_value_pf_base` 快照；在 sibling/安全门禁前调用 value_residual（此时七维主体已定稿）；新增 `--no-value-residual` A/B 开关；summary 写 value_residual 审计（含 applied 明细）。
+- `trim_annotate.annotate_all` 逐配置 value 改用 `value_for`（车系级 bmean + 入池 pf 基准 + 配置价），杜绝「车系级已残差、逐配置仍按 kWh/万元 delta，再被 with_config_scores 覆盖回旧分」的口径分叉（曾致宋Ultra 跨榜 9.5 vs 8.6）。
+- `anchor_pool` 增 `value_bins` 固定锚（全榜 summary 提取），categories/car_midsuv_bev.json 的 anchor_pool.path 刷新到 v19 且 modules 纳入 value_residual；子榜读全榜档均，保证同车跨榜同分。
+- `score_fingerprint.SCORE_CODE_FILES` 纳入 value_residual.py（改 value 公式老分判过期）。
+
+**踩坑（均已根因修）**：①逐配置重算用逐配置 sc 算 pf → ref 受子池影响漂移（深蓝S 9.5 vs 7.6）→改用入池稳定基准；②summarize 漏 pool_mean → anchor_pool 提取 value_bins 失败返 None →子榜本池拟合漂移；③apply 与 value_for 各写一份 delta 公式 →反向注入检不出 →抽 delta_for 共用。
+
+**验收**：bug 114/114（新增 t114 锁死代码接入/指纹/剔除value不重复计分/单调/clamp/锚点提取/v19产物；反向注入 delta_for→FAIL、恢复→全绿）；反向注入 103/103；比较器20/20、结构16/16、derive4/4、midsuv46/46、release39/39、value_residual/anchor_pool/trim_annotate/spec_score/rule_adjust/powertrain_efficiency 等 selftest 全过。v19 两榜 20/20 与 11/11 覆盖，跨榜同车 0 差异，指纹一致。ES6 value 6.4（>25万档 delta 触底，客观判断）；Model Y 9.7（同档价格相对低）、宋Ultra 9.5（15-20万档产品力高）。

@@ -136,6 +136,7 @@ CASES = [
     ("BUG-111", "乐道L60高配智驾被低配数据拖累+PPH小样本证据不对称", "v10.16.2"),
     ("BUG-112", "Euro NCAP乘员得分率被当未知：ES6 93.95%按五星保守档8.3，低于L60 C-NCAP 89.2%的8.4", "v10.16.3"),
     ("BUG-113", "碰撞成绩在车名徽标与碰撞成绩列两处重复+ES6两处数字不一致(95% vs 93.95%)", "v10.16.4"),
+    ("BUG-114", "性价比是人工裁决电池密度+死比价公式，名实不符不可复算", "v10.17.0"),
 ]
 
 
@@ -3924,8 +3925,59 @@ def t113():
             "ES6 93.95% 唯一口径，反向注入重挂徽标可检出")
 
 
+def t114():
+    """BUG-114：性价比 value 分是人工裁决（实质电池密度 kWh/万元），代码里的
+    spec_score.score_value 同榜比价公式是死代码没接主链（score_audit 自标 partial）。
+    名实不符、不可复算、贵=低分粗糙。用户确认参考 J.D. Power「同级均值距离」，
+    改价格残差法：同价位档内每万元产品力（七维剔 value）相对档均的距离。"""
+    from modules.engine import value_residual as VR
+    from modules.engine import anchor_pool as AP
+    import json as _J
+
+    # 1) 源码层：模块存在且接进主链、指纹门禁纳入
+    vsrc = _read("modules/engine/value_residual.py")
+    assert "def value_for" in vsrc and "def apply" in vsrc, "价值残差模块缺核心函数"
+    ps = _read("modules/board/pipeline.py")
+    assert "value_residual as _VR" in ps and "_VR.apply(cands" in ps, "未接入 pipeline"
+    fs = _read("modules/engine/score_fingerprint.py")
+    assert "value_residual.py" in fs, "未纳入指纹门禁（改 value 公式老分不判过期）"
+    # 死公式仍在但只作对照，主链不得再调用 score_value
+    assert "score_value(spec" not in ps, "主链仍在用旧死公式"
+
+    # 2) 单元层：可复算、剔除 value 不重复计分、单调、clamp
+    assert VR.selftest() == 0, "value_residual selftest 未过"
+    w = VR.DEFAULT_W
+    c = {"scores": {"powertrain": 8, "safety": 8, "adas": 8, "space": 8,
+                    "control": 8, "cabin": 8, "quality": 8, "value": 3}}
+    pf1 = VR.product_strength(c, w)
+    c2 = _J.loads(_J.dumps(c)); c2["scores"]["value"] = 10
+    assert pf1 == VR.product_strength(c2, w), "产品力受 value 自身影响=重复计分"
+    assert VR.value_for(0.5, 0.4) > VR.value_for(0.3, 0.4), "同档高 ppw 应高分"
+    assert VR.value_for(99, 0.4) == round(VR.NEUTRAL + VR.CAP, 2), "上界 clamp 失效"
+    assert VR.value_for(0.001, 0.4) == round(VR.NEUTRAL - VR.CAP, 2), "下界 clamp 失效"
+
+    # 3) 跨榜一致：档均值锚点能从全榜 summary 提取，子榜固定后同车同分
+    snap = AP.load("car_midsuv_bev")
+    assert snap and snap.get("value_bins"), "锚点缺 value_bins（子榜会本池拟合→跨榜漂移）"
+    assert set(snap["value_bins"]["bins"]) >= {"≤15万", "15-20万"}, "档均值不全"
+
+    # 4) 真实 v19 产物：value 由残差复算、ES6 客观低分、两榜同车 0 差异
+    d = _J.load(open(os.path.join(HERE, "runs", "midsuv_bev_202611_v19", "summary.json"), encoding="utf-8"))
+    vr = d.get("value_residual") or {}
+    assert vr.get("status") == "applied" and vr.get("covered") >= 18, "v19 残差未覆盖"
+    assert vr.get("source") in (None, "pool_fit"), "全榜应为本池拟合"
+    sub = _J.load(open(os.path.join(HERE, "runs", "midsuv_bev_1218_202611_v19", "summary.json"), encoding="utf-8"))
+    assert (sub.get("value_residual") or {}).get("status") == "applied"
+    # ES6：33.8 万在 >25 万档每万元产品力最低 → 残差 value 应低于中性 8.0
+    es6 = next((x for x in vr.get("applied", []) if x["model"] == "蔚来ES6"), None)
+    if es6:
+        assert es6["after"] < VR.NEUTRAL, f"ES6 应客观低于中性: {es6}"
+    return ("性价比改价格残差法：同价位档内每万元产品力相对档均距离（J.D. Power 同级距离），"
+            "七维剔 value 不重复计分，可复算；锚点固定跨榜同车 0 差异，ES6 低分变客观判断")
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114]
 
 
 def run():

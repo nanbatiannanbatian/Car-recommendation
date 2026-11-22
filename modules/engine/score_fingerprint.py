@@ -46,6 +46,9 @@ SCORE_CODE_FILES = [
     # 老候选池的旧安全分不会被判过期（与之前 sync_safety_scores 同类门禁漏洞）。
     "safety_check.py",
     "safety_score.py",
+    # v10.17.0：性价比价格残差法直接覆盖 scores.value（权重 12.2%），是打分代码。
+    # 漏了它则改 value 公式指纹不变、老候选池的旧人工 value 分不会被判过期。
+    "value_residual.py",
 ]
 STAMP_KEY = "_generated_by"
 

@@ -330,6 +330,26 @@ def annotate_all(cands: list[dict], cfg: dict) -> dict:
                                "knee": ANNOTATED_PT_KNEE}
                     sc["powertrain"] = _pt_soft
             conf = min((d["conf"] for d in ds), key=lambda x: CONF_ORDER[x]) if ds else "high"
+            # v10.17.0：逐配置 value 与车系级同口径——用价格残差法重算，杜绝
+            # 「车系级 value 已被 value_residual 改成残差分，逐配置却仍按 kWh/万元
+            # 加 delta，再被 with_config_scores 覆盖回去」的口径分叉（曾致宋Ultra
+            # 跨榜 value 9.5 vs 8.6）。配置价 t.price、产品力用本配置七维（剔 value）。
+            _vinfo = c.get("value_residual") or {}
+            _bmean = _vinfo.get("bin_mean_ppw")
+            if isinstance(_bmean, (int, float)) and t.get("price") and t["price"] > 0:
+                from modules.engine import value_residual as _VR
+                _pp_w = {k: W[k] for k in _VR.PROD_DIMS if k in W}
+                # 产品力取入池稳定基准（与车系级 value_residual 同口径），不用逐配置 sc：
+                # sc 的其他维 delta 会因 ref 选择受子池影响而漂移，用它算 ppw 会让同车
+                # 跨榜 value 不一致（深蓝S 9.5 vs 7.6）。价格效率只需「车系产品力/配置价」。
+                _pf_base = c.get("_value_pf_base") or sc
+                _pk = [k for k in _pp_w if isinstance(_pf_base.get(k), (int, float))]
+                if len(_pk) == len(_pp_w):
+                    _pf = sum(_pf_base[k] * _pp_w[k] for k in _pk) / sum(_pp_w.values())
+                    _ppw = _pf / float(t["price"])
+                    _vv = _VR.value_for(_ppw, _bmean, _vinfo.get("residual_delta") or 0.0)
+                    if _vv is not None:
+                        sc["value"] = _vv
             # v9.7.35：占位基准已由 resolve_ref 主动解析成真实代表配置，不再全车降 low
             # （旧逻辑把所有配置打 low→主榜低置信刷屏=BUG-043）。基准偏差只在 ref_basis 说明，
             # 不污染每个配置的置信度。只有基准完全无法解析（ref=None）才降置信。

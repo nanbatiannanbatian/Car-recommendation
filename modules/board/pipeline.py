@@ -147,6 +147,8 @@ def main():
                     help="不做安全分举证封顶（仅 A/B 对照，验证封顶确实改变分数）")
     ap.add_argument("--no-space-cap", action="store_true",
                     help="不做空间硬数据一致性封顶（仅 A/B 对照，验证 space 虚高确实被压）")
+    ap.add_argument("--no-value-residual", action="store_true",
+                    help="不做性价比价格残差法（仅 A/B 对照，回退人工 value 分）")
     ap.add_argument("--no-auto-safety", action="store_true",
                     help="不按官方成绩自动映射 safety 分（仅 A/B 对照；正常出榜不要关）")
     ap.add_argument("--no-backfill", action="store_true",
@@ -190,6 +192,13 @@ def main():
     # 这是契约层的事，不归一化会在 trim_annotate / auto_trims 里 TypeError。
     from modules.contracts.candidate_schema import normalize_pool
     cands = normalize_pool(cands)
+
+    # v10.17.0：性价比产品力基准快照——value 残差法的 pf 取候选池入池时的原始七维分，
+    # 不用 pipeline 中途被规则增量/安全回流/证据封顶改动的分数。理由：那些中间步骤含
+    # 联网核验（碰撞/销量）与榜内锚点，两榜执行时点不同会让 pf 漂移→档均漂移→同车
+    # value 不一致（宋Ultra 曾 9.5 vs 8.6）。入池原始分是全榜/子榜共用的稳定基准。
+    for _c in cands:
+        _c["_value_pf_base"] = dict(_c.get("scores") or {})
 
     # 固定锚点快照（v10.16.0）：子榜用全价位榜算好的榜内锚点，避免同车跨榜分数漂移。
     # 全价位榜自身没配 anchor_pool（或 --no-anchor-pool）→ 四个模块仍用本池现算。
@@ -567,6 +576,24 @@ def main():
                  "\n→ 确认为口径差非错误时用 --skip-consistency-gate 并在报告说明。")
     print(f"[内部一致性门禁] {_ic['checked']} 款候选，note/结构字段矛盾 0")
 
+    # 性价比价格残差法（v10.17.0，用户要求参考 J.D. Power 同级距离）：
+    # 旧 value 是人工裁决分（名实不符=电池密度、不可复算）；改为按固定价格档分组，
+    # 用「每万元产品力」相对本档均值的距离复算 value。产品力取其余七维归一加权
+    # （剔除 value 自身避免重复计分），保值率仍作有数据车微调。
+    # 必须在 sibling/安全门禁之前：新 value 要过同源车一致性校验；此时七维主体
+    # （规则增量/体验/效率/达成率/软上限/证据封顶/空间校准）已定稿，仅差后续
+    # airbags/ground_clearance 对 safety 的 ≤±0.3 微调（对 pf 影响<0.02）。
+    # 子榜从全价位固定快照读档均值（value_bins），保证同车跨榜同分。
+    from modules.engine import value_residual as _VR
+    _wv = {x["key"]: x["weight"] for x in cfg.get("dimensions", [])}
+    _vr_report = {"status": "skipped"}
+    if not getattr(a, "no_value_residual", False):
+        _vr_report = _VR.apply(cands, weights=_wv,
+                               fixed_bins=(_anchor or {}).get("value_bins"))
+        print(f"[性价比价格残差] 覆盖 {_vr_report['covered']}/{_vr_report['n']} 款（"
+              f"J.D. Power 同级距离，固定档 {len(_vr_report['bins'])} 组"
+              + ("，读全榜锚点" if _anchor else "，本池拟合") + "）")
+
     # v9.7.43：同源车评分一致性门禁——同品牌/同价带/同词根的车，维度分差>1.5
     # 必须在 score_diff_reasons 登记事实理由，否则拦截。根治"证据不足被当成产品差"
     # （007GT 曾 value 6.0/cabin 8.4 无据压低）。
@@ -854,6 +881,10 @@ def main():
                         "space_caps_n": len((_anchor or {}).get("space_caps") or {})},
         # v10.16.0：主榜三电软上限审计（消除效率+达成率叠加的满分）
         "main_powertrain_cap": _pt_capped,
+        # v10.17.0：性价比价格残差法审计（供子榜锚点+报告披露）
+        "value_residual": _VR.summarize(_vr_report)
+            if isinstance(_vr_report, dict) and _vr_report.get("bins") is not None
+            else {"status": "skipped"},
         # v9.7.23：未入池车型及原因（用户要求"能比就比，不能比说明原因"）
         "pool_excluded": (_pool_data.get("pool_excluded") if isinstance(_pool_data, dict) else []),
         # 2026-11-21：价格回流审计（回填了哪些、哪些 trims 也没价）
