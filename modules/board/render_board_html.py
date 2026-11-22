@@ -394,10 +394,23 @@ def render(data, summary, title, as_of):
                           '中等（组内名次波动较大）' if _tau >= 0.8 else '较低（逐名排序不可靠）')
             _tau_txt = (f'算法一致性 τ=<b>{_tau:.3f}</b>（越接近1越一致，本次一致性'
                         f'<b>{_tau_grade}</b>；τ&lt;0.9 时请勿严格按数字先后选车）')
+        _cross_band_txt = ''
+        # v10.15.4：多价位混排时提示「性价比随价格下降≠产品力弱」，引导看纯产品力榜/价位段子榜。
+        # 复用 band_subboards 的 active 判定（= multi_band），单价位榜不显示，避免噪音。
+        # 权重从 meta.dimensions 动态读取，不写死 11.7%——权重调整后文案自动同步。
+        if "band_subboards" in ids:
+            _vdim = next((d for d in (meta.get("dimensions") or [])
+                          if d.get("key") == "value"), None)
+            _vpct = (f"{float(_vdim.get('weight'))*100:.1f}%"
+                     if _vdim and isinstance(_vdim.get("weight"), (int, float)) else "约一成")
+            _cross_band_txt = (
+                ' <b style="color:#b42318">⚠ 跨价位提示：</b>本榜为全价位混排，含「性价比」维度'
+                f'（权重 {_vpct}），价格越高该项天然越低——<b>高价车总分偏低≠产品力更弱</b>；'
+                '「不看价格比硬件」请看下方「纯产品力总榜」，或按预算看「价位段子榜」。')
         H.append('<div class="stability-tip"><b>怎么读这张榜：</b>同档位内各行已用底色分组——'
                  '<b>第二档是「按偏好取舍组」，组内名次会随算法权重变动，请勿严格按数字先后选车</b>，'
                  '结合档位、评价与逐配置对比做决定。' + _tau_txt + '。'
-                 '「唯一名次」只在本榜 8 维规则内成立，不是购车唯一结论。</div>')
+                 '「唯一名次」只在本榜 8 维规则内成立，不是购车唯一结论。' + _cross_band_txt + '</div>')
         # v9.7.48：连续名次(补二值命中盲区) + 产品力≠市场热度口径说明
         _rm = _stab.get("rank_mean_by_model") or {}
         if _rm:
@@ -1078,6 +1091,15 @@ def selftest():
              "rank_delta": 1, "price": 15.0}]},
     }
     doc = render(data, None, "T", "202610")
+    # v10.15.4 跨价位提示回归：多段显示 / 单价位不显示 / 权重动态读取（不写死百分比）
+    _single = dict(data)
+    _single["band_subboards"] = data["band_subboards"][:1]  # 1 段 → multi_band=False
+    single_doc = render(_single, None, "T", "202610")
+    _w2 = dict(data)
+    _w2["meta"] = dict(data["meta"])
+    _w2["meta"]["dimensions"] = [{"key": "powertrain", "label": "三电", "weight": .75},
+                                 {"key": "value", "label": "性价比", "weight": .25}]
+    doc_w2 = render(_w2, None, "T", "202610")
     checks = [
         ("主榜车型", "A车" in doc),
         ("分数", "88.0" in doc),
@@ -1093,6 +1115,9 @@ def selftest():
         ("档位徽标class用英文T1/T2/T3", 'class="tier T1"' in doc and 'class="tier T2"' in doc),
         ("档位徽标中文可读", "第一档" in doc and "第二档" in doc),
         ("档位CSS颜色规则存在", ".tier.T1{background:var(--t1)}" in CSS),
+        ("跨价位提示·多段显示", "跨价位提示" in doc and "纯产品力总榜" in doc),
+        ("跨价位提示·权重动态读取", "40.0%" in doc and "25.0%" in doc_w2 and "40.0%" not in doc_w2),
+        ("跨价位提示·单价位不显示", "跨价位提示" not in single_doc),
     ]
     bad = [n for n, ok in checks if not ok]
     # 注册表契约

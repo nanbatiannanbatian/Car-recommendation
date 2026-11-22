@@ -13,7 +13,7 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 10.15.3
+version: 10.15.4
 author: "nanbatiannanbatian"
 ---
 
@@ -3410,3 +3410,11 @@ filings selftest OK（门禁+预估）、比较器 20/20、物理模型 selftest
 
 ### 验收
 bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency selftest 加 6 项新断言（重车不冤枉/高效车识别/同电耗重车占优/无数据不动/封顶±0.4/退化兜底/只改三电）。v7 榜单（`runs/midsuv_bev_202611_v7`）全门禁通过，日志文案同步为"车重归一残差法"。
+
+## v10.15.4 · 主榜跨价位提示（渲染层，用户确认后实施）
+
+用户连续追问高价车分数偏低、蔚来纯产品力榜也低，实证结论：公式无价格二次计数，高价车总分低主要来自 value 性价比维（价格越高该项天然越低），硬件维没有系统性价格偏差。skill 早有纯产品力榜+价位段子榜三视图解决，但全价位主榜顶部引导语未提示跨价位用户去看这两个视图，易误读为"便宜车产品力更强"。
+
+**改动仅渲染层**（`modules/board/render_board_html.py`，不碰任何公式/权重/分数）："怎么读这张榜"提示末尾追加高亮句——"⚠ 跨价位提示：本榜为全价位混排，含性价比维度（权重从 `meta.dimensions` 动态读取，不写死百分比），价格越高该项天然越低——高价车总分偏低≠产品力更弱；不看价格比硬件请看纯产品力总榜，或按预算看价位段子榜"。复用 `band_subboards` 的 active 判定（= multi_band），单价位榜不显示避免噪音。`board_view.py` lede desc 同步。这是用户铁律"涉及渲染改动先说明方案等确认"下先提方案、经用户明确同意后实施。
+
+**验收**：render_board_html selftest 加 3 项断言（多段显示 / 权重动态读取 40%→25% / 单价位不显示），board_view selftest、bug 107/107、比较器 20/20、结构 16/16、11 模块 selftest 全绿。v8 榜单（`runs/midsuv_bev_202611_v8`）全门禁通过。

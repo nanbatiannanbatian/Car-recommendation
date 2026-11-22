@@ -27,7 +27,7 @@ import paths
 # id, 标题, 适用条件 key, 说明（供 selftest / 文档）
 BLOCKS = [
     {"id": "lede", "title": "导语与规则", "when": "always",
-     "desc": "主榜唯一权威、事实列不计分、产品力榜并列辅助"},
+     "desc": "主榜唯一权威、事实列不计分、产品力榜并列辅助；多段榜提示跨价位性价比≠产品力"},
     {"id": "fact_coverage", "title": "事实列覆盖披露", "when": "has_fact_cols",
      "desc": "哪些事实字段有数据、哪些「—」未采集，不以估计值填充"},
     {"id": "main_board", "title": "打分主榜", "when": "always",
