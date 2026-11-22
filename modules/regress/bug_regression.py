@@ -3421,6 +3421,19 @@ def t107():
     ss_src = _read("modules/engine/spec_score.py")
     assert "电池容量" in ss_src, "spec_score 源码缺电池容量项"
     assert "POWERTRAIN_GROUPS" in ss_src, "spec_score 源码缺三电子维度分组定义"
+
+    # ②-c v10.15.6 三电权重上调锁死：纯电榜 powertrain 0.18→0.25，电池有效权重 9.9%→13.8%。
+    #     对齐尼尔森IQ 2026 中国电池决策权重 13.8%、业内评测三电 25-30%。
+    #     只锁纯电榜配置——跨能源榜是能源中性框架，不得被误改成 25%。
+    cfg_bev = json.loads(_read("categories/car_midsuv_bev.json"))
+    wm = {d["key"]: d["weight"] for d in cfg_bev["dimensions"]}
+    assert abs(wm["powertrain"] - 0.25) < 1e-9, \
+        f"纯电榜三电权重应 0.25，实际 {wm['powertrain']}"
+    assert abs(sum(wm.values()) - 1.0) < 1e-9, \
+        f"纯电榜 8 维权重和应=1，实际 {sum(wm.values())}"
+    assert wm["control"] <= 0.09 and wm["cabin"] <= 0.09, \
+        "车机/操控区分力最低，回抽后权重不应高于 9%"
+    # 跨能源框架用独立常量表，另由 energy_compare_regress.py 锁 0.18，此处不重复。
     ta_src = _read("modules/engine/trim_annotate.py")
     assert "(?<!\\d)" in ta_src or "num_re" in ta_src, \
         "trim_annotate 源码缺数字边界正则（数字粘连回归）"
