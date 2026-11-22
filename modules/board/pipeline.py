@@ -29,6 +29,7 @@ from modules.engine import leaderboard as L
 from modules.engine import ranking
 from modules.engine import thirdparty
 from modules.engine import airbags
+from modules.engine import ground_clearance
 from modules.engine import spec_facts
 from modules.engine import trims
 from modules.board import forecast as FC
@@ -125,6 +126,8 @@ def main():
                          "只读 safety_basis，不采信人工填写的 evidence_status")
     ap.add_argument("--no-airbags", action="store_true",
                     help="跳过被动安全气囊事实列与无成绩车受限修正（回测对照用）")
+    ap.add_argument("--no-ground-clearance", action="store_true",
+                    help="跳过最小离地间隙事实列与 safety 受限修正（回测对照用）")
     ap.add_argument("--no-spec-facts", action="store_true",
                     help="跳过官网配置事实节（该节本身不改分，仅作回测对照）")
     ap.add_argument("--no-trims", action="store_true",
@@ -587,6 +590,10 @@ def main():
     # 会影响后续所有打分 / 稳健性 / 三档，但不能影响准入。
     if not a.no_airbags:
         cands, _ = airbags.apply(cands)
+    # 最小离地间隙：事实列 + 空载口径受限 safety 修正（±0.3，不重复计分）。
+    # 与 airbags 同位置：改 scores.safety，必须在 safety_check 门禁之前。
+    if not getattr(a, "no_ground_clearance", False):
+        cands, _ = ground_clearance.apply(cands)
     # 官网配置事实库：只写 c['spec_facts']，SCORING_ENABLED=False 且有前后
     # scores 深比较断言。放在打分前是为了让报告能拿到全量候选，不改任何分数。
     if not a.no_spec_facts:
@@ -955,6 +962,16 @@ def main():
             "verified": cov["verified"], "total": cov["total"],
             "coverage_pct": cov["coverage_pct"],
             "adjusted": cov["adjusted"], "todo_n": len(cov["todo"]),
+        }
+
+    # 1b-2 最小离地间隙事实列（全局一节，来源+引述可核验；safety 已在打分前受限修正）
+    if not getattr(a, "no_ground_clearance", False):
+        parts += ["---", "", ground_clearance.report(cands), ""]
+        gc_cov = ground_clearance.coverage(cands)
+        summary["ground_clearance"] = {
+            "verified": gc_cov["verified"], "total": gc_cov["total"],
+            "adjusted": gc_cov["adjusted"], "conflicts": gc_cov["conflicts"],
+            "todo": gc_cov["todo"],
         }
 
     # 1c 细分维度决策表 + 官网配置事实（全局一节，不计入加权）

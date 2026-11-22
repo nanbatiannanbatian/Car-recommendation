@@ -13,7 +13,7 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 10.15.7
+version: 10.15.8
 author: "nanbatiannanbatian"
 ---
 
@@ -3463,3 +3463,20 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
 - `render_board_html.selftest` 加 3 项：≤10%显示 / 权重动态读取(8.0%) / >10%不显示(13.5%)。
 
 **验收**：bug 107/107（失败回测 103/103）、比较器 20/20、结构 16/16、derive 4/4、render selftest 全绿。v11 榜单（`runs/midsuv_bev_202611_v11`）全门禁通过：页面表头已显示三电 25.0%/智驾 8.0%（旧的 18.0%/13.5% 归零），智驾提示正确渲染；基准 top3 保持「极氪7X/海狮06EV/阿维塔07」，冠亚军不变。
+
+## v10.15.8 · 纯电榜离地间隙进安全维（独立受限小项 ±0.3）+ 事实库 SSOT（用户："四驱/离地间隙能否在安全加分"）
+
+用户提两问：① 四驱能否安全加分；② 离地间隙是否降低电池磕碰、能否安全加分。调查结论分两半：
+
+**四驱不加分**（已确认）：IIHS/NHTSA 与瑞典 VTI 14 年警方事故研究（5200 AWD vs 3.1 万 2WD，全部配 ESC）显示四驱只改善起步牵引、不改善制动转向，冰雪路面因"过度自信"伤人事故反而 +19~31%、撞击严重度 +13~15%；研究建议四驱不应作为安全配置宣传，真正救命的是 ESC（降致命单车事故 50%）。本池四驱字段覆盖 0/20（427 条逐配置仅 18 条文字提及），无数据基础。故不加分、不改代码。
+
+**离地间隙加分成立但需严谨落地**：纯电电池包平铺底盘，离地间隙比同级燃油 SUV 低 15~20mm，托底是热失控高频诱因；国标 GB38031-2025 新增底部撞击测试（35km/h 撞凸起硬物电池不起火不爆炸）并明确"离地间隙充足车型可豁免"——标准层面确认逻辑。按用户"按配置精确、不许打补丁、缺数据先补"的铁律，先网查 20 款车（新华网/汽车之家参数页/厂商官网/官方PDF/政府采购公告多源），发现数据三档：18 款可核验、2 款官方未公布（MONA L05/Q06 记 unknown 不推断）、5 款来源冲突取低值披露。同车型配置差异大（极氪7X 后驱197/四驱160、Model Y 后驱167/高性能147），故按候选池入榜配置取空载口径。
+
+**落地（照搬 airbags.py 合规范式，根因非补丁）**：
+- 新建 `categories/ground_clearance.json` SSOT：20 款逐车 trim + clearance_mm(空载) + source/url/quote + conflict 标记 + 裁决优先级（政府采购 > 汽车之家配置页 > 官网 > 第三方库 > 媒体问答）。
+- 新建 `modules/engine/ground_clearance.py`：≥175mm +0.3 / 150~175 0 / <150 −0.3 / unknown 0；幂等(gc_delta)、来源校验、审计字段、报告章节与待补清单；**单调性保护**（调整后无成绩车 safety 不得高于有成绩车最低分，违反则正 delta 回缩并在报告披露）；只改 scores.safety 不碰 adjust（adjust 只平移总分不激活维度权重）。
+- 防重复计分：气囊/CTB 是"碰撞时结构防护"已被碰撞成绩吸收，离地间隙是"降低磕碰概率"机制不同；有官方成绩车照常计（底部撞击非现测项），不搞 airbags 那种"有成绩就 0"。
+- pipeline 接入：import + `--no-ground-clearance` 开关 + apply（airbags 后、安全门禁前）+ 报告节 + summary.ground_clearance。
+- `adjust_budget.py` 纳入 safety 预算（safety: {airbags:0.3, ground_clearance:0.3}），并补历史字段兼容读取（空气囊模块写 airbag_delta、审计原读 airbags_adjust，补 airbag_delta 兼容）。
+
+**验收**：gc selftest 12/12（分档/幂等/单调性/数据校验）、bug 107/107（t107 加 6 条离地间隙断言 + 反向注入验证）、比较器 20/20、结构 16/16、derive 4/4、render selftest、adjust_budget selftest 全绿。v12 榜单（runs/midsuv_bev_202611_v12）：18/20 覆盖、5 款调整、5 款冲突取低、2 款待核；海狮06EV 因无碰撞成绩触发单调性保护 +0.3→0（报告如实披露）；基准 top3「极氪7X/海狮06EV/阿维塔07」不变、T1 极氪7X。

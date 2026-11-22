@@ -3451,6 +3451,21 @@ def t107():
     pl_src = _read("modules/board/pipeline.py")
     assert 'bv_cfg_path = _bv_cfg_path if os.path.exists(_bv_cfg_path)' in pl_src, \
         "pipeline 渲染器仍硬编码通用配置，页面权重会与打分/报告漂移"
+    # ②-e v10.15.8 离地间隙安全维受限修正：独立模块 + SSOT + 幂等 + 单调性保护 + 预算审计。
+    gc_db = json.loads(_read("categories/ground_clearance.json"))
+    assert len(gc_db["entries"]) == 20, "离地间隙事实库应覆盖 20 款候选"
+    assert gc_db["policy"]["target"] == "scores.safety", "离地间隙应落 scores.safety（摘要字段不改维度分）"
+    assert gc_db["policy"]["rule"] == {"ge_175": 0.3, "150_to_175": 0.0,
+                                        "lt_150": -0.3, "unknown": 0.0}, \
+        "离地间隙分档规则被改动：±0.3/unknown不推断"
+    gc_src = _read("modules/engine/ground_clearance.py")
+    assert "gc_delta" in gc_src and "单调性保护" in gc_src, \
+        "ground_clearance 缺幂等字段或单调性保护"
+    assert 'getattr(a, "no_ground_clearance", False)' in pl_src, \
+        "pipeline 未接入 ground_clearance 模块（改了模块但没接线）"
+    ab_src = _read("modules/engine/adjust_budget.py")
+    assert '"ground_clearance": 0.3' in ab_src, \
+        "adjust_budget 未把离地间隙纳入 safety 预算审计"
     # 跨能源框架用独立常量表，另由 energy_compare_regress.py 锁 0.18，此处不重复。
     ta_src = _read("modules/engine/trim_annotate.py")
     assert "(?<!\\d)" in ta_src or "num_re" in ta_src, \

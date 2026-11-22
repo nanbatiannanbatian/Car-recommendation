@@ -31,7 +31,7 @@ MODULE_CAPS = {
     "space":      {"rule_adjust": 0.8, "space_consistency": 0.0},  # 后者只压不抬，不计独立预算
     "adas":       {"experience": 1.5},
     "cabin":      {"experience": 1.5},
-    "safety":     {"airbags": 0.3},
+    "safety":     {"airbags": 0.3, "ground_clearance": 0.3},
     "value":      {"residual": 1.0},
     "quality":    {},
 }
@@ -104,6 +104,14 @@ def _collect_deltas(c: dict) -> dict:
     ab = c.get("airbags_adjust") or {}
     if isinstance(ab, dict):
         add("safety", "airbags", ab.get("delta", 0))
+    # 最小离地间隙（v10.15.8）：safety 维另一个独立小项，纳入预算审计防叠加。
+    # 兼容空气囊字段两种写法（模块实际写 airbag_delta，历史审计读 airbags_adjust）。
+    ab2 = c.get("airbag_delta")
+    if ab2 and not ab:
+        add("safety", "airbags", ab2)
+    gc = c.get("gc_delta")
+    if gc:
+        add("safety", "ground_clearance", gc)
     return out
 
 
