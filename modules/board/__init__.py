@@ -11,6 +11,8 @@
   master_pool 总候选池（单一事实源，治「每次临时拼池漏车」）
   warehouse / forecast / backfill  本地数据仓库、未上市预测、历史回填
   cross_energy_sections  跨能源正式榜的 14 区块（默认画像静态定稿）
+  sales_backfill  出榜前用懂车帝逐月权威销量回填候选池手填值（依赖 research）
+  range_achievement  三电续航达成率修正（调 physics 估算 + 榜内中位锚双向 ±1.0）
 
 不职责：本包不含打分公式（-> engine）、不含取数（-> research）。
 

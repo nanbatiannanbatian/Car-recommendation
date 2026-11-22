@@ -187,10 +187,16 @@ def _find_key(lib, name):
     return None
 
 
-def collect_sources(root=HERE):
-    """一次加载所有已落盘事实源，返回结构化源集合。纯读取，无网络。"""
+def collect_sources(root=HERE, pool_path=None):
+    """一次加载所有已落盘事实源，返回结构化源集合。纯读取，无网络。
+
+    v10.15.2 修复（--model 返回 0 款根因）：master_pool.json 在 v10.14.0 降级为
+    生成物已移到 data/gen/，这里却写死 CAT/master_pool.json（不存在），
+    导致 pool_keys 为空、--model 单车核验全部被过滤。改用 paths.cat() 自动解析，
+    并允许外部传入 pool 路径（CLI --pool 指定的池子）。
+    """
     S = {}
-    S["master_pool"] = _load_json(os.path.join(CAT, "master_pool.json"))
+    S["master_pool"] = _load_json(pool_path or str(paths.cat("master_pool.json")))
     S["baseline"] = _load_json(os.path.join(CAT, "baseline_car_ev.json"))
     S["cell_facts"] = _load_json(os.path.join(CAT, "cell_facts.json"))
     S["cncap"] = _load_json(os.path.join(HERE, "cncap_scores.json"))
@@ -540,13 +546,14 @@ def check_internal_consistency(cands: list[dict]) -> dict:
     return {"checked": len(cands), "conflicts": conflicts, "passed": not conflicts}
 
 
-def verify_all(root=HERE, models=None, dcd_path="", pool_only=True):
+def verify_all(root=HERE, models=None, dcd_path="", pool_only=True, pool_path=None):
     """主入口：返回 {car: {field: adjudication}}。
     pool_only=True 时只输出总池内的车（用户关心的是候选池核验结果）；
-    False 则包含所有事实源里出现的车（含池外燃油车/口碑车，用于发现）。"""
+    False 则包含所有事实源里出现的车（含池外燃油车/口碑车，用于发现）。
+    pool_path: 显式指定总池路径（CLI --pool）；缺省用 paths.cat() 解析的生成物。"""
     if dcd_path:
         os.environ["CROSS_VERIFY_DCD"] = dcd_path
-    S = collect_sources(root)
+    S = collect_sources(root, pool_path=pool_path)
     ev = build_evidence(S)
     pool_keys = set()
     if pool_only:
@@ -656,6 +663,18 @@ def selftest():
     assert _find_in(lib, "ID.AURA T6") is not None
     assert _find_in(lib, "阿尔法T5") is not None
     print("  [6] 跨库车名对齐 ✓")
+    # 7 [v10.15.2 回归] --model 单车核验不能因 master_pool 路径漂移返回 0 款。
+    #   反例（修复前）：collect_sources 写死 CAT/master_pool.json（P3 拆分后不存在），
+    #   pool_keys 为空 → --model 阿维塔07 被过滤 → 0 款。
+    _pool = str(paths.cat("master_pool.json"))
+    assert os.path.exists(_pool), f"生成物总池应存在：{_pool}"
+    S7 = collect_sources(pool_path=_pool)
+    assert len((S7.get("master_pool") or {}).get("cars", [])) > 0, \
+        "collect_sources 必须能从 paths.cat 解析出的生成物池读到车（不能写死 categories/）"
+    _res7, _ = verify_all(models=["阿维塔07 纯电版"], pool_only=True, pool_path=_pool)
+    assert len(_res7) >= 1, f"--model 阿维塔07 应至少核验到 1 款，实际 {len(_res7)}"
+    assert canon("阿维塔07 纯电版") == canon("阿维塔07"), "车名归一化应一致"
+    print("  [7] --model 单车核验路径（含生成物总池）✓")
     # 7 体验证据缺口：T6 场景（外部稿有实测、候选池 note 无）必须检出
     check_experience_gaps_selftest()
     print("  [7] 体验证据缺口（含外部源）✓")
@@ -676,7 +695,8 @@ def main():
         selftest()
         return 0
     models = [m.strip() for m in a.model.split(",")] if a.model else None
-    result, S = verify_all(models=models, dcd_path=a.dcd_cache, pool_only=not a.all_sources)
+    result, S = verify_all(models=models, dcd_path=a.dcd_cache,
+                           pool_only=not a.all_sources, pool_path=a.pool)
     out_dir = a.out or os.path.join(HERE, "runs", "cross_verify_20261119")
     jp, mp, data = write_report(result, out_dir, a.conflicts_only)
     print(f"交叉核验完成：{data['summary']['车型']} 款，"

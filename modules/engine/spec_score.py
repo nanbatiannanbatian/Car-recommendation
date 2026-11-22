@@ -153,35 +153,46 @@ def _n(x, default=None):
         return default
 
 
+# 智驾硬件规则增量上限（v10.15.2 · 审计 P0-2，2026-11-22）
+# 原规则硬件满打满算 +5.2（激光雷达1.6+算力2.0+城区1.2+高速0.4），基线5.0→10.2，
+# 意味着「看配置单就能满分」。J.D. Power 2026 TXI：执行指数四年首降、
+# 「不稳定/不准确」占抱怨48%、智驾投诉同比大增——市场共识已从堆料转向可用性。
+# 现把硬件总幅度压到 ADAS_HW_CAP=+2.0（仅作能力上限参考），可用性证据走 experience_score。
+ADAS_HW_CAP = 2.0
+
+
 def score_adas(s):
-    """智驾：硬件决定上限，软件决定可用性。"""
+    """智驾：硬件决定上限（±2.0封顶），软件可用性才是主证据（experience_score）。"""
     base, why = 5.0, []
     lidar = s.get("adas_lidar")
     if lidar is True or (isinstance(lidar, (int, float)) and lidar >= 1):
-        base += 1.6
-        why.append("激光雷达 +1.6")
+        why.append("激光雷达 +1.6（硬件上限项）")
     tops = _n(s.get("adas_tops"))
     if tops is not None:
         if tops >= 400:
-            base += 2.0
-            why.append(f"{tops:g}TOPS +2.0")
+            why.append(f"{tops:g}TOPS +2.0（硬件上限项）")
         elif tops >= 200:
-            base += 1.5
-            why.append(f"{tops:g}TOPS +1.5")
-        elif tops >= 100:
-            base += 0.9
-            why.append(f"{tops:g}TOPS +0.9")
-        elif tops >= 40:
-            base += 0.4
-            why.append(f"{tops:g}TOPS +0.4")
-        else:
-            why.append(f"{tops:g}TOPS +0")
+            why.append(f"{tops:g}TOPS +1.5（硬件上限项）")
     if s.get("adas_city_noa") is True:
-        base += 1.2
-        why.append("城区 NOA +1.2")
+        why.append("城区 NOA +1.2（硬件上限项）")
     if s.get("adas_highway_noa") is True:
-        base += 0.4
-        why.append("高速 NOA +0.4")
+        why.append("高速 NOA +0.4（硬件上限项）")
+    # 硬件项合计按封顶计入（能力上限，不等于可用性结论）
+    hw_raw = 0.0
+    if lidar is True or (isinstance(lidar, (int, float)) and lidar >= 1):
+        hw_raw += 1.6
+    if tops is not None:
+        hw_raw += 2.0 if tops >= 400 else (1.5 if tops >= 200 else (0.9 if tops >= 100 else (0.4 if tops >= 40 else 0)))
+    if s.get("adas_city_noa") is True:
+        hw_raw += 1.2
+    if s.get("adas_highway_noa") is True:
+        hw_raw += 0.4
+    hw = min(ADAS_HW_CAP, hw_raw)
+    if hw_raw > 0:
+        base += hw
+        why.append(f"硬件上限项合计 {hw_raw:g}，封顶计入 +{hw:g}（可用性靠实测证据另行调整）")
+    else:
+        why.append("无智驾硬件参数，仅基线 5.0")
     return base, why
 
 
@@ -211,31 +222,30 @@ def powertrain_parts(s):
     ct = cell_tier_of(cell, s.get("cell_route"))
     if ct["tier"] != "unknown":
         parts.append(("电芯", ct["points"], ct["text"]))
-    # ── 电池容量（2026-11-22 新增，用户诉求）────────────────────────────
+    # ── 电池容量（2026-11-22 新增，用户诉求；v10.15.2 去双计修正）────────────
     # 用户原话：「启源电池更好…电池度数又高，是不是在三电上需要去分开来」。
     # 此前三电规则里**电池度数完全缺席**（只有续航 km），于是「大电池」这个
     # 纯电车最核心的硬件差异不体现在分数上。
     #
-    # 口径陷阱（必须避开）：榜是 10–40 万**全价位**（蔚来ES6 33.8万 vs 极狐T5 11.38万），
-    # 电池度数的**绝对值跨价位不可比**——25万的车电池大是价格带的必然结果，
-    # 不是三电技术更好，直接按 kWh 给分会系统性奖励高价车（与「空间维用车长」
-    # 当年重复计数的教训同类）。
-    # 所以用 **kWh/万元**（每万元预算买到多少度电池）——这是跨价位可比的口径，
-    # 项目里已有同名参考列（board_v2 的 kwh_per_wan）。
+    # 【v10.15.2 双计修正】原实现用 kWh/万元（kwh/price），但：
+    #   · kWh/万元 已含 1/price 分母，经 rule_adjust 榜内中位锚相对化后，
+    #     与 value 维「同榜中位价差」（低价加分）**同向** → 低价大电池车被奖两次。
+    #   · 三电维应反映「电池硬件素质」= 绝对度数；跨价位可比性由 rule_adjust 的
+    #     榜内中位锚解决（同一榜里比，不需要再除价格）。
+    # 现在改为绝对 kWh 分档，kWh/万元 仍在页面作为「每万元买多少度电」披露列
+    # （board_v2.kwh_per_wan 不动）——打分归打分，披露归披露，各司其职。
     kwh = _n(s.get("kwh"))
-    price = _n(s.get("price"))
-    if kwh is not None and price:
-        per_wan = kwh / price          # kWh / 万元
-        if per_wan >= 5.0:
-            parts.append(("电池容量", 0.8, f"{kwh:g}kWh/{price:g}万 = {per_wan:.1f}kWh/万 +0.8"))
-        elif per_wan >= 4.2:
-            parts.append(("电池容量", 0.6, f"{kwh:g}kWh/{price:g}万 = {per_wan:.1f}kWh/万 +0.6"))
-        elif per_wan >= 3.4:
-            parts.append(("电池容量", 0.4, f"{kwh:g}kWh/{price:g}万 = {per_wan:.1f}kWh/万 +0.4"))
-        elif per_wan >= 2.8:
-            parts.append(("电池容量", 0.2, f"{kwh:g}kWh/{price:g}万 = {per_wan:.1f}kWh/万 +0.2"))
-        elif per_wan < 2.2:
-            parts.append(("电池容量", -0.4, f"{kwh:g}kWh/{price:g}万 = {per_wan:.1f}kWh/万 −0.4"))
+    if kwh is not None:
+        if kwh >= 90:
+            parts.append(("电池容量", 0.8, f"{kwh:g}kWh +0.8（绝对电量，硬件素质）"))
+        elif kwh >= 75:
+            parts.append(("电池容量", 0.6, f"{kwh:g}kWh +0.6（绝对电量，硬件素质）"))
+        elif kwh >= 65:
+            parts.append(("电池容量", 0.4, f"{kwh:g}kWh +0.4（绝对电量，硬件素质）"))
+        elif kwh >= 55:
+            parts.append(("电池容量", 0.2, f"{kwh:g}kWh +0.2（绝对电量，硬件素质）"))
+        elif kwh < 45:
+            parts.append(("电池容量", -0.4, f"{kwh:g}kWh −0.4（绝对电量，硬件素质）"))
     rg = _n(s.get("range_km"))
     if rg is not None:
         if rg >= 700:
@@ -335,12 +345,14 @@ def control_parts(s):
         parts.append(("驱动", 0.4, "后驱 +0.4"))
     z = _n(s.get("zero_to_100_s"))
     if z is not None:
+        # v10.15.2（审计 P1-3）：零百是「动力」不是「操控」，降权（原 +0.8/+0.3/−0.5）。
+        # 横向动态（麋鹿/侧倾/制动）才是操控主证据，走 experience_score。
         if z <= 5:
-            parts.append(("零百", 0.8, f"零百 {z:g}s +0.8"))
+            parts.append(("零百", 0.4, f"零百 {z:g}s +0.4（动力参考，降权）"))
         elif z <= 7:
-            parts.append(("零百", 0.3, f"零百 {z:g}s +0.3"))
+            parts.append(("零百", 0.2, f"零百 {z:g}s +0.2（动力参考，降权）"))
         elif z > 9:
-            parts.append(("零百", -0.5, f"零百 {z:g}s −0.5"))
+            parts.append(("零百", -0.3, f"零百 {z:g}s −0.3（动力参考，降权）"))
     return parts
 
 
@@ -448,26 +460,36 @@ def score_safety(s):
     return base, why
 
 
+# 车机硬件上限（v10.15.2 · 审计 P0-3，2026-11-22）
+# 原规则 8295 +1.4、8775 +1.2、8155 +0.8，屏幕≥15″ +0.4、语音大模型 +0.3，
+# 光看配置单可到 9.1。J.D. Power 2026 TXI：智能座舱投诉总量最高，副驾屏 21.3 PP100、
+# 35% 车主从未使用；「更多功能≠更好体验」，用户最满意的是无感稳定而非大屏堆料。
+# 现把芯片降为上限参考（封顶 +0.6），屏幕尺寸不再直接加分（多屏可能是问题源），
+# 流畅度/误唤醒等体验证据走 experience_score。
+CABIN_HW_CAP = 0.6
+
+
 def score_cabin(s):
-    """车机：芯片是一票否决项，屏幕与生态是加分项。"""
+    """车机：芯片是能力上限参考，流畅度/稳定性才是主证据（experience_score）。"""
     base, why = 7.0, []
     chip = str(s.get("cabin_chip") or "")
+    chip_raw = 0.0
     if "8295" in chip:
-        base += 1.4
-        why.append("8295 +1.4")
+        chip_raw = 1.4
     elif "8155" in chip:
-        base += 0.8
-        why.append("8155 +0.8")
+        chip_raw = 0.8
     elif "8775" in chip:
-        base += 1.2
-        why.append("8775 +1.2")
+        chip_raw = 1.2
+    if chip_raw:
+        hw = min(CABIN_HW_CAP, chip_raw)
+        base += hw
+        why.append(f"{chip} 芯片 +{chip_raw:g}，封顶 +{hw:g}（上限参考；流畅/稳定靠实测证据）")
+    # 屏幕尺寸不再直接加分：大屏/多屏在 J.D. Power 2026 是问题最多技术之一。
     inch = _n(s.get("screen_inch"))
     if inch is not None and inch >= 15:
-        base += 0.4
-        why.append(f"{inch:g}″ 屏 +0.4")
+        why.append(f"{inch:g}″ 屏 +0（尺寸不构成体验优势；多屏可能是问题源）")
     if s.get("llm_voice") is True:
-        base += 0.3
-        why.append("语音大模型 +0.3")
+        why.append("语音大模型（能力参考，不计分；准确率靠口碑证据）")
     return base, why
 
 
@@ -537,6 +559,22 @@ def selftest() -> int:
     w = sum(v for _, v, _ in weak)
     assert w < 0, "后扭力梁是真实短板，应减分"
     assert w >= -0.5, f"后扭力梁减分应减半（-0.3），实际 {w}"
+    # ③ 智驾硬件封顶 +2.0（审计 P0-2）：满配硬件不能把基线 5.0 顶到 10.2
+    full, _ = score_adas({"adas_lidar": True, "adas_tops": 508,
+                          "adas_city_noa": True, "adas_highway_noa": True})
+    assert full <= 5.0 + ADAS_HW_CAP, f"智驾硬件应封顶 +{ADAS_HW_CAP}，实际 {full}"
+    assert full == 7.0, f"满配硬件应 5.0+2.0=7.0，实际 {full}"
+    # ④ 车机去堆料（审计 P0-3）：屏幕尺寸不加分、芯片封顶 +0.6
+    big, _ = score_cabin({"cabin_chip": "8295", "screen_inch": 15.6, "llm_voice": True})
+    small, _ = score_cabin({"cabin_chip": "8295"})
+    assert big == small == 7.0 + CABIN_HW_CAP, \
+        f"屏幕/语音不应影响车机规则分（大屏不是体验优势），big={big} small={small}"
+    # ⑤ 电池容量去双计（审计 P1-1）：同 kwh 不同价，规则分必须相同（价格只归 value 维）
+    cap_a = powertrain_parts({"kwh": 80, "price": 15})
+    cap_b = powertrain_parts({"kwh": 80, "price": 35})
+    va = sum(v for n, v, _ in cap_a if n == "电池容量")
+    vb = sum(v for n, v, _ in cap_b if n == "电池容量")
+    assert va == vb, f"电池容量项不应含价格分母（价格归 value），15万={va} 35万={vb}"
     return 0
 
 

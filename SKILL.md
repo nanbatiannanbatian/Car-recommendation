@@ -13,7 +13,7 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 10.15.1
+version: 10.15.2
 author: "nanbatiannanbatian"
 ---
 
@@ -3344,3 +3344,50 @@ filings selftest OK（门禁+预估）、比较器 20/20、物理模型 selftest
 **修复**：改用 `paths.cat("fact_library.json")`。`selftest()` 加两层回归：①正断言「配置级无电芯、车系事实库有电芯」的车不被误报 `no_cell`；②反向篡改把路径换回错误目录，同一辆车必须被检出。另 4 款（乐道L60/小鹏G6/蔚来ES6/Model Y）确实缺电芯事实，联网补录进 `categories/fact_library.json`（唯一可写源，带 URL+引文+口径冲突披露），非写进会被重建覆盖的 `data/gen/`。
 
 **验收**：修复后 21 款池误报 7→4（真缺），补录后 20 款池严格校验 20/20 全绿；`trim_coverage --selftest` 正反向都过；bug 回归 107/107、跨能源 20/20、结构 16/16 全绿。
+
+---
+
+## v10.15.2 · 销量权威回填 + 八维公式审计落地 + 审计器字段错位根因修复（2026-11-22）
+
+用户三连要求：①阿维塔07趋势月销 7000 报错核查并改代码；②把审计报告的全部 P0/P1/P2 优化项代码层落地；③发现的 bug 全部代码层修复。销量口径用户拍板「全部榜值标 ≤上界」，优化范围拍板「审计报告全部项」。
+
+### 一、销量权威回填（阿维塔07 根因）
+
+**问题**：榜单显示阿维塔07趋势月销 7000，实际阿维塔品牌 2026-10 全系交付 7056 被误当单车系销量；懂车帝全部榜阿维塔07 车系近6月 `2318/2254/1252/716/461/356`，中位 984，纯电应 ≤984。
+
+**根因（非补丁）**：候选池 `trend_sales` 是手填常量，pipeline 出榜前从不校验权威销量；`cross_verify` 默认也不加载懂车帝快照。全池手填值普遍偏离数倍（腾势N7 1500→33、宋L EV 3500→85、Model Y 48000→29086）。
+
+**修复**：新增 `modules/board/sales_backfill.py`（初版在 engine，后因依赖 research 迁到 board），出榜前强制逐月抓懂车帝 `rank_data` 三口径（纯电/插混/全部）。纯电榜命中=逐月中位（`pure_bev`）；只全部榜命中=车系合计上界（`series_total`，页面显示 ≤N 不参与分位）；手填与权威差≥2倍或≥3000 记 dispute 披露。品牌别名（极氪↔ZEEKR）、纯电版/EV 后缀剥离、MONA L05 防误配 M03 都已处理。pipeline 加 `--no-sales-backfill` / `--sales-snapshot` / `--sales-months`。落 `runs/dcd_sales_snapshot_202610.json` 离线快照保证零网络可复现。
+
+### 二、八维公式审计优化落地
+
+- **P0-1 续航达成率进三电**：新增 `modules/board/range_achievement.py`，一手实测达成率优先，否则 physics.ev_range_model 估算高速120km/h 达成率；榜内中位锚，每5个百分点 ±0.1 分，±1.0 封顶，无数据不插补。20/20 覆盖。pipeline 加 `--no-range-achievement`。
+- **P1-1 电池容量去价格双计**：`spec_score.powertrain_parts` 的电池容量项从 `kWh/万元` 改为绝对 kWh 分档（≥90 +0.8 / ≥75 +0.6 / ≥65 +0.4 / ≥55 +0.2 / <45 −0.4）；价格归 value 维，kWh/万元 仅作披露列。零百降权（≤5s +0.4 / ≤7s +0.2 / >9s −0.3）。
+- **P1-3 智驾/车机去堆料**：`score_adas` 硬件项封顶 +2.0（原理论 +5.2 顶到 10.2），可用性靠体验证据；`score_cabin` 芯片封顶 +0.6，大屏/语音大模型不计分（尺寸不构成体验优势）。
+- **P1-5 调整预算审计**：新增 `modules/engine/adjust_budget.py`，只审计不截断，暴露同维多模块叠加。
+
+### 三、审计器字段错位根因修复（本轮独立发现的第三个同类 bug）
+
+`adjust_budget._collect_deltas` 还原各模块 delta 时，三处字段结构与真实写入不符导致审计恒读 0 / 严重低估：
+1. `powertrain_efficiency` 用 `adjust` 字段（旧只读 `delta`）——本轮前已修；
+2. `rule_adjust.detail[dim]` 本身就是维度记录（含 `adjust`），旧代码多套一层 item 遍历把标量当 dict，`rec.get` 恒失败——本轮修复；
+3. `experience_adjust` 生产结构是 `["dimensions"][dim].delta`，旧代码读 `["detail"]` 恒空——本轮修复。
+
+**根因**：审计器没有针对各模块真实写入结构做对照测试，全靠臆测字段名。**修复**：全部对齐真实生产结构，`selftest()` 用各模块真实形态构造样本（rule_adjust 的 adjust、experience 的 dimensions、efficiency 的 adjust、range 的 delta），四模块叠加 3.7 与真实池 1.18 两级验证。修复前 v6 只审计出 powertrain 0.83（严重低估），修复后正确读出 5 维（powertrain 1.18 / adas 1.0 / control 1.0 / cabin 0.35 / value 0.78）。
+
+### 四、其他 bug 与架构修复
+
+- **cross_verify --model 返回 0 款**：`master_pool.json` 已从 `categories/` 迁到 `data/gen/`，但 `collect_sources()` 仍读旧路径。改走 `paths.cat()` 并支持 CLI `--pool` 透传；selftest 加单车核验路径断言（阿维塔07 纯电版从 0→1 款）。
+- **experience_facts.json coverage_note 计数错**：写死「24条/10款」实际「30条/14款」，改动态统计。
+- **架构分层违规**：两个新模块初放 engine 层但依赖 physics/research，违反 layout_regress「engine 只依赖 contracts/data」。迁到 board 层（编排职责本就属 board），零例外、全绿。
+- **bug_regression BUG-107** 断言随电池容量新口径更新（绝对 kWh、价格归 value）。
+
+### 五、未实施项（诚实披露，非遗漏）
+
+- **P1-2 得房率双向加分**：实测覆盖率仅 5/67，远低于 skill 既有 G2 ≥70% 门槛，强行加分会给少数有数据的车随机加分 → 保持披露+一致性封顶，不进分。
+- **P1-4 性价比改产品力/价格分位**：产品力分来自总分会形成循环依赖，字段与口径不支持稳健改造 → 留待方案拍板。
+- **P2-1/2/3（GB38031 合规列 / AEB 子项 / VDS 质保召回细分 / 权重 A/B 校准）**：需新增权威事实源或样本量，本轮数据不具备。
+- **P2-4 页面置信标签**（仅硬件口径/有实测）：涉及页面渲染层，按用户铁律「先说明方案等确认」→ 本轮不动渲染。
+
+### 验收
+全套回归全绿：bug 107/107、跨能源比较器 20/20、结构 16/16、11 个模块 selftest 全过；v6 榜单阿维塔07 显示 ≤984 落第二档（月销<2000 正确拦截）；adjust_budget 修复后读出 5 维累计、无超预算。出榜命令：`pipeline.py --category car_midsuv_bev --candidates runs/midsuv_bev_pool_202611_final.json --out runs/midsuv_bev_202611_v6 --as-of 202610 --quality --sales-snapshot runs/dcd_sales_snapshot_202610.json`。

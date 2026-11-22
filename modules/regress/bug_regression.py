@@ -3367,20 +3367,22 @@ def t107():
     from modules.engine import trim_annotate as TA
     from modules.engine import trim_board as TB
 
-    # ① 电池容量项存在，且用 kWh/万元（跨价位可比）而非绝对 kWh
+    # ① 电池容量项存在，且用绝对 kWh（v10.15.2 去双计：价格归 value 维，kWh/万元仅披露）
     parts = SS.powertrain_parts({"kwh": 80.0, "price": 20.0, "range_km": 600})
     cap = [p for p in parts if p[0] == "电池容量"]
     assert cap, f"三电规则缺电池容量项: {[p[0] for p in parts]}"
-    assert "kWh/万" in cap[0][2], f"电池容量口径应为 kWh/万元: {cap[0][2]}"
-    # 同样 80kWh：20万的车 +0.8，40万的车不应拿同样分（跨价位不可比）
+    assert "绝对电量" in cap[0][2], f"电池容量口径应为绝对kWh（去价格双计）: {cap[0][2]}"
+    # 同样 80kWh：不同价位拿同样分（价格只在 value 维算一次，防双计）
     rich = SS.powertrain_parts({"kwh": 80.0, "price": 20.0})
     poor = SS.powertrain_parts({"kwh": 80.0, "price": 40.0})
     cr = [p for p in rich if p[0] == "电池容量"][0][1]
     cp = [p for p in poor if p[0] == "电池容量"][0][1]
-    assert cr > cp, f"同样电池不同价位应区分（防高价车系统性占优）: {cr} vs {cp}"
-    # 缺价格 → 不参与（缺数据≠差）
-    assert not [p for p in SS.powertrain_parts({"kwh": 80.0}) if p[0] == "电池容量"], \
-        "缺价格时电池容量项应缺席"
+    assert cr == cp, f"同样电池不同价位应同分（价格归 value，防双计）: {cr} vs {cp}"
+    # 缺 kwh → 不参与（缺数据≠差）；缺 price 不缺席（绝对口径不依赖价格）
+    assert not [p for p in SS.powertrain_parts({"price": 20.0}) if p[0] == "电池容量"], \
+        "缺电量时电池容量项应缺席"
+    assert [p for p in SS.powertrain_parts({"kwh": 80.0}) if p[0] == "电池容量"], \
+        "绝对kWh口径下缺价不影响电池容量项"
 
     # ② 三电子维度拆分：电池素质 / 补能能力
     g = SS.powertrain_group_parts({"platform_800v": True, "charge_10_80_min": 10,
@@ -3460,7 +3462,7 @@ def t107():
     assert "scored_trim_ref" in ta_src2, "trim_annotate 未使用 scored_trim_ref"
     ra_src2 = _read("modules/engine/rule_adjust.py")
     assert "scored_trim_ref" in ra_src2, "rule_adjust 未使用 scored_trim_ref"
-    return (f"三电电池容量进分(kWh/万元，跨价位可比) + 电池素质/补能能力子维度拆分 + "
+    return (f"三电电池容量进分(绝对kWh，价格归value防双计；kWh/万元仅披露) + 电池素质/补能能力子维度拆分 + "
             f"配置匹配不粘连({checked} 款抽样通过) + scored_trim_ref 优先")
 
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,

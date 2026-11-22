@@ -102,6 +102,8 @@ def main():
                     help="跳过第三方实测/拆车证据（默认启用，走 adjust 封顶通道）")
     ap.add_argument("--no-powertrain-efficiency", action="store_true",
                     help="跳过三电能耗效率修正（默认启用，全榜统一±0.4封顶；仅 A/B 对照用）")
+    ap.add_argument("--no-range-achievement", action="store_true",
+                    help="跳过续航达成率调整（默认启用，物理估算高速达成率榜内中位锚±1.0；仅 A/B 对照用）")
     ap.add_argument("--no-crash-verify", action="store_true",
                     help="跳过出榜前的逐车联网碰撞核验（默认启用；仅 A/B/断网对照用）")
     ap.add_argument("--no-crash-cache", action="store_true",
@@ -146,6 +148,11 @@ def main():
                     help="不按官方成绩自动映射 safety 分（仅 A/B 对照；正常出榜不要关）")
     ap.add_argument("--no-backfill", action="store_true",
                     help="不回填 trims 官方指导价到候选池（仅 A/B 对照用；正常出榜不要关）")
+    ap.add_argument("--no-sales-backfill", action="store_true",
+                    help="不回填懂车帝权威逐月销量到候选池（仅 A/B 对照；正常出榜必须开——"
+                         "候选池 trend_sales 是手填常量，曾在阿维塔07/Model Y 等差 8 倍）")
+    ap.add_argument("--sales-snapshot", help="懂车帝销量离线快照 json（零网络，离线复现/回测用）")
+    ap.add_argument("--sales-months", type=int, default=6, help="销量回填补捉的逐月数（默认6）")
     ap.add_argument("--no-ciasi-rescue", action="store_true",
                     help="不从 C-IASI 新闻稿联网救回数字图标车（仅 A/B 对照；正常出榜不要关）")
     ap.add_argument("--force-ciasi-rescue", action="store_true",
@@ -209,6 +216,30 @@ def main():
                 _ciasi_rescue = {"status": "error", "targets": _rescue_targets,
                                  "matched": {}, "error": f"{type(_ex).__name__}: {_ex}"}
                 print(f"[新闻稿救回] 联网失败，沿用已缓存文字等级：{_ciasi_rescue['error']}")
+
+    # 销量权威回填（2026-11-22 阿维塔07 事故根因修复）：候选池 trend_sales 是**手填常量**，
+    # 出榜链从不校验。实测阿维塔07 填 7000（懂车帝车系合计 356、纯电≤356）、
+    # Model Y 填 48000（实际纯电榜中位 29086），差 8 倍，却一路过闸误导第一档
+    # t1_min_sales=2000 门槛。现在出榜前用懂车帝逐月权威值强制覆盖：
+    #   纯电榜命中 → 逐月中位（scope=pure_bev）；只有全部榜命中 → 车系合计上界（scope=series_total，
+    #   下游页面显示「≤N」不参与分位）。手填值与权威值差≥2倍记 dispute 披露。
+    _sales_report = {"status": "skipped"}
+    if not getattr(a, "no_sales_backfill", False):
+        from modules.board import sales_backfill as SB
+        try:
+            _snap = SB._load_snapshot(a.sales_snapshot) if a.sales_snapshot else None
+            _sales_report = SB.backfill(
+                cands, as_of=str(getattr(a, "as_of", None) or "202610"),
+                snapshot=_snap, months=getattr(a, "sales_months", 6))
+            _disp = [x for x in _sales_report["applied"] if x["dispute"]]
+            print(f"[销量回填] 回填 {len(_sales_report['applied'])}/{_sales_report['n']} 款 / "
+                  f"无数据 {len(_sales_report['no_data'])} / 手填分歧 {_sales_report['dispute_count']}")
+            if _disp:
+                print("  分歧（手填→权威，以权威为准）：" + "、".join(
+                    f"{x['model']} {x['old']}→{x['new']}({x['scope']})" for x in _disp[:8]))
+        except Exception as _ex:                          # 联网失败不阻断，但显式告警
+            _sales_report = {"status": "error", "error": f"{type(_ex).__name__}: {_ex}"}
+            print(f"[销量回填] 联网失败，沿用候选池手填值（可能过期）：{_sales_report['error']}")
 
     # 价格回流（2026-11-21 事故根因修复）：trims.json 里已核验的官方指导价必须回流到
     # 候选池 price_guide。闸门只认 price_guide，不回流就会把数据齐全的车判成
@@ -382,6 +413,16 @@ def main():
         _eff_applied = sum(1 for c in cands
                            if (c.get("powertrain_efficiency") or {}).get("status") == "applied")
         print(f"[电耗效率修正] {_eff_applied} 款有电耗一手数据（榜内中位为基准，±0.4封顶）")
+
+    # 续航达成率调整（v10.15.2 · 审计 P0-1）：三电此前只看 CLTC 标称，达成率零散在体验库。
+    # 现在用 physics.ev_range_model 从 kwh/电耗/车重/Cd 估算高速达成率（一手实测优先），
+    # 榜内中位锚双向 ±1.0，无数据不插补。必须在 efficiency 之后、evidence_gate 之前。
+    from modules.board import range_achievement as _RCH
+    _ach_report = {"status": "skipped"}
+    if not getattr(a, "no_range_achievement", False):
+        _ach_report = _RCH.apply(cands)
+        print(f"[续航达成率] 覆盖 {_ach_report['covered']}/{_ach_report['n'] if 'n' in _ach_report else len(cands)} 款 / "
+              f"调整 {len(_ach_report['applied'])} 款 / {_ach_report['method']}")
 
     from modules.engine import evidence_gate as EG
     if getattr(a, "no_evidence_cap", False):
@@ -733,6 +774,14 @@ def main():
     # 1 逐榜：分榜 → 闸门 → 三档 → 审查 → 稳健性 → 权重审计 → 三榜并列
     #    顺序是「先分榜再闸门」，因为四个榜的价格带上限不同（16 万 / 18 万），
     #    gates 必须按榜取，不能全局一刀切。
+    # 调整预算审计（v10.15.2 · 审计 P1-5）：多模块叠加同维的总量暴露（只审计不截断）
+    from modules.engine import adjust_budget as _AB
+    _budget_report = _AB.audit(cands)
+    if _budget_report["exceeded"]:
+        print(f"[调整预算] ⚠ {len(_budget_report['exceeded'])} 车·维累计调整超名义预算："
+              + "、".join(f"{x['model']}/{x['dim']} {x['total_abs']}>{x['nominal_budget']}"
+                         for x in _budget_report["exceeded"][:5]))
+
     summary = {
         "category": a.category, "source": os.path.basename(a.candidates),
         "in": len(cands), "passed": 0, "dropped": 0, "sliders": custom,
@@ -742,6 +791,8 @@ def main():
         # 2026-11-21：价格回流审计（回填了哪些、哪些 trims 也没价）
         "price_backfill": {"filled": [{"model": m, "price_guide": pg} for m, pg in _p_filled],
                            "still_missing": _p_still},
+        # v10.15.2：销量权威回填审计（懂车帝逐月，纯电榜优先/全部榜标≤上界/手填分歧）
+        "sales_backfill": _sales_report,
         # v10.14.0：三段回流合并为唯一同步器（sync_safety_scores），
         # 审计字段同步收敛为一份（source = safety_scores SSOT）。
         "crash_backfill": {"filled": [{"model": m, "crash": d, "basis": b} for m, d, b in _c_filled],
@@ -773,6 +824,15 @@ def main():
             "applied": _eff_applied,
             "detail": {c["model"]: c["powertrain_efficiency"]
                        for c in cands if c.get("powertrain_efficiency")},
+        },
+        # v10.15.2（审计 P1-5）：同维多模块叠加调整预算审计（只披露不截断）
+        "adjust_budget": _budget_report,
+        # v10.15.2（审计 P0-1）：续航达成率调整审计（物理估算/一手实测优先、榜内中位锚±1.0）
+        "range_achievement": {
+            "enabled": not getattr(a, "no_range_achievement", False),
+            **{k: v for k, v in _ach_report.items() if k != "applied"},
+            "detail": {c["model"]: c["range_achievement"]
+                       for c in cands if c.get("range_achievement")},
         },
         # v10.11.0：配置驱动规则增量审计（逐项中位锚点、缺项不参与、双向封顶）
         "rule_adjust": {
