@@ -13,7 +13,7 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 10.21.0
+version: 10.22.0
 author: "nanbatiannanbatian"
 ---
 
@@ -3605,3 +3605,11 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
 - 保留：J.D. Power 在智驾权重说明里的独立引用（与两表无关）；v20+ 历史产物与历史版本文档记录（事实存档，不回改）。
 
 **验收**：v25 两榜（全榜 20 款、U18 11 款）对 v24 总分与八维 0 差异、跨榜同分 0 差异，两表与 summary 字段彻底消失；bug 118/118、反向注入 103/103、midsuv 46/46、layout 16/16、release 39/39、比较器 20/20、energy_router 32/32、render/board_view selftest 全过（区块 20/契约 11）。指纹 4175c1dd，锚点前移 v25。
+
+## v10.22.0 · 中型纯电轿车全价位榜 + 逐配置权重同源根因修复（2026-11-22）
+- 用户仅给「中型纯电轿车」，`energy_router` 自动判 A 类纯电（未问用户），按正式榜唯一流程出全价位榜，不用简版脚本。
+- 候选池：复用已核验 28 款快照 → 联网盘点新增捷达M6/艾尼氪V（逐配置+八维证据逐字段带 URL/原文），补齐 8 款缺口车的逐配置（7 款回填、红旗E-QM5 因换电版只有 NEDC 无 CLTC/电压/电芯显式移出并披露）；荣威D7 EV 原 12.38 万实为 DMH 插混价，纠正为 EV 14.98 万；旧池 7 款人工总分减分（销量/投诉重复计）按口径清零并留痕。建池脚本 `runs/build_midsedan_pool_202611.py` 可复现、幂等。
+- **根因修复（非产物补丁）**：`trim_annotate.py` 的 `weighted_total` 与逐配置产品力原固定用模块级旧权重（18%/13.5%），品类切到 25%/8% 后页面逐配置分与判档 `with_config_scores`/主榜不同源（实测 MG07 差 0.5）。改为权重从 `--category` 的 dimensions 注入，产品力/逐配置总分/最优配置选择全部随配置走；t051 因此恢复通过。此前同类问题（v10.15.7 页面表头漂移）只修了渲染器读配置，漏了逐配置引擎这一层。
+- 回归测试跟随当前事实源：t048 基线从 202610 历史快照改指 202611 权威池（universe 已随联网盘点纳入两款新车），并新增「新车必须入池」断言——强化而非绕过门禁。
+- 验收：bug 118/118、反向注入 103/103、layout 16/16、release 39/39、router 32/32、compare 20/20、midsuv 46/46、derive 4/4、render/board_view/trim_annotate selftest 全过。指纹 4175c1dd→65a74206；按「逻辑变更全池重算」三榜重出（轿车全价位 29 款、SUV 全榜 v26、U18 v26），SUV 跨榜同车总分 0 差异；SUV 主榜少数车因最优配置按新权重重选变化 ±0.1~0.3，非评分口径回退。
+- 已知展示边界（未改渲染，待用户确认）：`render_board_html` 的「入池口径」文案仍硬编码「紧凑型车+纯电动月销榜前10」，在本轿车榜显示为旧口径，需确认后再改。

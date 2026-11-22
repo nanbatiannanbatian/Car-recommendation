@@ -875,7 +875,9 @@ def t048():
 
     # 断言2（数据级）：全价位榜的 universe 清单存在且正常态无漏收
     univ = str(paths.cat("universe_car_midsedan_allprice.json"))
-    pool = os.path.join(HERE, "runs", "midsedan_bev_1218_202610", "candidates_allprice.json")
+    # 2026-11-22：universe 已随联网盘点更新到当前在售全集（新增捷达M6/艾尼氪V），
+    # 基线必须指向当前权威池，不能拿 202610 历史快照对 202611 清单（否则误报漏收）。
+    pool = os.path.join(HERE, "runs", "midsedan_bev_pool_202611.json")
     assert os.path.exists(univ) and os.path.exists(pool), "universe/候选池未固化"
     d = json.load(open(pool, encoding="utf-8"))
     r = TC.check_universe(pool, univ, d.get("pool_excluded", []))
@@ -889,6 +891,7 @@ def t048():
     # 断言3：漏收的车已补入候选池+trims
     names = {c["model"] for c in d["candidates"]}
     assert "特斯拉Model 3" in names and "极氪007" in names and "比亚迪e7" in names, "门禁发现的车仍未入池"
+    assert "捷达M6" in names and "北京现代艾尼氪V" in names, "2026-11 联网盘点发现的新车未入池"
     # 2026-11-22：走统一入口（人工库 + 自动库合流）
     from modules.data.trims_store import load as _load_trims
     trims = {"entries": list(_load_trims().values())}["entries"]

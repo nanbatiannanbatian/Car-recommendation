@@ -62,8 +62,16 @@ def load_trims(path: str | None = None) -> dict[str, dict]:
     return _load()
 
 
-def weighted_total(scores: dict) -> float:
-    return round(sum(float(scores.get(k, 0)) * v for k, v in W.items()) * 10, 1)
+def weighted_total(scores: dict, weights: dict | None = None) -> float:
+    """按当前品类配置权重求和。
+
+    2026-11-22 根因修复：原来固定用模块级 W（旧 18%/13.5% 口径），
+    给纯电轿车/中型SUV切到 25%/8% 后，逐配置分仍按旧权重，
+    与判档 with_config_scores / 主榜分不同源（BUG-051 实测 MG07 差 0.5）。
+    权重唯一事实源 = 出榜 --category 的 dimensions。
+    """
+    w = weights or W
+    return round(sum(float(scores.get(k, 0)) * v for k, v in w.items()) * 10, 1)
 
 
 def charge_minutes(t: dict) -> tuple[float | None, str]:
@@ -277,6 +285,10 @@ def resolve_ref(name: str, trims: list[dict], cands_for_model: list[dict] | None
 def annotate_all(cands: list[dict], cfg: dict) -> dict:
     """给每个车的所有配置生成人工口径分（base_scores + delta）。"""
     tdb = load_trims()
+    # 权重随 --category 走，不再用模块级旧权重（页面/判档/主榜同一口径）。
+    Wc = {d["key"]: d["weight"] for d in (cfg.get("dimensions") or []) if d.get("key") in W}
+    if not Wc:
+        Wc = dict(W)
     out = {}
     for c in cands:
         model = c["model"]
@@ -338,7 +350,7 @@ def annotate_all(cands: list[dict], cfg: dict) -> dict:
             _bmean = _vinfo.get("bin_mean_ppw")
             if isinstance(_bmean, (int, float)) and t.get("price") and t["price"] > 0:
                 from modules.engine import value_residual as _VR
-                _pp_w = {k: W[k] for k in _VR.PROD_DIMS if k in W}
+                _pp_w = {k: Wc[k] for k in _VR.PROD_DIMS if k in Wc}
                 # 产品力取入池稳定基准（与车系级 value_residual 同口径），不用逐配置 sc：
                 # sc 的其他维 delta 会因 ref 选择受子池影响而漂移，用它算 ppw 会让同车
                 # 跨榜 value 不一致（深蓝S 9.5 vs 7.6）。价格效率只需「车系产品力/配置价」。
@@ -356,9 +368,9 @@ def annotate_all(cands: list[dict], cfg: dict) -> dict:
             if ref is None:
                 conf = "low"
             # 产品力分：剔除 value 的 7 维按原权重归一化×10（与 product_power_board 同口径）
-            pp_keys = [k for k in W if k != "value"]
-            pp_tw = sum(W[k] for k in pp_keys)
-            pp_score = round(sum(sc.get(k, 0) * W[k] for k in pp_keys) / pp_tw * 10, 2) if pp_tw else None
+            pp_keys = [k for k in Wc if k != "value"]
+            pp_tw = sum(Wc[k] for k in pp_keys)
+            pp_score = round(sum(sc.get(k, 0) * Wc[k] for k in pp_keys) / pp_tw * 10, 2) if pp_tw else None
             trims.append({
                 "name": t.get("name"), "price": t.get("price"),
                 "battery_kwh": t.get("battery_kwh"), "cell_supplier": t.get("cell_supplier"),
@@ -366,7 +378,7 @@ def annotate_all(cands: list[dict], cfg: dict) -> dict:
                 # v10.11.0：三电与补能事实透传（页面「三电与补能」区块用）
                 "voltage_v": t.get("voltage_v"), "consumption": t.get("consumption"),
                 "charge_power_kw": t.get("charge_power_kw"), "swap": t.get("swap"),
-                "scores": sc, "total": weighted_total(sc), "power_score": pp_score,
+                "scores": sc, "total": weighted_total(sc, Wc), "power_score": pp_score,
                 "confidence": conf, "deltas": ds,
                 "score_cap": _pt_cap,
                 "note": t.get("note", ""), "score_source": "annotated",
