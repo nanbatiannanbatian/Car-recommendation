@@ -35,7 +35,19 @@ HERE = str(paths.ROOT)
 sys.path.insert(0, HERE)
 
 TARGET_CLASSES = ("中型车", "中型SUV", "中大型车", "中大型SUV")
-FLEET_HINT = ("E-QM5", "比亚迪e7", "e7", "江豚", "星海V6")
+
+
+def _fleet_hint():
+    """疑似营运主力车型名单从配置读取（v10.24.0：不再硬编码在代码里）。
+    同时修掉旧名单里裸 'e7' 子串误伤（海豹07EV/深蓝L07 等）的隐患。"""
+    try:
+        with open(str(paths.cat("fleet_models.json")), encoding="utf-8") as f:
+            return tuple(json.load(f).get("models") or ())
+    except (OSError, ValueError):
+        return ()
+
+
+FLEET_HINT = _fleet_hint()
 
 
 def band_for(cls):

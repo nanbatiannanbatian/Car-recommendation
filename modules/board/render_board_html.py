@@ -260,6 +260,14 @@ def render(data, summary, title, as_of):
     """
     from modules.board import board_view as BV
     meta = data.get("meta", {})
+    # v10.24.0：叙述统计（智驾占比说明里的行业数字）从策略配置读取，渲染层不写死。
+    _narr = {}
+    try:
+        import paths as _paths
+        with open(str(_paths.cat("rank_v2_policy.json")), encoding="utf-8") as _f:
+            _narr = (json.load(_f).get("narrative_stats") or {}).get("adas weight tip") or {}
+    except (OSError, ValueError, ImportError):
+        _narr = {}
     rows = data.get("main_board", [])
     bands = data.get("band_subboards", [])
     seg = data.get("segmented_summary", {})
@@ -303,15 +311,15 @@ def render(data, summary, title, as_of):
     # v9.7.20：候选池与证据披露同步到页面（评审反复指出报告里有、页面看不到）
     _pool = (summary or {}).get("pool_disclosure")
     if _pool:
+        # v10.24.0：入池口径从 summary 动态读取（pipeline 按品类 gates 生成），
+        # 不再写死「汽车之家紧凑型车+纯电动月销榜前10」——在轿车/SUV榜上完全错误。
+        _criteria = e(_pool.get("criteria") or "")
         H.append(f'<div class="rule"><b>候选池与证据披露：</b>本池 {e(_pool["total"])} 款，'
                  f'带核验来源 {e(_pool["sourced"])}/{e(_pool["total"])}，'
                  f'有官方碰撞成绩 {e(_pool["crash"])}/{e(_pool["total"])}，'
                  f'证据 A/B/C = {e(_pool["ev_a"])}/{e(_pool["ev_b"])}/{e(_pool["ev_c"])}，'
                  f'网查补采 {e(_pool["extended"])} 款（置信低）。'
-                 '入池口径：汽车之家「紧凑型车 + 纯电动」2026-10 车系月销榜前 10，'
-                 '官方二级分类 + 纯电 + 指导价；来源多为网查多源交叉（非厂商直供），'
-                 '未见来源/无碰撞成绩的车只作参数参考。'
-                 '<b>没有官方碰撞成绩不记 0 分、只标缺失，降权≠安全。</b></div>')
+                 f'{_criteria}</div>')
         _pex = (summary or {}).get("pool_excluded") or []
         if _pex:
             _pl = "；".join(f"{e(x.get('model'))}（月销{e(x.get('sales'))}）：{e(x.get('reason'))}"
@@ -320,7 +328,7 @@ def render(data, summary, title, as_of):
                      f'<b>未入池车型及原因（能比就比，不能比则说明）：</b>{_pl}。</div>')
         H.append('<div class="rule" style="background:#f7f6f3;border-left-color:#888780">'
                  f'<b>榜单定位：</b>这是本池 {len(rows)} 款候选车的<b>可审计横向对比榜</b>，'
-                 '<b>不是全市场全价位紧凑型纯电轿车的覆盖榜</b>；未入池车型不代表更差，'
+                 '<b>不是全市场同级别车型的覆盖榜</b>；未入池车型不代表更差，'
                  '只是不在本期取证样本内。展示的 1–10 名是分数排序，'
                  '名次可信度以报告「同档组」为准，能不能买以「三档」为准。</div>')
 
@@ -389,11 +397,18 @@ def render(data, summary, title, as_of):
             _awpct = f"{float(_aw)*100:.1f}%"
             _adas_tip = (
                 f'<div class="stability-tip"><b style="color:#b42318">⚠ 关于智驾权重（本榜 {_awpct}）：</b>'
-                '智驾权重低于三电/安全，是因为行业「<b>高装车、低使用</b>」：城区 NOA 装车率 34%，'
-                '但可用路段主动开启仅 <b>6.3%</b>，仅 31% 车主经常用、20% 不敢用，七成激活集中在高速；'
-                'J.D. Power 2026 智驾「不稳定/不准确」占抱怨 48%。<b>权重低≠智驾不重要</b>——它仍是购车门槛项'
-                '（69% 视城市 NOA 为标配），影响定价与保值率；本榜智驾分已按「硬件封顶+实测证据」打分，'
-                '非配置堆料。重视智驾可重点看下方逐配置里的智驾硬件与证据列。</div>')
+                '智驾权重低于三电/安全，是因为行业「<b>高装车、低使用</b>」：'
+                + e(_narr.get("adoption") or "城区 NOA 装车率较高") + '，'
+                '但' + e(_narr.get("active") or "实际主动开启率偏低") + '，'
+                + e(_narr.get("usage") or "多数车主不常使用") + '；'
+                + e(_narr.get("complaint") or "满意度调研中稳定性抱怨占比不低") + '。'
+                '<b>权重低≠智驾不重要</b>——它仍是购车门槛项'
+                '（' + e(_narr.get("musthave") or "多数用户视城市 NOA 为标配") + '），影响定价与保值率；'
+                '本榜智驾分已按「硬件封顶+实测证据」打分，'
+                '非配置堆料。重视智驾可重点看下方逐配置里的智驾硬件与证据列。'
+                + (f'<br><span style="color:var(--ink3);font-size:12px">统计口径截至 '
+                   f'{e(_narr.get("as_of"))}，来源：{e(_narr.get("source_note"))}</span>'
+                   if _narr else '') + '</div>')
             H.append(_adas_tip)
         # v9.7.48：连续名次(补二值命中盲区) + 产品力≠市场热度口径说明
         _rm = _stab.get("rank_mean_by_model") or {}
@@ -525,9 +540,22 @@ def render(data, summary, title, as_of):
         tb = meta.get("trim_board") or {}
         if tb:
             H.append('<h2>逐配置对比 <span>点车型展开 · 同车不同配置的相对差别</span></h2>')
+            # v10.24.0：示例从本池数据动态取（此前写死具体车型及各项分值，换榜即错、
+            # 分值调整后与算法漂移）。取三电最高-最低配置差最大的一款作示例。
+            _demo = ""
+            for _m, _td in tb.items():
+                _ts = (_td or {}).get("trims") or []
+                _pw = [float(x.get("scores", {}).get("powertrain") or 0) for x in _ts
+                       if x.get("scores", {}).get("powertrain") is not None]
+                if len(_pw) >= 2:
+                    _gap = max(_pw) - min(_pw)
+                    if _gap > 0.05 and (not _demo or _gap > _demo[0]):
+                        _demo = (_gap, _m, max(_ts, key=lambda x: float(
+                            (x.get("scores") or {}).get("powertrain") or 0)).get("name", ""))
+            _demo_txt = (f'例如本池 {e(_demo[1])} 的 {e(_demo[2])} 三电分最高，'
+                         '展开可看各项得分理由。') if _demo else '展开可看每个配置的三电分与得分理由。'
             H.append('<div class="rule">每个配置按 spec_score 规则单独算分，<b>★＝该车最高分配置，也是主榜用来排名的配置</b>。'
-                     '看对比请盯「三电」列和最后一列「得分理由」——例如 MG07 845版靠 800V+1.0、12min快充+1.4、'
-                     '一线电芯+0.7、845km+0.8 把三电从 7.3 拉到 9.9。'
+                     '看对比请盯「三电」列和最后一列「得分理由」——' + _demo_txt +
                      '注意：配置表缺悬架/算力等参数，逐配置分有插补维度，只作同车配置相对对比。</div>')
             for r in rows:
                 td = tb.get(r["model"])
@@ -613,7 +641,7 @@ var TRIMDATA=__DATA__;
 function trimCellVals(model,idx){
   var t=TRIMDATA[model].trims[idx],sc=t.scores||{},charge=String(t.charge||''),
       cell=String(t.cell_supplier||'—'),kwh=t.battery_kwh,price=t.price;
-  var mv=charge.match(/(900|800|400)\s*V/);
+  var mv=charge.match(/(\d{3,4})\s*V/);
   return {name:t.name,price:price,total:t.total,power:t.power_score,scores:sc,verdict:t.verdict||'',
     cell:cell+(mv?' · '+mv[1]+'V':''),
     kwh:(kwh&&price)?(kwh/price).toFixed(2):'—'};

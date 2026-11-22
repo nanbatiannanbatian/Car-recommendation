@@ -82,9 +82,15 @@ def charge_minutes(t: dict) -> tuple[float | None, str]:
     返回 (等效分钟, 口径说明)；解析不出返回 (None, "")。
     """
     c = str(t.get("charge") or "")
-    m = re.search(r"(\d{2})\s*[-–]\s*(\d{2})%?\s*(?:约|大约)?\s*(\d+(?:\.\d+)?)\s*min", c)
+    # v10.24.0 根因修复：单位既可能是英文 min，也可能是中文「分钟」。
+    # 此前正则只认 min，导致 22 条配置（海豹06GT 二代闪充 30-80% 9分钟、
+    # 极氪007GT 10.5分钟、蔚来ET5 36分钟等）解析为 None → 快充项不进分。
+    # 这不是"数据缺失"，是解析器漏识单位——同款车把 9min 写成 9分钟就凭空少一项分。
+    # 口径不变：仍按区间宽度线性折算到 70%，只把单位识别统一。
+    _UNIT = r"(?:min|分钟|minute)"
+    m = re.search(r"(\d{2})\s*[-–]\s*(\d{2})%?\s*(?:约|大约)?\s*(\d+(?:\.\d+)?)\s*" + _UNIT, c)
     if not m:
-        m2 = re.search(r"(\d+(?:\.\d+)?)\s*min", c)
+        m2 = re.search(r"(\d+(?:\.\d+)?)\s*" + _UNIT, c)
         if m2:
             return float(m2.group(1)), "未标区间(按原文)"
         return None, ""

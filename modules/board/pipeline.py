@@ -823,13 +823,15 @@ def main():
     _crash_named = sum(1 for c in _all if CRS.parse_score(c.get("crash")))
     _ev_cnt = {k: sum(1 for c in _all if c.get("evidence_status") == k) for k in ("A", "B", "C")}
     _ext_n = sum(1 for c in _all if c.get("extended") or c.get("score_evidence"))
+    # v10.24.0：入池口径文案从品类 gates 动态生成（HTML/报告共用 board_view 唯一来源），
+    # 不再写死「紧凑型车+纯电动月销榜前10」这类在轿车/SUV榜上错误的旧口径。
+    from modules.board import board_view as _BV
+    _pool_criteria = _BV.pool_criteria_text(cfg, label="", as_of=str(getattr(a, "as_of", "") or ""))
     parts.append(
         f"> **候选池与证据披露（自动生成）：**本池 {len(_all)} 款，"
         f"带核验来源 {_src_named}/{len(_all)}，有官方碰撞成绩 {_crash_named}/{len(_all)}，"
         f"证据等级 A/B/C = {_ev_cnt['A']}/{_ev_cnt['B']}/{_ev_cnt['C']}，"
-        f"其中 {_ext_n} 款为网查补采（置信低）。"
-        "入池口径：官方二级分类 + 纯电 + 指导价；未见来源/无碰撞成绩的车只作参数参考，"
-        "不构成安全推荐。**没有官方碰撞成绩不记 0 分、只标缺失，降权≠安全。**")
+        f"其中 {_ext_n} 款为网查补采（置信低）。" + _pool_criteria)
     _pmnotes = (_pool_data.get("pool_meta") or {}).get("notes") if isinstance(_pool_data, dict) else None
     if _pmnotes:
         parts.append("> **候选池说明：**" + "；".join(str(x) for x in _pmnotes) + "。")
@@ -976,6 +978,8 @@ def main():
             "total": len(_all), "sourced": _src_named, "crash": _crash_named,
             "ev_a": _ev_cnt["A"], "ev_b": _ev_cnt["B"], "ev_c": _ev_cnt["C"],
             "extended": _ext_n,
+            # v10.24.0：入池口径文案（HTML 与报告共用唯一来源，禁止渲染层写死）
+            "criteria": _pool_criteria,
         },
     }
     # 2026-11-22：官方召回事件注入（用户要求"召回入质量维度"）。

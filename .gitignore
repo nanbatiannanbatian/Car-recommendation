@@ -4,7 +4,7 @@ config.json
 
 # 运行产物与缓存
 runs/
-data/
+/data/
 dist/
 __pycache__/
 *.pyc

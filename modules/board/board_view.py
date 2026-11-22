@@ -21,6 +21,7 @@
 from __future__ import annotations
 import json
 import os
+import re
 import paths
 
 # ---------------------------------------------------------------- 区块注册表
@@ -452,15 +453,15 @@ def main_cell(key: str, row: dict, cand: dict, grade: str = "") -> str:
             brand = str(bp.get("cell"))
         else:
             brand = "未披露"
-        # v9.7.29：弗迪电芯标代际+闪充（事实库核验），二代≠都支持闪充，按事实标
-        if "弗迪" in brand:
-            gen = fr.get("电芯代际")
-            flash = fr.get("电芯闪充")
-            if gen:
-                tag = str(gen)
-                if flash and flash != "待核":
-                    tag += f"/{flash}"
-                brand = f"{brand}[{tag}]"
+        # v10.24.0：按事实字段标注电芯代际+闪充，不再硬编码「弗迪」品牌名——
+        # 任何品牌只要事实库里有「电芯代际」证据都应同样标注（二代≠都支持闪充，按事实标）。
+        gen = fr.get("电芯代际")
+        flash = fr.get("电芯闪充")
+        if gen:
+            tag = str(gen)
+            if flash and flash != "待核":
+                tag += f"/{flash}"
+            brand = f"{brand}[{tag}]"
         # 电压：优先配置 charge，其次 battery_detail
         charge = str((bd or {}).get("charge") or "")
         import re
@@ -502,6 +503,39 @@ def dimension_lines(meta: dict) -> list[str]:
             for d in meta.get("dimensions") or []]
 
 
+def pool_criteria_text(cfg: dict, label: str = "", as_of: str = "") -> str:
+    """入池口径文案——从品类配置 gates 动态生成，禁止在渲染层写死级别/能源/日期/来源。
+
+    v10.24.0 根因修正：此前 HTML 渲染层写死「汽车之家紧凑型车+纯电动 2026-10 月销榜前10」，
+    在轿车榜/SUV 榜上显示成完全错误的旧口径；pipeline 报告侧又是另一套文案。
+    现统一由此函数按 cfg.gates 生成，HTML 与 Markdown 共用唯一来源。
+    """
+    gates = (cfg or {}).get("gates") or {}
+    cls = (gates.get("class") or {}).get("allow") or []
+    power = (gates.get("power") or {}).get("allow") or []
+    cls_txt = "、".join(str(x) for x in cls) if cls else "官方二级分类车型"
+    power_txt = "、".join(str(x) for x in power) if power else "官方动力类型"
+    # 价位带（若有）一并披露，取代写死的「月销榜前10」
+    price = (gates.get("price") or {}).get("band")
+    band_txt = ""
+    if isinstance(price, (list, tuple)) and len(price) == 2:
+        lo, hi = price
+        if lo or hi:
+            band_txt = f"，指导价 {lo:g}–{hi:g} 万" if (isinstance(lo, (int, float))
+                       and isinstance(hi, (int, float))) else ""
+    # label 是品类准确标题（如「中型纯电轿车（全价位·2026-10）」）；
+    # subject 常是通用占位「车型」，不作标题用。
+    subject = str(label or (cfg or {}).get("label") or (cfg or {}).get("subject") or "本榜")
+    # label 已带年月（如「…（全价位·2026-10）」）时不再重复数据截点
+    asof_txt = "" if re.search(r"20\d{2}[-.]?\d{2}", subject) else (
+        f"（数据截点 {as_of}）" if as_of else "")
+    return (f"入池口径：{subject}——厂商/易车官方二级分类为「{cls_txt}」、"
+            f"官方动力类型「{power_txt}」{band_txt}{asof_txt}；"
+            "联网盘点在售车型，来源多为公开配置页多源交叉（非厂商直供）；"
+            "未见来源的车只作参数参考，不构成推荐。"
+            "**没有官方碰撞成绩不记 0 分、只标缺失，降权≠安全。**")
+
+
 def method_boundary_text() -> list[str]:
     """方法与边界的固定披露文案（两版共用，避免各写一份漂移）。"""
     return [
@@ -515,7 +549,7 @@ def method_boundary_text() -> list[str]:
         "「底盘转向」「车轮制动」两组对纯电车整组为空（只填燃油车），因此该维的规则调整"
         "只覆盖少数有实测证据的车，缺参数的不插补、不按差档。",
         "入选只认官方二级分类 + 官方指导价，不用轴距推定级别、不拿促销价入榜。",
-        "级别按厂商/易车官方二级分类，存在车身尺寸偏小仍划入本池的案例（如 AION UT 车长 4270mm），"
+        "级别按厂商/易车官方二级分类，存在车身尺寸偏小仍划入本池的案例，"
         "与同级大车身车型比空间时需自行折扣；本榜不按轴距二次重分类。",
         "分数证据类型：全部维度为「官方参数 + 客观差异规则推算」，非实车实测；"
         "无第三方统一实测（冬测续航达成率/充电曲线）数据时如实标注，不伪装成实测。",

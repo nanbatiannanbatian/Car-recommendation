@@ -13,7 +13,7 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 10.23.0
+version: 10.24.0
 author: "nanbatiannanbatian"
 ---
 
@@ -3620,3 +3620,21 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
 - **根因二（评分配置解析盲信人工 ref 副本）**：`rule_adjust._spec_of` 与 `trim_annotate.annotate_all` 各自解析评分配置，都盲信 trims 库人工维护的 `scored_trim_ref`（独立副本会与候选池漂移）。秦MAX 候选池 trim「EV 630 超越型」价 13.29 万、配置表精确名「EV 630km 超越型」64.32kWh，人工 ref 却写「EV 530km 领先型」10.99 万 → 三电取到低配 52.87kWh/100kW 被系统性低估。修法：新增 `trim_annotate.resolve_score_ref` 唯一解析入口——候选池显式 `trim.price` 精确命中唯一配置为最高优先（价格是定价/value/闸门共用硬数据），同价多配置用配置名消歧，无显式价格时按候选池配置名匹配（比漂移的 ref 权威），占位名车回退人工 ref；两个消费者共用此入口。建池脚本 `runs/build_midsedan_pool_202611.py` 同步按候选池价回填 ref，避免重跑写回错值。修正 4 款同源漂移：秦MAX(630 超越型)、极氪7X(103kWh vs 旧 75)、零跑C11(640激光雷达 vs 智尊)、极狐阿尔法T5(660 vs 560)。
   - 边界坑（已规避）：绝不能用 `price_of()` 做锚——它在 trim.price 缺失时回退 price_guide 下限（车系最低价），会把「带内主力配置」占位车锚到最低配，破坏人工代表配置（银河A7/极狐贝塔S3）。
 - 回归：新增 BUG-121（低功率中性+高功率递增+反向注入）、BUG-122（秦MAX锚630超越型64.32kWh+候选池名优先于漂移ref+占位名车回退+两消费者同源）；同步更新 t103/t105 的 selftest 依赖与 t107 的字面断言（改为锁统一入口）。全套回归 bug 120/120、反向注入 103/103、midsuv 46/46、layout 16/16、release 39/39、compare 20/20、router 32/32、derive 4/4、各 selftest 全绿。指纹 b8fc17c1，三榜按逻辑变更全池重算。
+
+## v10.24.0 · 海豹06二代闪充分差质疑 → 快充解析根因 + 全库硬编码参数化（2026-11-22）
+- 用户问「海豹06和极氪007三电差别具体体现在哪，二代闪充不会比极氪007差这么多，有问题根因改」+「不要硬编码，所有硬编码的地方都查出来改掉」。用户拍板：硬编码按收益大的方向改（不动打分阈值裸数字），海豹06从代码层切换27款并重跑看效果。
+- **根因一（快充单位解析只认英文 min）**：`trim_annotate.charge_minutes` 正则只匹配 `min`，配置文本写中文「分钟」即解析为 None → 快充项不进分。全库 22 条配置/10 款车受影响：海豹06GT「30-80% 9分钟」、海豹07EV 9分钟、极氪007GT 10.5分钟、蔚来ET5 36分钟、阿维塔06 10分钟、悦意08 20分钟、捷达M6 25分钟、艾尼氪V 20分钟等。同款车把 9min 写成 9分钟就凭空少一项分——这不是数据缺失是解析器漏识单位。修法：单位识别统一为 `min|分钟|minute`，折算口径不变（按区间宽度线性到等效 10-80%）。修复后：海豹06GT 9min→等效12.6min快充项+1.1、蔚来ET5 36min→等效50.4min项−0.4（此前漏扣也纠正）。
+- **根因二（海豹06EV 评分配置停在旧代 + 电压字段空）**：候选池评分配置是 2025款545旗舰（24min、无高压平台），而 2027款二代闪充（2026-08上市，全系800V原生闪充+第二代刀片，10-97% 9min）已在库却没被选上；自动采集条目 voltage_v 为空、charge 只写区间，导致高压平台 +1.0 与二代闪充快充项双丢失。修法（全部配置化，无车型名写死在代码）：
+  - 新建 `categories/score_trim_overrides.json`：显式登记评分配置裁决（from 545高配12.98 → to 2027款630智享13.29，含新浪汽车/汽车之家 URL+原文+日期）与字段补丁（voltage_v=800、charge 文本）。
+  - 建池脚本 `runs/build_midsedan_pool_202611.py` 从配置读 overrides，只在现配置匹配 from 时幂等切换并留痕 `_score_trim_override`。
+  - `trims_store.load()` 末尾统一注入 field_patch（只在字段缺失时填、附依据）——不让 data/gen 生成物成为第二可写副本，自动采集重跑不冲掉人工核验补丁。
+  - 海豹06EV 三电 8.55→9.4（快充+0.52、240kW电机+0.4、800V项恢复）；人工基线 8.6 保留不重估，避免与规则增量双重计价。
+- **硬编码参数化（收益大的一批，打分阈值裸数字不动）**：
+  - 入池口径：`board_view.pool_criteria_text(cfg)` 从品类 gates.class/power/price + label 动态生成，注入 `summary.pool_disclosure.criteria`；HTML 与 Markdown 报告共用唯一来源。删除渲染层写死的「汽车之家紧凑型车+纯电动 2026-10 月销榜前10」与「不是全市场全价位紧凑型纯电轿车覆盖榜」。
+  - 逐配置示例：MG07 845版写死车名+各项分值 → 从本池 trim_board 动态取三电配置差最大的一款。
+  - 智驾权重说明的 6 个行业统计数字 → `rank_v2_policy.json.narrative_stats`，渲染时读取并标口径日期。
+  - JS 电压正则 `(900|800|400)` → `(\d{3,4})`（board_view.py 早已通用化，HTML JS 此前遗漏，600V 平台会静默漏显）。
+  - `method_boundary_text` 删 AION UT 具体车名+车长举例；`board_view` 电芯代际标注去掉「弗迪」品牌名硬编码（改为有任何品牌有代际字段就标）。
+  - 车型/别名名单移到配置：`fleet_models.json`（FLEET_HINT，同时修掉裸 'e7' 子串误伤海豹07EV/深蓝L07）、`brand_aliases.json`（cross_verify 品牌剥离+希腊别名）、`cell_brand_aliases.json`（电芯别名，与 cell_tier 分级表分工）、`export_aliases.json`（crash_systems 同源车出口名 EL6）。均由代码在读时加载，配置是唯一数据源。
+- 回归：新增 BUG-123（中文分钟解析+22配置覆盖+反向注入）、BUG-124（源码级断言硬编码清除+配置存在）、BUG-125（海豹06EV切27款+电压补丁+裁决带证据）；更新 t030（不再检查写死的「车系月销前10」，改查动态 criteria 读取）。全套 bug 123/123、反向注入 102/102、midsuv 46/46、layout 16/16、release 39/39、compare 20/20、router 32/32、derive 4/4、各 selftest 全绿。
+- 产物：三榜全池重算 `runs/midsedan_bev_allprice_202611_v28`、`runs/midsuv_bev_202611_v28`、`runs/midsuv_bev_u18_202611_v28`（锚点 path 前移 v28）。SUV 跨榜同车 5 款总分 0 差异。轿车榜前二仍极氪007GT 88.3/极氪007 88.0（海豹06EV 三电提升未改总分结构——只一维变化不足以进前10，合理）。页面 0 处旧硬编码文案残留。

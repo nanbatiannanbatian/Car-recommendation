@@ -52,15 +52,32 @@ from modules.contracts.model_names import canon
 # 跨库车名对齐：内联 filings.py 的纯函数逻辑（那套函数本身不依赖 requests，
 # 但 filings 模块顶层 import requests，在无 requests 环境会失败，故直接内联零依赖版）。
 import re as _re
-_GREEK_ALIAS = [("阿尔法", "Α"), ("贝塔", "Β"), ("伽马", "Γ"),
-                ("阿尔法", ""), ("贝塔", ""), ("伽马", "")]
-_BRAND_STRIP = ["比亚迪", "大众汽车", "上汽大众", "一汽大众", "大众", "ID.UNYX",
-                "ID.", "丰田", "一汽丰田", "广汽丰田", "日产", "东风日产", "别克",
-                "上汽通用", "长安启源", "长安", "深蓝", "极狐", "北汽", "奇瑞",
-                "捷途", "星途", "吉利", "银河", "领克", "极氪", "五菱", "宝骏",
-                "广汽埃安", "埃安", "AION", "东风风行", "东风", "奕派", "岚图",
-                "小鹏", "MONA", "零跑", "理想", "蔚来", "乐道", "红旗", "荣威",
-                "名爵", "MG", "哈弗", "魏牌", "欧拉", "ORA", "星海", "宝马", "BMW"]
+
+
+def _load_brand_aliases():
+    """车名归一化的品牌/希腊字母别名从配置读取（v10.24.0）：
+    此前硬编码在代码里，新品牌要改代码，且与其它模块的别名表各写一份。"""
+    try:
+        with open(str(paths.cat("brand_aliases.json")), encoding="utf-8") as f:
+            d = json.load(f)
+        strip = [str(x) for x in (d.get("brand_strip") or [])]
+        greek = [(str(a), str(b)) for a, b in (d.get("greek_alias") or [])]
+        return greek, strip
+    except (OSError, ValueError, TypeError):
+        return [], []
+
+
+_GREEK_ALIAS, _BRAND_STRIP = _load_brand_aliases()
+
+
+def _cell_brand_aliases():
+    """电芯品牌别名从配置读取（v10.24.0，唯一数据源）。"""
+    try:
+        with open(str(paths.cat("cell_brand_aliases.json")), encoding="utf-8") as f:
+            return [(str(a), str(b)) for a, b in (json.load(f).get("aliases") or [])]
+    except (OSError, ValueError, TypeError):
+        return [("宁德时代", "宁德时代"), ("CATL", "宁德时代"),
+                ("比亚迪", "弗迪"), ("弗迪", "弗迪")]
 
 def _norm_name(s):
     s = (s or "").strip().replace("（", "(").replace("）", ")")
@@ -136,13 +153,8 @@ def _norm_value(field, v):
             # 展示值仍保留全文——括号里是注解不是不同供应商。
             import re as _re2
             compare = _re2.sub(r"[（(].*?[）)]", "", s).strip()
-            for a, b in [("宁德时代", "宁德时代"), ("CATL", "宁德时代"),
-                         ("时代一汽", "宁德时代"), ("上汽时代", "上汽时代"),
-                         ("弗迪", "弗迪"), ("比亚迪", "弗迪"),
-                         ("中创新航", "中创新航"), ("中航锂电", "中创新航"),
-                         ("国轩高科", "国轩"), ("国轩", "国轩"),
-                         ("蜂巢能源", "蜂巢"), ("清陶", "清陶"),
-                         ("神盾短刀", "神盾短刀"), ("欣旺达", "欣旺达")]:
+            # v10.24.0：电芯别名从配置读取（唯一数据源，不再硬编码在代码里）
+            for a, b in _cell_brand_aliases():
                 if a in compare:
                     return b, s
             return compare, s

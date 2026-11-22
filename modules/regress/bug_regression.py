@@ -143,6 +143,9 @@ CASES = [
     ("BUG-120", "冷却分档直冷>液冷违背均温性共识且与快充二次计价；反转后锚点路径滞后又破坏跨榜同分", "v10.20.2"),
     ("BUG-121", "电机功率<170kW一律−0.4使家用够用车被扣，且未采功率的车反而中性（记得全的吃亏）", "v10.23.0"),
     ("BUG-122", "评分配置解析盲信人工scored_trim_ref副本，与候选池指导价漂移（秦MAX 630超越型错配530低配）", "v10.23.0"),
+    ("BUG-123", "快充解析只认英文min，中文「9分钟」判为无数据→二代闪充项不进分（海豹06GT/极氪007GT/海豹07EV等22配置）", "v10.24.0"),
+    ("BUG-124", "展示层与逻辑层硬编码：入池口径写死紧凑型车月销前10/MG07示例/AION UT/智驾数字/JS电压(900|800|400)/车型名单", "v10.24.0"),
+    ("BUG-125", "海豹06EV评分配置停在2025款24min、2027款二代闪充800V的voltage为空→高压+快充项丢失", "v10.24.0"),
 ]
 
 
@@ -691,11 +694,16 @@ def t031():
     return "标签诚实：10款候选审计榜"
 
 def t030():
-    """候选池披露不得指向不存在的内容。"""
+    """候选池披露不得指向不存在的内容（v10.24.0：口径文案改为动态，不再检查写死字符串）。"""
     src = _read("render_board_html.py")
     assert "同级未入池车型见 report.md" not in src, "候选池披露仍有空指向"
-    assert "车系月销榜前 10" in src, "未写真实入池口径"
-    return "入池口径写实，无空指向"
+    # v10.24.0：入池口径从 summary.pool_disclosure.criteria 动态读取，
+    # 由 board_view.pool_criteria_text 按品类 gates 生成——不再写死「车系月销榜前10」。
+    assert '"criteria"' in src or ".get(\"criteria\")" in src or "_pool.get(\"criteria\")" in src, \
+        "未从 summary 读取真实入池口径文案"
+    from modules.board import board_view as _BV
+    assert hasattr(_BV, "pool_criteria_text"), "缺统一的入池口径生成器"
+    return "入池口径由品类gates动态生成、渲染层读取summary，无空指向"
 
 def t029():
     """候选池披露必须进页面；估算电池值降精度显示。"""
@@ -4246,8 +4254,105 @@ def t122():
             "+ 占位名车回退人工ref + 两消费者同源")
 
 
+def t123():
+    """BUG-123：快充时间单位识别（v10.24.0）。
+
+    根因：charge_minutes 正则只认英文 min，中文「30-80% 9分钟」解析失败
+    → charge_10_80_min=None → 快充项不进分。海豹06GT 二代闪充 9min、
+    极氪007GT 10.5min、海豹07EV 9min、蔚来ET5 36min 等 22 条配置受影响。
+    反向注入：把中文分支去掉，中文用例必须失败。
+    """
+    from modules.engine import trim_annotate as TA, trim_board as TB, spec_score as SS
+    cases = [
+        ("30-80% 9分钟", 12.6),         # 50%区间→等效70%
+        ("30-80% 10.5分钟", 14.7),
+        ("30-80% 36分钟", 50.4),
+        ("30-80% 10分钟（0.17h）", 14.0),
+        ("400V/3C，30–80% 约 20min", 28.0),  # 英文口径不变
+        ("800V 兆瓦闪充 10-70% 5min", 5.8),
+    ]
+    for text, want in cases:
+        got, _ = TA.charge_minutes({"charge": text})
+        assert got is not None and abs(got - want) < 0.05, \
+            f"快充解析 {text!r} 应为 {want}，实际 {got}"
+    # 真实配置验证：海豹06GT 二代闪充必须拿到快充项
+    db = TB.load_trims()
+    t = db["海豹06GT"]["trims"][0]
+    sp = TB.spec_from_trim(t, {})
+    assert sp.get("charge_10_80_min") is not None, "海豹06GT 9分钟快充仍未被解析"
+    parts = SS.powertrain_parts(sp)
+    charge = [v for n, v, _ in parts if n == "快充"]
+    assert charge and charge[0] >= 1.0, f"海豹06GT 二代闪充快充项应≥1.0，实际 {charge}"
+    return ("中文「分钟」与英文min同口径解析 + 22条配置覆盖 + 海豹06GT 9min→等效12.6min快充项+1.1")
+
+
+def t124():
+    """BUG-124：硬编码参数化（v10.24.0）。
+
+    ① 入池口径由 board_view.pool_criteria_text(cfg) 从品类 gates 生成，
+       渲染层/报告层都不写死「紧凑型车+纯电动月销榜前10」。
+    ② MG07/AION UT 具体车名举例从渲染代码移除。
+    ③ JS 电压正则不再只认 900|800|400。
+    ④ 车型名单/品牌别名/弗迪特判从代码移到配置。
+    反向注入：把配置函数替换成写死文案，断言必须失败。
+    """
+    import json
+    from modules.board import board_view as BV
+    cfg = json.load(open("categories/car_midsedan_allprice.json", encoding="utf-8"))
+    txt = BV.pool_criteria_text(cfg, as_of="202610")
+    assert "中型车" in txt and "BEV" in txt, f"口径文案应按品类 gates 生成，实际 {txt}"
+    assert "紧凑型车" not in txt and "月销榜前10" not in txt, \
+        f"口径文案仍残留旧硬编码：{txt}"
+    # 源码级断言：渲染层不再写死旧口径车名/数字
+    import inspect
+    from modules.board import render_board_html as RH
+    src = inspect.getsource(RH)
+    assert "紧凑型车 + 纯电动" not in src, "HTML 仍写死旧入池口径"
+    assert "MG07 845版" not in src, "HTML 仍写死 MG07 示例车名与分值"
+    assert r"(900|800|400)" not in src, "JS 电压正则仍只认三个固定值"
+    assert "var mv=charge.match(/(\\d{3,4})\\s*V/)" in src, "JS 电压正则未改为通用"
+    bvsrc = inspect.getsource(BV)
+    assert "AION UT 车长" not in bvsrc, "board_view 仍写死 AION UT 举例"
+    assert 'if "弗迪" in brand' not in bvsrc, "board_view 仍硬编码品牌名特判"
+    # 配置文件存在且有效
+    for p in ("fleet_models.json", "brand_aliases.json", "cell_brand_aliases.json",
+              "export_aliases.json", "rank_v2_policy.json"):
+        d = json.load(open("categories/" + p, encoding="utf-8"))
+        assert d, f"{p} 空配置"
+    return ("入池口径按品类gates动态生成 + 车名举例/智驾数字/JS正则/车型名单/品牌特判配置化")
+
+
+def t125():
+    """BUG-125：海豹06EV 换代评分配置与电压字段（v10.24.0）。
+
+    根因：评分配置停在 2025款545旗舰（24min/无电压），而 2027款二代闪充
+    （800V/9min）已在售且在库；自动采集 voltage_v 为空 → 高压平台项丢失。
+    修法：score_trim_overrides.json 显式登记裁决与字段补丁，
+    建池脚本应用 trim 覆盖，trims_store 读取时注入字段补丁（不让生成物成为第二副本）。
+    """
+    import json
+    from modules.engine import trim_board as TB, spec_score as SS
+    pool = json.load(open("runs/midsedan_bev_pool_202611.json", encoding="utf-8"))
+    c = next(x for x in pool["candidates"] if x["model"] == "海豹06EV")
+    assert "2027款" in c["trim"]["name"], f"海豹06EV 评分配置未切到2027款：{c['trim']}"
+    assert abs(c["trim"]["price"] - 13.29) < 0.005, f"评分配置价应为13.29，实际 {c['trim']['price']}"
+    db = TB.load_trims()
+    t = next(x for x in db["海豹06EV"]["trims"] if "630KM智享" in x["name"])
+    assert t.get("voltage_v") == 800, "海豹06EV 2027款电压仍为空（800V补丁失效）"
+    sp = TB.spec_from_trim(t, {})
+    assert sp.get("platform_800v") is True, "高压平台项仍丢失"
+    assert sp.get("charge_10_80_min") is not None and sp["charge_10_80_min"] <= 12, \
+        f"二代闪充等效时间应有竞争力，实际 {sp.get('charge_10_80_min')}"
+    parts = SS.powertrain_parts(sp)
+    assert any(n == "高压平台" and v >= 1.0 for n, v, _ in parts), "高压平台+1.0未进分"
+    # 幂等：配置裁决有留痕与证据
+    ov = c.get("_score_trim_override") or {}
+    assert ov.get("evidence"), "评分配置裁决缺证据"
+    return ("海豹06EV切2027款630智享13.29万 + 800V补丁读取时注入 + 高压+快充项进分 + 裁决带证据")
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120, t121, t122]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120, t121, t122, t123, t124, t125]
 
 
 def run():

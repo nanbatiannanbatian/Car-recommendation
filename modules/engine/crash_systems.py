@@ -21,8 +21,11 @@ Hindustan Times 各国NCAP综述）：
 计分统一原则：各体系不可按得分率横向直接比较（年份/规程/选车方式不同），
 按"权威体系 + 等级/得分率"映射到统一 0-10 安全分，见 official_safety_scores.json。
 """
+import json
 import re
 from collections import OrderedDict
+
+import paths
 
 # code -> 定义。code 即候选池 safety_basis 的标准值。
 SYSTEMS = OrderedDict([
@@ -296,9 +299,17 @@ _SECONDARY_REJECT = ("安全车身设计", "设计标准", "标准开发", "非�
 #   判据（防止误伤）：只有【同源映射命中 + 具体年份 + 具体得分率/星级 + 一手权威体系】
 #   才升级为一手；泛泛的「宣称双五星」「按X标准设计」无数字仍一律拒绝。
 #   映射只放"确定是同一台车"的别名，不确定的不写（宁可漏，不可错配）。
-EXPORT_ALIASES = {
-    "蔚来ES6": ["EL6"],          # 蔚来官网英文站：ES6 = EL6 同代，中欧双五星
-}
+def _load_export_aliases():
+    """同源车出口名映射从配置读取（v10.24.0，不再硬编码在代码里）。"""
+    try:
+        with open(str(paths.cat("export_aliases.json")), encoding="utf-8") as f:
+            return {str(k): [str(x) for x in v]
+                    for k, v in (json.load(f).get("aliases") or {}).items()}
+    except (OSError, ValueError, AttributeError):
+        return {}
+
+
+EXPORT_ALIASES = _load_export_aliases()
 
 # 一手权威体系：出口版在这些体系的实测成绩可视为同源车一手成绩。
 # 不含 IIHS/C-IASI（这些是本国体系，出口版不会去测）；不含弱 NCAP 变体。
