@@ -3433,6 +3433,24 @@ def t107():
         f"纯电榜 8 维权重和应=1，实际 {sum(wm.values())}"
     assert wm["control"] <= 0.09 and wm["cabin"] <= 0.09, \
         "车机/操控区分力最低，回抽后权重不应高于 9%"
+
+    # ②-d v10.15.7 智驾权重下调锁死：12.5%→8%，差额平分给安全/空间/性价比各 +1.5pp，三电 25% 不动。
+    #     业内"高装车低使用"：城区开启率 6.3%、31% 经常用、20% 不敢用；但智驾是门槛项故不清零。
+    assert abs(wm["adas"] - 0.08) < 1e-9, \
+        f"纯电榜智驾权重应 0.08，实际 {wm['adas']}"
+    assert abs(wm["powertrain"] - 0.25) < 1e-9, \
+        f"三电权重应维持 0.25（上轮结果不被推翻），实际 {wm['powertrain']}"
+    assert abs(wm["safety"] - 0.177) < 1e-9 and abs(wm["space"] - 0.131) < 1e-9 \
+        and abs(wm["value"] - 0.122) < 1e-9, "安全/空间/性价比应各 +1.5pp 承接智驾差额"
+    # 页面提示源码断言：智驾低权重提示必须存在且权重动态读取（不写死 8%）
+    rh_src = _read("modules/board/render_board_html.py")
+    assert "关于智驾权重" in rh_src, "render_board_html 缺智驾低权重提示"
+    assert "_aw <= 0.10" in rh_src, "智驾提示缺 ≤10% 显示门槛（跨能源榜不应显示）"
+    assert 'float(_aw)*100' in rh_src, "智驾提示权重应动态读取，不写死百分比"
+    # 页面权重漂移根因：pipeline 渲染必须走当前 category 配置，与打分/报告同源。
+    pl_src = _read("modules/board/pipeline.py")
+    assert 'bv_cfg_path = _bv_cfg_path if os.path.exists(_bv_cfg_path)' in pl_src, \
+        "pipeline 渲染器仍硬编码通用配置，页面权重会与打分/报告漂移"
     # 跨能源框架用独立常量表，另由 energy_compare_regress.py 锁 0.18，此处不重复。
     ta_src = _read("modules/engine/trim_annotate.py")
     assert "(?<!\\d)" in ta_src or "num_re" in ta_src, \

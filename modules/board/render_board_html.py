@@ -411,6 +411,24 @@ def render(data, summary, title, as_of):
                  '<b>第二档是「按偏好取舍组」，组内名次会随算法权重变动，请勿严格按数字先后选车</b>，'
                  '结合档位、评价与逐配置对比做决定。' + _tau_txt + '。'
                  '「唯一名次」只在本榜 8 维规则内成立，不是购车唯一结论。' + _cross_band_txt + '</div>')
+        # v10.15.7：智驾低权重原因说明（用户："智驾占比太高，高速差别不大、城区不好用、开一年后城区一般不开"。
+        # 调查证实"高装车低使用"，但智驾仍是门槛项，故保留非零权重。只在智驾权重≤10%的榜显示，
+        # 避免污染跨能源榜(能源中性 13.5%)。权重从 meta.dimensions 动态读取，不写死 8%；
+        # 文案客观写两面：为何低（使用率数据）+ 为何不清零（门槛项/保值率/本榜非堆料打分）。
+        _adas_tip = ''
+        _adim = next((d for d in (meta.get("dimensions") or [])
+                      if d.get("key") == "adas"), None)
+        _aw = _adim.get("weight") if _adim and isinstance(_adim.get("weight"), (int, float)) else None
+        if _aw is not None and _aw <= 0.10:
+            _awpct = f"{float(_aw)*100:.1f}%"
+            _adas_tip = (
+                f'<div class="stability-tip"><b style="color:#b42318">⚠ 关于智驾权重（本榜 {_awpct}）：</b>'
+                '智驾权重低于三电/安全，是因为行业「<b>高装车、低使用</b>」：城区 NOA 装车率 34%，'
+                '但可用路段主动开启仅 <b>6.3%</b>，仅 31% 车主经常用、20% 不敢用，七成激活集中在高速；'
+                'J.D. Power 2026 智驾「不稳定/不准确」占抱怨 48%。<b>权重低≠智驾不重要</b>——它仍是购车门槛项'
+                '（69% 视城市 NOA 为标配），影响定价与保值率；本榜智驾分已按「硬件封顶+实测证据」打分，'
+                '非配置堆料。重视智驾可重点看下方逐配置里的智驾硬件与证据列。</div>')
+            H.append(_adas_tip)
         # v9.7.48：连续名次(补二值命中盲区) + 产品力≠市场热度口径说明
         _rm = _stab.get("rank_mean_by_model") or {}
         if _rm:
@@ -1124,6 +1142,24 @@ def selftest():
         ("跨价位提示·多段显示", "跨价位提示" in doc and "纯产品力总榜" in doc),
         ("跨价位提示·权重动态读取", "40.0%" in doc and "25.0%" in doc_w2 and "40.0%" not in doc_w2),
         ("跨价位提示·单价位不显示", "跨价位提示" not in single_doc),
+    ]
+    # v10.15.7 智驾低权重提示回归：权重≤10%显示 / >10%不显示 / 权重动态读取（不写死百分比）
+    _a1 = dict(data)
+    _a1["meta"] = dict(data["meta"])
+    _a1["meta"]["dimensions"] = [{"key": "powertrain", "label": "三电", "weight": .25},
+                                  {"key": "value", "label": "性价比", "weight": .122},
+                                  {"key": "adas", "label": "智驾", "weight": .08}]
+    doc_adas8 = render(_a1, None, "T", "202610")
+    _a2 = dict(data)
+    _a2["meta"] = dict(data["meta"])
+    _a2["meta"]["dimensions"] = [{"key": "powertrain", "label": "三电", "weight": .18},
+                                  {"key": "value", "label": "性价比", "weight": .117},
+                                  {"key": "adas", "label": "智驾", "weight": .135}]
+    doc_adas135 = render(_a2, None, "T", "202610")
+    checks += [
+        ("智驾提示·≤10%显示", "关于智驾权重" in doc_adas8 and "6.3%" in doc_adas8),
+        ("智驾提示·权重动态读取", "8.0%" in doc_adas8),
+        ("智驾提示·>10%不显示", "关于智驾权重" not in doc_adas135),
     ]
     bad = [n for n, ok in checks if not ok]
     # 注册表契约

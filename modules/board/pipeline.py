@@ -1043,7 +1043,13 @@ def main():
             from modules.board import render_board_html as RH
             from modules.board import board_view as BView
             _here = str(paths.ROOT)
-            bv_cfg_path = str(paths.cat("car_ev_1218_quality.json"))
+            # v10.15.7 根因修复：页面维度权重必须与打分/报告同源（用户：智驾降权后页面要一致显示）。
+            # 原先硬编码 car_ev_1218_quality.json（18%/13.5%），而打分用 --category 配置
+            # （car_midsuv_bev.json 25%/8%），导致报告显示 8% 但页面表头仍是 13.5% 的漂移。
+            # board_v2.build 只读 cfg["dimensions"]，改用当前 category 配置即与打分同源；
+            # 若该配置缺失则回退旧通用配置（兼容老榜）。
+            _bv_cfg_path = str(paths.cat(f"{a.category}.json"))
+            bv_cfg_path = _bv_cfg_path if os.path.exists(_bv_cfg_path) else str(paths.cat("car_ev_1218_quality.json"))
             policy_path = str(paths.cat("rank_v2_policy.json"))
             if os.path.exists(bv_cfg_path) and os.path.exists(policy_path):
                 cfg_v2 = json.load(open(bv_cfg_path, encoding="utf-8"))
