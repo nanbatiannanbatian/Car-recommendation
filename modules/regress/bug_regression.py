@@ -149,6 +149,7 @@ CASES = [
     ("BUG-126", "三电阈值硬编码在代码裸数字，改档要动代码且无法审计当前生效版本", "v10.25.0"),
     ("BUG-127", "max_power_kw/motor_kw字段错配64处+charge被填纯电压12处致功率/电压/快充项静默缺席", "v10.25.0"),
     ("BUG-128", "三电阈值配置化后无复核到期信号+车型参数/申报库/候选池无统一新鲜度体检，2027三电升级后静默用旧档", "v10.26.0"),
+    ("BUG-129", "页面展示两处失真：未入池车型及原因整段外露(用户要剔除)+主榜写死历史版本号v9.7.x被误读为当前版本", "v10.27.0"),
 ]
 
 
@@ -4533,8 +4534,57 @@ def t128():
             "纯读不改分 + 三类反向注入翻转 + 刷新计划闭环")
 
 
+def t129():
+    """BUG-129：页面两处展示失真——
+    ① 「未入池车型及原因（能比就比，不能比则说明）」整段外露，用户要求页面剔除
+       （数据仍在 summary.pool_excluded 与 report.md，仍可逐条审计，不许悄悄丢弃）；
+    ② 主榜/证据类型/证据分级写死历史版本标记 v9.7.1/v9.7.16/v9.7.18，
+       被读成"当前版本"，实为规则引入版本 → 改为动态读 SKILL.md 当前版本。
+    锁死：①渲染源码不再输出未入池整段；②三处版本号为动态 _ver；
+    ③数据层 pool_excluded 仍保留；④真实三榜 HTML 无旧串、版本号=当前版本。
+    """
+    rsrc = _read("render_board_html.py")
+    # ① 渲染源码不再拼「未入池车型及原因」整段（注释提及允许，但不得有 H.append 输出）
+    assert "未入池车型及原因（能比就比，不能比则说明）" not in rsrc, \
+        "渲染器仍输出未入池车型及原因整段"
+    assert 'f\'<b>未入池车型及原因' not in rsrc and '"<b>未入池车型及原因' not in rsrc, \
+        "渲染器仍有未入池原因 HTML 输出"
+    # ② 三处版本号改动态 _ver，历史硬编码串清零（注释里的 v9.7.x 演进标记不算页面输出）
+    for old in ("v9.7.1：", "分数证据类型（v9.7.16）", "证据分级提示（v9.7.18）"):
+        assert old not in rsrc, f"页面仍写死历史版本号: {old}"
+    assert rsrc.count("v{_ver}") >= 3, "三处版本号未改为动态 _ver"
+    assert "skill_version" in rsrc and "score_fingerprint" in rsrc, \
+        "版本号未走 skill_version 单一真相源"
+    # ③ 数据层仍保留 pool_excluded（不许因去展示而删数据）
+    psrc = _read("pipeline.py")
+    assert '"pool_excluded"' in psrc, "summary.pool_excluded 数据层被误删"
+    # ④ 真实三榜 HTML：无未入池整段、无旧版本串、版本号=当前版本
+    from modules.engine.score_fingerprint import skill_version
+    ver = skill_version()
+    assert ver, "读不到当前 skill 版本"
+    for run in ("midsedan_bev_allprice_202611_v30", "midsuv_bev_202611_v30",
+                "midsuv_bev_u18_202611_v30"):
+        p = os.path.join(HERE, "runs", run, "榜单.html")
+        if not os.path.exists(p):
+            continue
+        import re as _re
+        html = open(p, encoding="utf-8").read()
+        # CSS 里的版本注释（/* v9.7.16：... */）不是页面可见文本，剔除后再断言展示层
+        visible = _re.sub(r"<style>.*?</style>", "", html, flags=_re.S)
+        assert "未入池车型及原因" not in visible, f"{run} 页面仍显示未入池整段"
+        assert "v9.7.1：" not in visible and "v9.7.16" not in visible and "v9.7.18" not in visible, \
+            f"{run} 页面仍有旧版本标记"
+        assert f"v{ver}：每款车取其" in visible, f"{run} 页面版本号未更新为当前 {ver}"
+    # 反向注入：把动态版本号改回写死，检测必须触发（证明断言非摆设）
+    injected = rsrc.replace("v{_ver}：每款车取其", "v9.7.1：每款车取其", 1)
+    assert "v9.7.1：每款车取其" in injected, "反向注入未生效"
+    assert "v9.7.1：" not in rsrc, "反向注入对照失败：真实源码仍含旧串"
+    return ("页面剔除未入池整段(数据层保留) + 三处版本号动态读当前版本 + "
+            "三榜 HTML 验证 + 反向注入可检出")
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120, t121, t122, t123, t124, t125, t126, t127, t128]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120, t121, t122, t123, t124, t125, t126, t127, t128, t129]
 
 
 def run():

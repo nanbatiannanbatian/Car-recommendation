@@ -13,7 +13,7 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 10.26.0
+version: 10.27.0
 author: "nanbatiannanbatian"
 ---
 
@@ -3655,3 +3655,10 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
 - **改动二（新鲜度体检模块）**：新建 `modules/research/data_freshness.py`，**纯读、不联网、不改任何数据文件、不改分**（AST 锁死不 import engine/board）。体检四类：①阈值复核到期（fresh/due/overdue，due=周期 80% 后提醒）；②车型三电参数采集日期（data/gen/trims.json 各车 date，默认 90 天过期，列出过期车+已采字段+重采命令）；③候选池指纹（只读 stamp，真判定交 score_fingerprint --check）；④申报库缓存（3 天，与 filings_board.STALE_DAYS 一致）。输出结构化 JSON + 人读刷新计划（4 类 kind：threshold_review/spec_refresh/filings_refresh/pool_restamp）。CLI：`--json`/`--strict`(overdue 退 2)/`--as-of YYYY-MM-DD`(模拟未来体检)/`--spec-days`。遵守 research 包契约（只返回 dict、不 import engine）。
 - **回归**：新增 BUG-128（review 元数据存在+周期合理+selftest 多场景+**纯读性 SHA256 前后比对**+三类反向注入：改 reviewed_at→overdue/去 review 块→unknown(不静默 fresh)/车型 date 过期→spec_refresh 计划+AST 锁不越界进打分层）。全套 bug 126/126、反向注入 102/102、midsuv 46/46、layout 16/16、release 39/39、compare 20/20、router 32/32、derive 4/4、各 selftest 全绿。
 - **零分数影响**：本次只加元数据+体检模块+回归，未动打分代码与权重配置——三候选池指纹 `--check` 均「一致」(48478d21)，v29 三榜分数不变，**不重出榜**。
+
+## v10.27.0 · 页面两处展示修正（未入池说明剔除 + 版本号动态化，2026-11-22）
+- 用户看中型纯电轿车榜单页面提两点：①「未入池车型及原因（能比就比，不能比则说明）」整段不用说明、页面剔除即可；②打分主榜第一行显示 `v9.7.1` 版本号错了。
+- **辨析**：①是 v9.7.23/v9.7.24 应早先要求加进 skill 的展示（用户现改主意，以新指令为准）——按"渲染改动先确认"铁律先给方案，用户拍板「仅页面剔除、report 保留」。②`v9.7.1` 不是写错，是"该规则引入时的版本标记"（v9.7.1 引入"主榜按最高配置分排名"），当前版本已 10.26.0，放页面顶部易被误读为当前版本；页面另有 `v9.7.16`（分数证据类型）、`v9.7.18`（证据分级提示）两处同类标记。用户拍板「改成动态当前版本」。
+- **改动（根治在生成链路，非产物补丁）**：`modules/board/render_board_html.py` ①删掉 `pool_excluded` 的 HTML 提示块（约原 323-328 行）；数据在 `summary.pool_excluded` 与 report.md 落榜名单中保留，仍可逐条审计，不违背"不能比则说明"数据纪律。②render() 顶部经 `score_fingerprint.skill_version()` 单一真相源读 SKILL.md 当前版本 `_ver`，三处旧标记改 `v{_ver}` 动态输出；Render 缺依赖时优雅降级为空串。三榜重出后页面显示 `v10.27.0`。
+- **回归**：新增 BUG-129（渲染源码无未入池 HTML 输出/无写死 v9.7.x/`v{_ver}`≥3/走 skill_version/pipeline 数据层 pool_excluded 保留/三榜 v30 HTML 验证/反向注入 `v{_ver}` 可检出）；negative_regression 加 `t129: ["v{_ver}"]` 探针。全套 bug 127/127、反向注入 103/103、midsuv 46/46、layout 16/16、release 39/39、compare 20/20、router 32/32、各 selftest 全绿。
+- **零分数影响**：纯展示层改动，未动打分代码与权重——score_fingerprint 指纹 48478d21 不变（版本号按设计不进指纹）；三榜重出 v30 仅为刷新 HTML 展示，跨榜同车总分与八维 0 差异。

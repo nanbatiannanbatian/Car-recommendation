@@ -260,6 +260,13 @@ def render(data, summary, title, as_of):
     """
     from modules.board import board_view as BV
     meta = data.get("meta", {})
+    # v10.27.0：页面版本号动态读 SKILL.md frontmatter，渲染层不写死历史版本号。
+    # 单一真相源 = score_fingerprint.skill_version()（与报告"当前出榜 skill vX"同一函数）。
+    try:
+        from modules.engine.score_fingerprint import skill_version as _skill_version
+        _ver = _skill_version()
+    except (ImportError, OSError, ValueError):
+        _ver = ""
     # v10.24.0：叙述统计（智驾占比说明里的行业数字）从策略配置读取，渲染层不写死。
     _narr = {}
     try:
@@ -320,12 +327,8 @@ def render(data, summary, title, as_of):
                  f'证据 A/B/C = {e(_pool["ev_a"])}/{e(_pool["ev_b"])}/{e(_pool["ev_c"])}，'
                  f'网查补采 {e(_pool["extended"])} 款（置信低）。'
                  f'{_criteria}</div>')
-        _pex = (summary or {}).get("pool_excluded") or []
-        if _pex:
-            _pl = "；".join(f"{e(x.get('model'))}（月销{e(x.get('sales'))}）：{e(x.get('reason'))}"
-                           for x in _pex)
-            H.append(f'<div class="rule" style="background:#fbf3e9;border-left-color:#BA7517">'
-                     f'<b>未入池车型及原因（能比就比，不能比则说明）：</b>{_pl}。</div>')
+        # v10.27.0：页面不再展示「未入池车型及原因」（用户要求剔除展示）；
+        # 数据在 summary.pool_excluded 与 report.md 落榜名单中保留，仍可逐条审计。
         H.append('<div class="rule" style="background:#f7f6f3;border-left-color:#888780">'
                  f'<b>榜单定位：</b>这是本池 {len(rows)} 款候选车的<b>可审计横向对比榜</b>，'
                  '<b>不是全市场同级别车型的覆盖榜</b>；未入池车型不代表更差，'
@@ -351,7 +354,7 @@ def render(data, summary, title, as_of):
     if "main_board" in ids:
         grades = BV.fact_grades(rows)
         H.append("<h2>打分主榜 <span>按每车最高配置分排序（锚定到车系分量纲）· 事实列不参与排序</span></h2>")
-        H.append('<div class="rule">v9.7.1：每款车取其<b>最高分配置</b>参与排名，逐配置分经标准差锚定到车系分量纲'
+        H.append(f'<div class="rule">v{_ver}：每款车取其<b>最高分配置</b>参与排名，逐配置分经标准差锚定到车系分量纲'
                  '（买车买的是具体配置）。无配置数据的车沿用原车系分。'
                  '点下方「逐配置对比」可展开看每款车的全部配置。</div>')
         H.append('<div class="rule">按<b>评分配置</b>逐车评分（配置不同分不同）；指导价/月销/kWh·万元/'
@@ -597,7 +600,7 @@ def render(data, summary, title, as_of):
     if "score_breakdown" in ids:
         dims = meta.get("dimensions") or []
         H.append("<h2>总分构成 <span>8 维原始分 · 加权分＝Σ(维分×权重)×10 + adjust</span></h2>")
-        H.append('<div class="rule"><b>分数证据类型（v9.7.16）：</b>本榜所有维度分均为'
+        H.append(f'<div class="rule"><b>分数证据类型（v{_ver}）：</b>本榜所有维度分均为'
                  '<b>官方参数 + 客观差异规则推算</b>（来源：配置表/碰撞成绩/销量），'
                  '<b>不是实车实测分数</b>；配置间差异由「三电得分理由」逐条列明。'
                  '标注 <span class="flag flag-est">低置信</span> 表示基准配置匹配或证据不足，'
@@ -778,7 +781,7 @@ document.addEventListener('change',function(ev){
         _es = (summary or {}).get("evidence_soft") or []
         if _es:
             _lines = "；".join(f"{e(x.get('model'))}（{e(x.get('tier'))}）" for x in _es)
-            H.append(f'<div class="rule"><b>证据分级提示（v9.7.18）：</b>{_lines} '
+            H.append(f'<div class="rule"><b>证据分级提示（v{_ver}）：</b>{_lines} '
                      '一手证据不足（新上市/样本少/缺权威碰撞成绩）——已降低第一档资格，'
                      '<b>但不因此判劣或打入「暂缓」</b>；真正的硬风险（停产/无交付/营运为主）才进第三档。</div>')
 
