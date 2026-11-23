@@ -203,6 +203,15 @@ def run():
     else:
         check("实际产物存在", False, "请先运行 python build_release.py")
 
+    # v10.40.0：接入确定性包体检（自包含/死链/文档命令/活跃标识符可达）
+    # 4 项判定性检查已反向注入验证非摆设；这里把结果逐条并进 release regress
+    try:
+        from modules.regress import package_audit as _PA
+        for _name, _ok, _detail in _PA.audit_package(Path(ZIP)):
+            check(f"包体检:{_name}", _ok, _detail)
+    except Exception as _e:
+        check("包体检可执行", False, f"{type(_e).__name__}: {_e}")
+
     print(f"\n结果: {len(P)}/{len(P)+len(F)} 通过")
     if F:
         print("失败:", F)
