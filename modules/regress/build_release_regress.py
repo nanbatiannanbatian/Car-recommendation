@@ -88,6 +88,11 @@ def run():
             packed_docs = {d: z.read(f"car-recommendation/{d}").decode("utf-8", "ignore")
                            for d in ("SKILL.md", "README.md")
                            if f"car-recommendation/{d}" in names}
+            # v10.34.0：references 文件（含完整 v10 演进史）随包检查
+            for d in ("detail.md", "evolution.md"):
+                p = f"car-recommendation/references/{d}"
+                if p in names:
+                    packed_docs[d] = z.read(p).decode("utf-8", "ignore")
         check("实际产物解压后<3MB", total < MAX, f"{total/1024:.1f}KB")
         check("产物无历史污染数据", not any("v61polluted" in n or "v60before" in n for n in names))
         check("产物无回归测试脚本", not any(n.endswith(("_regress.py", "_regression.py")) for n in names))
@@ -130,16 +135,32 @@ def run():
             skill_packed = packed_docs["SKILL.md"]
             check("产物SKILL无逐版演进段", not any(
                 l.startswith("## v9.") or l.startswith("## v10.") for l in skill_packed.splitlines()))
-            check("产物SKILL有仓库指针", "版本演进史" in skill_packed and "github.com" in skill_packed)
+            # v10.34.0：官方渐进式披露——SKILL.md 精简+references 指针，演进史物理移到随包 references/
+            check("产物SKILL有references指针", "references/evolution.md" in skill_packed
+                  and "references/detail.md" in skill_packed)
+            check("产物SKILL正文精简(<500行)", len(skill_packed.splitlines()) < 500,
+                  f"{len(skill_packed.splitlines())}行")
             # v10.33.0：v9+ 能力补写节必须随包（剥离演进史后能力说明不能一起丢）
             check("产物含v9+能力补充节", "## 当前能力补充（v9–v10 沉淀" in skill_packed)
+            # v10.34.0：references/ 两文件必须随包且含完整 v10 演进史
+            if "evolution.md" in packed_docs:
+                evo = packed_docs["evolution.md"]
+                import re as _re2
+                v10chap = _re2.findall(r'^## (v10\.\d+\.\d+)', evo, _re2.M)
+                check("产物evolution含全部v10章节", len(v10chap) >= 25,
+                      f"{len(v10chap)}个v10章节")
+                check("产物evolution含v10.33", "v10.33.0" in evo)
+            else:
+                check("产物含references/evolution.md", False)
             for kw in ("价格残差法", "水桶车稳健通道", "数据时效体检", "固定锚", "联网优先"):
                 check(f"产物含能力关键词:{kw}", kw in skill_packed)
         if "README.md" in packed_docs:
             check("产物README无逐版演进段", not any(
                 l.startswith("## v9.") or l.startswith("## v10.")
                 for l in packed_docs["README.md"].splitlines()))
-        check("产物体积留>=800KB余量(v10.32)", total < (3072 - 800) * 1024,
+        # v10.34.0：references/ 随包(完整演进史+详细手册)后体积升到 ~2353KB，
+        # 余量 ~719KB 仍充足；门槛从 800KB 调到 600KB，但绝不放宽到临界。
+        check("产物体积留>=600KB余量(v10.34)", total < (3072 - 600) * 1024,
               f"解压后 {total/1024:.1f}KB")
         check("产物无零引用调研md", not any(
             "碰撞成绩核查" in n or "开源项目与数据源调研" in n for n in names))

@@ -192,6 +192,12 @@ def collect_files():
                 for c in sorted(p.glob("*")):
                     if c.is_file() and not is_excluded_name(c.name) and c.suffix in ROOT_INCLUDE_EXT:
                         files.append(c)
+            elif p.name == "references":
+                # v10.34.0：官方渐进式披露——详细能力/演进史放 references/*.md 随包
+                # （两级目录：references/<file>.md，符合平台层级限制）
+                for c in sorted(p.glob("*")):
+                    if c.is_file() and not is_excluded_name(c.name) and c.suffix in ROOT_INCLUDE_EXT:
+                        files.append(c)
             continue
         if not p.is_file():
             continue
@@ -301,24 +307,23 @@ def _flat_arcname(p: Path) -> str:
 
 
 def strip_changelog(text: str, arc: str) -> str:
-    """v10.32.0：打包时剥离 SKILL.md / README.md 的逐版本演进史（仅 zip 内字节）。
+    """v10.32.0→v10.34.0：打包时的文档处理（仅 zip 内字节）。
 
-    源码树保留完整演进（用户铁律：README/SKILL 要随每次提交更新、历史可审计）；
-    发布包不需要逐版流水账——正文（能力/铁律/命令/边界）已自包含，演进史放 GitHub 仓库。
-    剥离点 = 第一个 `## v9.0.0`（v9 之前的历史在两文件里都是按版本罗列）。
-    末尾留一行指针，说明完整演进史在仓库，绝不静默删除。
+    v10.34.0 起 SKILL.md 已按官方渐进式披露重构：正文只留核心+指针，
+    详细能力/演进史物理移到 references/detail.md 与 references/evolution.md 随包，
+    不再需要剥离（SKILL.md 内已无 `## v9.0.0`）——直接原样返回。
+    README.md 仍含逐版演进史（源码树保留审计），打包时剥离该段留指针。
     """
+    if arc == "SKILL.md":
+        return text
     marker = "\n## v9.0.0"
     idx = text.find(marker)
     if idx < 0:
         fail(f"{arc} 未找到演进史剥离点 '## v9.0.0'（文档结构升级后需同步此规则）")
     head = text[:idx].rstrip()
-    repo = ("https://github.com/nanbatiannanbatian/Car-recommendation"
-            if arc == "README.md" else
-            "https://github.com/nanbatiannanbatian/Car-recommendation/blob/main/SKILL.md")
-    return head + (f"\n\n---\n\n> **版本演进史（v9.0.0 起）不在发布包内**："
-                   f"为控制平台 3MB 体积限制，逐版本变更记录已剥离；"
-                   f"完整历史见源码仓库 {repo}。正文能力/铁律/命令均完整保留。\n")
+    repo = "https://github.com/nanbatiannanbatian/Car-recommendation"
+    return head + (f"\n\n---\n\n> **版本演进史（v9.0.0 起）不在 README 内**："
+                   f"完整逐版历史随包见 `references/evolution.md`，源码仓库 {repo} 亦有。\n")
 
 
 def rewrite_for_flat(text: str, arc: str) -> str:

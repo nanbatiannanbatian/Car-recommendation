@@ -397,8 +397,9 @@ def t047():
 
 def t046():
     """research-collector 完全整合：无独立身份、无 orchestrator 死依赖。"""
-    sk = _read("SKILL.md")
-    assert "统一证据采集（内建" in sk, "采集能力未并入SKILL"
+    # v10.34.0：官方 references 分层后，详细能力章节在 references/detail.md（内容未丢，仅搬移）
+    sk = _read("SKILL.md") + _read("references/detail.md")
+    assert "统一证据采集（内建" in sk, "采集能力未并入SKILL/references"
     rp = _read("research/researcher.py")
     assert "import orchestrator" not in rp and "def extract_sources" not in rp, "残留辩论引擎死代码"
     rd = _read("research/README.md")
@@ -1419,8 +1420,8 @@ def t066():
     rsrc = _read("render_board_html.py")
     assert "与第一档共同构成" in rsrc and "只有几款" in rsrc, "缺一档+强推荐叙事"
     assert "换算法会换位" in rsrc and "稳定地排第5左右" in rsrc, "缺两种强推荐原因的文案"
-    # 并行纪律固化
-    sksrc = _read("SKILL.md")
+    # 并行纪律固化（v10.34.0：该段已搬到 references/detail.md，内容未丢）
+    sksrc = _read("SKILL.md") + _read("references/detail.md")
     assert "多会话并行改代码的纪律" in sksrc and "新增文件必须先加白名单" in sksrc, \
         "并行/白名单纪律未固化"
     # 真实产物
@@ -4570,8 +4571,8 @@ def t129():
     from modules.engine.score_fingerprint import skill_version
     ver = skill_version()
     assert ver, "读不到当前 skill 版本"
-    for run in ("midsedan_bev_allprice_202611_v36", "midsuv_bev_202611_v36",
-                "midsuv_bev_u18_202611_v36"):
+    for run in ("midsedan_bev_allprice_202611_v37", "midsuv_bev_202611_v37",
+                "midsuv_bev_u18_202611_v37"):
         p = os.path.join(HERE, "runs", run, "榜单.html")
         if not os.path.exists(p):
             continue
@@ -4624,8 +4625,8 @@ def t130():
     tip_bev = sales_tip({"sales_scope": "pure_bev", "trend_sales": 11166})
     assert "纯电单独" in tip_bev and "上界" not in tip_bev, "纯电口径 hover 不应说上界"
     # ④ 真实 v31 三榜 HTML：无矛盾串、月销格有 title hover
-    for run in ("midsedan_bev_allprice_202611_v36", "midsuv_bev_202611_v36",
-                "midsuv_bev_u18_202611_v36"):
+    for run in ("midsedan_bev_allprice_202611_v37", "midsuv_bev_202611_v37",
+                "midsuv_bev_u18_202611_v37"):
         p = os.path.join(HERE, "runs", run, "榜单.html")
         if not os.path.exists(p):
             continue
@@ -4667,8 +4668,8 @@ def t131():
         assert f"<th>{col}</th>" not in rsrc, f"空间表仍有空列 {col}"
     assert "无统一计算口径" in rsrc and "不编造、不插补" in rsrc, "缺数据边界说明"
     # ③ v32 三榜 HTML：无两区块标题、空间表头只 5 列、无 4 空列名
-    for run in ("midsedan_bev_allprice_202611_v36", "midsuv_bev_202611_v36",
-                "midsuv_bev_u18_202611_v36"):
+    for run in ("midsedan_bev_allprice_202611_v37", "midsuv_bev_202611_v37",
+                "midsuv_bev_u18_202611_v37"):
         p = os.path.join(HERE, "runs", run, "榜单.html")
         if not os.path.exists(p):
             continue
@@ -4720,7 +4721,7 @@ def t132():
     assert all(not any("碰撞" in b for b in (x.get("t1_blockers") or [])) for x in robust_in), \
         "稳健通道不应豁免碰撞实锤门槛"
     # ③ 本榜(202611)判档分有7.9维，诚实不触发——不降阈值迁就单车型
-    p = os.path.join(HERE, "runs", "midsedan_bev_allprice_202611_v36", "summary.json")
+    p = os.path.join(HERE, "runs", "midsedan_bev_allprice_202611_v37", "summary.json")
     if os.path.exists(p):
         sd = _J.load(open(p, encoding="utf-8"))
         assert not (sd.get("robust_t1") or {}).get("中型纯电轿车（全价位）"), \
