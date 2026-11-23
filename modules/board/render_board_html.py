@@ -57,7 +57,6 @@ border-radius:18px;background:#fff;color:var(--ink2);cursor:pointer;transition:a
 .viewbar button.on{background:var(--accent2);border-color:var(--accent2);color:#fff;font-weight:600}
 body.view-simple .vblk[data-view="extra"]{display:none}
 body.view-simple .navgrid a[data-view="extra"]{display:none}
-body.view-simple .navbox{display:none}  /* v10.43 用户：简洁版去掉顶层导航，完整版保留 */
 .view-hint{font-size:12px;color:var(--ink3);margin:2px 0 10px;line-height:1.6}
 @media print{.viewbar{display:none}body.view-simple .vblk[data-view="extra"]{display:block}}
 .topbar a{color:var(--ink3);text-decoration:none}
@@ -1255,8 +1254,8 @@ def selftest():
             f'id="sec-{bid}"' in _energy_doc and f'data-view="extra" data-block="{bid}"' in _energy_doc
             for bid in ("energy_facts", "space_facts"))),
         ("视图提示不含三电与空间", "三电与补能 + 空间与储物" not in doc),
-        # v10.43 简洁版隐藏顶层导航（完整版保留）
-        ("视图CSS隐藏顶层导航", 'body.view-simple .navbox{display:none}' in CSS),
+        # v10.44 简洁版保留顶层导航（只隐藏 extra 链接，导航区本身两版都显示）
+        ("简洁版导航区显示", 'body.view-simple .navbox{display:none}' not in CSS),
         ("视图extra不误标核心", not any(
             f'data-view="core" data-block="{bid}"' in doc
             for bid in ("trim_compare", "score_breakdown", "method_boundary"))),

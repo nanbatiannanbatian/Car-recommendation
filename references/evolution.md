@@ -1524,3 +1524,9 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
 - 修法：SIMPLE_VIEW_IDS 移除 energy_facts/space_facts(简版回到4块:导语/主榜/产品力/三档);视图提示文案去掉三电空间;CSS加 `body.view-simple .navbox{display:none}`(DOM仍在,切完整版即现);selftest断言反转(三电空间归extra/h2锚点+extra包装/提示不含/顶层导航CSS隐藏)。
 - 验证：render selftest 全绿;实生成榜 core=3块(导语常驻)/extra含三电空间;顶层导航DOM保留且简洁版隐藏CSS在、提示文案已去。零分数影响,指纹不变。
 - 效果：简洁版首屏=导语+两榜+三档、无导航卡片,真正一目了然;完整版=18区块+导航卡片全在。
+
+## v10.44.0 简洁版恢复顶层导航（2026-11-23）
+- 用户："简洁版导航要的"——撤销 v10.43 的"简洁版隐藏顶层导航"，导航区两版都显示。
+- 修法：删 `body.view-simple .navbox{display:none}` CSS 一条；保留 `navgrid a[data-view="extra"]{display:none}`（简洁版导航只列当前可见核心区块，点导航不会跳到隐藏区块）。selftest 断言反转。
+- 验证：render selftest 全绿；实生成榜导航DOM在、无隐藏导航CSS、extra链接隐藏规则仍在；零分数影响，指纹不变。
+- 现状：简洁版=导语+主榜+产品力+三档+导航区(核心链接)；完整版=18区块+导航区(全部链接)。
