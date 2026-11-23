@@ -138,6 +138,15 @@ def run():
             # v10.34.0：官方渐进式披露——SKILL.md 精简+references 指针，演进史物理移到随包 references/
             check("产物SKILL有references指针", "references/evolution.md" in skill_packed
                   and "references/detail.md" in skill_packed)
+            # v10.37.0：指针必须如实说明滚动窗口+仓库兜底，不得声称"完整历史在包内"(软死链)
+            check("SKILL指针写明滚动窗口", "最近 30 版滚动窗口" in skill_packed
+                  and "github.com" in skill_packed)
+            check("SKILL指针无过时承诺", "含全部 v10.x" not in skill_packed)
+            # 活铁律必须在发布包核心(SKILL+detail)可查，不因裁剪演进史而丢能力
+            core_pkg = skill_packed + packed_docs.get("detail.md", "")
+            for rule in ("trims[]", "候选池收全", "联网优先", "证据 C 不一律判三档",
+                         "指纹门禁", "bug 代码化"):
+                check(f"发布包核心含活铁律:{rule}", rule in core_pkg)
             check("产物SKILL正文精简(<500行)", len(skill_packed.splitlines()) < 500,
                   f"{len(skill_packed.splitlines())}行")
             # v10.35.0：官方规范——正文标题不硬编码旧版本（单一事实源）+ 大 reference 需目录

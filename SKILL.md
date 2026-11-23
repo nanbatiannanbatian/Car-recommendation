@@ -13,7 +13,7 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 10.36.0
+version: 10.37.0
 author: "nanbatiannanbatian"
 ---
 
@@ -316,7 +316,7 @@ python3 pipeline.py --category <categories/下的配置ID> \
 本 skill 采用官方渐进式披露结构：`SKILL.md` 只保留核心铁律、当前能力与命令；详细资料按需读取：
 
 - **`references/detail.md`** — 各模块详细口径与用法（ranking/leaderboard/robust/取数链/防错四件套/入池规则/备案预测/安全气囊/配置阶梯/统一榜单/证据采集/逐配置摄入/交叉核验等 v4–v8 完整章节）。遇到具体模块的参数、CLI、判定细节时读此文件。
-- **`references/evolution.md`** — v9.0.0 起的完整逐版本演进史（含全部 v10.x：为什么改、改了什么、验收与已知边界）。需要追溯某口径来龙去脉时读此文件。
+- **`references/evolution.md`** — 逐版本演进史（为什么改、改了什么、验收与已知边界）。**发布包只含最近 30 版滚动窗口**（文件开头写明版本范围与指针）；完整历史（含 v9.x 及更早）在源码仓库 `github.com/nanbatiannanbatian/Car-recommendation` 的 `references/evolution.md`。需要追溯某口径来龙去脉时：先读本地文件，若目标版本不在窗口内、按文件开头的仓库指针查阅完整版。
 
 两文件均随发布包携带、可离线查阅；源码树与 GitHub 仓库有完整版。
 
