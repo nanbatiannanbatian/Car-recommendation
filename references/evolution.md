@@ -1512,3 +1512,9 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
 - 踩坑：①初版 body 无 `view-simple` class→CSS 隐藏规则不生效，补上；②nav 里 extra 链接在简版仍显示会跳隐藏区块→加 `.navgrid a[data-view=extra]` 隐藏；③fact_coverage/lede 无 h2 无法自动分组→fact_coverage 加哨兵、lede 常驻(本就 core 语义)。
 - 验证：render selftest +9项(切换条/JS/默认简洁/CSS隐藏/core含主榜三档产品力/extra不误标/无哨兵残留)全绿；实生成榜静态验证 core=3块(main_board/tiers/product_power)、extra=10块、2个script块node --check全过；浏览器截图因大页超时改静态DOM验证。零分数影响，指纹不变。
 - 效果：简版首屏=两榜+一句话+三档，一目了然；点"完整"看全部18区块。三榜重出 v44 仅版本号。
+
+## v10.42.0 简版增加三电与补能/空间与储物（2026-11-23）
+- 用户："简洁版还有三电与补能以及空间与储物"。明确指定，直接实施。
+- 修法：SIMPLE_VIEW_IDS 加 `energy_facts`/`space_facts`（简版 core 从 4 块→6 块：导语/主榜/产品力/三档/三电/空间）；视图提示文案同步；selftest 加映射断言+扩展 fixture 实测。
+- 踩坑（关键）：三电/空间的 h2 原本没有 `id="sec-XXX"` 锚点（NAV_BY_TITLE 缺这两项，历史遗留——导航也从不列它们），导致视图包装的边界正则识别不到这两块→它们不会带 data-view，会两版都显示。补 NAV_BY_TITLE 映射后实测 core=5块(有数据的榜)/6块(含导语)，三电空间正确归 core。selftest 加"h2锚点+core包装"断言防复发。
+- 验证：render selftest 全绿(+三电空间映射/锚点/core包装/提示文案)，实生成榜 core 含 energy_facts/space_facts、extra 11块正确排除。零分数影响，指纹不变。
