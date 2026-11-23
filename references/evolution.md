@@ -1468,3 +1468,10 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
 - **frontmatter 字段判断**：严格校验器(codebuddy-plugins-official/external_plugins，Anthropic Claude 参考实现)拒绝了 display_name/description_zh/en/examples/version/author 等 8 字段；但核查证据——cb_teams_marketplace（WorkBuddy 团队版）的 skill-creator 自身 plugin.json 就用 description_zh/en，本机全部真实 WorkBuddy skill 均用这些顶层字段，WorkBuddy 宽松校验器(cb_teams/quick_validate.py)通过。结论：这些是 WorkBuddy 生态合法展示扩展，**不删**（删了会破坏技能市场展示与版本追踪），并在 SKILL.md 正文写明缘由防后人误删。
 - **修正项（3处真实 gap）**：①`references/detail.md` 2014 行无目录 → 加 34 条 H2 TOC；②`references/evolution.md` 1458 行无目录 → 加 v9/v10 分段 TOC（初版用了无效 #v9/#v10 锚点，改纯文本分组）；③SKILL.md 正文标题硬编码旧版本 `v10.14.0`（frontmatter 已 10.34）→ 去掉硬编码版本号，遵守单一事实源。
 - 回归：宽松校验通过、发布包重建全检查过、bug/layout/midsuv/release 全绿；零分数影响，指纹不变。
+
+## v10.36.0 · 演进史滚动窗口 + 体积增长门禁（2026-11-23）
+- 用户问："随着版本演进 references 里文件是否会一直增大，有哪些方法"。实测数据：每版 ~1.77KB/17行，references 合计 295KB（detail 140KB + evolution 153KB），当前包 2360KB 余量 712KB；按实测 16 版/天节奏一个月就触 3MB 线。用户选"滚动窗口+门禁"。
+- 修法（源码树完整保留、仅 zip 内字节裁剪）：`build_release.py` 加 `EVOLUTION_KEEP_VERSIONS=30` + `rolling_crop_evolution()`，打包时 evolution.md 只保留最近 30 版（当前 v10.15.1–v10.35.0），开头加"滚动窗口+完整历史见 GitHub"指针 + TOC；源码树 86 版完整不动。evolution 在包内 153KB→79KB，总包 2360→2285KB（余量稳定，不再随版本线性增长）。
+- 门禁：打包后检查源码树演进史版数，超"窗口+50"时预警（历史在仓库属预期，提示可归档）；原有解压后体积预警保留。
+- 回归：release regress +4项（滚动窗口≤30版/源码树完整>包内/有仓库指针）→63/63；反向注入证明非摆设（窗口调大则不裁、真实裁30版）。零分数影响，指纹不变。
+- 治理效果：体积恒定控在 ~2.3MB，历史零丢失（源码树/GitHub 完整），未来每加一版自动滚动、无需人工清理。

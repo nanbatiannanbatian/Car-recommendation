@@ -155,6 +155,16 @@ def run():
                 check("产物evolution含全部v10章节", len(v10chap) >= 25,
                       f"{len(v10chap)}个v10章节")
                 check("产物evolution含v10.33", "v10.33.0" in evo)
+                # v10.36.0：滚动窗口——包内只带最近30版，源码树完整（历史不丢）
+                import build_release as _BR
+                src_evo = open(str(Path(HERE) / "references" / "evolution.md"), encoding="utf-8").read()
+                n_src = len(_re2.findall(r'^## v[\d.]+', src_evo, _re2.M))
+                n_pkg = len(v10chap) + len(_re2.findall(r'^## v9\.', evo, _re2.M))
+                check("产物evolution滚动窗口<=30版", n_pkg <= _BR.EVOLUTION_KEEP_VERSIONS,
+                      f"包内{n_pkg}版")
+                check("源码树evolution完整(>包内)", n_src >= n_pkg,
+                      f"源码{n_src}版/包内{n_pkg}版")
+                check("产物evolution有仓库指针", "滚动窗口" in evo and "github.com" in evo)
             else:
                 check("产物含references/evolution.md", False)
             for kw in ("价格残差法", "水桶车稳健通道", "数据时效体检", "固定锚", "联网优先"):

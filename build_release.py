@@ -93,6 +93,10 @@ EXCLUDE_DIRS = {"runs", "cache", "__pycache__", "dist", ".git",
                 # v10.0 模块化：data/ 是生成物缓存（可重建），tools/ 是一次性迁移脚本
                 "data", "tools"}
 MAX_ZIP_BYTES = 3 * 1024 * 1024                      # 官方压缩 zip 体积上限 3MB
+# v10.36.0：演进史滚动窗口——发布包只带最近 N 个版本章节，更早的留源码树/GitHub。
+# 实测每版 ~1.77KB，全带会随版本线性增长触碰 3MB 红线；滚动窗口让体积恒定。
+EVOLUTION_KEEP_VERSIONS = 30
+EVOLUTION_ARC = "references/evolution.md"
 # 官方实际校验的是「解压后」总大小 <= 3MB；此前只查压缩后体积导致上传被拒。
 # 该常量把口径代码化，打包时第二个检查会用解压后总字节数比较。
 MAX_UNCOMPRESSED_BYTES = 3 * 1024 * 1024
@@ -326,6 +330,32 @@ def strip_changelog(text: str, arc: str) -> str:
                    f"完整逐版历史随包见 `references/evolution.md`，源码仓库 {repo} 亦有。\n")
 
 
+def rolling_crop_evolution(text: str) -> str:
+    """v10.36.0：演进史滚动窗口——发布包只保留最近 EVOLUTION_KEEP_VERSIONS 个版本章节。
+
+    源码树完整保留全部版本（可审计、GitHub 可查）；只在 zip 内字节裁剪，
+    开头加指针说明更早版本在仓库。体积恒定，不随版本线性增长。
+    """
+    import re as _re
+    lines = text.splitlines()
+    idx = [i for i, l in enumerate(lines) if _re.match(r'^## v[\d.]+', l)]
+    if len(idx) <= EVOLUTION_KEEP_VERSIONS:
+        return text  # 未超窗口，原样
+    keep_from = idx[-EVOLUTION_KEEP_VERSIONS]
+    cropped = lines[keep_from:]
+    first_ver = _re.match(r'^## (v[\d.]+)', cropped[0]).group(1)
+    last_ver = _re.match(r'^## (v[\d.]+)', cropped[-1] if cropped[-1].startswith('## ') else
+                         next(l for l in reversed(cropped) if l.startswith('## v'))).group(1)
+    header = (f"# 版本演进史（滚动窗口：{first_ver} – {last_ver}，最近 {EVOLUTION_KEEP_VERSIONS} 版）\n\n"
+              f"> 发布包只携带最近 {EVOLUTION_KEEP_VERSIONS} 个版本以控制体积。"
+              f"更早版本（v9.x 及早期）完整保存在源码仓库："
+              f"https://github.com/nanbatiannanbatian/Car-recommendation/blob/main/references/evolution.md\n"
+              f"> 当前能力口径见 SKILL.md / references/detail.md。\n\n"
+              f"## 目录\n\n"
+              f"- **{first_ver} – {last_ver}**：最近 {EVOLUTION_KEEP_VERSIONS} 版（按时间正序，逐版含为什么改/改了什么/验收）\n\n")
+    return header + '\n'.join(cropped) + '\n'
+
+
 def rewrite_for_flat(text: str, arc: str) -> str:
     """把源码里的分层 import 改写为扁平包可用的 import（仅作用于 zip 内字节）。"""
     # 1) runpy 薄壳与显式三级 import：modules.<pkg>.<mod> -> modules.<mod>
@@ -408,6 +438,11 @@ def build_zip(files):
                 text = strip_changelog(p.read_text(encoding="utf-8"), flat_rel)
                 z.writestr(arc, text)
                 uncompressed += len(text.encode("utf-8"))
+            elif flat_rel == EVOLUTION_ARC:
+                # v10.36.0：演进史滚动窗口（源码树完整保留，仅 zip 内字节裁剪）
+                text = rolling_crop_evolution(p.read_text(encoding="utf-8"))
+                z.writestr(arc, text)
+                uncompressed += len(text.encode("utf-8"))
             else:
                 z.write(p, arc)
                 uncompressed += p.stat().st_size
@@ -426,6 +461,15 @@ def build_zip(files):
         left = (MAX_UNCOMPRESSED_BYTES - uncompressed) / 1024
         print(f"[warn] 解压后距 3MB 上限只剩 {left:.0f}KB —— 下次再加随包数据就会超；"
               f"先看 paths.CURATED_JSON 里哪些能转成可重建生成物", file=sys.stderr)
+    # v10.36.0：源码树演进史增长预警（即使发布包滚动裁剪恒定，也提醒源码树别无限膨胀）
+    src_evo = HERE / EVOLUTION_ARC
+    if src_evo.exists():
+        import re as _re
+        src_lines = src_evo.read_text(encoding="utf-8")
+        n_ver = len(_re.findall(r'^## v[\d.]+', src_lines, _re.M))
+        if n_ver > EVOLUTION_KEEP_VERSIONS + 50:
+            print(f"[warn] 源码树演进史已 {n_ver} 版（发布包只带最近 {EVOLUTION_KEEP_VERSIONS} 版）；"
+                  f"历史完整保留在仓库属预期，但如仓库体积敏感可归档旧版", file=sys.stderr)
     return out
 
 
