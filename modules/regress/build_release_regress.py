@@ -140,6 +140,11 @@ def run():
                   and "references/detail.md" in skill_packed)
             check("产物SKILL正文精简(<500行)", len(skill_packed.splitlines()) < 500,
                   f"{len(skill_packed.splitlines())}行")
+            # v10.35.0：官方规范——正文标题不硬编码旧版本（单一事实源）+ 大 reference 需目录
+            check("SKILL无硬编码旧版本", "v10.14.0" not in skill_packed)
+            for _d in ("detail.md", "evolution.md"):
+                if _d in packed_docs and len(packed_docs[_d].splitlines()) > 300:
+                    check(f"产物{_d}有目录(>300行)", "## 目录" in packed_docs[_d][:600])
             # v10.33.0：v9+ 能力补写节必须随包（剥离演进史后能力说明不能一起丢）
             check("产物含v9+能力补充节", "## 当前能力补充（v9–v10 沉淀" in skill_packed)
             # v10.34.0：references/ 两文件必须随包且含完整 v10 演进史

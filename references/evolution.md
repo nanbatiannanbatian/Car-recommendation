@@ -2,6 +2,11 @@
 
 > 本文件随发布包携带，供追溯每个版本「为什么改、改了什么、验收结果」。当前能力口径见 SKILL.md / references/detail.md。
 
+## 目录
+
+- **v9.x 演进（56 版）**：v9.0.0 页面单点收敛 … v9.7.42 联网优先铁律
+- **v10.x 演进（29 版）**：v10.15.1 逐配置电芯校验 … v10.34.0 references 分层
+
 ## v9.0.0 · 页面展示逻辑单点收敛 + 历史必要区块补回（2026-11-19）
 
 ### 为什么要改（架构问题）
@@ -1456,3 +1461,10 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
 - build_release：白名单加 references/ 目录（两级 references/<file>.md 符合平台层级限制）；strip_changelog 对 SKILL.md 不再剥离（演进史已物理移出），README.md 仍剥离留指针。
 - 发布包：SKILL.md 36KB/321行、detail.md 139KB、evolution.md 150KB（v10 全 28 章节可查）；总包 2199→2353KB，余量 719KB 仍 <3MB。
 - 回归：release regress 更新（SKILL references 指针/正文<500行/evolution 含 v10 全章节+v10.33/体积门槛 800→600KB）→ 57/57；解包 98 模块导入全过+selftest 全绿+references 可离线读；bug130/130 等全绿。零分数影响，指纹不变。
+
+## v10.35.0 · 官方规范全面审计与修正（2026-11-23）
+- 用户："按 workbuddy 官方规范看哪些没符合，按建议直接改"。系统读官方 skill-creator（两份校验器 + 编写指南）逐项审计。
+- **符合项（无需改）**：SKILL.md 存在、frontmatter 以 --- 开头、name=car-recommendation 合规 kebab-case、description 93字(<1024)无尖括号、SKILL.md 正文 321 行(<500 官方建议)、references/ 分层+指针、zip 顶层 car-recommendation/SKILL.md、两级目录。
+- **frontmatter 字段判断**：严格校验器(codebuddy-plugins-official/external_plugins，Anthropic Claude 参考实现)拒绝了 display_name/description_zh/en/examples/version/author 等 8 字段；但核查证据——cb_teams_marketplace（WorkBuddy 团队版）的 skill-creator 自身 plugin.json 就用 description_zh/en，本机全部真实 WorkBuddy skill 均用这些顶层字段，WorkBuddy 宽松校验器(cb_teams/quick_validate.py)通过。结论：这些是 WorkBuddy 生态合法展示扩展，**不删**（删了会破坏技能市场展示与版本追踪），并在 SKILL.md 正文写明缘由防后人误删。
+- **修正项（3处真实 gap）**：①`references/detail.md` 2014 行无目录 → 加 34 条 H2 TOC；②`references/evolution.md` 1458 行无目录 → 加 v9/v10 分段 TOC（初版用了无效 #v9/#v10 锚点，改纯文本分组）；③SKILL.md 正文标题硬编码旧版本 `v10.14.0`（frontmatter 已 10.34）→ 去掉硬编码版本号，遵守单一事实源。
+- 回归：宽松校验通过、发布包重建全检查过、bug/layout/midsuv/release 全绿；零分数影响，指纹不变。

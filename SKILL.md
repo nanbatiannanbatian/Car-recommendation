@@ -13,11 +13,11 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 10.34.0
+version: 10.35.0
 author: "nanbatiannanbatian"
 ---
 
-# Car recommendation —— 可信购车榜单引擎（v10.14.0）
+# Car recommendation —— 可信购车榜单引擎
 
 > 前身 omni-debate（多模型辩论 skill）；2026-11 辩论引擎整体移除，本 skill 只保留
 > **可复现的榜单与预测链路**。为什么不用 LLM 直接排名，见《为什么出榜流程不含 LLM/辩论》。
@@ -319,3 +319,5 @@ python3 pipeline.py --category <categories/下的配置ID> \
 - **`references/evolution.md`** — v9.0.0 起的完整逐版本演进史（含全部 v10.x：为什么改、改了什么、验收与已知边界）。需要追溯某口径来龙去脉时读此文件。
 
 两文件均随发布包携带、可离线查阅；源码树与 GitHub 仓库有完整版。
+
+> **frontmatter 说明**：`name` + `description` 是官方必填（决定 skill 何时触发）；`display_name*` / `description_zh|en` / `examples*` / `version` / `author` 是 WorkBuddy 技能市场的展示扩展（本机全部 WorkBuddy skill 及 cb_teams 官方 skill-creator 的 plugin.json 均使用），不要按 Anthropic 参考校验器的白名单删掉——那是 Claude 生态的严格子集，WorkBuddy 生态的宽松校验器（`cb_teams_marketplace/.../quick_validate.py`）已通过。
