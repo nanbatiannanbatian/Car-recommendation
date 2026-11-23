@@ -278,6 +278,81 @@ def check_doc_script_refs(files):
     info("文档脚本引用检查通过（所有 python xxx.py 引用的脚本均在包内）")
 
 
+# ---- 6b. zip 内扁平化（v10.31.0）-----------------------------------------
+# 平台上传校验：zip 内最多两级目录（根/二级/文件，即路径最多 3 段）。
+# 源码树保留 modules/<pkg>/ 分包（357 处 import、单一事实源、回归 paths.src 依赖），
+# 打包时做「编译式」变换产出扁平包：modules/<pkg>/x.py -> modules/x.py，
+# 并改写包内所有跨包 import / runpy / paths 动态加载，使扁平包自身可运行。
+# 源码与 GitHub 仓库完全不动；改写只作用于 zip 内字节。
+FLAT_PKGS = ("contracts", "research", "physics", "envscore", "engine", "board", "regress", "data")
+
+
+def _flat_arcname(p: Path) -> str:
+    """源码路径 -> zip 内路径（扁平化 modules/<pkg>/x.py -> modules/x.py）。"""
+    rel = p.relative_to(HERE).as_posix()
+    parts = rel.split("/")
+    if len(parts) == 3 and parts[0] == "modules" and parts[1] in FLAT_PKGS:
+        name = parts[2]
+        # 各子包的 __init__.py 都是纯 docstring（无可执行代码），扁平后无意义且会重名 → 丢弃
+        if name == "__init__.py":
+            return ""
+        return f"modules/{name}"
+    return rel
+
+
+def rewrite_for_flat(text: str, arc: str) -> str:
+    """把源码里的分层 import 改写为扁平包可用的 import（仅作用于 zip 内字节）。"""
+    # 1) runpy 薄壳与显式三级 import：modules.<pkg>.<mod> -> modules.<mod>
+    for pkg in FLAT_PKGS:
+        text = re.sub(rf"modules\.{pkg}\.([A-Za-z_][\w]*)", r"modules.\1", text)
+    # 2) 二级包导入：from modules.<pkg> import X -> from modules import X
+    for pkg in FLAT_PKGS:
+        text = re.sub(rf"from modules\.{pkg} import", "from modules import", text)
+        text = re.sub(rf"import modules\.{pkg}(?!\.)", "import modules", text)
+    # 3) paths.py：src() 的 glob 不再有子包目录；module() 的 pkg 轮询改直查 modules
+    if arc == "paths.py":
+        text = text.replace('MODULES.glob(f"*/{p.stem}.py")', 'MODULES.glob(f"{p.stem}.py")')
+        text = text.replace('return MODULES / "research" / "config.json"',
+                            'return MODULES / "config.json"')
+        old_loop = '''    for pkg in ("contracts", "research", "physics", "envscore", "engine", "board", "regress"):
+        full = f"modules.{pkg}.{dotted}"
+        try:
+            return importlib.import_module(full)
+        except ModuleNotFoundError as e:
+            if getattr(e, "name", "") != full:
+                raise  # 模块存在但内部依赖缺失，照实抛
+    return importlib.import_module(dotted)'''
+        new_loop = '''    # v10.31.0：zip 内已扁平为 modules/<name>.py，直接查 modules 包
+    full = f"modules.{dotted}"
+    try:
+        return importlib.import_module(full)
+    except ModuleNotFoundError as e:
+        if getattr(e, "name", "") != full:
+            raise  # 模块存在但内部依赖缺失，照实抛
+    return importlib.import_module(dotted)'''
+        if old_loop not in text:
+            fail("paths.module() 轮询结构与预期不符（源码升级后需同步扁平改写规则）")
+        text = text.replace(old_loop, new_loop)
+    # 4) __file__ 三级反推（原 modules/engine/x.py -> 根；扁平后 modules/x.py 少一层）
+    if "dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))" in text:
+        text = text.replace("dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))",
+                            "dirname(os.path.dirname(os.path.abspath(__file__)))")
+    return text
+
+
+def check_flat_no_collision(files):
+    """扁平后 modules/<name>.py 不得重名（__init__.py 已丢弃）。"""
+    seen: dict[str, str] = {}
+    for p in files:
+        arc = _flat_arcname(p)
+        if not arc or not arc.startswith("modules/"):
+            continue
+        if arc in seen and seen[arc] != p.as_posix():
+            fail(f"扁平化后模块重名: {arc} <- {seen[arc]} / {p}")
+        seen[arc] = p.as_posix()
+    info(f"扁平化名称检查通过（{len(seen)} 个模块无重名）")
+
+
 # ---- 7. 打包 -------------------------------------------------------------
 def build_zip(files):
     if DIST.exists():
@@ -290,11 +365,21 @@ def build_zip(files):
         version = m.group(1).strip().strip('"\'')
     out = DIST / f"{SKILL_NAME}-v{version}.zip"
     uncompressed = 0
+    skipped_init = 0
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as z:
         for p in files:
-            arc = f"{SKILL_NAME}/{p.relative_to(HERE).as_posix()}"
-            z.write(p, arc)
-            uncompressed += p.stat().st_size
+            flat_rel = _flat_arcname(p)
+            if not flat_rel:          # 丢弃各子包纯 docstring 的 __init__.py
+                skipped_init += 1
+                continue
+            arc = f"{SKILL_NAME}/{flat_rel}"
+            if p.suffix == ".py":
+                text = rewrite_for_flat(p.read_text(encoding="utf-8"), flat_rel)
+                z.writestr(arc, text)
+                uncompressed += len(text.encode("utf-8"))
+            else:
+                z.write(p, arc)
+                uncompressed += p.stat().st_size
     size = out.stat().st_size
     if size > MAX_ZIP_BYTES:
         out.unlink()
@@ -322,6 +407,12 @@ def verify_zip(out):
             fail(f"zip 顶层目录异常：{tops}")
         if f"{SKILL_NAME}/SKILL.md" not in names:
             fail("zip 内缺少 SKILL.md")
+        # v10.31.0：平台硬规则——zip 内路径最多 3 段（根/二级/文件）
+        deep = [n for n in names if len(n.split("/")) > 3]
+        if deep:
+            fail(f"zip 内目录层级超限（>{SKILL_NAME}/<二级>/<文件>）：{len(deep)} 条，"
+                 f"示例 {deep[:3]}")
+        info("目录层级检查通过（最多 根/二级/文件）")
         bad = []
         for n in names:
             if not n.endswith((".py", ".md", ".json", ".txt")):
@@ -349,6 +440,7 @@ def main():
         check_syntax(files)
         check_requirements()
         check_doc_script_refs(files)
+        check_flat_no_collision(files)
         out = build_zip(files)
         verify_zip(out)
     except ReleaseError as e:

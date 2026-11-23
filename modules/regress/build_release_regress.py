@@ -110,6 +110,17 @@ def run():
         # 2026-11-22 新增（事实源读取层），必须随包发布。
         check("产物不含 data/ 生成物缓存",
               not any(n.startswith("car-recommendation/data/") for n in names))
+        # v10.31.0：平台硬规则——zip 内路径最多 3 段（根/二级/文件）
+        check("产物目录层级≤3(v10.31)", all(len(n.split("/")) <= 3 for n in names),
+              f"超限 {sum(len(n.split('/'))>3 for n in names)} 条")
+        check("产物modules已扁平(无子包)", not any(
+            n.startswith("car-recommendation/modules/") and len(n.split("/")) > 3
+            for n in names))
+        check("产物含扁平核心模块", "car-recommendation/modules/leaderboard.py" in names
+              and "car-recommendation/modules/pipeline.py" in names)
+        check("产物无子包__init__", not any(
+            n.startswith("car-recommendation/modules/") and n.endswith("/__init__.py")
+            and len(n.split("/")) > 3 for n in names))
     else:
         check("实际产物存在", False, "请先运行 python build_release.py")
 

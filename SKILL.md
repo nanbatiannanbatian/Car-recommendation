@@ -13,7 +13,7 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 10.30.0
+version: 10.31.0
 author: "nanbatiannanbatian"
 ---
 
@@ -3686,3 +3686,10 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
 - **稳健通道（扩推荐口径不改分）**：`tiering.t1_robust` 配置化（enabled/min_dim=8.0/max_rank_span=5/max_rank_mean=7/label），`tier_rules` 解析并在 `tier_report` 实现：全8维≥8.0 + 名次区间≤5且均值≤7 + 无硬风险 + 除"进前三"外其余第一档门槛（证据A/碰撞实锤/月销≥2000/归一化稳）全过 → 入第一档标"安心首选·水桶无短板"。只豁免 rank_blockers 两条，不放水任何质量/证据门槛。默认关闭，仅显式启用品类生效。报告判档表加稳健通道行、T1 明细加标、页面三档卡片给徽标（summary.robust_t1）。
 - **回归**：新增 BUG-132（页面/判档同源取数+稳健通道配置/理论/老池触发不放水/v33页面维度分对齐/反向注入）+t132 探针；更新 t066（老池稳健通道合法扩 T1，原"T1不应放宽"断言改为"原两款主通道车仍在+稳健车带判据"）。全套 bug 130/130、注入 106/106、layout 16/16、midsuv 46/46、release 39/39、compare 20/20、router 32/32、selftest 全绿。
 - **指纹/产物**：leaderboard.py+pipeline.py 在指纹代码清单，重打三池 ccd8c169→7356e504；三榜重出 v33。本榜当前无全维≥8.0 车触发稳健通道（诚实：深蓝L06 判档智驾7.9<8.0 不勉强放宽），稳健通道已就位待未来合格车自动生效。
+
+## v10.31.0 · 发布 zip 目录层级修复（平台"两级目录"硬规则，2026-11-23）
+- 用户上传 `dist/car-recommendation-v10.30.0.zip` 到开放平台被拒：「目录层级超限——Skill 包仅支持两级目录结构（根目录/二级目录/文件）」。根因：v10.0 模块化后 zip 内 `car-recommendation/modules/<pkg>/x.py` 是 4 段（根/二级/三级/文件），平台最多 3 段。
+- **修法（源码树不动，只改打包脚本——编译式变换）**：`build_release.py` 新增 `_flat_arcname()` + `rewrite_for_flat()`，打包时把 `modules/<pkg>/x.py` 映射为 `modules/x.py`，并在 zip 内字节级改写：① `modules.<pkg>.<mod>`→`modules.<mod>`（import / runpy 薄壳 / 显式三级导入）；② `from modules.<pkg> import`→`from modules import`；③ `paths.module()` 的 pkg 轮询、`paths.src()` 的 `*/{stem}.py` glob、`MODULES/"research"/config.json`；④ 一处 `__file__` 三级反推；⑤ 各子包纯 docstring 的 `__init__.py` 丢弃（扁平后无意义且重名）。源码 357 处 import、6 大子包、GitHub 仓库全部不动。
+- **校验加码**：`verify_zip` 加"路径≤3段"硬检查；`check_flat_no_collision` 查扁平重名（100 模块无碰撞）；`build_release_regress` +4 项（层级≤3/modules已扁平/含扁平核心模块/无子包__init__），43/43 通过；反向注入对照证明检测非摆设。
+- **扁平包可运行实证**：解包到临时目录后 98 个模块导入全过（仅 lxml 缺依赖属环境非改写 bug）、核心 selftest（board_view/render/energy_router/space_consistency/value_residual）全绿、`paths.module()/src()` 动态解析正确、CLI 薄壳 `python board_view.py --selftest` 等正常。
+- **零分数影响**：纯发布链路改动，打分代码/权重/源码树不动（paths.py 源码未动，只在打包字节改写），指纹不变。三榜重出 v34 仅为页面版本号显示 v10.31.0，分数 0 差异。发布产物 `dist/car-recommendation-v10.31.0.zip` 为扁平结构、可上传。
