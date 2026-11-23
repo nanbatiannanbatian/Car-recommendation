@@ -1504,3 +1504,11 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
 - **抓到真实遗留 bug**：SKILL.md 第261行"完整版见 GitHub"旧表述（v10.33 残留）被体检抓出并修正为 references/evolution.md——证明工具不是摆设。
 - **第二层·提交钩子**：`install_hooks.py`（钩子唯一可写源，.git/hooks 不被 git 跟踪、重装跑一次）在 GitHub 仓库装 pre-commit：只跑 <1s 的 package_audit 源码检查，带 SKIP_AUDIT=1 逃生阀；**不跑 layout_regress**（仓库按零JSON策略无人工事实库、会误拦）、**不跑 bug_regression**（41s 太慢，显式命令出榜/发布前跑）。三场景实测：正常提交通过、注入死链被拦、SKIP_AUDIT 绕过成功，测试提交已回滚。
 - 效果评估：判定性核查从"靠AI每次手写一次性脚本"变"发布+提交自动守住"，零漏检可回归；judgment 类保持人工/AI 判断。零分数影响，指纹不变。
+
+## v10.41.0 排行榜简版/完整版视图切换（用户要求一目了然+一键切完整，2026-11-23）
+- 用户："排行榜能否简化，主要主榜+纯产品力榜一目了然，一键切完整版，让用户理解逻辑"。按页面渲染铁律先给方案、用户拍板：简版=导语+主榜+纯产品力+三档(用户选),页顶切换开关(用户选)。
+- 实现（纯展示层，零分数影响）：①`board_view.py` 加 `SIMPLE_VIEW_IDS={lede,main_board,product_power,tiers}` + `block_view()` 单一事实源；②`render_board_html.py` CSS 加 `.viewbar` 按钮/`.vblk[data-view]` 隐藏规则/导航 extra 隐藏，页顶注入切换条+提示文案，body 默认 `view-simple`，末尾加 `setBoardView()` JS（localStorage 记忆、打印时全展开）；③渲染后统一包装每段为 `<div class="vblk" data-view="core|extra" data-block="...">`（边界=h2锚点+fact_coverage哨兵，footer哨兵不包装）——不重写渲染流程、最小改动。
+- 关键辨析：简版导语已是一句话("打分主榜唯一权威、事实列不计分、产品力榜辅助")，正是"理解逻辑"的关键，不能只留两表不解释；三档保留让用户知道"能不能买"。
+- 踩坑：①初版 body 无 `view-simple` class→CSS 隐藏规则不生效，补上；②nav 里 extra 链接在简版仍显示会跳隐藏区块→加 `.navgrid a[data-view=extra]` 隐藏；③fact_coverage/lede 无 h2 无法自动分组→fact_coverage 加哨兵、lede 常驻(本就 core 语义)。
+- 验证：render selftest +9项(切换条/JS/默认简洁/CSS隐藏/core含主榜三档产品力/extra不误标/无哨兵残留)全绿；实生成榜静态验证 core=3块(main_board/tiers/product_power)、extra=10块、2个script块node --check全过；浏览器截图因大页超时改静态DOM验证。零分数影响，指纹不变。
+- 效果：简版首屏=两榜+一句话+三档，一目了然；点"完整"看全部18区块。三榜重出 v44 仅版本号。

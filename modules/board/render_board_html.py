@@ -48,6 +48,17 @@ border-radius:8px;padding:9px 11px;transition:border-color .15s,background .15s}
 .navgrid a b{display:block;font-size:13.5px;color:var(--accent2)}
 .navgrid a span{display:block;font-size:12px;color:var(--ink3);line-height:1.5;margin-top:2px}
 .topbar{text-align:right;font-size:12px;margin-top:8px}
+/* v10.41.0 简版/完整版视图切换：简版只显示 core 区块，完整版全显示 */
+.viewbar{display:flex;align-items:center;gap:8px;justify-content:flex-end;margin:14px 0 4px}
+.viewbar span{font-size:12px;color:var(--ink3);margin-right:2px}
+.viewbar button{font:13px/1.4 inherit;padding:6px 13px;border:1px solid var(--line);
+border-radius:18px;background:#fff;color:var(--ink2);cursor:pointer;transition:all .15s}
+.viewbar button:hover{border-color:var(--accent2)}
+.viewbar button.on{background:var(--accent2);border-color:var(--accent2);color:#fff;font-weight:600}
+body.view-simple .vblk[data-view="extra"]{display:none}
+body.view-simple .navgrid a[data-view="extra"]{display:none}
+.view-hint{font-size:12px;color:var(--ink3);margin:2px 0 10px;line-height:1.6}
+@media print{.viewbar{display:none}body.view-simple .vblk[data-view="extra"]{display:block}}
 .topbar a{color:var(--ink3);text-decoration:none}
 h2{scroll-margin-top:18px}
 h2{font-size:20px;margin:38px 0 6px;padding-bottom:9px;border-bottom:2px solid var(--line)}
@@ -309,13 +320,24 @@ def render(data, summary, title, as_of):
 
     head = f"""<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{e(title)} · 可信购车榜单</title><style>{CSS}</style></head><body><div class="wrap">
+<title>{e(title)} · 可信购车榜单</title><style>{CSS}</style></head><body class="view-simple"><div class="wrap">
 <div class="kicker">CAR-RECOMMENDATION · 统一榜单引擎 · 数据月 {e(as_of)}</div>
 <h1>{e(title)} <em>可信排行榜</em></h1>
 <div class="meta"><span>候选 <b>{len(rows)}</b> 款</span>
 <span>主榜口径 <b>{e(meta.get('primary', '8维加权打分榜'))}</b></span>
 <span>生成 <b>{datetime.now().strftime('%Y-%m-%d %H:%M')}</b></span></div>"""
     H = [head]
+
+    # ---- v10.41.0 视图切换条（页顶醒目）：简版默认，一键切完整版
+    H.append('<div class="viewbar" id="viewbar">'
+             '<span>视图：</span>'
+             '<button type="button" id="btn-simple" class="on" onclick="setBoardView(\'simple\')">简洁（默认）</button>'
+             '<button type="button" id="btn-full" onclick="setBoardView(\'full\')">完整（全部区块）</button>'
+             '</div>'
+             '<div class="view-hint" id="view-hint">'
+             '简洁视图 = 一句话导语 + 打分主榜 + 纯产品力总榜 + 三档分级；'
+             '点「完整」查看逐配置/总分构成/三电/取证/方法边界等全部内容。'
+             '</div>')
 
     # ---- v9.7.14 本榜导航：从 BLOCKS 单一来源生成，只列本次实际渲染的区块
     NAV_BY_TITLE = {
@@ -334,7 +356,9 @@ def render(data, summary, title, as_of):
         title_b = b["title"].replace("（下拉）", "").replace("（维度明细）", "")
         anchor = NAV_BY_TITLE.get(title_b, bid)
         desc = re.sub(r"多段全价位榜才有；|（下拉）|（维度明细）", "", b.get("desc") or "").strip()
-        nav_items.append(f'<a href="#sec-{anchor}"><b>{e(title_b)}</b><span>{e(desc)}</span></a>')
+        _v = BV.block_view(bid)
+        nav_items.append(f'<a href="#sec-{anchor}" data-view="{_v}">'
+                         f'<b>{e(title_b)}</b><span>{e(desc)}</span></a>')
     if nav_items:
         H.append('<div class="navbox" id="top"><h3>本榜导航 · 点击直达各部分</h3>'
                  '<div class="navgrid">' + "".join(nav_items) + '</div>'
@@ -369,6 +393,7 @@ def render(data, summary, title, as_of):
 
     # ---- 事实列覆盖披露
     if "fact_coverage" in ids:
+        H.append('<!--VB:fact_coverage-->')  # v10.41.0 视图包装哨兵（无 h2 的区块需显式标记）
         have, lack = BV.fact_coverage(meta, rows)
         if lack:
             H.append(f'<div class="rule">事实参考列覆盖：本榜有数据的是 <b>{e("、".join(have))}</b>；'
@@ -1104,9 +1129,25 @@ document.addEventListener('change',function(ev){
                 H.append(f"<li>{e(it if isinstance(it, str) else json.dumps(it, ensure_ascii=False))}</li>")
             H.append("</ul></div>")
 
+    H.append('<!--VB:__footer__-->')  # v10.41.0：footer 不参与视图包装
     H.append(f"""<div class="foot">可信购车榜单引擎 · 展示区块注册表 board_view.py（{len(active)} 项已渲染）<br>
 主榜调用 leaderboard.score_rows，事实列不计分、子榜复用分数均由 selftest 验证。</div>
-</div></body></html>""")
+</div>
+<script>
+// v10.41.0 简版/完整版切换：纯前端，不改数据/分数；记住用户选择。
+function setBoardView(v){{
+  document.body.classList.remove('view-simple','view-full');
+  document.body.classList.add('view-'+v);
+  var s=document.getElementById('btn-simple'), f=document.getElementById('btn-full');
+  if(s) s.className=(v==='simple'?'on':'');
+  if(f) f.className=(v==='full'?'on':'');
+  var h=document.getElementById('view-hint');
+  if(h) h.style.display=(v==='simple'?'':'none');
+  try{{localStorage.setItem('car_rank_view',v)}}catch(e){{}}
+}}
+(function(){{try{{if(localStorage.getItem('car_rank_view')==='full')setBoardView('full')}}catch(e){{}}}})();
+</script>
+</body></html>""")
     # v9.7.14：给每个 h2 加锚点 id（按标题文字匹配 BLOCKS，不依赖渲染顺序）
     def _add_anchor(m):
         inner = m.group(1)
@@ -1114,7 +1155,24 @@ document.addEventListener('change',function(ev){
         bid = NAV_BY_TITLE.get(first, "")
         return f'<h2 id="sec-{bid}">' + inner + '</h2>' if bid else m.group(0)
     H = [re.sub(r"<h2>(.*?)</h2>", _add_anchor, blk) if isinstance(blk, str) else blk for blk in H]
-    return "\n".join(H)
+    html = "\n".join(H)
+    # v10.41.0：统一包装每个区块为 <div class="vblk" data-view="core|extra">。
+    # 边界 = 有 h2 锚点的区块（sec-XXX）+ 无 h2 的哨兵（fact_coverage）；
+    # data-view 取自 board_view.block_view() 单一事实源。纯展示层包装，不碰任何数据。
+    boundaries = list(re.finditer(r'<!--VB:fact_coverage-->|<h2 id="sec-([A-Za-z_][\w]*)">', html))
+    if boundaries:
+        out = [html[:boundaries[0].start()]]
+        for i, m in enumerate(boundaries):
+            end = boundaries[i + 1].start() if i + 1 < len(boundaries) else len(html)
+            seg = html[m.start():end]
+            seg = re.sub(r'^<!--VB:fact_coverage-->', '', seg)
+            bid = m.group(1) or "fact_coverage"
+            view = BV.block_view(bid)
+            out.append(f'<div class="vblk" data-view="{view}" data-block="{bid}">{seg}</div>')
+        html = "".join(out)
+    # footer 哨兵不参与包装，但要去掉标记本身
+    html = html.replace('<!--VB:__footer__-->', '')
+    return html
 
 
 def selftest():
@@ -1171,6 +1229,19 @@ def selftest():
         ("跨价位提示·多段显示", "跨价位提示" in doc and "纯产品力总榜" in doc),
         ("跨价位提示·权重动态读取", "40.0%" in doc and "25.0%" in doc_w2 and "40.0%" not in doc_w2),
         ("跨价位提示·单价位不显示", "跨价位提示" not in single_doc),
+        # v10.41.0 简版/完整版视图：默认简洁、一键切完整、core/extra 分组来自单一事实源
+        ("视图切换条存在", 'id="viewbar"' in doc and 'btn-simple' in doc and 'btn-full' in doc),
+        ("视图切换JS存在", "function setBoardView" in doc and "setBoardView('full')" in doc),
+        ("视图默认简洁", 'body class="view-simple"' in doc),
+        ("视图CSS隐藏extra", 'body.view-simple .vblk[data-view="extra"]{display:none}' in CSS),
+        ("视图CSS隐藏extra导航", 'body.view-simple .navgrid a[data-view="extra"]{display:none}' in CSS),
+        ("视图core含主榜三档产品力", all(
+            f'data-view="core" data-block="{bid}"' in doc
+            for bid in ("main_board", "tiers", "product_power"))),
+        ("视图extra不误标核心", not any(
+            f'data-view="core" data-block="{bid}"' in doc
+            for bid in ("trim_compare", "score_breakdown", "method_boundary"))),
+        ("视图包装无哨兵残留", "<!--VB:" not in doc),
     ]
     # v10.15.7 智驾低权重提示回归：权重≤10%显示 / >10%不显示 / 权重动态读取（不写死百分比）
     _a1 = dict(data)

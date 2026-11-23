@@ -78,6 +78,16 @@ MAIN_BOARD_COLUMNS = [
 
 BLOCK_IDS = [b["id"] for b in BLOCKS]
 
+# v10.41.0：简版/完整版视图分组（用户要求"主榜+纯产品力榜一目了然，一键切完整版"）。
+# 简版 = 核心 4 块：一句话导语 + 打分主榜 + 纯产品力总榜 + 三档分级。
+# 这是展示层分组，不改数据/分数/report；完整版仍是全部 BLOCKS。
+SIMPLE_VIEW_IDS = frozenset({"lede", "main_board", "product_power", "tiers"})
+
+
+def block_view(bid: str) -> str:
+    """返回区块所属视图：'core'（简版+完整版都显示）/ 'extra'（仅完整版）。"""
+    return "core" if bid in SIMPLE_VIEW_IDS else "extra"
+
 # 契约：历史页面里「必要且数据可支撑」的区块，任何版本不得悄悄少渲染。
 REQUIRED_BLOCK_IDS = [
     "main_board", "score_breakdown", "tiers", "product_power",
