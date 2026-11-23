@@ -94,6 +94,8 @@ def check_links(texts: dict[str, str], names: set[str], results: list) -> None:
 # "用户照着敲"的命令（官方审核硬规则）；裸提到 xxx.py 是描述性引用（可能指向
 # 已废止脚本），不该判缺失。占位名 <候选池.json>/x.py 不算。
 PY_CMD_RE = re.compile(r"python3?\s+([\w\-]+\.py)")
+# 占位名不是真脚本：<xxx.py>/x.py/foo.py/bar.py 等示意名，排除
+PLACEHOLDER_SCRIPTS = {"xxx.py", "x.py", "foo.py", "bar.py", "your_script.py", "script.py"}
 
 
 def check_doc_code(texts: dict[str, str], py_names: set[str], results: list) -> None:
@@ -101,7 +103,7 @@ def check_doc_code(texts: dict[str, str], py_names: set[str], results: list) -> 
     for name, text in texts.items():
         for m in PY_CMD_RE.finditer(text):
             ref = m.group(1)
-            if ref not in py_names and ref not in missing:
+            if ref not in py_names and ref not in PLACEHOLDER_SCRIPTS and ref not in missing:
                 missing[ref] = name
     for ref, where in sorted(missing.items()):
         _check(results, f"文档命令脚本缺失:{ref}({where})", False)

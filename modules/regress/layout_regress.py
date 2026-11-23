@@ -30,7 +30,7 @@ HERE = str(paths.ROOT)
 sys.path.insert(0, HERE)
 
 PKGS = ("contracts", "data", "research", "physics", "envscore", "engine", "board", "regress")
-ROOT_INFRA = {"paths", "build_release", "sync_to_repo"}
+ROOT_INFRA = {"paths", "build_release", "sync_to_repo", "install_hooks"}  # v10.40: 钩子安装器是作者基础设施
 THIN_MAX_LINES = 25
 
 # 允许的包间依赖（只准向下）。未列出的边 = 违规。

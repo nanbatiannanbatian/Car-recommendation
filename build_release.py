@@ -66,6 +66,7 @@ EXCLUDE_FILES = {                                     # 文件名精确排除
     "key.txt",                # 疑似密钥
     "build_release.py",       # 打包脚本自身
     "sync_to_repo.py",        # 作者私用同步脚本，含本机仓库路径
+    "install_hooks.py",       # v10.40.0：作者私用钩子安装器，含本机仓库路径
 }
 EXCLUDE_GLOBS = ["*.bak", "*.bak-*", "*.tmp", "*.pyc", "*.orig",
                  # v6.0/v6.1 配置快照遗留，无任何代码/文档引用（已核实）；解压后共 223KB
