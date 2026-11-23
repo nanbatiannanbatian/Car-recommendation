@@ -1530,3 +1530,11 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
 - 修法：删 `body.view-simple .navbox{display:none}` CSS 一条；保留 `navgrid a[data-view="extra"]{display:none}`（简洁版导航只列当前可见核心区块，点导航不会跳到隐藏区块）。selftest 断言反转。
 - 验证：render selftest 全绿；实生成榜导航DOM在、无隐藏导航CSS、extra链接隐藏规则仍在；零分数影响，指纹不变。
 - 现状：简洁版=导语+主榜+产品力+三档+导航区(核心链接)；完整版=18区块+导航区(全部链接)。
+
+## v10.45.0 性价比价格口径错配根因修复（Model Y 虚高，2026-11-23）
+- 用户："Model Y 性价比这么高不可能，是公认低性价比车型，看哪里的问题，根因改"。
+- **根因（全池系统性，非个例）**：value_residual 的 ppw=产品力/价格，旧版分母取 `price_guide[0]` 区间最低价（Model Y 26.35 后驱 62.5kWh），分子 pf 反映主榜评分配置水平（28.85 长续航）——**分子分母不同配置**，ppw 虚高 0.298（vs 配置价 0.272）→ value 从 7.28 抬到 9.54（delta +0.762）。而候选池 note 明写"性价比三车最低（26.35万最贵+度数最小+智驾选装）"——**证据与公式结论直接矛盾**，内部一致性门禁没查这一项。18/20 款车是区间价，全被系统性影响。
+- 排查中验证并否决的伪根因：①产品力 pf 含高配口碑加成——实测 pf=7.85 就是候选池车系七维分，无高配加成，否决；②>25万档仅3款样本少——档均 0.280 偏低是表象，换全池锚会让便宜车全封顶/贵车全压 6.5，更糟，否决；③最低配价配最低配 pf——Model Y 最低配 pf 也是 7.85，无变化，否决。
+- 修法（用户选"保留分档+价格改配置价"）：`value_residual._ppw/apply/fit_bins` 加 `price_map` 参数（评分配置价优先，无则回退区间最低价，向后兼容）；pipeline 用 `trim_annotate.annotate_all` 本地算 best_trim 价传入（20/20 款拿到配置价）；`anchor_pool.extract` 存 `value_price_map` 快照，子榜复用保跨榜一致；审计字段加 `price_used`/`price_basis`。纯本地计算无网络。
+- **效果**：Model Y value 9.54→8.81（delta +0.762→+0.026 近中性），主榜名次 **5→9**，"强推"标去掉；真正高性价比车（海狮06EV/极狐T5/长安启源Q06/MONA L05）上位。候选池三份重打指纹（打分代码变更，纪律要求）；value_residual selftest +3b 根因断言、bug_regression 新增 t133/BUG-133（price_map生效+pipeline接入+锚点快照+Model Y<9+反向注入），131/131 全绿；layout/midsuv/compare/router 全绿。
+- 踩坑：指纹门禁在改打分代码后拦住出榜（正确行为）→用 score_fingerprint --stamp --config 重打三池；stamp 必须在所有代码改动定稿后做（selftest 断言写进 value_residual.py 又改了哈希，重打一次）。

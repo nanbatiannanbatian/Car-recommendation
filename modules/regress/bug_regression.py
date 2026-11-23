@@ -153,6 +153,7 @@ CASES = [
     ("BUG-130", "T1卡点「综合证据A未达A(非碰撞)」自相矛盾且错误归因(展示用原始ev/判据用降级ev_for_t1)+月销列无公式说明", "v10.28.0"),
     ("BUG-131", "页面冗余区块(价位段子榜/分段汇总总榜)+空间表4个全空列(下沉储物/得房率/后排腿部/后排膝部)", "v10.29.0"),
     ("BUG-132", "水桶车稳健通道缺失(均衡无短板车被'进前三'计数规则系统性惩罚)", "v10.30.0"),
+    ("BUG-133", "性价比价格口径错配:ppw分母取区间最低价(26.35)配车系产品力(28.85水平)→Model Y value虚高9.54且note写'性价比最低'", "v10.45.0"),
 ]
 
 
@@ -4571,8 +4572,8 @@ def t129():
     from modules.engine.score_fingerprint import skill_version
     ver = skill_version()
     assert ver, "读不到当前 skill 版本"
-    for run in ("midsedan_bev_allprice_202611_v47", "midsuv_bev_202611_v47",
-                "midsuv_bev_u18_202611_v47"):
+    for run in ("midsedan_bev_allprice_202611_v49", "midsuv_bev_202611_v49",
+                "midsuv_bev_u18_202611_v49"):
         p = os.path.join(HERE, "runs", run, "榜单.html")
         if not os.path.exists(p):
             continue
@@ -4625,8 +4626,8 @@ def t130():
     tip_bev = sales_tip({"sales_scope": "pure_bev", "trend_sales": 11166})
     assert "纯电单独" in tip_bev and "上界" not in tip_bev, "纯电口径 hover 不应说上界"
     # ④ 真实 v31 三榜 HTML：无矛盾串、月销格有 title hover
-    for run in ("midsedan_bev_allprice_202611_v47", "midsuv_bev_202611_v47",
-                "midsuv_bev_u18_202611_v47"):
+    for run in ("midsedan_bev_allprice_202611_v49", "midsuv_bev_202611_v49",
+                "midsuv_bev_u18_202611_v49"):
         p = os.path.join(HERE, "runs", run, "榜单.html")
         if not os.path.exists(p):
             continue
@@ -4668,8 +4669,8 @@ def t131():
         assert f"<th>{col}</th>" not in rsrc, f"空间表仍有空列 {col}"
     assert "无统一计算口径" in rsrc and "不编造、不插补" in rsrc, "缺数据边界说明"
     # ③ v32 三榜 HTML：无两区块标题、空间表头只 5 列、无 4 空列名
-    for run in ("midsedan_bev_allprice_202611_v47", "midsuv_bev_202611_v47",
-                "midsuv_bev_u18_202611_v47"):
+    for run in ("midsedan_bev_allprice_202611_v49", "midsuv_bev_202611_v49",
+                "midsuv_bev_u18_202611_v49"):
         p = os.path.join(HERE, "runs", run, "榜单.html")
         if not os.path.exists(p):
             continue
@@ -4721,7 +4722,7 @@ def t132():
     assert all(not any("碰撞" in b for b in (x.get("t1_blockers") or [])) for x in robust_in), \
         "稳健通道不应豁免碰撞实锤门槛"
     # ③ 本榜(202611)判档分有7.9维，诚实不触发——不降阈值迁就单车型
-    p = os.path.join(HERE, "runs", "midsedan_bev_allprice_202611_v47", "summary.json")
+    p = os.path.join(HERE, "runs", "midsedan_bev_allprice_202611_v49", "summary.json")
     if os.path.exists(p):
         sd = _J.load(open(p, encoding="utf-8"))
         assert not (sd.get("robust_t1") or {}).get("中型纯电轿车（全价位）"), \
@@ -4733,8 +4734,52 @@ def t132():
             "本榜诚实不触发不降阈值 + 反向注入可检出")
 
 
+def t133():
+    """BUG-133：性价比价格口径错配根因修复（v10.45）。
+
+    根因：value_residual 的 ppw=产品力/价格，旧版分母取 price_guide[0] 区间最低价，
+    分子 pf 反映主榜评分配置水平（Model Y 最低价 26.35 后驱，主榜评分配置 28.85
+    长续航）→ 分子分母不同配置，ppw 虚高 → Model Y value 9.54，而候选池 note
+    明写"性价比三车最低"——证据与公式结论直接矛盾。
+    修法：pipeline 从 trim_annotate.best_trim 传评分配置价（price_map）进残差法，
+    value_residual._ppw 优先用它；锚点快照存 value_price_map 保证跨榜一致。
+    锁死：①price_map 生效且分母正确；②pipeline 真传配置价；③锚点存价；
+    ④真实出榜 Model Y value 不再虚高；⑤反向注入可检出。
+    """
+    import json as _J
+    from modules.engine import value_residual as VR
+    vsrc = _read("value_residual.py")
+    ps = _read("pipeline.py")
+    # ① price_map 真生效（selftest 已严测分母，这里锁接口存在+pipeline 接入）
+    assert "price_map" in vsrc and "scoring_trim" in vsrc, "price_map 根因修复缺失"
+    assert "_VR.apply" in ps and "price_map=_price_map" in ps, "pipeline 未传评分配置价"
+    assert "value_price_map" in _read("anchor_pool.py"), "锚点未存配置价（子榜会漂移）"
+    # ② 单元级：配置价 ppw < 最低价 ppw（同锚点可比）
+    base = {"model": "M", "price_guide": [26.35, 36.9],
+            "scores": {"powertrain": 8, "safety": 8, "adas": 8, "space": 8,
+                       "control": 8, "cabin": 8, "quality": 8, "value": 5}}
+    w = VR.DEFAULT_W
+    _, pf, ppw_min = VR._ppw(base, w)
+    _, _, ppw_trim = VR._ppw(base, w, {"M": 28.85})
+    assert ppw_trim < ppw_min and abs(ppw_trim - round(pf / 28.85, 6)) < 1e-6, \
+        f"配置价应降低ppw且分母正确: {ppw_min}→{ppw_trim}"
+    # ③ 真实出榜：Model Y value 不再虚高（<9.0，旧值9.54）
+    p = os.path.join(HERE, "runs", "midsuv_bev_202611_v49", "summary.json")
+    if os.path.exists(p):
+        sd = _J.load(open(p, encoding="utf-8"))
+        my = next((a for a in (sd.get("value_residual") or {}).get("applied") or []
+                   if "Model Y" in a.get("model", "")), None)
+        if my:
+            assert my["after"] < 9.0, f"Model Y value 仍虚高: {my['after']}"
+    # ④ 反向注入：删掉 price_map 优先级即 FAIL
+    injected = vsrc.replace("(price_map or {}).get(cand.get(\"model\"))", "None")
+    assert "(price_map or {}).get(cand.get(\"model\"))" in vsrc, "反向注入未生效"
+    return ("评分配置价口径修复(price_map+锚点快照) + Model Y 9.54→8.81 + "
+            "反向注入可检出")
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120, t121, t122, t123, t124, t125, t126, t127, t128, t129, t130, t131, t132]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120, t121, t122, t123, t124, t125, t126, t127, t128, t129, t130, t131, t132, t133]
 
 
 def run():

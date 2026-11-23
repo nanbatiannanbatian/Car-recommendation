@@ -18,7 +18,9 @@
 
   「与同级均值的距离」落地为：
     · 产品力 pf = 其余七维（剔除 value 自身，避免重复计分）按权重归一的加权分；
-    · 每万元产品力 ppw = pf / 指导价；
+    · 每万元产品力 ppw = pf / 评分配置价（v10.45 根因修复：旧版用 price_guide[0]
+      区间最低价，与产品力的评分配置口径错配，Model Y 26.35后驱价配28.85长续航
+      产品力 → value 虚高 9.54，note 却写"性价比三车最低"）；
     · 价格档 bin = 固定边界（≤15 / 15-20 / 20-25 / >25 万）；
     · value = NEUTRAL + gain × (ppw / 本档 ppw 均值 − 1)，clamp 到 ±cap。
   即：同价位档内，单位价格买到的产品力高于本档均值 → 加分，低于 → 扣分。
@@ -88,22 +90,35 @@ def product_strength(cand: dict, weights: dict | None = None) -> float | None:
     return round(sum(float(vals[d]) * w[d] for d in w) / tw, 6)
 
 
-def _ppw(cand: dict, weights: dict | None = None) -> tuple[str | None, float | None, float | None]:
-    price = cand.get("price_guide")
-    price = float(price[0]) if isinstance(price, (list, tuple)) and price else (
-        float(price) if isinstance(price, (int, float)) else None)
+def _ppw(cand: dict, weights: dict | None = None,
+         price_map: dict | None = None) -> tuple[str | None, float | None, float | None]:
+    """每万元产品力。价格口径 v10.45 根因修复：
+
+    旧版取 price_guide[0]（区间最低价），但产品力 pf 反映主榜评分配置水平
+    （如 Model Y 主榜用 28.85 长续航，最低价却是 26.35 后驱）→ 分子分母不同配置，
+    ppw 虚高把 Model Y 的 value 抬到 9.54（note 却写"性价比三车最低"）。
+    现优先用 price_map[model]（pipeline 从 trim_annotate 的评分配置价传入），
+    与产品力同一配置；无映射时回退 price_guide[0]（兼容 selftest/外部直调）。
+    """
+    score_price = (price_map or {}).get(cand.get("model"))
+    price = (float(score_price) if isinstance(score_price, (int, float)) and score_price > 0 else None)
+    if price is None:
+        pg = cand.get("price_guide")
+        price = float(pg[0]) if isinstance(pg, (list, tuple)) and pg else (
+            float(pg) if isinstance(pg, (int, float)) else None)
     pf = product_strength(cand, weights)
     if pf is None or price is None or price <= 0:
         return None, pf, None
     return price_bin(price), pf, round(pf / price, 6)
 
 
-def fit_bins(cands: list[dict], weights: dict | None = None) -> dict:
+def fit_bins(cands: list[dict], weights: dict | None = None,
+             price_map: dict | None = None) -> dict:
     """从本池拟合各价格档 ppw 均值（全价位榜用；子榜改用 fixed_bins 快照）。"""
     by_bin: dict[str, list[float]] = {}
     detail = []
     for c in cands:
-        b, pf, ppw = _ppw(c, weights)
+        b, pf, ppw = _ppw(c, weights, price_map)
         if b and ppw is not None:
             by_bin.setdefault(b, []).append(ppw)
         detail.append({"model": c.get("model"), "bin": b, "pf": pf, "ppw": ppw})
@@ -118,18 +133,20 @@ def fit_bins(cands: list[dict], weights: dict | None = None) -> dict:
 
 
 def apply(cands: list[dict], weights: dict | None = None,
-          fixed_bins: dict | None = None) -> dict:
+          fixed_bins: dict | None = None, price_map: dict | None = None) -> dict:
     """原地覆盖 scores.value 为价格残差分；返回审计 report。
 
     fixed_bins: 全价位榜快照 {"bins": {...}, "pool_mean": float}，给定时跳过本池拟合
       （子榜用），保证同车 value 跨榜一致。
+    price_map: {model: 评分配置价}（v10.45 根因修复），让 ppw 分母与产品力同配置；
+      pipeline 从 trim_annotate.best_trim 传入，子榜用锚点快照时也要传同一份。
     """
-    fit = fit_bins(cands, weights)
+    fit = fit_bins(cands, weights, price_map)
     bins = dict(fit["bins"]) if not fixed_bins else dict(fixed_bins.get("bins") or {})
     pool_mean = fit["pool_mean"] if not fixed_bins else fixed_bins.get("pool_mean")
     applied = []
     for c in cands:
-        b, pf, ppw = _ppw(c, weights)
+        b, pf, ppw = _ppw(c, weights, price_map)
         if b is None or ppw is None:
             continue
         anchor = bins.get(b) or pool_mean
@@ -144,8 +161,12 @@ def apply(cands: list[dict], weights: dict | None = None,
         delta = delta_for(ppw, anchor)
         final = value_for(ppw, anchor, rdelta)
         scores["value"] = final
+        _used_price = (price_map or {}).get(c.get("model")) or (
+            c.get("price_guide")[0] if isinstance(c.get("price_guide"), (list, tuple))
+            and c.get("price_guide") else c.get("price_guide"))
         c["value_residual"] = {
             "status": "applied", "bin": b, "pf": round(pf, 3), "ppw": ppw,
+            "price_used": _used_price, "price_basis": "scoring_trim" if (price_map or {}).get(c.get("model")) else "range_min",
             "bin_mean_ppw": round(anchor, 6), "before": before, "after": final,
             "delta": round(delta, 3), "residual_delta": rdelta,
             "residual_rate": (rev or {}).get("rate"),
@@ -159,7 +180,8 @@ def apply(cands: list[dict], weights: dict | None = None,
     return {"status": "applied" if applied else "skipped", "n": len(cands),
             "covered": len(applied), "bins": bins, "pool_mean": pool_mean,
             "source": "fixed_anchor" if fixed_bins else "pool_fit",
-            "method": f"价格残差法：同价位档内每万元产品力相对档均的距离（gain={GAIN:g}, cap=±{CAP:g}, 中性={NEUTRAL:g}）",
+            "method": (f"价格残差法：同价位档内每万元产品力（分母=评分配置价）相对档均的距离"
+                       f"（gain={GAIN:g}, cap=±{CAP:g}, 中性={NEUTRAL:g}）"),
             "applied": applied}
 
 
@@ -213,6 +235,22 @@ def selftest() -> int:
     r = apply([c_hi, c_lo], w)
     assert r["covered"] == 2
     assert c_hi["scores"]["value"] > c_lo["scores"]["value"], "同档高产品力应价值分更高"
+    # 3b) v10.45 根因：price_map（评分配置价）必须覆盖 price_guide[0]（区间最低价）。
+    # Model Y 类：区间最低价配车系产品力 → ppw 虚高。给配置价后 ppw 必须按配置价算，
+    # 且低配价、高配价两车 ppw 不同（证明 price_map 真生效、不是摆设）。
+    _c = {"model": "测试车", "price_guide": [26.35, 36.9], "scores": dict(base["scores"])}
+    _b0, _pf0, _ppw0 = _ppw(_c, w)
+    _b1, _pf1, _ppw1 = _ppw(_c, w, {"测试车": 28.85})
+    assert _ppw1 < _ppw0, "配置价(28.85)的ppw应低于区间最低价(26.35)"
+    assert abs(_ppw1 - round(_pf0 / 28.85, 6)) < 1e-6, "price_map 分母应为配置价"
+    assert abs(_ppw0 - round(_pf0 / 26.35, 6)) < 1e-6, "无price_map应回退区间最低价"
+    _fixed = {"bins": {_b0: 0.30}, "pool_mean": 0.30}  # 同锚点才可比 value
+    _c1 = json.loads(json.dumps(_c))
+    _r0 = apply([_c1], w, fixed_bins=_fixed)
+    _c2 = json.loads(json.dumps(_c))
+    _r1 = apply([_c2], w, fixed_bins=_fixed, price_map={"测试车": 28.85})
+    assert _c2["value_residual"]["price_basis"] == "scoring_trim", "审计应记录配置价口径"
+    assert _r1["applied"][0]["after"] < _r0["applied"][0]["after"], "同锚点下配置价value应低于最低价value"
     # 4) 固定锚点：same cands 用不同子池拟合 vs 固定快照 → 同车同分
     snap = {"bins": r["bins"], "pool_mean": r["pool_mean"]}
     c_hi2 = json.loads(json.dumps(c_hi)); c_lo2 = json.loads(json.dumps(c_lo))

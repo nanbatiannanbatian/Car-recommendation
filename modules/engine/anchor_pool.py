@@ -55,13 +55,18 @@ def extract(summary: dict) -> dict | None:
     snap: dict = {"source_n": summary.get("in") if isinstance(summary.get("in"), int) else None,
                   "evidence_cap": {}, "range_median": None,
                   "efficiency": None, "space_tol": None, "space_caps": {},
-                  "rule_medians": {}, "value_bins": None}
+                  "rule_medians": {}, "value_bins": None, "value_price_map": {}}
 
     # 价值残差档均值（v10.17.0）：性价比改成同价位档内每万元产品力相对档均的距离，
     # 档均属榜内统计锚，子榜必须复用全价位快照，否则 12-18 万子池档均漂移→同车变分。
     vr = summary.get("value_residual") or {}
     if isinstance(vr.get("bins"), dict) and vr["bins"] and isinstance(vr.get("pool_mean"), (int, float)):
         snap["value_bins"] = {"bins": dict(vr["bins"]), "pool_mean": vr["pool_mean"]}
+    # v10.45：评分配置价快照——子榜 ppw 分母必须与全价位榜同配置，否则同车 value 漂移
+    snap["value_price_map"] = {
+        a["model"]: a["price_used"] for a in (vr.get("applied") or [])
+        if isinstance(a, dict) and a.get("model") and isinstance(a.get("price_used"), (int, float))
+    }
 
     # 证据封顶：dimension_cap(非 safety) + safety_cap
     dcaps = summary.get("dimension_cap") or []

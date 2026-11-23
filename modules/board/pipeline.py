@@ -586,13 +586,33 @@ def main():
     # 子榜从全价位固定快照读档均值（value_bins），保证同车跨榜同分。
     from modules.engine import value_residual as _VR
     _wv = {x["key"]: x["weight"] for x in cfg.get("dimensions", [])}
+    # v10.45 根因修复：ppw 分母必须用主榜评分配置价（与产品力同配置），
+    # 不能再用 price_guide[0] 区间最低价（Model Y 26.35后驱价配28.85长续航产品力 →
+    # value 虚高 9.54，而 note 写"性价比三车最低"）。评分配置价由 trim_annotate
+    # 本地确定性算出（读 trims.json，无网络）；无配置数据的车回退 range_min。
+    # 子榜从锚点快照读同一份 price_map，保证同车跨榜 value 一致。
+    _price_map = dict((_anchor or {}).get("value_price_map") or {})
+    if not _price_map:  # 全价位榜：本池算评分配置价
+        try:
+            from modules.engine import trim_annotate as _TA
+            _td = _TA.annotate_all(cands, cfg)
+            for _m, _tdm in _td.items():
+                _bt = next((t for t in (_tdm.get("trims") or [])
+                            if t.get("name") == _tdm.get("best_trim")), None)
+                if _bt and isinstance(_bt.get("price"), (int, float)) and _bt["price"] > 0:
+                    _price_map[_m] = float(_bt["price"])
+        except Exception as _e:
+            print(f"[性价比价格口径] 评分配置价解析失败({_e})，回退区间最低价")
     _vr_report = {"status": "skipped"}
     if not getattr(a, "no_value_residual", False):
         _vr_report = _VR.apply(cands, weights=_wv,
-                               fixed_bins=(_anchor or {}).get("value_bins"))
+                               fixed_bins=(_anchor or {}).get("value_bins"),
+                               price_map=_price_map)
+        _n_trim = sum(1 for c in cands if c.get("model") in _price_map)
         print(f"[性价比价格残差] 覆盖 {_vr_report['covered']}/{_vr_report['n']} 款（"
               f"J.D. Power 同级距离，固定档 {len(_vr_report['bins'])} 组"
-              + ("，读全榜锚点" if _anchor else "，本池拟合") + "）")
+              + ("，读全榜锚点" if _anchor else "，本池拟合")
+              + f"，评分配置价 {_n_trim}/{_vr_report['n']} 款）")
 
     # v9.7.43：同源车评分一致性门禁——同品牌/同价带/同词根的车，维度分差>1.5
     # 必须在 score_diff_reasons 登记事实理由，否则拦截。根治"证据不足被当成产品差"
