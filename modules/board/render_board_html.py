@@ -57,6 +57,7 @@ border-radius:18px;background:#fff;color:var(--ink2);cursor:pointer;transition:a
 .viewbar button.on{background:var(--accent2);border-color:var(--accent2);color:#fff;font-weight:600}
 body.view-simple .vblk[data-view="extra"]{display:none}
 body.view-simple .navgrid a[data-view="extra"]{display:none}
+body.view-simple .navbox{display:none}  /* v10.43 用户：简洁版去掉顶层导航，完整版保留 */
 .view-hint{font-size:12px;color:var(--ink3);margin:2px 0 10px;line-height:1.6}
 @media print{.viewbar{display:none}body.view-simple .vblk[data-view="extra"]{display:block}}
 .topbar a{color:var(--ink3);text-decoration:none}
@@ -335,7 +336,7 @@ def render(data, summary, title, as_of):
              '<button type="button" id="btn-full" onclick="setBoardView(\'full\')">完整（全部区块）</button>'
              '</div>'
              '<div class="view-hint" id="view-hint">'
-             '简洁视图 = 一句话导语 + 打分主榜 + 纯产品力总榜 + 三档分级 + 三电与补能 + 空间与储物；'
+             '简洁视图 = 一句话导语 + 打分主榜 + 纯产品力总榜 + 三档分级；'
              '点「完整」查看逐配置/总分构成/三电/取证/方法边界等全部内容。'
              '</div>')
 
@@ -1204,7 +1205,7 @@ def selftest():
              "rank_delta": 1, "price": 15.0}]},
     }
     doc = render(data, None, "T", "202610")
-    # v10.42：带三电/空间数据的扩展 fixture，测这两块的 h2 锚点与 core 视图包装
+    # v10.43：带三电/空间数据的扩展 fixture，测这两块的 h2 锚点与 extra 视图包装
     _ed = dict(data)
     _ed["energy_facts"] = {"A车": {"battery_kwh": 60, "cell": "CATL", "groups": {}},
                            "B车": {"battery_kwh": 75, "cell": "宁德", "groups": {}}}
@@ -1247,15 +1248,15 @@ def selftest():
         ("视图core含主榜三档产品力", all(
             f'data-view="core" data-block="{bid}"' in doc
             for bid in ("main_board", "tiers", "product_power"))),
-        # v10.42 用户追加：三电与补能/空间与储物进简版（映射函数单一源，实测数据块可能不在小 fixture）
-        ("视图core含三电与空间", BV.block_view("energy_facts") == "core"
-         and BV.block_view("space_facts") == "core"),
-        # core 区块必须有 h2 锚点（否则视图包装边界识别不到、会两版都显示）：
-        # 用带三电/空间数据的扩展 fixture 实测锚点 id 与 core 包装
-        ("三电空间h2锚点+core包装", all(
-            f'id="sec-{bid}"' in _energy_doc and f'data-view="core" data-block="{bid}"' in _energy_doc
+        # v10.43 用户改回：三电与补能/空间与储物移回完整版（extra），简版不含
+        ("视图三电与空间归extra", BV.block_view("energy_facts") == "extra"
+         and BV.block_view("space_facts") == "extra"),
+        ("三电空间h2锚点+extra包装", all(
+            f'id="sec-{bid}"' in _energy_doc and f'data-view="extra" data-block="{bid}"' in _energy_doc
             for bid in ("energy_facts", "space_facts"))),
-        ("视图提示含三电与空间", "三电与补能 + 空间与储物" in doc),
+        ("视图提示不含三电与空间", "三电与补能 + 空间与储物" not in doc),
+        # v10.43 简洁版隐藏顶层导航（完整版保留）
+        ("视图CSS隐藏顶层导航", 'body.view-simple .navbox{display:none}' in CSS),
         ("视图extra不误标核心", not any(
             f'data-view="core" data-block="{bid}"' in doc
             for bid in ("trim_compare", "score_breakdown", "method_boundary"))),

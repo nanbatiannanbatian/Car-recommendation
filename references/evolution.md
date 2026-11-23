@@ -1518,3 +1518,9 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
 - 修法：SIMPLE_VIEW_IDS 加 `energy_facts`/`space_facts`（简版 core 从 4 块→6 块：导语/主榜/产品力/三档/三电/空间）；视图提示文案同步；selftest 加映射断言+扩展 fixture 实测。
 - 踩坑（关键）：三电/空间的 h2 原本没有 `id="sec-XXX"` 锚点（NAV_BY_TITLE 缺这两项，历史遗留——导航也从不列它们），导致视图包装的边界正则识别不到这两块→它们不会带 data-view，会两版都显示。补 NAV_BY_TITLE 映射后实测 core=5块(有数据的榜)/6块(含导语)，三电空间正确归 core。selftest 加"h2锚点+core包装"断言防复发。
 - 验证：render selftest 全绿(+三电空间映射/锚点/core包装/提示文案)，实生成榜 core 含 energy_facts/space_facts、extra 11块正确排除。零分数影响，指纹不变。
+
+## v10.43.0 三电/空间移回完整版 + 简洁版隐藏顶层导航（2026-11-23）
+- 用户："三电与补能 + 空间与储物去掉，顶层导航也去掉"。确认范围：三电/空间从简版移回完整版；顶层导航**仅简洁版隐藏、完整版保留**(用户选)。
+- 修法：SIMPLE_VIEW_IDS 移除 energy_facts/space_facts(简版回到4块:导语/主榜/产品力/三档);视图提示文案去掉三电空间;CSS加 `body.view-simple .navbox{display:none}`(DOM仍在,切完整版即现);selftest断言反转(三电空间归extra/h2锚点+extra包装/提示不含/顶层导航CSS隐藏)。
+- 验证：render selftest 全绿;实生成榜 core=3块(导语常驻)/extra含三电空间;顶层导航DOM保留且简洁版隐藏CSS在、提示文案已去。零分数影响,指纹不变。
+- 效果：简洁版首屏=导语+两榜+三档、无导航卡片,真正一目了然;完整版=18区块+导航卡片全在。
