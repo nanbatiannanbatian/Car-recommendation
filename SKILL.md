@@ -13,7 +13,7 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 10.31.0
+version: 10.32.0
 author: "nanbatiannanbatian"
 ---
 
@@ -3693,3 +3693,12 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
 - **校验加码**：`verify_zip` 加"路径≤3段"硬检查；`check_flat_no_collision` 查扁平重名（100 模块无碰撞）；`build_release_regress` +4 项（层级≤3/modules已扁平/含扁平核心模块/无子包__init__），43/43 通过；反向注入对照证明检测非摆设。
 - **扁平包可运行实证**：解包到临时目录后 98 个模块导入全过（仅 lxml 缺依赖属环境非改写 bug）、核心 selftest（board_view/render/energy_router/space_consistency/value_residual）全绿、`paths.module()/src()` 动态解析正确、CLI 薄壳 `python board_view.py --selftest` 等正常。
 - **零分数影响**：纯发布链路改动，打分代码/权重/源码树不动（paths.py 源码未动，只在打包字节改写），指纹不变。三榜重出 v34 仅为页面版本号显示 v10.31.0，分数 0 差异。发布产物 `dist/car-recommendation-v10.31.0.zip` 为扁平结构、可上传。
+
+## v10.32.0 · 发布包瘦身（解压后 2474KB → 约 2200KB，留足 3MB 余量，2026-11-23）
+- 用户："文件大小快到 3M，看看哪些太大、怎么减少"。核查：解压后 2473.5KB（上限 3072KB，余量 598KB）、压缩后 973KB；平台按解压后校验（历史踩过坑，代码 MAX_UNCOMPRESSED_BYTES 已固化）。大头：.py 1897KB（146 文件，均为运行代码不可砍）、.md 567KB（8 文件）。
+- **三项瘦身（用户全选）**：
+  ① 打包时剥离两份文档的逐版演进史（SKILL 146KB + README 90KB = -236KB）：源码树完整保留演进（遵守"每次提交更新 README/SKILL"铁律、历史可审计），只在 zip 内字节裁剪到第一个 `## v9.0.0` 之前，末尾留"完整历史见 GitHub"指针。`strip_changelog()` + build_zip 接入；正文（能力/铁律/命令/边界）自包含，正文引用 33 脚本均随包。
+  ② README 顶部版本行精简（-19KB）：第 4 行原把 14 个"历史版本"说明串成 10782 字符巨行，改为只留当前版本说明 + "演进见下方章节/GitHub"，历史在演进段与仓库完好。
+  ③ 删 2 份零运行引用调研 md（-26KB）：`碰撞成绩核查报告.md`（0 引用）、`开源项目与数据源调研_20261120.md`（仅 SKILL.md 演进段背景提及，该段打包时已剥离）。源码树与包均删除。
+- **零分数影响**：纯文档/打包层，打分代码/权重/指纹不动。三榜重出 v35 仅为页面版本号显示 v10.32.0。
+- 回归：build/regress/docs selftest 全绿（详见当轮记录）。

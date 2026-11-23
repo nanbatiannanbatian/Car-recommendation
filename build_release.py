@@ -300,6 +300,27 @@ def _flat_arcname(p: Path) -> str:
     return rel
 
 
+def strip_changelog(text: str, arc: str) -> str:
+    """v10.32.0：打包时剥离 SKILL.md / README.md 的逐版本演进史（仅 zip 内字节）。
+
+    源码树保留完整演进（用户铁律：README/SKILL 要随每次提交更新、历史可审计）；
+    发布包不需要逐版流水账——正文（能力/铁律/命令/边界）已自包含，演进史放 GitHub 仓库。
+    剥离点 = 第一个 `## v9.0.0`（v9 之前的历史在两文件里都是按版本罗列）。
+    末尾留一行指针，说明完整演进史在仓库，绝不静默删除。
+    """
+    marker = "\n## v9.0.0"
+    idx = text.find(marker)
+    if idx < 0:
+        fail(f"{arc} 未找到演进史剥离点 '## v9.0.0'（文档结构升级后需同步此规则）")
+    head = text[:idx].rstrip()
+    repo = ("https://github.com/nanbatiannanbatian/Car-recommendation"
+            if arc == "README.md" else
+            "https://github.com/nanbatiannanbatian/Car-recommendation/blob/main/SKILL.md")
+    return head + (f"\n\n---\n\n> **版本演进史（v9.0.0 起）不在发布包内**："
+                   f"为控制平台 3MB 体积限制，逐版本变更记录已剥离；"
+                   f"完整历史见源码仓库 {repo}。正文能力/铁律/命令均完整保留。\n")
+
+
 def rewrite_for_flat(text: str, arc: str) -> str:
     """把源码里的分层 import 改写为扁平包可用的 import（仅作用于 zip 内字节）。"""
     # 1) runpy 薄壳与显式三级 import：modules.<pkg>.<mod> -> modules.<mod>
@@ -375,6 +396,11 @@ def build_zip(files):
             arc = f"{SKILL_NAME}/{flat_rel}"
             if p.suffix == ".py":
                 text = rewrite_for_flat(p.read_text(encoding="utf-8"), flat_rel)
+                z.writestr(arc, text)
+                uncompressed += len(text.encode("utf-8"))
+            elif flat_rel in ("SKILL.md", "README.md"):
+                # v10.32.0：发布包剥离逐版演进史（源码树完整保留，仅 zip 内字节裁剪）
+                text = strip_changelog(p.read_text(encoding="utf-8"), flat_rel)
                 z.writestr(arc, text)
                 uncompressed += len(text.encode("utf-8"))
             else:

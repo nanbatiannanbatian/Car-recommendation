@@ -84,6 +84,10 @@ def run():
         with zipfile.ZipFile(ZIP) as z:
             total = sum(i.file_size for i in z.infolist())
             names = set(z.namelist())
+            # v10.32.0：演进史剥离检查需在 with 内读（出块 zip 即关闭）
+            packed_docs = {d: z.read(f"car-recommendation/{d}").decode("utf-8", "ignore")
+                           for d in ("SKILL.md", "README.md")
+                           if f"car-recommendation/{d}" in names}
         check("实际产物解压后<3MB", total < MAX, f"{total/1024:.1f}KB")
         check("产物无历史污染数据", not any("v61polluted" in n or "v60before" in n for n in names))
         check("产物无回归测试脚本", not any(n.endswith(("_regress.py", "_regression.py")) for n in names))
@@ -121,6 +125,20 @@ def run():
         check("产物无子包__init__", not any(
             n.startswith("car-recommendation/modules/") and n.endswith("/__init__.py")
             and len(n.split("/")) > 3 for n in names))
+        # v10.32.0：发布包瘦身——演进史剥离 + 体积预算（留 >=800KB 余量）
+        if "SKILL.md" in packed_docs:
+            skill_packed = packed_docs["SKILL.md"]
+            check("产物SKILL无逐版演进段", not any(
+                l.startswith("## v9.") or l.startswith("## v10.") for l in skill_packed.splitlines()))
+            check("产物SKILL有仓库指针", "版本演进史" in skill_packed and "github.com" in skill_packed)
+        if "README.md" in packed_docs:
+            check("产物README无逐版演进段", not any(
+                l.startswith("## v9.") or l.startswith("## v10.")
+                for l in packed_docs["README.md"].splitlines()))
+        check("产物体积留>=800KB余量(v10.32)", total < (3072 - 800) * 1024,
+              f"解压后 {total/1024:.1f}KB")
+        check("产物无零引用调研md", not any(
+            "碰撞成绩核查" in n or "开源项目与数据源调研" in n for n in names))
     else:
         check("实际产物存在", False, "请先运行 python build_release.py")
 
