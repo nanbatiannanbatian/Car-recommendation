@@ -1490,3 +1490,9 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
 - 根治（撤销 v10.36 滚动窗口）：build_release.py 删除 EVOLUTION_KEEP_VERSIONS/rolling_crop_evolution/增长预警分支，references/evolution.md **完整随包**（88 版 v9.0.0–v10.38.0，156KB）。SKILL.md 指针改为"完整演进史随发布包携带、离线可查、无需访问外部仓库"。体积 2285→2364KB，仍远低于 3MB（余量 708KB）——自包含优先于省体积。
 - 门禁（回归反转）：release regress 把"滚动窗口<=30版/有仓库指针"改为"完整含 v9.x(>=50版)/包内版本数=源码树/含 4 个活跃标识符/SKILL 声明完整随包无外部依赖"→74/74。README 的 github 提及是中性"仓库亦有"（主源是随包 evolution.md），非依赖。
 - 教训：任何"包内指向外部仓库"的设计在官方市场分发场景都是死链；自包含 > 体积优化。零分数影响，指纹不变。
+
+## v10.39.0 · README 发布包精简（源码完整保留，2026-11-23）
+- 用户问"README能否简化或不上传"。核查：README 被打包白名单+3处回归硬依赖（bug_regression 两处 assert 非JSON运行文件不得排除、layout_regress 文档CLI检查、data_bootstrap selftest），**不能从白名单删**（删了回归挂、官方审核惯例也期待 README）。但包内 README 95KB/863行，其中"代码结构"段(v10.0-v10.2变更)与 v6-v10 章节已全部在 SKILL.md + references/detail.md + evolution.md 里重复，顶部还有未清干净的历史版本链 → 纯冗余。
+- 用户选"打包时大幅精简"。修法（延续编译式裁剪纪律，源码/GitHub 完整不动）：build_release 新增 `trim_readme()`，按章节标题前缀匹配只保留用户装包必看段（这是什么/安装/依赖/需要配置什么/上手几条命令/生成物重建）+ 精简版本行 + references 指针，删掉重复的详细段与历史链。包内 README 95.3KB→9.2KB，总包 2364→2280KB（余量 792KB）。
+- 踩坑：初版用章节标题精确匹配，漏了带括号补充的「依赖（别人怎么装）」「生成物重建（新装包首跑必看）」两段→改前缀匹配解决。
+- 回归：release regress +9项（6个保留段/精简<30KB/无版本链/有references指针）→83/83；包内 md 死链 0 条。零分数影响，指纹不变。

@@ -182,9 +182,18 @@ def run():
             for kw in ("价格残差法", "水桶车稳健通道", "数据时效体检", "固定锚", "联网优先"):
                 check(f"产物含能力关键词:{kw}", kw in skill_packed)
         if "README.md" in packed_docs:
+            rd_packed = packed_docs["README.md"]
             check("产物README无逐版演进段", not any(
                 l.startswith("## v9.") or l.startswith("## v10.")
-                for l in packed_docs["README.md"].splitlines()))
+                for l in rd_packed.splitlines()))
+            # v10.39.0：README 发布包精简——保留用户必看段，删掉与 SKILL/references 重复的详细段
+            for h in ("## 这是什么", "## 安装", "## 依赖", "## 需要配置什么",
+                      "## 上手几条命令", "## 生成物重建"):
+                check(f"产物README保留段:{h}", any(l.startswith(h) for l in rd_packed.splitlines()))
+            check("产物README精简(<30KB)", len(rd_packed.encode("utf-8")) < 30 * 1024,
+                  f"{len(rd_packed.encode('utf-8'))/1024:.1f}KB")
+            check("产物README无版本历史链", "v10.16.2（" not in rd_packed)
+            check("产物README有references指针", "references/evolution.md" in rd_packed)
         # v10.34.0：references/ 随包(完整演进史+详细手册)后体积升到 ~2353KB，
         # 余量 ~719KB 仍充足；门槛从 800KB 调到 600KB，但绝不放宽到临界。
         check("产物体积留>=600KB余量(v10.34)", total < (3072 - 600) * 1024,

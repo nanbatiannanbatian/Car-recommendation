@@ -310,6 +310,49 @@ def _flat_arcname(p: Path) -> str:
     return rel
 
 
+def trim_readme(text: str) -> str:
+    """v10.39.0：README 发布包精简（源码/GitHub 保留完整，仅 zip 内字节裁剪）。
+
+    包内 README 只需"用户装包后要看的": 标题/版本/这是什么/安装/依赖/配置/命令/生成物重建。
+    详细的模块结构与 v6–v10 变更记录已随包在 SKILL.md + references/detail.md + evolution.md，
+     README 再带一份是重复。按章节标题选取（非行号，抗源码漂移）。
+    """
+    lines = text.splitlines()
+    # 前缀匹配（标题可能带括号补充，如「依赖（别人怎么装）」）
+    keep_headings = ("## 这是什么", "## 安装", "## 依赖", "## 需要配置什么",
+                     "## 上手几条命令", "## 生成物重建")
+    # 标题区(1-4行: # 标题 + 简介 + 当前版本行)原样保留
+    head: list[str] = []
+    for l in lines[:6]:
+        head.append(l)
+        if l.startswith("> 无模型调用") and "当前版本" in l:
+            break
+    # 去掉 head 里可能混入的历史版本引用块(第5行起 > vX)
+    head = [l for l in head if not re.match(r'^>\s*v\d+\.\d+', l)]
+    # 按 ## 章节切块，只取保留章节
+    blocks: list[tuple[str, list[str]]] = []
+    cur: tuple[str, list[str]] | None = None
+    for l in lines:
+        if l.startswith("## "):
+            if cur:
+                blocks.append(cur)
+            cur = (l, [])
+        elif cur:
+            cur[1].append(l)
+    if cur:
+        blocks.append(cur)
+    kept: list[str] = []
+    for title, body in blocks:
+        if any(title.startswith(h) for h in keep_headings):
+            kept.append(title.rstrip())
+            kept.extend(body)
+    pointer = ["", "---", "",
+               "> 本 README 为发布包精简版。模块结构与逐版本变更的完整资料随包见 "
+               "`SKILL.md`、`references/detail.md`（详细能力）与 `references/evolution.md`（完整演进史）；"
+               "源码仓库亦有完整 README。"]
+    return '\n'.join(head + [""] + kept + pointer).rstrip() + '\n'
+
+
 def strip_changelog(text: str, arc: str) -> str:
     """v10.32.0→v10.34.0：打包时的文档处理（仅 zip 内字节）。
 
@@ -407,7 +450,12 @@ def build_zip(files):
                 text = rewrite_for_flat(p.read_text(encoding="utf-8"), flat_rel)
                 z.writestr(arc, text)
                 uncompressed += len(text.encode("utf-8"))
-            elif flat_rel in ("SKILL.md", "README.md"):
+            elif flat_rel == "README.md":
+                # v10.39.0：发布包 README 精简（源码/GitHub 保留完整，仅 zip 内字节裁剪）
+                text = trim_readme(p.read_text(encoding="utf-8"))
+                z.writestr(arc, text)
+                uncompressed += len(text.encode("utf-8"))
+            elif flat_rel == "SKILL.md":
                 # v10.32.0：发布包剥离逐版演进史（源码树完整保留，仅 zip 内字节裁剪）
                 text = strip_changelog(p.read_text(encoding="utf-8"), flat_rel)
                 z.writestr(arc, text)
