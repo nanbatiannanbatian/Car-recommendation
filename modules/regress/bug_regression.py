@@ -4570,8 +4570,8 @@ def t129():
     from modules.engine.score_fingerprint import skill_version
     ver = skill_version()
     assert ver, "读不到当前 skill 版本"
-    for run in ("midsedan_bev_allprice_202611_v35", "midsuv_bev_202611_v35",
-                "midsuv_bev_u18_202611_v35"):
+    for run in ("midsedan_bev_allprice_202611_v36", "midsuv_bev_202611_v36",
+                "midsuv_bev_u18_202611_v36"):
         p = os.path.join(HERE, "runs", run, "榜单.html")
         if not os.path.exists(p):
             continue
@@ -4624,8 +4624,8 @@ def t130():
     tip_bev = sales_tip({"sales_scope": "pure_bev", "trend_sales": 11166})
     assert "纯电单独" in tip_bev and "上界" not in tip_bev, "纯电口径 hover 不应说上界"
     # ④ 真实 v31 三榜 HTML：无矛盾串、月销格有 title hover
-    for run in ("midsedan_bev_allprice_202611_v35", "midsuv_bev_202611_v35",
-                "midsuv_bev_u18_202611_v35"):
+    for run in ("midsedan_bev_allprice_202611_v36", "midsuv_bev_202611_v36",
+                "midsuv_bev_u18_202611_v36"):
         p = os.path.join(HERE, "runs", run, "榜单.html")
         if not os.path.exists(p):
             continue
@@ -4667,8 +4667,8 @@ def t131():
         assert f"<th>{col}</th>" not in rsrc, f"空间表仍有空列 {col}"
     assert "无统一计算口径" in rsrc and "不编造、不插补" in rsrc, "缺数据边界说明"
     # ③ v32 三榜 HTML：无两区块标题、空间表头只 5 列、无 4 空列名
-    for run in ("midsedan_bev_allprice_202611_v35", "midsuv_bev_202611_v35",
-                "midsuv_bev_u18_202611_v35"):
+    for run in ("midsedan_bev_allprice_202611_v36", "midsuv_bev_202611_v36",
+                "midsuv_bev_u18_202611_v36"):
         p = os.path.join(HERE, "runs", run, "榜单.html")
         if not os.path.exists(p):
             continue
@@ -4720,7 +4720,7 @@ def t132():
     assert all(not any("碰撞" in b for b in (x.get("t1_blockers") or [])) for x in robust_in), \
         "稳健通道不应豁免碰撞实锤门槛"
     # ③ 本榜(202611)判档分有7.9维，诚实不触发——不降阈值迁就单车型
-    p = os.path.join(HERE, "runs", "midsedan_bev_allprice_202611_v35", "summary.json")
+    p = os.path.join(HERE, "runs", "midsedan_bev_allprice_202611_v36", "summary.json")
     if os.path.exists(p):
         sd = _J.load(open(p, encoding="utf-8"))
         assert not (sd.get("robust_t1") or {}).get("中型纯电轿车（全价位）"), \

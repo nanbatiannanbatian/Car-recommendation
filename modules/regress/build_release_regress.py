@@ -131,6 +131,10 @@ def run():
             check("产物SKILL无逐版演进段", not any(
                 l.startswith("## v9.") or l.startswith("## v10.") for l in skill_packed.splitlines()))
             check("产物SKILL有仓库指针", "版本演进史" in skill_packed and "github.com" in skill_packed)
+            # v10.33.0：v9+ 能力补写节必须随包（剥离演进史后能力说明不能一起丢）
+            check("产物含v9+能力补充节", "## 当前能力补充（v9–v10 沉淀" in skill_packed)
+            for kw in ("价格残差法", "水桶车稳健通道", "数据时效体检", "固定锚", "联网优先"):
+                check(f"产物含能力关键词:{kw}", kw in skill_packed)
         if "README.md" in packed_docs:
             check("产物README无逐版演进段", not any(
                 l.startswith("## v9.") or l.startswith("## v10.")
