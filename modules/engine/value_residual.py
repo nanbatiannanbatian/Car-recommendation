@@ -16,19 +16,24 @@
   （中型纯电 SUV），故只按价格档分组；经销商体验全缺、保值率仅 3/20 款有数据，
   不作合成因子，保值率仅作有数据车的既有微调（experience.residual_adjust）。
 
-  「与同级均值的距离」落地为：
+  v10.47 定性为「质价比」：每万元买到的产品力，全池一把尺子、不分价位档。
+  用户指出分档=不同车不同标准，且本池实测 pf 与价格无关（≤17万 pf=8.17 /
+  >22万 pf=8.03；Hedonic 回归系数 b=-0.0118≈0，残差法退化为纯产品力排名、失效），
+  故放弃分档与 Hedonic，改用全池统一锚。
+
+  落地为：
     · 产品力 pf = 其余七维（剔除 value 自身，避免重复计分）按权重归一的加权分；
     · 每万元产品力 ppw = pf / 评分配置价（v10.45 根因修复：旧版用 price_guide[0]
       区间最低价，与产品力的评分配置口径错配，Model Y 26.35后驱价配28.85长续航
       产品力 → value 虚高 9.54，note 却写"性价比三车最低"）；
-    · 价格档 bin = 固定边界（≤15 / 15-20 / 20-25 / >25 万）；
-    · value = NEUTRAL + gain × (ppw / 本档 ppw 均值 − 1)，clamp 到 ±cap。
-  即：同价位档内，单位价格买到的产品力高于本档均值 → 加分，低于 → 扣分。
-  这正是 J.D. Power「distance to peer-group average」的性价比化表达，
-  且全程由维度分 + 指导价复算，不依赖人工拍分。
+    · value = NEUTRAL + gain × (ppw / 全池 ppw 均值 − 1)，clamp 到 ±cap；
+      基准 8.0 中性，高者加分、低者扣分。
+  即：全池统一标准——单位价格买到的产品力高于全池均值 → 加分，低于 → 扣分。
+  因 pf 几乎不随价格涨，质价比天然偏向低价车（便宜车买到的每万元产品力更高），
+  这是口径的必然结果、不是 bug，页面与报告必须如实向用户写明。
 
-跨榜一致：档 ppw 均值属榜内统计锚，子榜必须从全价位榜固定快照取（anchor_pool
-  的 value_bins），否则 12-18 万子池档均漂移会让同车 value 变分。全榜自身本池现算。
+跨榜一致：全池 ppw 均值属榜内统计锚，子榜必须从全价位榜固定快照取（anchor_pool
+  的 value_bins.pool_mean），否则子池均值漂移会让同车 value 变分。全榜自身本池现算。
 
 契约：
   product_strength(cand, weights=None) -> float | None
@@ -149,7 +154,12 @@ def apply(cands: list[dict], weights: dict | None = None,
         b, pf, ppw = _ppw(c, weights, price_map)
         if b is None or ppw is None:
             continue
-        anchor = bins.get(b) or pool_mean
+        # v10.47 根因修复：统一质价比——全池一个锚（pool_mean），不再按价位档分档。
+        # 理由：本池七维产品力 pf 与价格几乎无关（实测 ≤17万 pf=8.17 / >22万 pf=8.03，
+        # Hedonic 回归系数 b=-0.0118≈0），分档只会让"贵车档均值低→贵车被抬分"，
+        # 且同一辆车落在不同档 get 不同 value = 不同标准。统一锚 = 每万元产品力
+        # 对全池均值的距离，全池一把尺子，Model Y(28.85万, ppw0.272)→6.5 触底。
+        anchor = pool_mean
         if not anchor or anchor <= 0:
             continue
         scores = c.setdefault("scores", {})
@@ -167,12 +177,12 @@ def apply(cands: list[dict], weights: dict | None = None,
         c["value_residual"] = {
             "status": "applied", "bin": b, "pf": round(pf, 3), "ppw": ppw,
             "price_used": _used_price, "price_basis": "scoring_trim" if (price_map or {}).get(c.get("model")) else "range_min",
-            "bin_mean_ppw": round(anchor, 6), "before": before, "after": final,
+            "bin_mean_ppw": round(anchor, 6), "anchor_scope": "pool", "before": before, "after": final,
             "delta": round(delta, 3), "residual_delta": rdelta,
             "residual_rate": (rev or {}).get("rate"),
             "source": "fixed_anchor" if fixed_bins else "pool_fit",
-            "basis": (f"J.D. Power 同级距离：{b} 每万元产品力 {ppw:.3f} / 档均 {anchor:.3f}"
-                      f" → {delta:+.2f}；中性档 {NEUTRAL:g}"
+            "basis": (f"质价比（全池统一）：每万元产品力 {ppw:.3f} / 全池均 {anchor:.3f}"
+                      f" → {delta:+.2f}；中性 {NEUTRAL:g}"
                       + (f"；保值率 {rev['rate']:g}% 微调 {rdelta:+.2f}" if rev else "")),
         }
         applied.append({"model": c.get("model"), "bin": b, "before": before,
@@ -180,8 +190,8 @@ def apply(cands: list[dict], weights: dict | None = None,
     return {"status": "applied" if applied else "skipped", "n": len(cands),
             "covered": len(applied), "bins": bins, "pool_mean": pool_mean,
             "source": "fixed_anchor" if fixed_bins else "pool_fit",
-            "method": (f"价格残差法：同价位档内每万元产品力（分母=评分配置价）相对档均的距离"
-                       f"（gain={GAIN:g}, cap=±{CAP:g}, 中性={NEUTRAL:g}）"),
+            "method": (f"质价比法（全池统一）：每万元产品力（分母=评分配置价）相对全池均值的距离"
+                       f"（gain={GAIN:g}, cap=±{CAP:g}, 中性={NEUTRAL:g}，不分价位档）"),
             "applied": applied}
 
 
@@ -235,6 +245,21 @@ def selftest() -> int:
     r = apply([c_hi, c_lo], w)
     assert r["covered"] == 2
     assert c_hi["scores"]["value"] > c_lo["scores"]["value"], "同档高产品力应价值分更高"
+    # 3a) v10.47 根因：全池统一锚——不同价位档的车共用同一个 pool_mean，
+    # 不再"高档均值低→贵车被抬分"。构造跨档两车：贵车 ppw 更低应 value 更低。
+    c_cheap = {"model": "便宜车", "price_guide": [10.0],
+               "scores": {**base["scores"], "powertrain": 9}}
+    c_pricey = {"model": "贵车", "price_guide": [30.0],
+                "scores": dict(base["scores"])}  # pf 更低 + 价更高 → ppw 必更低
+    _rr = apply([c_cheap, c_pricey], w)
+    assert _rr["covered"] == 2
+    _anchor_used = {c["model"]: c["value_residual"]["bin_mean_ppw"]
+                    for c in (c_cheap, c_pricey)}
+    assert _anchor_used["便宜车"] == _anchor_used["贵车"], \
+        f"全池统一锚必须同值: {_anchor_used}"
+    assert all(c["value_residual"]["anchor_scope"] == "pool" for c in (c_cheap, c_pricey))
+    assert c_cheap["scores"]["value"] > c_pricey["scores"]["value"], \
+        "统一锚下每万元产品力高者（便宜车）value 应更高"
     # 3b) v10.45 根因：price_map（评分配置价）必须覆盖 price_guide[0]（区间最低价）。
     # Model Y 类：区间最低价配车系产品力 → ppw 虚高。给配置价后 ppw 必须按配置价算，
     # 且低配价、高配价两车 ppw 不同（证明 price_map 真生效、不是摆设）。

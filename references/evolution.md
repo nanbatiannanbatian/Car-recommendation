@@ -1538,3 +1538,13 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
 - 修法（用户选"保留分档+价格改配置价"）：`value_residual._ppw/apply/fit_bins` 加 `price_map` 参数（评分配置价优先，无则回退区间最低价，向后兼容）；pipeline 用 `trim_annotate.annotate_all` 本地算 best_trim 价传入（20/20 款拿到配置价）；`anchor_pool.extract` 存 `value_price_map` 快照，子榜复用保跨榜一致；审计字段加 `price_used`/`price_basis`。纯本地计算无网络。
 - **效果**：Model Y value 9.54→8.81（delta +0.762→+0.026 近中性），主榜名次 **5→9**，"强推"标去掉；真正高性价比车（海狮06EV/极狐T5/长安启源Q06/MONA L05）上位。候选池三份重打指纹（打分代码变更，纪律要求）；value_residual selftest +3b 根因断言、bug_regression 新增 t133/BUG-133（price_map生效+pipeline接入+锚点快照+Model Y<9+反向注入），131/131 全绿；layout/midsuv/compare/router 全绿。
 - 踩坑：指纹门禁在改打分代码后拦住出榜（正确行为）→用 score_fingerprint --stamp --config 重打三池；stamp 必须在所有代码改动定稿后做（selftest 断言写进 value_residual.py 又改了哈希，重打一次）。
+
+## v10.47.0 性价比改全池统一质价比（不分价位档，2026-11-23）
+- 用户："性价比是不是理解成质价比更好，统一公式，什么价位段都一个标准；把描述写清楚给用户"。
+- 排查两轮：①查业内权威——J.D. Power 官方方法论确实是"按价格区间+尺寸分组，算与同组均值的距离"(即现有分档法的来源)；Consumer Reports 价值分=5年每英里成本+性能+可靠性合成；Hedonic回归(经济学50年、多国CPI质量调整)=特征隐含价值÷售价，真统一公式。
+- **实测否决 Hedonic(我上轮推荐错了)**：本池回归 pf=8.304−0.0118×价格，系数b≈0且为负——贵车产品力不更高(≤17万pf=8.17/>22万pf=8.03)。残差≈pf本身(不含价格)=纯产品力排名，Model Y残差−0.11→value7.7仍"中等"，失效。
+- 定案：**全池 ppw 统一锚**——每万元产品力(pf÷评分配置价)对全池均值的距离，全池一把尺子不分档。数学上 pf 不随价格涨时价格必是主导变量，便宜车质价比天然高——这是口径必然结果非bug，页面如实写明。
+- 修法：value_residual.apply 的 anchor 从 `bins.get(b)` 改 `pool_mean`（锚点参数 name保持兼容）；审计加 anchor_scope=pool、basis/basis文案改"质价比(全池统一)"；module docstring 重写；pipeline 注释与日志改口径；页面 lede 加醒目蓝框"质价比怎么算"(每万元产品力/全池统一不分档/±1.5封顶/8.0中性/同产品力价低者高/是公式必然非便宜车更好/买贵车看纯产品力榜)；render selftest +1 断言，bug_regression 新增 BUG-134(全池锚/跨档同锚/页面口径/Model Y delta触底/反向注入)。
+- **效果(v49分档→v50统一)**：Model Y 质价比delta +0.026→**−1.5触底**(最终value 7.28因保值率+1.5回补,J.D. Power resale因子真实存在),主榜名次 **9→14**；value最高从"MONA/极狐T5/Model Y第三"变成"MONA/大众ID/海狮06/零跑C10全9.5,Model Y出局"。分档时Model Y质价比排第3=用户最初质疑,统一后根治。
+- 回归：value_residual selftest +3a(跨档同锚),render selftest全绿,bug 132/132全绿;候选池三份重打指纹(打分代码变更);三榜v50出榜。零模型调用。
+- 踩坑：Model Y最终value由保值率回补不能断言after≤7,改断言delta触底——尊重J.D. Power resale设计。

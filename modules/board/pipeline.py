@@ -576,10 +576,11 @@ def main():
                  "\n→ 确认为口径差非错误时用 --skip-consistency-gate 并在报告说明。")
     print(f"[内部一致性门禁] {_ic['checked']} 款候选，note/结构字段矛盾 0")
 
-    # 性价比价格残差法（v10.17.0，用户要求参考 J.D. Power 同级距离）：
-    # 旧 value 是人工裁决分（名实不符=电池密度、不可复算）；改为按固定价格档分组，
-    # 用「每万元产品力」相对本档均值的距离复算 value。产品力取其余七维归一加权
-    # （剔除 value 自身避免重复计分），保值率仍作有数据车微调。
+    # 质价比法（v10.47：全池统一，不分价位档）：
+    # 旧 value 是人工裁决分（名实不符=电池密度、不可复算）；v10.17 改价格残差（分档），
+    # v10.47 用户指出分档=不同车不同标准，且实测本池产品力与价格无关（Hedonic b≈0），
+    # 故去掉分档、用「每万元产品力」相对全池均值的距离复算 value——全池一把尺子。
+    # 产品力取其余七维归一加权（剔除 value 自身避免重复计分），保值率仍作有数据车微调。
     # 必须在 sibling/安全门禁之前：新 value 要过同源车一致性校验；此时七维主体
     # （规则增量/体验/效率/达成率/软上限/证据封顶/空间校准）已定稿，仅差后续
     # airbags/ground_clearance 对 safety 的 ≤±0.3 微调（对 pf 影响<0.02）。
@@ -609,8 +610,8 @@ def main():
                                fixed_bins=(_anchor or {}).get("value_bins"),
                                price_map=_price_map)
         _n_trim = sum(1 for c in cands if c.get("model") in _price_map)
-        print(f"[性价比价格残差] 覆盖 {_vr_report['covered']}/{_vr_report['n']} 款（"
-              f"J.D. Power 同级距离，固定档 {len(_vr_report['bins'])} 组"
+        print(f"[质价比·全池统一] 覆盖 {_vr_report['covered']}/{_vr_report['n']} 款（"
+              f"每万元产品力对全池均值，不分价位档"
               + ("，读全榜锚点" if _anchor else "，本池拟合")
               + f"，评分配置价 {_n_trim}/{_vr_report['n']} 款）")
 
