@@ -14,7 +14,7 @@
   J.D. Power 不设单一「性价比」维度，而是先按价格档 + 尺寸分组，再取「车型属性
   与同级组均值的距离」，由质量可靠/驾驶体验/保值率/经销商体验合成。本榜尺寸已固定
   （中型纯电 SUV），故只按价格档分组；经销商体验全缺、保值率仅 3/20 款有数据，
-  不作合成因子，保值率仅作有数据车的既有微调（experience.residual_adjust）。
+  v10.49 起保值率不再混进 value，改为独立事实展示（residual_values.json 单一源）。
 
   v10.47 定性为「质价比」：每万元买到的产品力，全池一把尺子、不分价位档。
   用户指出分档=不同车不同标准，且本池实测 pf 与价格无关（≤17万 pf=8.17 /
@@ -63,7 +63,12 @@ BIN_EDGES = (15.0, 20.0, 25.0)
 BIN_LABELS = ("≤15万", "15-20万", "20-25万", ">25万")
 
 NEUTRAL = 8.0   # 与 J.D. Power「同级均值=80分」对齐（10 分制 8.0）
-GAIN = 12.0     # ppw 相对档均偏离 10% → ±1.2 分
+# v10.48 重标定：GAIN 从 12 降到 3。
+# 12 是分档时代标的（档内 ppw 波动小，偏离 10%→±1.2）；v10.47 改全池统一锚后
+# 全池 ppw 差 2.4 倍（0.231~0.565），GAIN=12 让 18/20 款触顶、分数挤成 9.5/6.5 两坨
+# （极狐T5 ppw0.535 与 海狮06 0.501 都被压成 9.5，差异消失）。
+# GAIN=3：0 款触顶、value 分布 6.6~8.9，T5 正确高于海狮06，Model Y 仍底部。
+GAIN = 3.0      # ppw 相对全池均偏离 ≈30% → ±0.9 分（跨月稳定，不触顶）
 CAP = 1.5       # 单维调整封顶，与 experience 单维 ±1.5 一致
 MIN_PEERS = 2   # 档内少于 2 款不设该档均值，回退全池均值
 
@@ -164,12 +169,13 @@ def apply(cands: list[dict], weights: dict | None = None,
             continue
         scores = c.setdefault("scores", {})
         before = scores.get("value")
-        # 保值率仍作有数据车的既有微调（J.D. Power resale 因子，覆盖不足照实披露）。
-        # 直接调单一真相源 residual_values.json，不读 experience 运行时字段，避免顺序耦合。
-        from modules.engine import experience_score as ES
-        rdelta, rev = ES.residual_adjust(c.get("model", ""))
+        # v10.49 根因修复：保值率不再混进"质价比"这一格。
+        # 用户看到 value 列以为是纯质价比，实为"质价比+保值微调"合成——
+        # 极狐T5 质价比 delta(0.667)>海狮06(0.434) 却因保值-0.31 最终分更低，用户误读。
+        # J.D. Power 的 resale 是独立 20% 维度，不该塞进单一 value 格。
+        # 保值率改为独立事实展示（residual_values.json 单一源），不再加分。
         delta = delta_for(ppw, anchor)
-        final = value_for(ppw, anchor, rdelta)
+        final = value_for(ppw, anchor)  # 不传 residual_delta
         scores["value"] = final
         _used_price = (price_map or {}).get(c.get("model")) or (
             c.get("price_guide")[0] if isinstance(c.get("price_guide"), (list, tuple))
@@ -178,12 +184,10 @@ def apply(cands: list[dict], weights: dict | None = None,
             "status": "applied", "bin": b, "pf": round(pf, 3), "ppw": ppw,
             "price_used": _used_price, "price_basis": "scoring_trim" if (price_map or {}).get(c.get("model")) else "range_min",
             "bin_mean_ppw": round(anchor, 6), "anchor_scope": "pool", "before": before, "after": final,
-            "delta": round(delta, 3), "residual_delta": rdelta,
-            "residual_rate": (rev or {}).get("rate"),
+            "delta": round(delta, 3),  # v10.49：保值率已剔除，residual_delta 不再进 value
             "source": "fixed_anchor" if fixed_bins else "pool_fit",
-            "basis": (f"质价比（全池统一）：每万元产品力 {ppw:.3f} / 全池均 {anchor:.3f}"
-                      f" → {delta:+.2f}；中性 {NEUTRAL:g}"
-                      + (f"；保值率 {rev['rate']:g}% 微调 {rdelta:+.2f}" if rev else "")),
+            "basis": (f"质价比（全池统一，不含保值）：每万元产品力 {ppw:.3f} / 全池均 {anchor:.3f}"
+                      f" → {delta:+.2f}；中性 {NEUTRAL:g}"),
         }
         applied.append({"model": c.get("model"), "bin": b, "before": before,
                         "after": final, "delta": round(delta, 3)})
@@ -205,16 +209,16 @@ def delta_for(ppw: float | None, bin_mean: float | None) -> float | None:
 
 def value_for(ppw: float | None, bin_mean: float | None,
               residual_delta: float = 0.0) -> float | None:
-    """纯函数：给定每万元产品力 + 本档均值 → value 分（两处共用的唯一口径）。
+    """纯函数：给定每万元产品力 + 全池均值 → 纯质价比分（两处共用的唯一口径）。
 
-    逐配置链路（trim_annotate）与车系链路（apply）都调它，杜绝「车系用残差、
-    逐配置仍用 kWh/万元」的口径分叉——后者曾让 with_config_scores 用 best_trim
-    覆盖回旧 value，造成同车跨榜 value 差 0.9（宋Ultra 9.5 vs 8.6）。
+    逐配置链路（trim_annotate）与车系链路（apply）都调它，杜绝口径分叉。
+    v10.49：residual_delta 参数保留仅为签名兼容（旧调用方仍传），但不再计入——
+    保值率是独立事实，不混进"质价比"这一格。
     """
     delta = delta_for(ppw, bin_mean)
     if delta is None:
         return None
-    return round(max(0.0, min(10.0, NEUTRAL + delta + (residual_delta or 0.0))), 2)
+    return round(max(0.0, min(10.0, NEUTRAL + delta)), 2)
 
 
 def summarize(report: dict) -> dict:
@@ -276,6 +280,11 @@ def selftest() -> int:
     _r1 = apply([_c2], w, fixed_bins=_fixed, price_map={"测试车": 28.85})
     assert _c2["value_residual"]["price_basis"] == "scoring_trim", "审计应记录配置价口径"
     assert _r1["applied"][0]["after"] < _r0["applied"][0]["after"], "同锚点下配置价value应低于最低价value"
+    # 3c) v10.49 根因：保值率不得混进 value——value_for 传 residual_delta 也应忽略
+    _pp = 0.5
+    _v_plain = value_for(_pp, 0.45)
+    _v_res = value_for(_pp, 0.45, residual_delta=0.31)
+    assert _v_plain == _v_res, "保值率不得改变质价比分（参数仅为签名兼容）"
     # 4) 固定锚点：same cands 用不同子池拟合 vs 固定快照 → 同车同分
     snap = {"bins": r["bins"], "pool_mean": r["pool_mean"]}
     c_hi2 = json.loads(json.dumps(c_hi)); c_lo2 = json.loads(json.dumps(c_lo))

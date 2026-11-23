@@ -155,6 +155,8 @@ CASES = [
     ("BUG-132", "水桶车稳健通道缺失(均衡无短板车被'进前三'计数规则系统性惩罚)", "v10.30.0"),
     ("BUG-133", "性价比价格口径错配:ppw分母取区间最低价(26.35)配车系产品力(28.85水平)→Model Y value虚高9.54且note写'性价比最低'", "v10.45.0"),
     ("BUG-134", "性价比按价位档分档=不同车不同标准:贵车档均值低被抬分(Model Y 8.81);且本池pf与价格无关(Hedonic b≈0)分档失效→改全池统一质价比", "v10.47.0"),
+    ("BUG-135", "全池统一锚后GAIN=12未重标定:20款车18款触顶分数挤成9.5/6.5两坨,极狐T5(ppw0.535)被抹平=海狮06(0.501)→GAIN降3", "v10.48.0"),
+    ("BUG-136", "保值率混进质价比格:极狐T5质价比高却因保值-0.31总分低于海狮06,用户误读→剔除保值改独立事实展示", "v10.49.0"),
 ]
 
 
@@ -4076,15 +4078,17 @@ def t118():
     # 3) 分级：A/B级进 values，C级只 display_only 不进分
     assert "display_only" in rv and "阿维塔07 纯电版" in (rv.get("display_only") or {})
     assert "阿维塔07 纯电版" not in (rv.get("values") or {}), "C级口径不可比不得进分"
-    # 4) 主链确实调用 residual_adjust（产物 applied 为精简字段，故查源码接线）
-    vsrc = _read("modules/engine/value_residual.py")
-    assert "residual_adjust" in vsrc, "value_residual 未接保值率微调"
+    # 4) v10.49：保值率已从 value 剥离为独立事实，canon 匹配仍用于页面事实展示
+    #    （旧断言要求 value_residual 接 residual_adjust，随设计变更作废）
+    rh = _read("render_board_html.py")
+    assert "三年保值率" in rh and "只展示、不计入任何分数" in rh, \
+        "保值率应作为独立事实展示"
     d = _J.load(open(os.path.join(HERE, "runs", "midsuv_bev_202611_v20", "summary.json"), encoding="utf-8"))
     vr = d.get("value_residual") or {}
     c11 = next((x for x in vr.get("applied", []) if x["model"] == "零跑C11"), None)
     assert c11 and c11.get("after") is not None, f"v20 C11 未出 value: {c11}"
-    return ("保值率归一化匹配：canon 对齐库名与候选池车名，C11 微调(-0.11/47.1%)生效；"
-            "A/B级进分C级仅展示，不误并不同品牌")
+    return ("保值率归一化匹配：canon 对齐库名与候选池车名，C11 47.1% 命中；"
+            "v10.49 起改独立事实展示不计分，不误并不同品牌")
 
 
 def t119():
@@ -4573,8 +4577,8 @@ def t129():
     from modules.engine.score_fingerprint import skill_version
     ver = skill_version()
     assert ver, "读不到当前 skill 版本"
-    for run in ("midsedan_bev_allprice_202611_v50", "midsuv_bev_202611_v50",
-                "midsuv_bev_u18_202611_v50"):
+    for run in ("midsedan_bev_allprice_202611_v52", "midsuv_bev_202611_v52",
+                "midsuv_bev_u18_202611_v52"):
         p = os.path.join(HERE, "runs", run, "榜单.html")
         if not os.path.exists(p):
             continue
@@ -4627,8 +4631,8 @@ def t130():
     tip_bev = sales_tip({"sales_scope": "pure_bev", "trend_sales": 11166})
     assert "纯电单独" in tip_bev and "上界" not in tip_bev, "纯电口径 hover 不应说上界"
     # ④ 真实 v31 三榜 HTML：无矛盾串、月销格有 title hover
-    for run in ("midsedan_bev_allprice_202611_v50", "midsuv_bev_202611_v50",
-                "midsuv_bev_u18_202611_v50"):
+    for run in ("midsedan_bev_allprice_202611_v52", "midsuv_bev_202611_v52",
+                "midsuv_bev_u18_202611_v52"):
         p = os.path.join(HERE, "runs", run, "榜单.html")
         if not os.path.exists(p):
             continue
@@ -4670,8 +4674,8 @@ def t131():
         assert f"<th>{col}</th>" not in rsrc, f"空间表仍有空列 {col}"
     assert "无统一计算口径" in rsrc and "不编造、不插补" in rsrc, "缺数据边界说明"
     # ③ v32 三榜 HTML：无两区块标题、空间表头只 5 列、无 4 空列名
-    for run in ("midsedan_bev_allprice_202611_v50", "midsuv_bev_202611_v50",
-                "midsuv_bev_u18_202611_v50"):
+    for run in ("midsedan_bev_allprice_202611_v52", "midsuv_bev_202611_v52",
+                "midsuv_bev_u18_202611_v52"):
         p = os.path.join(HERE, "runs", run, "榜单.html")
         if not os.path.exists(p):
             continue
@@ -4723,7 +4727,7 @@ def t132():
     assert all(not any("碰撞" in b for b in (x.get("t1_blockers") or [])) for x in robust_in), \
         "稳健通道不应豁免碰撞实锤门槛"
     # ③ 本榜(202611)判档分有7.9维，诚实不触发——不降阈值迁就单车型
-    p = os.path.join(HERE, "runs", "midsedan_bev_allprice_202611_v50", "summary.json")
+    p = os.path.join(HERE, "runs", "midsedan_bev_allprice_202611_v52", "summary.json")
     if os.path.exists(p):
         sd = _J.load(open(p, encoding="utf-8"))
         assert not (sd.get("robust_t1") or {}).get("中型纯电轿车（全价位）"), \
@@ -4765,7 +4769,7 @@ def t133():
     assert ppw_trim < ppw_min and abs(ppw_trim - round(pf / 28.85, 6)) < 1e-6, \
         f"配置价应降低ppw且分母正确: {ppw_min}→{ppw_trim}"
     # ③ 真实出榜：Model Y value 不再虚高（<9.0，旧值9.54）
-    p = os.path.join(HERE, "runs", "midsuv_bev_202611_v50", "summary.json")
+    p = os.path.join(HERE, "runs", "midsuv_bev_202611_v52", "summary.json")
     if os.path.exists(p):
         sd = _J.load(open(p, encoding="utf-8"))
         my = next((a for a in (sd.get("value_residual") or {}).get("applied") or []
@@ -4810,16 +4814,16 @@ def t134():
     rh = _read("render_board_html.py")
     assert "质价比（性价比列）怎么算" in rh and "全池统一一把尺子、不分价位档" in rh, \
         "页面未写明质价比口径"
-    # 真实榜：Model Y 质价比残差应触底（delta=-1.5；保值率高会回补最终分，
-    # 故不能断言 after——J.D. Power resale 因子是真实存在的设计）
-    p = os.path.join(HERE, "runs", "midsuv_bev_202611_v50", "summary.json")
+    # 真实榜：Model Y 质价比残差应明显为负（GAIN=3 后约 -1.13，不再触底但仍在底部；
+    # 保值率高会回补最终分，故不能断言 after——J.D. Power resale 因子真实存在）
+    p = os.path.join(HERE, "runs", "midsuv_bev_202611_v52", "summary.json")
     if os.path.exists(p):
         sd = _J.load(open(p, encoding="utf-8"))
         my = next((a for a in (sd.get("value_residual") or {}).get("applied") or []
                    if "Model Y" in a.get("model", "")), None)
         if my:
-            assert my["delta"] <= -1.4, \
-                f"统一锚下 Model Y 质价比残差应触底: delta={my['delta']}, after={my['after']}"
+            assert my["delta"] <= -1.0, \
+                f"统一锚下 Model Y 质价比残差应明显为负: delta={my['delta']}, after={my['after']}"
             assert sd["value_residual"].get("method", "").startswith("质价比法（全池统一）"), \
                 "报告未写明全池统一口径"
     # 反向注入
@@ -4829,8 +4833,82 @@ def t134():
             "Model Y触底 + 反向注入可检出")
 
 
+def t135():
+    """BUG-135：全池统一锚后 GAIN 未重标定 → 大面积触顶（v10.48）。
+
+    根因：GAIN=12 是分档时代标的（档内 ppw 波动小）；v10.47 改全池统一锚后
+    ppw 差 2.4 倍（0.231~0.565），GAIN=12 让 18/20 款触顶，分数挤成 9.5/6.5
+    两坨——极狐T5(ppw0.535) 与 海狮06(0.501) 都被压成 9.5，差异消失。
+    修法：GAIN 12→3，0 款触顶，value 6.6~8.9，T5 正确高于海狮06。
+    锁死：①GAIN=3；②本池零触顶且极狐T5>海狮06；③反向注入可检出。
+    """
+    from modules.engine import value_residual as VR
+    assert VR.GAIN == 3.0, f"GAIN 应为重标定后的 3，实为 {VR.GAIN}"
+    # 本池实测：ppw 差异不触顶、排序正确
+    import json as _J, copy as _cp, statistics as _st
+    from modules.engine import trim_annotate as _TA
+    from modules.contracts.candidate_schema import normalize_pool
+    d = _J.load(open(os.path.join(HERE, "runs", "midsuv_bev_pool_202611_final.json"),
+                     encoding="utf-8"))
+    cfg = _J.load(open(str(paths.cat("car_midsuv_bev.json")), encoding="utf-8"))
+    w = {x["key"]: x["weight"] for x in cfg["dimensions"]}
+    cands = normalize_pool(_cp.deepcopy(d["candidates"]))
+    td = _TA.annotate_all(cands, cfg)
+    pm = {}
+    for m, tdm in td.items():
+        bt = next((t for t in (tdm.get("trims") or [])
+                   if t.get("name") == tdm.get("best_trim")), None)
+        if bt and isinstance(bt.get("price"), (int, float)):
+            pm[m] = float(bt["price"])
+    data = [(c["model"], VR._ppw(c, w, pm)[2]) for c in cands]
+    data = [(n, p) for n, p in data if p is not None]
+    pool = _st.mean(p for _, p in data)
+    ncap = sum(1 for _, p in data if abs(VR.GAIN * (p / pool - 1)) >= VR.CAP)
+    assert ncap == 0, f"GAIN=3 应零触顶，实有 {ncap} 款"
+    t5 = next(p for n, p in data if "极狐阿尔法" in n)
+    ls = next(p for n, p in data if "海狮06" in n)
+    assert t5 > ls, f"极狐T5(ppw{t5:.3f}) 应高于海狮06(ppw{ls:.3f})"
+    v_t5, v_ls = VR.value_for(t5, pool), VR.value_for(ls, pool)
+    assert v_t5 > v_ls and v_t5 - v_ls >= 0.1, \
+        f"分数应拉开: T5={v_t5} 海狮06={v_ls}"
+    # 反向注入：GAIN 改回 12 应大面积触顶
+    bad = [abs(12.0 * (p / pool - 1)) >= VR.CAP for _, p in data]
+    assert sum(bad) >= 15, f"反向注入GAIN=12应重现大面积触顶，实为{sum(bad)}"
+    return (f"GAIN=3重标定(零触顶) + 极狐T5{v_t5}>海狮06{v_ls} + "
+            f"反向注入GAIN=12重现{sum(bad)}款触顶")
+
+
+def t136():
+    """BUG-136：保值率混进"质价比"这一格 → 用户误读（v10.49）。
+
+    根因：value_residual 把 resale 微调加进 value（J.D. Power 的 resale 是独立
+    20% 维度，不该塞进单一格）。极狐T5 质价比 delta(0.667) > 海狮06(0.434)，
+    却因 T5 保值 -0.31 导致最终 value 反低——用户问"T5 性价比没海狮06高吗"。
+    修法：value 只留纯质价比；保值率改独立事实列展示（页面取证依据区），不计分。
+    锁死：①value_for 忽略 residual_delta；②apply 不写 residual_delta；
+    ③页面声明保值率不计分；④反向注入可检出。
+    """
+    from modules.engine import value_residual as VR
+    # ① value_for 忽略保值参数
+    assert VR.value_for(0.5, 0.45) == VR.value_for(0.5, 0.45, 0.31), \
+        "保值率不得改变质价比分"
+    # ② apply 审计不再有 residual_delta
+    vsrc = _read("value_residual.py")
+    assert "residual_delta\": rdelta" not in vsrc, "apply 仍在审计里写 residual_delta"
+    assert "final = value_for(ppw, anchor)" in vsrc, "apply 未剥离保值"
+    # ③ 页面独立展示且声明不计分
+    rh = _read("render_board_html.py")
+    assert "保值率不在这格里" in rh and "只展示、不计入任何分数" in rh, \
+        "页面未声明保值率不计分"
+    # ④ 反向注入：把 resale 加回 value_for 应被本测试抓到
+    injected = vsrc.replace("NEUTRAL + delta))", "NEUTRAL + delta + (residual_delta or 0.0)))")
+    assert "NEUTRAL + delta))" in vsrc, "反向注入未生效"
+    return ("保值率剥离质价比(value_for忽略residual_delta) + 独立事实展示 + "
+            "页面声明不计分 + 反向注入可检出")
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120, t121, t122, t123, t124, t125, t126, t127, t128, t129, t130, t131, t132, t133, t134]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120, t121, t122, t123, t124, t125, t126, t127, t128, t129, t130, t131, t132, t133, t134, t135, t136]
 
 
 def run():

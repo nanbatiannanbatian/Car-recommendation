@@ -395,9 +395,11 @@ def render(data, summary, title, as_of):
                  '<div class="rule" style="background:#f0f6f8;border-left-color:#1f6f8b">'
                  '<b>质价比（性价比列）怎么算：</b>每万元买到的产品力 '
                  '= 七维产品力（剔除价格本身）÷ 该车评分配置指导价，'
-                 '<b>全池统一一把尺子、不分价位档</b>——高于全池平均加分、低于扣分（±1.5 封顶，8.0 为中性）。'
+                 '<b>全池统一一把尺子、不分价位档</b>——高于全池平均加分、低于扣分（8.0 为中性，'
+                 '按偏离幅度平滑给分、极端才封顶 ±1.5，本池实测落在 6.6–8.9）。'
                  '因为产品力分数基本不随价格增长，<b>同产品力下价格越低质价比越高</b>，'
                  '这是公式的必然结果而非便宜车「更好」；买贵车请改看「纯产品力总榜」（不看价格比硬件）。'
+                 '<b>保值率不在这格里</b>（它是持有成本不是产品力，只在「逐车取证依据」展示、不计分）。'
                  '分数由维度分与指导价复算，不用人工拍分。</div>')
 
     # ---- 事实列覆盖披露
@@ -1017,7 +1019,21 @@ document.addEventListener('change',function(ev){
 
     # ---- 逐车取证依据（历史有、v8.x 漏掉，v9.0 补回）
     if "evidence_notes" in ids:
-        H.append("<h2>逐车取证依据 <span>取证要点 / 证据等级 / 销量口径 · 可逐条质疑</span></h2>")
+        # v10.49：保值率从 value 列剥离，改为这里的事实展示（不参与任何打分）
+        _residual: dict = {}
+        try:
+            from modules.engine import experience_score as _ES
+            from modules.contracts.model_names import canon as _canon
+            _rv = _ES.load_residual_values()
+            for _name, _rate in (_rv.get("values") or {}).items():
+                if isinstance(_rate, (int, float)):
+                    _residual[_canon(_name)] = _rate
+        except Exception:
+            _residual = {}
+        H.append("<h2>逐车取证依据 <span>取证要点 / 证据等级 / 销量口径 · 可逐条质疑</span></h2>"
+                 '<div class="rule">保值率为独立事实列（中国汽车流通协会×精真估三年口径），'
+                 '<b>只展示、不计入任何分数</b>——它不是产品力，是持有成本的市场结果；'
+                 '无数据的车如实留空、不插补。</div>')
         H.append("<table><thead><tr><th style='text-align:left'>车型</th><th>证据</th>"
                  "<th style='text-align:left'>取证要点与事实</th></tr></thead><tbody>")
         grades = BV.fact_grades(rows)
@@ -1036,6 +1052,11 @@ document.addEventListener('change',function(ev){
                     extras.append(f'<i style="color:{BV.grade_color(g)}">{e(k)} {e(txt)}（上界）</i>')
                 else:
                     extras.append(f"{e(k)} {e(txt)}")
+            # v10.49：保值率作为事实展示（不计分），有数据才显示
+            from modules.contracts.model_names import canon as _canon2
+            _rv_rate = _residual.get(_canon2(r.get("model") or ""))
+            if isinstance(_rv_rate, (int, float)):
+                extras.append(f'<b style="color:#1f6f8b">三年保值率 {_rv_rate:g}%（仅展示·不计分）</b>')
             detail = e(note) + (f"<br><span style='color:#7b8590'>{' · '.join(extras)}</span>"
                                 if extras else "")
             H.append(f"<tr><td class='name'>{e(r.get('model'))}</td><td>{e(r.get('evidence'))}</td>"
@@ -1271,6 +1292,9 @@ def selftest():
         ("页面写明质价比口径", "质价比（性价比列）怎么算" in doc
          and "全池统一一把尺子、不分价位档" in doc
          and "每万元买到的产品力" in doc),
+        # v10.49 保值率剥离：页面声明不计分
+        ("页面声明保值率不计分", "保值率不在这格里" in doc
+         and "只展示、不计入任何分数" in doc),
     ]
     # v10.15.7 智驾低权重提示回归：权重≤10%显示 / >10%不显示 / 权重动态读取（不写死百分比）
     _a1 = dict(data)
