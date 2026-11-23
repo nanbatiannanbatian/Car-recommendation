@@ -157,6 +157,9 @@ CASES = [
     ("BUG-134", "性价比按价位档分档=不同车不同标准:贵车档均值低被抬分(Model Y 8.81);且本池pf与价格无关(Hedonic b≈0)分档失效→改全池统一质价比", "v10.47.0"),
     ("BUG-135", "全池统一锚后GAIN=12未重标定:20款车18款触顶分数挤成9.5/6.5两坨,极狐T5(ppw0.535)被抹平=海狮06(0.501)→GAIN降3", "v10.48.0"),
     ("BUG-136", "保值率混进质价比格:极狐T5质价比高却因保值-0.31总分低于海狮06,用户误读→剔除保值改独立事实展示", "v10.49.0"),
+    ("BUG-137", "生命周期两套渲染路径分裂:HTML原样透传候选池字段18台车显示「—」/MD走确证层显示「在售」+两套标签表漂移(LC_LABEL 6键/LIFECYCLE_STATUS_CN 15键)+MD列名仍叫「周期」+t035假断言", "v10.50.0"),
+    ("BUG-138", "电池来源列电压V丢显:BUG-127归一charge纯电压文本→voltage_v后渲染层三级取数没同步(MONA L05/腾势N7主榜无V、逐配置列与JS下拉同病)", "v10.50.0"),
+    ("BUG-139", "电芯联网核验本地链与显示层口径不一致:核验层只查fact_library/fact_ref/trims,候选池cell_brand与master_pool不在链上(池有品牌仍判unavailable走联网)+查询式被占位配置名稀释", "v10.50.0"),
 ]
 
 
@@ -650,16 +653,33 @@ def t036():
     return "电压/快充全量采集，配置级差异体现"
 
 def t035():
-    """主榜与逐配置表不得有异常空白；真缺口要标未披露。"""
+    """主榜与逐配置表不得有异常空白；真缺口要标未披露；生命周期列无空值/无英文直出。
+
+    v10.50.0 由假断言升级为真断言：旧版只断言行数≥16，「主榜周期列无空」名存实亡
+    ——HTML 18 台无标注车显示「—」而门禁/回归均未报警（用户问「周期-是什么」的根因）。
+    """
+    from modules.board import board_view as BV
+    from modules.engine import leaderboard as LB
+    from modules.engine import lifecycle_confirm as LCF
+    # ① 确证层默认：无标注车 resolve 后主榜周期列有中文值，不出现「—」/英文
+    for status in (None, "", "active", "new_launch", "facelift_pending", "stopped"):
+        lc = LB.lifecycle_of({"model": "X", "lifecycle": ({"status": status} if status else None)})
+        cell = BV.main_cell("period", {"lifecycle": lc}, {"model": "X"})
+        assert cell and cell != "—" and cell.strip(), f"周期列空值: {status!r} → {cell!r}"
+        assert not re.search(r"[a-z_]{3,}", cell), f"周期列英文直出: {status!r} → {cell!r}"
+    # ② 未映射状态原样透传（门禁负责拦，不静默吞）——负向语义锁死
+    assert BV.lifecycle_status_cn("wild_status") == "wild_status"
+    # ③ 标签表 SSOT：覆盖 admit 闸门认的 stopped（此前两表都不认识，闸门口径脱节）
+    assert LCF.LIFECYCLE_CN.get("stopped") == "已停产"
+    assert "LIFECYCLE_CN" in _read("lifecycle_confirm.py"), "标签SSOT未落在确证层"
+    # ④ 逐配置表：电芯继承标注 + 快充缺口标未披露（既有契约保留）
     p = os.path.join(HERE, "runs", "compact_bev_extended_202610", "榜单.html")
     if os.path.exists(p):
         t = _read("runs/compact_bev_extended_202610/榜单.html")
-        # 主榜周期列无空
-        assert t.count("data-model") >= 16, "主榜行数不足"
-        # 逐配置表：电芯继承标注 + 快充缺口标未披露
+        m = re.search(r"<h2[^>]*>逐配置对比.*?(?=<h2|$)", t, re.S)
+        assert "未披露" not in (m.group(0) if m else ""), "逐配置仍有未披露快充"
         assert ">车系<" in t, "电芯车系继承标缺失"
-        assert "基准配置（无配置级差异）" in t
-    return "全字段显示自检通过"
+    return "周期列无空值/无英文直出 + 标签SSOT含stopped + 逐配置缺口标未披露"
 
 def t034():
     """电池来源列必须展示事实库电芯；best_trim.cell_supplier=null 不能吞掉回退。"""
@@ -4907,8 +4927,118 @@ def t136():
             "页面声明不计分 + 反向注入可检出")
 
 
+def t137():
+    """BUG-137：生命周期两套渲染路径分裂 + 两套标签表漂移 + MD 列名「周期」（v10.50.0）。
+
+    根因：board_v2.build 原样透传候选池 lifecycle 字段（不经 lifecycle_confirm.resolve），
+    18 台无标注车 HTML 显示「—」而 MD 走 resolve 默认 active 显示「在售」，同一车两产物
+    自相矛盾；leaderboard.LC_LABEL（6 键）与 board_view.LIFECYCLE_STATUS_CN（15 键）
+    互不同步（同状态两种文案、MD 侧漏 on_sale/steady 映射=英文直出漏洞）；
+    admit 闸门认 "stopped" 但两表都不认识。
+    修法：标签表单一事实源移到 lifecycle_confirm.LIFECYCLE_CN（两处引用别名）；
+    board_v2.build 统一走 LB.lifecycle_of；MD 表头「周期」→「生命周期状态」；
+    中文化门禁同时校验确证库条目状态值。
+    """
+    from modules.board import board_view as BV
+    from modules.engine import leaderboard as LB
+    from modules.engine import lifecycle_confirm as LCF
+    # ① 标签表单一事实源：两处别名指向同一对象（新增状态只改 lifecycle_confirm）
+    assert BV.LIFECYCLE_STATUS_CN is LCF.LIFECYCLE_CN, "HTML 侧标签表未引用 SSOT"
+    assert LB.LC_LABEL is LCF.LIFECYCLE_CN, "MD 侧标签表未引用 SSOT"
+    # ② 确证层默认：无标注车 resolve → active → 主榜周期列显示「在售」（不是「—」）
+    lc = LB.lifecycle_of({"model": "无标注车"})
+    assert lc["status"] == "active", f"resolve 默认 active 失效: {lc}"
+    assert BV.main_cell("period", {"lifecycle": lc}, {"model": "无标注车"}) == "在售"
+    # ③ 缺失值的诚实显示（防御分支）：空状态=「在售（默认）」，杜绝裸「—」
+    assert BV.lifecycle_status_cn(None) == "在售（默认）"
+    # ④ MD 表头改名（用户问「周期-是什么」的根因之一）
+    assert "生命周期状态 |" in _read("leaderboard.py"), "MD 表头仍叫「周期」"
+    # ⑤ build 统一走 resolve（源码断言，反向注入可检出）
+    assert "LB.lifecycle_of(_c)" in _read("board_v2.py"), "board_v2.build 未接确证层"
+    # ⑥ 中文化门禁同时扫描确证库条目（库里野值此前 MD 路径可达英文直出）
+    assert "lifecycle_status.json" in _read("board_view.py"), "门禁未扫描确证库"
+    return "标签SSOT合一 + build走resolve + MD表头改名 + 门禁扫确证库 + 默认在售"
+
+
+def t138():
+    """BUG-138：电池来源列电压 V 丢显（v10.50.0）。
+
+    根因：BUG-127（v10.25.0）把 trims 里纯电压文本（"800V"/"900V"）归一到 voltage_v
+    数值字段并清空 charge，渲染层三级取数当时只认 charge 正则 + battery_platform 兜底，
+    没同步读 voltage_v——MONA L05（voltage_v=800、charge 仅"10–80% 约 19min"）与
+    腾势N7（charge 被归一清空）这类车电压静默丢显；逐配置「电压/快充」列与配置下拉
+    JS 同病。数据层改了、渲染层没同步=BUG-127 类根因的展示层复发。
+    修法：主榜电池来源三级取数 charge文本 > voltage_v > battery_platform；
+    逐配置列 charge 无 V 时补「NNNV 平台」口径；JS trimCellVals 同步加 voltage_v 兜底。
+    """
+    from modules.board import board_view as BV
+    # ① 主榜：charge 无 V 文本 + voltage_v=800 → 必须显示 800V（MONA L05 场景）
+    row = {"best_trim_detail": {"cell_supplier": "中创新航",
+                                 "charge": "10–80% 约 19min", "voltage_v": 800}}
+    got = BV.main_cell("cell_brand", row, {"model": "X"})
+    assert "800V" in got, f"电压丢显未修（MONA场景）: {got}"
+    # ② charge 被归一清空（腾势N7 场景）→ voltage_v 兜底
+    row2 = {"best_trim_detail": {"cell_supplier": "弗迪", "charge": "", "voltage_v": 800}}
+    assert "800V" in BV.main_cell("cell_brand", row2, {"model": "Y"}), "归一空charge场景未修"
+    # ③ charge 文本有 V 时优先（不回归）
+    row3 = {"best_trim_detail": {"cell_supplier": "宁德时代",
+                                  "charge": "900V · 10–80% 约 10min"}}
+    assert "900V" in BV.main_cell("cell_brand", row3, {"model": "Z"})
+    # ④ 逐配置列 + JS 同口径（源码断言，反向注入可检出）
+    rh = _read("render_board_html.py")
+    assert "t.voltage_v" in rh, "JS 下拉电压未接 voltage_v"
+    assert "V 平台" in rh, "逐配置电压/快充列未补平台口径"
+    bv = _read("board_view.py")
+    assert "_vv" in bv and "voltage_v" in bv.split("def main_cell")[1][:4000], \
+        "main_cell 电压链未读 voltage_v"
+    return "主榜三级取数接voltage_v + 逐配置列补平台口径 + JS同步"
+
+
+def t139():
+    """BUG-139：电芯联网核验本地链与显示层口径不一致（v10.50.0）。
+
+    根因：verify_all 本地链只有 fact_library→fact_ref→trims 三路，显示层
+    （board_v2.fact_columns）却读候选池 cell_brand 与 vehicle_facts 权威入口——
+    核验层与显示层取数口径不一致，池里有品牌的车（如宋Ultra EV 池=弗迪）仍被判
+    unavailable 走联网；查询式还被占位配置名（「带内主力配置（待核）」）与缺失
+    kWh 稀释，百度摘要更不含品牌词。
+    修法：本地链补候选池 cell_brand 与 master_pool（与显示层同口径，命中即 ok
+    不联网，如实标注来源）；查询式过滤占位配置名与非数值 kWh。
+    """
+    from modules.research import cell_brand_verify as CBV
+    calls = {"n": 0}
+
+    def boom(query):
+        calls["n"] += 1
+        raise RuntimeError("核验层本地有值却联网——本地链漏源")
+
+    # ① 候选池自带 cell_brand（显示层口径）→ ok，不联网
+    rep = CBV.verify_all([{"model": "池里有品牌车", "cell_brand": "弗迪",
+                           "trim": {"name": "X"}}], facts={}, fetcher=boom)
+    assert rep["per_car"]["池里有品牌车"]["status"] == "ok", rep
+    assert calls["n"] == 0, "池里有品牌仍联网"
+    # ② master_pool 回填（monkeypatch 隔离数据文件）
+    orig = CBV._pool_cell_brands
+    CBV._pool_cell_brands = lambda: {"master池车": "宁德时代"}
+    try:
+        rep2 = CBV.verify_all([{"model": "master池车", "trim": {"name": "X"}}],
+                              facts={}, fetcher=boom)
+        assert rep2["per_car"]["master池车"]["status"] == "ok", rep2
+        assert calls["n"] == 0, "master_pool 有品牌仍联网"
+    finally:
+        CBV._pool_cell_brands = orig
+    # ③ 占位配置名与非数值 kWh 不进查询式
+    qs = CBV._queries_for("某车", {"trim": {"name": "带内主力配置（待核）"},
+                                   "battery_kwh": None})
+    assert all("主力配置" not in q and "待核" not in q for q in qs), qs
+    assert all("kWh" not in q for q in qs), "kWh 缺失不应拼进查询式"
+    # ④ 源码断言（反向注入可检出）
+    assert "_pool_cell_brands" in _read("cell_brand_verify.py"), "本地链未接 master_pool"
+    return "核验本地链补池内品牌+master_pool + 查询式去占位污染"
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120, t121, t122, t123, t124, t125, t126, t127, t128, t129, t130, t131, t132, t133, t134, t135, t136]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120, t121, t122, t123, t124, t125, t126, t127, t128, t129, t130, t131, t132, t133, t134, t135, t136, t137, t138, t139]
 
 
 def run():

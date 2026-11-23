@@ -24,6 +24,45 @@ import os
 import re
 import paths
 
+# v10.50.0：生命周期中文标签单一事实源（engine 层）。此前 HTML 侧
+# LIFECYCLE_STATUS_CN（15 键）与 MD 侧 leaderboard.LC_LABEL（6 键）两套漂移——
+# 同状态两种文案、MD 侧漏映射英文直出、admit 认 stopped 两表不认识。
+# 现统一引用 lifecycle_confirm.LIFECYCLE_CN，新增状态只改一处。
+from modules.engine import lifecycle_confirm as LCF
+
+LIFECYCLE_STATUS_CN = LCF.LIFECYCLE_CN
+
+
+def lifecycle_status_cn(status: str) -> str:
+    return LCF.lifecycle_status_cn(status)
+
+
+def check_lifecycle_coverage(cands: list[dict]) -> dict:
+    """v9.7.43：检查所有候选的生命周期状态是否都有中文映射。
+    防止再出现 on_sale 这种漏映射、页面直出英文。返回未映射状态→车型列表。
+
+    v10.50.0：门禁同时校验确证库（lifecycle_status.json）条目的状态值——
+    此前只查候选原始字段，库里写入野值时 MD 路径（resolve 透传库状态）仍会
+    英文直出。两表合一后这里查单一事实源 LCF.LIFECYCLE_CN。
+    """
+    missing = {}
+    for c in cands:
+        lc = c.get("lifecycle")
+        s = (lc.get("status") if isinstance(lc, dict) else lc) or ""
+        s = str(s).strip()
+        if s and s not in LCF.LIFECYCLE_CN:
+            missing.setdefault(s, []).append(c.get("model"))
+    # 确证库条目（resolve 第一优先级）也要在映射表内
+    try:
+        db = json.load(open(str(paths.cat("lifecycle_status.json")), encoding="utf-8"))
+        for e in (db.get("entries") or []):
+            s = str(e.get("status") or "").strip()
+            if s and s not in LCF.LIFECYCLE_CN:
+                missing.setdefault(s, []).append(f"确证库:{e.get('model')}")
+    except (OSError, ValueError):
+        pass
+    return {"missing": missing, "passed": not missing}
+
 # ---------------------------------------------------------------- 区块注册表
 # id, 标题, 适用条件 key, 说明（供 selftest / 文档）
 BLOCKS = [
@@ -250,37 +289,6 @@ EXPERIENCE_DIM_LABELS = {
 }
 
 
-LIFECYCLE_STATUS_CN = {
-    "new_launch": "新车爬坡", "facelift_pending": "改款清库",
-    "discontinued": "已停产", "clearance": "清库",
-    "stable": "在售", "sales_collapse": "销量待确认",
-    # v9.7.13：补页面实测漏网的两个状态（原来原文直出英文）
-    "steady": "在售（稳定）", "active": "在售",
-    "ramp_up": "爬坡期", "mature": "成熟期", "declining": "销量回落",
-    "new": "新车上市", "pending": "待确认", "unknown": "状态未知",
-    # v9.7.43：补 on_sale（特斯拉Model 3/比亚迪e7 用此值，此前原文直出英文）
-    "on_sale": "在售",
-}
-
-
-def lifecycle_status_cn(status: str) -> str:
-    return LIFECYCLE_STATUS_CN.get(str(status or ""), str(status) if status else "—")
-
-
-def check_lifecycle_coverage(cands: list[dict]) -> dict:
-    """v9.7.43：检查所有候选的生命周期状态是否都有中文映射。
-    防止再出现 on_sale 这种漏映射、页面直出英文。返回未映射状态→车型列表。
-    """
-    missing = {}
-    for c in cands:
-        lc = c.get("lifecycle")
-        s = (lc.get("status") if isinstance(lc, dict) else lc) or ""
-        s = str(s).strip()
-        if s and s not in LIFECYCLE_STATUS_CN:
-            missing.setdefault(s, []).append(c.get("model"))
-    return {"missing": missing, "passed": not missing}
-
-
 def car_verdict(row: dict, cand: dict, meta: dict | None = None) -> dict:
     """机械生成单车的评价（优点/短板/适合人群/购买建议）——纯规则、无模型调用、可复现。
 
@@ -469,14 +477,25 @@ def main_cell(key: str, row: dict, cand: dict, grade: str = "") -> str:
             if flash and flash != "待核":
                 tag += f"/{flash}"
             brand = f"{brand}[{tag}]"
-        # 电压：优先配置 charge，其次 battery_detail
+        # 电压：三级取数（v10.50.0 根因修复）——charge 文本 > voltage_v 数值 > battery_platform。
+        # BUG-127（v10.25.0）把 trims 里纯电压文本（"800V"/"900V"）归一到 voltage_v 数值字段
+        # 并清空 charge，渲染层当时只认 charge 正则 + battery_platform 兜底，没同步读
+        # voltage_v——于是 MONA L05（voltage_v=800、charge 仅"10–80% 约 19min"）与
+        # 腾势N7（charge 被归一清空）这类车电压静默丢显。bd（best_trim_detail）由
+        # trim_annotate 透传 voltage_v（:441），零数据成本。
         charge = str((bd or {}).get("charge") or "")
         import re
         # 2026-11-22：不再硬编码 (900|800|400)——写死三个值意味着以后出现
         # 500V/600V 等新平台就会**静默漏显**（与「参数页字段漏提取」同一类病：
         # 缺口被伪装成「数据源没有」）。改成通用匹配任意 V 数值。
         mv = re.search(r"(\d{3,4})\s*V", charge)
-        volt = (mv.group(1) + "V") if mv else bp.get("voltage")
+        _vv = (bd or {}).get("voltage_v")
+        if mv:
+            volt = mv.group(1) + "V"
+        elif isinstance(_vv, (int, float)) and _vv > 0:
+            volt = f"{_vv:g}V"
+        else:
+            volt = bp.get("voltage")
         if volt and volt != "未披露":
             brand = f"{brand} · {volt}"
         else:

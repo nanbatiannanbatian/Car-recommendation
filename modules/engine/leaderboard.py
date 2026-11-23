@@ -883,10 +883,7 @@ def recommend_report(cands: list[dict], cfg: dict, weights: list[float] | None =
 #   · 车不行 → 该扣分（真实竞争力下降）
 #   · 停产 / 改款在即 / 新车爬坡 → 销量曲线反映的是产品周期，不是竞争力
 # 所以先判周期状态，再决定销量能不能当证据。
-LC_LABEL = {"active": "在售", "new_launch": "新车爬坡期",
-            "facelift_pending": "改款在即（现款清库）",
-            "clearance": "清库", "discontinued": "已停产",
-            "sales_drop": "销量骤降·需查生命周期"}
+LC_LABEL = LC.LIFECYCLE_CN   # v10.50.0：标签表单一事实源在 lifecycle_confirm（两套漂移表合一）
 
 
 def lifecycle_of(c: dict) -> dict:
@@ -1546,7 +1543,7 @@ def top_table(cands: list[dict], cfg: dict, weights: list[float] | None = None,
         from modules.engine import crash_systems as _CS
         return _CS.display_short(c.get("crash"))
 
-    L.append("| 名次 | 车型 | 评分配置 | 指导价 | 趋势月销 | 加权分 | 名次区间(95%) | 同档组 | 碰撞成绩 | 气囊 侧/帘/中 | 证据 | 周期 |")
+    L.append("| 名次 | 车型 | 评分配置 | 指导价 | 趋势月销 | 加权分 | 名次区间(95%) | 同档组 | 碰撞成绩 | 气囊 侧/帘/中 | 证据 | 生命周期状态 |")
     L.append("|---|---|---|---|---|---|---|---|---|---|---|---|")
     for i, r in enumerate(ranked):
         c = by.get(r["model"], {})

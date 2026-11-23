@@ -543,7 +543,10 @@ def build(cands: list[dict], cfg: dict, policy: dict,
         _c = by_model[r["model"]]
         r["trim"] = _c.get("trim")
         r["evidence_status"] = _c.get("evidence_status")
-        r["lifecycle"] = _c.get("lifecycle")
+        # v10.50.0：生命周期走确证层统一入口（与 report.md 同源，根治 HTML「—」/
+        # MD「在售」分裂）——此前原样透传候选池字段，18 台无标注车显示「—」，
+        # 确证库+默认 active 兜底只服务 MD 路径。resolve 后空值永不出现。
+        r["lifecycle"] = LB.lifecycle_of(_c) if LB is not None else (_c.get("lifecycle") or {})
         # v9.7.12：note 随行带出，供 car_verdict 识别营运/网约车（只读证据关键词）
         r["note"] = _c.get("note")
         # v9.6.1：档位（从 summary.tiers 反查）、电压/封装（按评分配置）
@@ -599,7 +602,10 @@ def build(cands: list[dict], cfg: dict, policy: dict,
             },
             "experience_enabled": not no_experience,
             # v9.0：生命周期事实随数据出（历史页面有、v8.x 漏渲染）
-            "lifecycle": {c["model"]: c["lifecycle"] for c in cands if c.get("lifecycle")},
+            # v10.50.0：用 resolve 后的生命周期（与主榜同源），只收特殊状态车
+            # （active/默认在售不进专章，专章回答「哪些车现在不该按销量曲线判」）
+            "lifecycle": {r["model"]: r["lifecycle"] for r in rows
+                          if (r.get("lifecycle") or {}).get("status") not in (None, "", "active")},
             "three_board": analyses.get("three_board", {}),
             "robustness": analyses.get("robustness", {}),
             "audit_boundary": analyses.get("audit_boundary", {}),

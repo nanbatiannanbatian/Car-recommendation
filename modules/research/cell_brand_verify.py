@@ -135,13 +135,20 @@ def _queries_for(model: str, cand: dict) -> list[str]:
 
     纪律：查询式里**不放品牌候选词**。百度摘要常回显查询词，一旦把
     「宁德时代」写进查询，就会凭空「查」出宁德时代——那是自证，不是证据。
+
+    v10.50.0 查询式去污染（根因：联网核验「查不到」的次要原因）——
+    占位配置名（「带内主力配置（待核）」等）与非数值 kWh 会把查询式稀释成
+    「宋Ultra EV 带内主力配置（待核） 电芯品牌 电池供应商」，百度摘要更不含品牌词。
+    占位判据与 trim_annotate.is_placeholder_ref 同口径（research 不向上 import
+    engine，内联同一份 token 表）。
     """
     trim = (cand.get("trim") or {}).get("name") or cand.get("trim_raw") or ""
     kwh = cand.get("battery_kwh") or ""
     parts = [model]
-    if trim:
+    if trim and not _is_placeholder_ref(trim):
         parts.append(str(trim))
-    if kwh:
+    if isinstance(kwh, (int, float)) or (
+            isinstance(kwh, str) and kwh.replace(".", "").replace("-", "").isdigit()):
         parts.append(f"{kwh}kWh")
     head = " ".join(str(p) for p in parts if p)
     return [
@@ -149,6 +156,38 @@ def _queries_for(model: str, cand: dict) -> list[str]:
         f"{head} 电池 搭载 什么电芯 品牌",
         f"{model} 电芯供应商 电池类型",
     ]
+
+
+# 占位配置名 token 表（与 trim_annotate.is_placeholder_ref 同口径）
+_PLACEHOLDER_TOKENS = ("待核", "待配置", "待核验", "主力配置", "待定")
+
+
+def _is_placeholder_ref(name: str) -> bool:
+    """占位配置名判据——这类名字不进联网查询式（见 _queries_for）。"""
+    s = str(name or "")
+    return (not s or s in ("—", "-", "null", "None", "unknown")
+            or any(k in s for k in _PLACEHOLDER_TOKENS))
+
+
+def _pool_cell_brands() -> dict:
+    """master_pool.json 的 facts.cell_brand：{canon(车型): 品牌}。
+
+    v10.50.0：核验层本地链补齐——显示层（board_v2.fact_columns）会读候选池自带
+    cell_brand，但核验层此前只读 fact_library/fact_ref/trims，池里明明有品牌
+    （如实测宋Ultra EV 池=弗迪）的车仍被判 unavailable 走联网。master_pool 是
+    候选池事实字段的权威回填源（data/gen 生成物，只读）。
+    """
+    from modules.contracts.model_names import canon
+    try:
+        d = json.load(open(str(paths.gen("master_pool.json")), encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    out: dict[str, str] = {}
+    for car in (d.get("cars") or []):
+        b = str(((car.get("facts") or {}).get("cell_brand") or "").strip())
+        if b and b not in ("—", "-", "未披露"):
+            out[canon(car.get("model") or "")] = b
+    return out
 
 
 def verify_cell(model: str, cand: dict, *, local_brand: str | None = None,
@@ -283,10 +322,19 @@ def verify_all(cands: list[dict], *, facts: dict | None = None,
                fetcher=None, today: str | None = None,
                cache: dict | None = None, cache_path: str | None = None,
                use_cache: bool = False, trim_cells: dict | None = None) -> dict:
-    """对全榜逐车核验：事实库有值跳过；空的联网查；产出逐车状态与原因。"""
+    """对全榜逐车核验：事实库有值跳过；空的联网查；产出逐车状态与原因。
+
+    v10.50.0 本地结构化源全链路（根因修复：核验层与显示层取数口径不一致）——
+    显示层 board_v2.fact_columns 的电芯取数链是 fact_library > 候选池 cell_brand >
+    vehicle_facts 权威入口，但核验层此前只有 fact_library > fact_ref > trims 三路，
+    候选池自带 cell_brand 与 master_pool facts.cell_brand 不在链上：池里有品牌
+    的车（如宋Ultra EV 池=弗迪）仍被联网判 unavailable。补齐后与显示层同口径，
+    本地任意结构化源命中即 ok、不联网，并如实标注来源。
+    """
     facts = facts or {}
     if trim_cells is None:
         trim_cells = load_trim_cells()
+    pool_brands = _pool_cell_brands()
     per_car: dict[str, dict] = {}
     for c in cands:
         model = c.get("model") if isinstance(c, dict) else str(c)
@@ -294,9 +342,18 @@ def verify_all(cands: list[dict], *, facts: dict | None = None,
             c.get("fact_ref") or {}).get("电芯")
         local_source = "fact_library" if local else ""
         if not local:
+            local = (c if isinstance(c, dict) else {}).get("cell_brand")
+            if local:
+                local_source = "候选池"
+        if not local:
             local = _trim_cell(model, c if isinstance(c, dict) else {}, trim_cells)
             if local:
                 local_source = "trims.json 逐配置电芯"
+        if not local:
+            from modules.contracts.model_names import canon
+            local = pool_brands.get(canon(model))
+            if local:
+                local_source = "master_pool"
         rec = verify_cell(model, c if isinstance(c, dict) else {},
                           local_brand=local, fetcher=fetcher, today=today,
                           cache=cache, cache_path=cache_path, use_cache=use_cache,

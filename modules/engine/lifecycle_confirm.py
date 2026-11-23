@@ -85,6 +85,33 @@ def resolve(c: dict, db: dict | None = None) -> dict:
 CONFIRMED_STATES = ("discontinued", "facelift_pending", "clearance", "new_launch")
 
 
+# ---------------------------------------------------------------- 中文标签单一事实源
+# v10.50.0：此前两套漂移的表——leaderboard.LC_LABEL（6 键，MD/判档/审查侧）与
+# board_view.LIFECYCLE_STATUS_CN（15 键，HTML 侧）互不同步：同状态两种文案
+# （新车爬坡期/新车爬坡）、MD 侧漏 on_sale/steady 等映射（英文直出漏洞，
+# BUG-019/060 只修了 HTML 侧）、admit 闸门认 "stopped" 但两表都不认识。
+# 统一到本模块作为唯一事实源，两处改为引用别名，新增状态只改这一处。
+# 未映射的非空状态原样返回（门禁负责拦，不静默吞）；空值按系统约定
+# 「无标注=默认在售」显示「在售（默认）」，杜绝裸「—」被读成保养周期。
+LIFECYCLE_CN = {
+    "active": "在售", "on_sale": "在售", "stable": "在售", "steady": "在售（稳定）",
+    "new_launch": "新车爬坡期", "new": "新车上市", "ramp_up": "爬坡期",
+    "facelift_pending": "改款在即（现款清库）", "clearance": "清库",
+    "discontinued": "已停产", "stopped": "已停产",
+    "sales_drop": "销量骤降·需查生命周期", "sales_collapse": "销量待确认",
+    "mature": "成熟期", "declining": "销量回落", "pending": "待确认",
+    "unknown": "状态未知",
+}
+
+
+def lifecycle_status_cn(status) -> str:
+    """状态 → 中文（唯一入口）。空值=「在售（默认）」（resolve 第三回退的诚实显示）。"""
+    s = str(status or "")
+    if not s:
+        return "在售（默认）"
+    return LIFECYCLE_CN.get(s, s)
+
+
 def annotate(c: dict, db: dict | None = None) -> dict:
     """直接把确证结果写回 c['lifecycle']（含 confirmed/source/url 字段）。
 

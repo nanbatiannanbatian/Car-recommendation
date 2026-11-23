@@ -642,7 +642,14 @@ def render(data, summary, title, as_of):
                     cell_val = str(t.get("cell_supplier") or "未披露")
                     if t.get("cell_inherited"):
                         cell_val += '<span class="flag flag-est" title="车系级电芯，未逐配置核验">车系</span>'
-                    charge_val = str(t.get("charge") or "未披露")
+                    # v10.50.0：电压/快充列——charge 无 V 文本（BUG-127 归一后电压在
+                    # voltage_v 数值字段，或参数页未填）时，用 voltage_v 补「平台」口径，
+                    # 与主榜电池来源列三级取数同源，杜绝「逐配置表有电压、主榜不显」的分裂。
+                    charge_val = str(t.get("charge") or "")
+                    _vv = t.get("voltage_v")
+                    if isinstance(_vv, (int, float)) and _vv > 0 and "V" not in charge_val:
+                        charge_val = (f"{_vv:g}V · " + charge_val) if charge_val else f"{_vv:g}V 平台"
+                    charge_val = charge_val or "未披露"
                     H.append(f"<tr><td class='name'>{e(t.get('name'))}{flag}</td>"
                              f"<td>{e(t.get('price'))}</td>"
                              f"<td>{_kwh_cell(t, r.get('note'))}</td>"
@@ -707,8 +714,11 @@ function trimCellVals(model,idx){
   var t=TRIMDATA[model].trims[idx],sc=t.scores||{},charge=String(t.charge||''),
       cell=String(t.cell_supplier||'—'),kwh=t.battery_kwh,price=t.price;
   var mv=charge.match(/(\d{3,4})\s*V/);
+  // v10.50.0：电压三级取数与 Python 端同口径——charge 文本 > voltage_v 数值。
+  // BUG-127 归一后部分配置 charge 无 V 文本（电压在 voltage_v），此前下拉切换后电压丢显。
+  var volt = mv ? mv[1]+'V' : (t.voltage_v ? (t.voltage_v+'V') : '');
   return {name:t.name,price:price,total:t.total,power:t.power_score,scores:sc,verdict:t.verdict||'',
-    cell:cell+(mv?' · '+mv[1]+'V':''),
+    cell:cell+(volt?' · '+volt:''),
     kwh:(kwh&&price)?(kwh/price).toFixed(2):'—'};
 }
 function applyTrim(model,idx){
@@ -1073,6 +1083,13 @@ document.addEventListener('change',function(ev){
             for model, info in (life.items() if isinstance(life, dict) else []):
                 H.append(f"<li>{e(BV.lifecycle_line(model, info))}</li>")
             H.append("</ul></div>")
+            # v10.50.0：图例——主榜「生命周期状态」列的无标注车显示「在售」是确证层
+            # 默认（active），不是漏采；专章只列特殊状态车。此前 HTML 原样透传候选池
+            # 字段、18 台无标注车显示「—」与 report.md「在售」自相矛盾（用户问
+            # 「周期-是什么意思」的根因）。
+            H.append('<div class="rule">主榜「生命周期状态」列：无单独标注的车显示「在售」'
+                     '＝确证层默认（active），不是漏采、也不是保养周期；本节只列有特殊状态'
+                     '（新车爬坡 / 改款清库 / 停产等）的车。</div>')
 
     # ---- 落榜与待核（历史有、v8.x 漏掉，v9.0 补回）
     if "dropped" in ids:
@@ -1217,7 +1234,9 @@ def selftest():
         "main_board": [
             {"rank": 1, "model": "A车", "total": 88.0, "evidence": "A", "tier": "T1",
              "note": "取证要点", "scores": {"powertrain": 9, "value": 8},
-             "fact_ref": {"指导价": 13.0, "电芯": "—"}},
+             "fact_ref": {"指导价": 13.0, "电芯": "—"},
+             "lifecycle": {"status": "new_launch", "date": "2026-10-29",
+                           "note": "新车爬坡期"}},
             {"rank": 2, "model": "B车", "total": 80.0, "evidence": "B", "tier": "T2",
              "note": "取证明细", "scores": {"powertrain": 7, "value": 9},
              "fact_ref": {"指导价": 15.0, "电芯": "—"}},
@@ -1295,6 +1314,10 @@ def selftest():
         # v10.49 保值率剥离：页面声明不计分
         ("页面声明保值率不计分", "保值率不在这格里" in doc
          and "只展示、不计入任何分数" in doc),
+        # v10.50.0 生命周期列：有标注中文状态、无标注「在售（默认）」
+        # （根治 HTML 主榜「—」与 MD「在售」分裂，用户问「周期-是什么」）
+        ("生命周期列·有标注中文", "新车爬坡期" in doc),
+        ("生命周期列·无标注默认在售", "在售（默认）" in doc),
     ]
     # v10.15.7 智驾低权重提示回归：权重≤10%显示 / >10%不显示 / 权重动态读取（不写死百分比）
     _a1 = dict(data)

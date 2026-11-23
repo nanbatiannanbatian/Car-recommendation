@@ -1562,3 +1562,14 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
 - 效果：极狐T5 value 9.4>海狮06 8.26(质价比真实排序),用户质疑根治。保值率数据未丢、改透明展示。
 - 回归：value selftest+3c(value_for忽略residual_delta),render selftest+页面声明,BUG-136(忽略residual/不写字段/页面展示/反向注入),t118更新,bug134/134;全量回归+三榜重出+三池重打指纹。
 - 教训：分维度得分不要塞进别的格子——用户看到"性价比"列就该是纯性价比,合成因子要么独立成列要么明确标注。
+
+## v10.50.0 榜单展示层三根因修复（用户看榜发现的展示/数据链 bug 根治，2026-11-23）
+- 用户看纯电中型SUV榜提出三件事：电池来源列电压V丢了、「周期-是什么意思」、电芯联网查不到（并要求确认8维打分逻辑+业内对标+数据缺口渠道+根因修改）。并行调查定位三个展示/数据链根因（均属「数据层改了、渲染/核验层没同步」的 BUG-127 类病）：
+- **BUG-138 电压V丢显**：根因=v10.25.0 BUG-127 把 trims 纯电压文本归一到 voltage_v 数值字段并清空 charge，渲染层三级取数只认 charge 正则+battery_platform 兜底、没同步读 voltage_v——MONA L05（voltage_v=800、charge 仅快充文本）与腾势N7（charge 被归一清空）电压静默丢显；逐配置「电压/快充」列与配置下拉 JS 同病。修法：主榜电池来源三级取数 charge文本>voltage_v>battery_platform；逐配置列 charge 无 V 时补「NNNV 平台」口径；JS trimCellVals 同步加 voltage_v 兜底。连带暴露：battery_platform.json 14 台全轿车 0 台 SUV 的兜底失效（其渲染兜底角色由 trims voltage_v 取代，文件保留作历史轿车口径）。
+- **BUG-139 电芯核验本地链缺口**：根因=核验层 verify_all 本地链只有 fact_library→fact_ref→trims 三路，显示层（board_v2.fact_columns）却读候选池 cell_brand 与 vehicle_facts 权威入口——口径不一致，池里有品牌的车（如宋Ultra EV 池=弗迪）仍被判 unavailable 走联网；查询式还被占位配置名（「带内主力配置（待核）」）与缺失 kWh 稀释。修法：本地链补候选池 cell_brand 与 master_pool facts（与显示层同口径，命中即 ok 不联网，如实标来源）；_queries_for 过滤占位配置名与非数值 kWh。实测效果：轿车榜 15 款、SUV/u18 各 1 款经「候选池」本地链命中，零联网。
+- **BUG-137 生命周期分裂**：根因=HTML 路径（board_v2.build）原样透传候选池 lifecycle 字段、不经 lifecycle_confirm.resolve，18 台无标注车显示「—」；MD 路径走 resolve 默认 active 显示「在售」——同一车两产物自相矛盾；且 leaderboard.LC_LABEL（6键）与 board_view.LIFECYCLE_STATUS_CN（15键）两套漂移（同状态两种文案、MD 侧漏 on_sale/steady 映射=英文直出漏洞、admit 闸门认 stopped 两表都不认识）；MD 表头仍叫「周期」；t035「主榜周期列无空」是假断言（只断言行数≥16）。修法：标签表单一事实源移到 lifecycle_confirm.LIFECYCLE_CN（17 状态，含 stopped/on_sale 等交叉覆盖），两处引用别名；board_v2.build 统一走 LB.lifecycle_of；MD 表头「周期」→「生命周期状态」；中文化门禁同时扫描确证库条目状态值；t035 重写为真断言（resolve 后周期列无空值/无英文直出/SSOT 含 stopped）。页面生命周期专章加图例「无标注车显示在售=确证层默认，不是漏采」。
+- **字段显示审计结论**（用户问「还有哪些字段没显示」）：三电与补能区块（v10.11 起）已摊开电量/电压/快充/最大充电功率/官方电耗/电芯/换电/CLTC/峰值功率——充电功率(24%)、换电(4%)、电压(36%)覆盖率低是汽车之家参数页源头限制（非代码漏采），页面如实标「未披露」不推断；主榜「电池来源」列的电压 V 即 BUG-138 修复对象。
+- **零分数影响**：三处全是展示/核验层，评分代码、权重、配置未动。三榜 v52→v53 A/B 验证：SUV 20 款/u18 11 款/轿车 28 款逐配置总分+八维 0 差异；候选池按纪律重打指纹 cf2e2c64（leaderboard.py 在指纹清单，标签别名+表头改动触发）。
+- 回归：bug_regression 135/137（BUG-075/104 为环境缺 requests 模块——pip 被代理 SSL 拦截装不上，与改动无关，开发环境全绿）；失败回测 107/108 检出（t075 同环境原因探针不适用）；layout 16/16；midsuv_full 46/46；build_release/energy_router/energy_compare 全绿；render/board_view/cell_brand_verify/spec_score selftest 全过。新增 BUG-137/138/139 三用例 + t035 真断言重写 + 负向探针 3 条。
+- 榜单产物：runs/midsuv_bev_202611_v53（20 款全价位）、midsuv_bev_u18_202611_v53（11 款）、midsedan_bev_allprice_202611_v53（28 款）。
+- 文档/同步：SKILL 10.49.0→10.50.0、README 当前版本行、evolution.md 本节。sync --apply → commit → push。
