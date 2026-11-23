@@ -138,10 +138,10 @@ def run():
             # v10.34.0：官方渐进式披露——SKILL.md 精简+references 指针，演进史物理移到随包 references/
             check("产物SKILL有references指针", "references/evolution.md" in skill_packed
                   and "references/detail.md" in skill_packed)
-            # v10.37.0：指针必须如实说明滚动窗口+仓库兜底，不得声称"完整历史在包内"(软死链)
-            check("SKILL指针写明滚动窗口", "最近 30 版滚动窗口" in skill_packed
-                  and "github.com" in skill_packed)
-            check("SKILL指针无过时承诺", "含全部 v10.x" not in skill_packed)
+            # v10.38.0：指针声明完整随包、自包含——官方市场安装拿不到 GitHub，不得有外部兜底依赖
+            check("SKILL指针声明完整随包", "完整的**逐版本演进史" in skill_packed
+                  and "离线可查" in skill_packed and "无需访问外部仓库" in skill_packed)
+            check("SKILL指针无外部仓库依赖", "滚动窗口" not in skill_packed)
             # 活铁律必须在发布包核心(SKILL+detail)可查，不因裁剪演进史而丢能力
             core_pkg = skill_packed + packed_docs.get("detail.md", "")
             for rule in ("trims[]", "候选池收全", "联网优先", "证据 C 不一律判三档",
@@ -164,16 +164,19 @@ def run():
                 check("产物evolution含全部v10章节", len(v10chap) >= 25,
                       f"{len(v10chap)}个v10章节")
                 check("产物evolution含v10.33", "v10.33.0" in evo)
-                # v10.36.0：滚动窗口——包内只带最近30版，源码树完整（历史不丢）
+                # v10.38.0：完整演进史随包（撤销滚动窗口）——官方市场安装的 skill
+                # 拿不到源码仓库，包必须自包含；v9.x 必须和源码树一致地在包内
                 import build_release as _BR
                 src_evo = open(str(Path(HERE) / "references" / "evolution.md"), encoding="utf-8").read()
                 n_src = len(_re2.findall(r'^## v[\d.]+', src_evo, _re2.M))
-                n_pkg = len(v10chap) + len(_re2.findall(r'^## v9\.', evo, _re2.M))
-                check("产物evolution滚动窗口<=30版", n_pkg <= _BR.EVOLUTION_KEEP_VERSIONS,
-                      f"包内{n_pkg}版")
-                check("源码树evolution完整(>包内)", n_src >= n_pkg,
-                      f"源码{n_src}版/包内{n_pkg}版")
-                check("产物evolution有仓库指针", "滚动窗口" in evo and "github.com" in evo)
+                n_pkg = len(_re2.findall(r'^## v[\d.]+', evo, _re2.M))
+                check("产物evolution完整含v9.x", len(_re2.findall(r'^## v9\.', evo, _re2.M)) >= 50,
+                      f"包内v9章节{len(_re2.findall(r'^## v9\\.', evo, _re2.M))}")
+                check("产物evolution版本数=源码树", n_pkg == n_src,
+                      f"包内{n_pkg}/源码{n_src}")
+                # 被裁窗口曾导致32个活跃标识符只在历史里——现在完整随包必可查
+                for ident in ("TIRE_PRESSURE_MULT", "cell_gen", "evidence_soft", "field_sources"):
+                    check(f"产物evolution含活跃标识符:{ident}", ident in evo)
             else:
                 check("产物含references/evolution.md", False)
             for kw in ("价格残差法", "水桶车稳健通道", "数据时效体检", "固定锚", "联网优先"):
