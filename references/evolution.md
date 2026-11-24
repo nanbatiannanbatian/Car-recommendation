@@ -1773,3 +1773,13 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
 - 发现门禁逐车判定 21 款池外高销量车时，又抓出 2 个真漏：方程豹钛7 EV（中大型/1000V闪充/月销1.2万）、岚图追光S（中大型/800V/华为ADS5）——印证门禁价值。
 - 最终：22 款严格官方中大型在售纯电SUV重出榜，唐L与大型SUV全移出，唐EV/T7/钛7EV/追光S补入；完整性22/22/0、生命周期22款非停产、发现21款全判定、bug151/151全绿。
 - 教训：工具存在≠接线——lifecycle_confirm/discover 早就在，没接 pipeline 就连续漏收。凡防漏工具必须接进出榜链路。
+
+## v10.69.0 症状自动生成 + 级别自动判定（2026-11-24）
+- 用户："一步：更新 lifecycle_status.json 把这个写成代码，你单独更新这个以后其他车还是会有问题。第二步：口径改为严格中大型SUV你不能只靠我选择，你要自己判断，我说中大型就是中大型"。
+- **根因**：上一版我手工往 lifecycle_status.json 加唐L/唐EV记录=补丁；级别口径拿去问用户=推卸判定责任。而 lifecycle_detect.py（销量变点判 collapse?/cliff?）、levels.json（官方级别库）都存在，只是没接出榜链路。
+- 修法：
+  ① 新建 `modules/research/lifecycle_gate_build.py`：从候选池逐月销量自动算症状写 `lifecycle_reviewed`（带序列+原因，唐L 87→5→1→3→3 会判 collapse?），pipeline 硬拦"疑似但未核验"；人工只写核验结论 status+url+note，不手写整库。任何车退市销量自己报警。
+  ② 新建 `modules/engine/level_gate.py`：按 levels.json 官方二级分类自动准入（白名单=cfg.gates.class.allow），无级别缓存/不符一律拒绝——不问用户、不靠 universe 手工挑、不按轴距推定。levels.json 补 18 款已核实官方级别。
+  ③ pipeline 现五道门禁：级别口径→生命周期症状→生命周期确证→候选发现→完整性，全部 fail-hard 带审计。
+- 回归：bug152/152(可注入116)+iron10/10+layout16/16+midsuv52/52+energy21/21+router32/32 全绿；level_gate/lifecycle_gate_build selftest 通过；22款全符合官方中大型口径、0级别不符、0无级别。
+- 教训：①"手工改数据文件"是补丁，"让数据自己生成+门禁强制"才是根因修复；②级别是客观事实（官方二级分类），不该问用户、不该按尺寸猜——用户说中大型就是严格按官方分类判。

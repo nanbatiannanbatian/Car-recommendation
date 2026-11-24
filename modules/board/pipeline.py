@@ -142,6 +142,7 @@ def main():
     ap.add_argument("--skip-universe-gate", action="store_true", help="跳过完整性门禁(须在报告说明为何同级漏收车无需处理)")
     ap.add_argument("--allow-discontinued", action="store_true", help="允许已停产停售车参与(默认硬拦;须在报告说明原因)")
     ap.add_argument("--skip-discovery-gate", action="store_true", help="跳过候选发现门禁(须在报告说明为何池外高销量车无需判定)")
+    ap.add_argument("--skip-lifecycle-gate", action="store_true", help="跳过生命周期症状门禁(须在报告说明为何销量骤降车无需核验)")
     ap.add_argument("--skip-consistency-gate", action="store_true", help="跳过条目内一致性门禁(须在报告说明为何note与结构字段矛盾不是错误)")
     ap.add_argument("--skip-sibling-gate", action="store_true", help="跳过同源车评分一致性门禁(须在报告说明为何无据差异合理)")
     ap.add_argument("--skip-safety-gate", action="store_true", help="跳过安全分严谨性门禁(须在报告说明为何成绩映射分可偏离)")
@@ -577,6 +578,41 @@ def main():
 
     # v9.7.43：候选池完整性门禁——出榜前必须联网盘点同级全量在售车型，与候选池比对。
     # 漏收的车必须逐个判定：能入池的补入候选池+trims.json，不能入池的写进 pool_excluded[] 并写明事实原因。
+    # v10.69 根因修复：级别口径单一真相源——官方二级分类自动判定准入。
+    # 用户："我说中大型就是中大型，你要自己判断"——级别按 levels.json 的
+    # 官方二级分类自动判，不问用户、不靠 universe 手工挑、不按轴距推定。
+    # 无官方级别缓存的车一律不得出榜（防"默认在售默认符合"的静默放行）。
+    from modules.engine import level_gate as _LG
+    _allow_cls = ((cfg.get("gates") or {}).get("class") or {}).get("allow") or []
+    if _allow_cls:
+        _lvl = _LG.audit(cands, _allow_cls)
+        if _lvl["rejected"] or _lvl["unverified"]:
+            bad = _lvl["rejected"] + _lvl["unverified"]
+            sys.exit("级别口径门禁：以下候选不符合本榜官方级别口径：\n"
+                     + "\n".join(f"  {x['model']}：{x['reason']}" for x in bad[:12])
+                     + f"\n→ 本榜官方二级分类白名单={_allow_cls}；"
+                     "不符的移出候选池，无级别缓存的先跑 auto_levels.py 联网核验写 levels.json。")
+        print(f"[级别口径门禁] 官方二级分类白名单 {_allow_cls} / {len(cands)} 款全部符合")
+
+    # v10.69 根因修复：生命周期症状门禁——销量骤降车必须逐车核验。
+    # 2026-11-24 用户："更新 lifecycle_status.json 写成代码，单独更新这个
+    # 以后其他车还是会有问题"。根因：手工写 JSON 是补丁；lifecycle_detect.py
+    # 早就能从销量序列判 collapse?/cliff?/clearance?，但没接出榜链路。
+    # 现在 lifecycle_reviewed 由 lifecycle_gate_build.py 从销量自动生成症状，
+    # 出榜时检查"疑似但未核验"并硬拦——任何车退市都会自己报警，不靠人搜新闻。
+    _lrev = data.get("lifecycle_reviewed") or {}
+    if _lrev and not getattr(a, "skip_lifecycle_gate", False):
+        _unverified = [r for r in (_lrev.get("reviewed") or []) if not r.get("status")]
+        if _unverified:
+            sys.exit("生命周期症状门禁：以下车销量骤降但未核验，不得出榜：\n"
+                     + "\n".join(f"  {r.get('model')}（{r.get('detected')}）："
+                                 f"{r.get('values')} {r.get('reasons', [''])[0]}"
+                                 for r in _unverified[:12])
+                     + "\n→ 跑 modules/research/lifecycle_gate_build.py --apply 重生成症状，"
+                     "逐车核验写 status（normal / confirmed_discontinued / relaunched，带url+note）。"
+                     "\n→ 确需带未核验车出榜用 --skip-lifecycle-gate（须在报告说明）。")
+        print(f"[生命周期症状门禁] 销量异常 {len(_lrev.get('reviewed') or [])} 款已逐车核验，未核验 0")
+
     # v10.68 根因修复：候选发现门禁——池外高销量车必须逐车判定。
     # 2026-11-24 事故：极狐阿尔法T7（中大型纯电SUV、月销8131）漏收，
     # discover.py 早已抓到它（其文档开头就写着这个案例），但从未接进出榜链路。

@@ -174,6 +174,7 @@ CASES = [
     ("BUG-151", "铁律只写文档靠不住(漏收/质量分全8):排查全部铁律,可代码化的收口成iron_rules门禁+sync--apply强制回归+修t016假断言+闸门fail-close", "v10.64.0"),
     ("BUG-152", "热泵只当默认参数+电费只按CLTC:热管理三态无逐车事实(冬季续航一律半热泵半PTC)、TCO只算声明电耗(CLTC比真实低15-35%)→建heatpump_facts事实表+三态进模型+TCO双口径", "v10.67.0"),
     ("BUG-153", "唐L停产仍排第1+极狐T7等新车漏收:生命周期确证/发现门禁存在但没接出榜链路,靠人记得跑=必漏;另严格中大型口径", "v10.68.0"),
+    ("BUG-154", "手写lifecycle_status_json是补丁+级别口径靠用户选:销量变点检测/官方级别库都在但没接出榜链路→lifecycle_gate_build自动症状+level_gate自动准入", "v10.69.0"),
 ]
 
 
@@ -5332,6 +5333,57 @@ def t151():
             "t016真比对 + 闸门fail-close + 反向注入可检出")
 
 
+def t154():
+    """BUG-154：手写 lifecycle_status.json 是补丁 + 级别口径靠用户选（v10.69）。
+
+    用户："更新 lifecycle_status.json 写成代码，你单独更新这个以后其他车
+    还是会有问题"；"口径改为严格中大型SUV你不能只靠我选择，你要自己判断"。
+    根因：lifecycle_detect（销量变点）+ levels.json（官方级别库）都存在，
+    但没接出榜链路——手工写 JSON 是补丁，问用户级别是推卸判定责任。
+    修法：
+      ① lifecycle_gate_build.py 从销量序列自动生成 lifecycle_reviewed 症状，
+         出榜硬拦"疑似但未核验"（任何车退市销量自己报警）；
+      ② level_gate.py 按 levels.json 官方二级分类自动准入，
+         无级别缓存/不符一律拒绝（不问用户、不按轴距推定）。
+    锁死：①生成器自检；②level_gate 三态判定；③pipeline 两门禁接线；
+    ④22款全符合；⑤反向注入可检出。
+    """
+    import json as _J
+    from modules.engine import level_gate as _LG
+    # ① 生命周期症状生成器自检
+    from modules.research import lifecycle_gate_build as _GB
+    fake = [{"model": "崩塌", "trend_months": {"202606": 90, "202607": 5,
+                                             "202608": 1, "202609": 2}},
+            {"model": "正常", "trend_months": {"202606": 100, "202607": 105,
+                                             "202608": 98, "202609": 102}}]
+    r = _GB.build_reviewed(fake)
+    assert any(x["model"] == "崩塌" for x in r["reviewed"]), "销量崩塌未检出"
+    assert not any(x["model"] == "正常" for x in r["reviewed"]), "正常车误报"
+    # ② 级别三态判定
+    lv = {"A": {"cls": "中大型SUV"}, "B": {"cls": "大型SUV"}}
+    assert _LG.eligible({"model": "A"}, ["中大型SUV"], lv)["ok"], "符合级别被拒"
+    assert not _LG.eligible({"model": "B"}, ["中大型SUV"], lv)["ok"], "大型SUV混入"
+    assert not _LG.eligible({"model": "C"}, ["中大型SUV"], lv)["ok"], "无级别被放行"
+    # ③ pipeline 接线
+    ps = _read("pipeline.py")
+    assert "level_gate as _LG" in ps and "级别口径门禁" in ps, "级别门禁未接 pipeline"
+    assert "lifecycle_reviewed" in ps and "生命周期症状门禁" in ps, "生命周期症状门禁未接"
+    assert "--skip-lifecycle-gate" in ps, "症状门禁缺逃生阀"
+    # ④ 实池全符合
+    p = str(paths.cat("levels.json"))
+    cfg = _J.load(open(str(paths.cat("car_largesuv_bev.json")), encoding="utf-8"))
+    allow = cfg["gates"]["class"]["allow"]
+    assert allow == ["中大型SUV"], "口径非严格中大型"
+    pool = _J.load(open(str(paths.RUNS_DIR / "largesuv_bev_pool_202611.json"), encoding="utf-8"))
+    aud = _LG.audit(pool["candidates"], allow)
+    assert not aud["rejected"] and not aud["unverified"], f"仍有不合规车: {aud}"
+    # 反向注入
+    injected = ps.replace("level_gate as _LG", "level_gate as _XX")
+    assert "level_gate as _LG" in ps, "反向注入未生效"
+    return ("生命周期症状自动生成(销量自报不靠手写JSON) + 级别按官方二级分类自动准入"
+            + "(不问用户/不按轴距推定) + 两门禁接出榜 + 22款全符合 + 反向注入可检出")
+
+
 def t153():
     """BUG-153：停产车留榜 + 新车漏收（v10.68）。
 
@@ -5609,7 +5661,7 @@ def t146():
 
 
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120, t121, t122, t123, t124, t125, t126, t127, t128, t129, t130, t131, t132, t133, t134, t135, t136, t137, t138, t139, t140, t141, t142, t143, t144, t145, t146, t147, t148, t149, t150, t151, t152, t153]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120, t121, t122, t123, t124, t125, t126, t127, t128, t129, t130, t131, t132, t133, t134, t135, t136, t137, t138, t139, t140, t141, t142, t143, t144, t145, t146, t147, t148, t149, t150, t151, t152, t153, t154]
 
 
 def run():

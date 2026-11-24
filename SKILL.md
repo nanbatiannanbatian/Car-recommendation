@@ -13,7 +13,7 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 10.68.0
+version: 10.69.0
 author: "nanbatiannanbatian"
 ---
 
@@ -263,6 +263,18 @@ HTML/报告用 `--as-of <YYYYMM>` 标注事实列数据月，禁止停在"—"�
 - 已核验的领域快照（如 `runs/midsedan_bev_1218_202610/candidates_allprice.json` 25款）可作候选，**分数一律复用其中已核验的 `scores`**，不许用 Agent 补采分顶替。
 - "销量榜 Top" ≠ 候选全集：只能做候选发现器，绝不直接当入池名单（会系统性漏车）。
 - 用 `runs/` 下无指纹快照必须 `--force-stale`，并在报告显著标注"过期/强制出榜"。
+
+**①a0 症状自动生成 + 级别自动判定（v10.69，用户"手写JSON是补丁/级别别问我"）**
+- **生命周期症状自动生成**：`modules/research/lifecycle_gate_build.py` 从候选池逐月销量
+  跑 `lifecycle_detect.classify()`，把 collapse?/cliff?/clearance? 车自动写进候选池
+  `lifecycle_reviewed`（带销量序列+原因）；出榜硬拦"疑似但未核验"的车。
+  任何车退市销量自己报警——不再靠人手写 lifecycle_status.json（那是补丁，下次别的车照样漏）。
+  核验结论写 status（normal/confirmed_discontinued/relaunched + url + note），
+  由 `--apply` 写回；逃 `--skip-lifecycle-gate`。
+- **级别口径自己判**：`modules/engine/level_gate.py` 按 `levels.json` 官方二级分类
+  自动准入（白名单 = cfg.gates.class.allow），无级别缓存/级别不符一律拒绝，
+  不问用户、不靠 universe 手工挑、不按轴距推定。逃：无（级别不符必须修数据）。
+  新车型入池前先用 auto_levels.py 联网核验官方二级分类写进 levels.json。
 
 **①a 生命周期+候选发现硬门禁（v10.68，用户"唐L退市/极狐T7漏收，根因改"）**
 出榜前 pipeline 自动过两道门禁（默认硬拦，各有显式逃生阀须在报告说明）：
