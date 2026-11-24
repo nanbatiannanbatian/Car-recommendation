@@ -709,20 +709,39 @@ def breakeven_km(cars, cond, bev_price=None):
     return round((fixed_b - fixed_i) / (TCO["years"] * unit_diff), 1)  # km/年
 
 
-# ============ 7b. 能源形式聚合结论 + 画像自检（v10.53.0）============
+# ============ 7b. 能源形式聚合结论 + 画像自检（v10.53.0 / 形式合并 v10.57.0）============
 FORM_CN = {"ICE": "燃油", "HEV": "油混", "PHEV": "插混", "EREV": "增程", "BEV": "纯电"}
+# v10.57.0 形式结论合并（用户「油混和油车差别不大，业内也不强行区分」）：
+# 政策/牌照/购置税口径上 HEV 与 ICE 完全同待遇（H5 限牌 −8、H6 营运 −10 同罚，非新能源目录），
+# 11 项条件里 9 项同分，因此「形式适配结论」按 3 个家族给：
+#   燃油（含油混）/ 插混·增程 / 纯电。
+# 但逐车打分与标签保留 HEV vs ICE 的差别（油耗、残值、产品力各自不同），
+# 形式结论不做「油混是一种独立能源」的暗示。
+FORM_FAMILY = {"ICE": "FUEL", "HEV": "FUEL", "PHEV": "NEV", "EREV": "NEV", "BEV": "BEV"}
+FAMILY_CN = {"FUEL": "燃油（含油混）", "NEV": "插混·增程", "BEV": "纯电"}
 FORM_MIN_N = 3   # 形式均分的最小样本量：少于 3 款不算形式结论（1 台车的分不能代表一种能源）
 
 
+def form_name(code):
+    """形式家族 → 中文名；兼容直接传 power（ICE/HEV/…）。"""
+    return FAMILY_CN.get(code) or FORM_CN.get(code) or code
+
+
 def recommend_form(rows, cond):
-    """能源形式聚合结论：按形式算均分/硬条件车数/不建议项数 → 排序。
+    """能源形式聚合结论：按**形式家族**（燃油含油混/插混·增程/纯电）算均分/硬条件车数/不建议项数 → 排序。
     回答「我这种条件适合哪种能源形式」；逐车结论仍以综合榜为准（形式均分受池内车源结构影响）。
-    池内某形式车数 < 3 时标「样本不足」，不参与形式推荐（1 台车的均分不能代表一种能源形式）。"""
+    池内某家族车数 < 3 时标「样本不足」，不参与形式推荐（1 台车的均分不能代表一种能源形式）。
+    members 保留家族内部逐 power 明细（油混 73.0 vs 燃油 68.7），供页面披露、不让合并掩盖事实。"""
     agg = {}
     for r in rows:
         p = r.get("power")
-        a = agg.setdefault(p, {"power": p, "n": 0, "sum": 0.0, "adj_sum": 0.0,
-                               "hard": 0, "bad": 0, "best": None, "best_score": -1e9})
+        fam = FORM_FAMILY.get(p, p)
+        a = agg.setdefault(fam, {"power": fam, "n": 0, "sum": 0.0, "adj_sum": 0.0,
+                                 "hard": 0, "bad": 0, "best": None, "best_score": -1e9,
+                                 "members": {}})
+        m = a["members"].setdefault(p, {"power": p, "n": 0, "sum": 0.0})
+        m["n"] += 1
+        m["sum"] += r.get("composite") or 0
         a["n"] += 1
         a["sum"] += r.get("composite") or 0
         a["adj_sum"] += r.get("adj") or 0
@@ -734,9 +753,15 @@ def recommend_form(rows, cond):
             a["best"], a["best_score"] = r.get("model"), r.get("composite") or 0
     out = []
     for p, a in agg.items():
+        mem = []
+        for mp, ma in a["members"].items():
+            mem.append({"power": mp, "cn": FORM_CN.get(mp, mp), "n": ma["n"],
+                        "avg": round(ma["sum"] / ma["n"], 1)})
+        mem.sort(key=lambda x: -x["avg"])
         out.append({"power": p, "n": a["n"], "avg": round(a["sum"] / a["n"], 1),
                     "avg_adj": round(a["adj_sum"] / a["n"], 2),
-                    "hard": a["hard"], "bad": a["bad"], "best": a["best"]})
+                    "hard": a["hard"], "bad": a["bad"], "best": a["best"],
+                    "members": mem})
     out.sort(key=lambda x: (-x["avg"], x["hard"], -x["n"]))
     eligible = [x for x in out if x["n"] >= FORM_MIN_N]
     base = eligible[0] if eligible else out[0]
@@ -759,31 +784,43 @@ def recommend_form(rows, cond):
 
 
 def form_narrative(forms, cond=None):
-    """一句话形式结论（页面/正式榜顶部展示）。"""
+    """一句话形式结论（页面/正式榜顶部展示）。形式按家族口径（燃油含油混/插混·增程/纯电）。"""
+    def tag(f):
+        return form_name(f["power"])
+
+    def mem_note(f):
+        mem = f.get("members") or []
+        if len(mem) <= 1:
+            return ""
+        return "（家族内部：" + "、".join(f"{m['cn']} {m['avg']:.1f}（{m['n']} 款）" for m in mem) + "）"
+
     if not forms:
         return "池内无车，无法给出形式结论"
     if len(forms) == 1:
         f0 = forms[0]
-        return (f"池内只有{FORM_CN.get(f0['power'], f0['power'])}一种能源形式（{f0['n']} 款），"
+        return (f"池内只有{form_name(f0['power'])}一种能源形式（{f0['n']} 款），"
                 "不存在跨形式取舍，形式适配结论不适用。")
     eligible = [f for f in forms if f["n"] >= FORM_MIN_N] or forms
     top = eligible[0]
     second = eligible[1] if len(eligible) > 1 else None
-    txt = (f"本画像下{FORM_CN.get(top['power'], top['power'])}形式最合适"
+    txt = (f"本画像下{tag(top)}形式最合适"
            f"（均分 {top['avg']:.1f}，池内 {top['n']} 款，最强一款 {top['best']}）")
     if second:
         gap = round(top["avg"] - second["avg"], 1)
         if gap >= 2:
-            txt += (f"，比{FORM_CN.get(second['power'], second['power'])}（{second['avg']:.1f}）"
+            txt += (f"，比{tag(second)}形式（均分 {second['avg']:.1f}）"
                     f"明显领先 {gap:.1f} 分")
         elif gap > 0:
-            txt += (f"，与{FORM_CN.get(second['power'], second['power'])}（{second['avg']:.1f}）"
+            txt += (f"，与{tag(second)}形式（均分 {second['avg']:.1f}）"
                     f"只差 {gap:.1f} 分，按具体车型选更靠谱")
         else:
-            txt += f"，与{FORM_CN.get(second['power'], second['power'])}基本同级"
+            txt += f"，与{tag(second)}基本同级"
     thin = [f for f in forms if f["n"] < FORM_MIN_N]
     if thin:
-        txt += "；" + "、".join(f"{FORM_CN.get(f['power'], f['power'])}{f['n']}款" for f in thin) + "样本不足，不作形式结论"
+        txt += "；" + "、".join(f"{form_name(f['power'])}{f['n']}款" for f in thin) + "样本不足，不作形式结论"
+    note = mem_note(top) + (mem_note(second) if second else "")
+    if note:
+        txt += "；" + note + "差距不构成「独立能源形式」的差别，逐车仍看具体车型"
     if top["hard"]:
         txt += f"；但该形式有 {top['hard']} 款触发硬条件（无固定充电/极寒/长途续航等），需逐车核"
     return txt + "。"
@@ -966,6 +1003,15 @@ def selftest():
     assert forms and forms[0]["avg"] >= forms[-1]["avg"]
     # 每形式仅 1 款 → 全部「样本不足」，不得硬推一个「最适配」
     assert all(f["label"] == "样本不足" for f in forms), "单样本形式应标样本不足"
+    # 形式家族合并（v10.57.0）：油混与燃油同属 FUEL，结论层不再把油混当独立能源
+    rows_fuel = analyze([ice, {**ice, "power": "HEV", "model": "测试油混", "product": 80.0}], DEFAULT_COND)
+    f_fuel = recommend_form(rows_fuel, DEFAULT_COND)
+    fuel = [f for f in f_fuel if f["power"] == "FUEL"]
+    assert fuel, "油混与燃油应合并为 FUEL 家族"
+    assert {m["power"] for m in fuel[0]["members"]} == {"ICE", "HEV"}, "家族内部应保留逐能源明细"
+    assert not [f for f in f_fuel if f["power"] == "HEV"], "HEV 不应再单列为一种形式家族"
+    assert fuel[0]["n"] == 2 and abs(fuel[0]["avg"] - (ice["product"] + 80.0) / 2) < 1.0, "家族均分应为逐车加权"
+    assert form_name("HEV") == "油混" and form_name("FUEL") == "燃油（含油混）"
     # 扩到 3 款纯电后，纯电才成为「最适配」
     rows3 = analyze([bev, {**bev, "model": "测试纯电B", "product": 80.0},
                      {**bev, "model": "测试纯电C", "product": 79.0}, ice], DEFAULT_COND)

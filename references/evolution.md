@@ -1627,3 +1627,12 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
 - 回归：selftest（11 因素）、`env_equivalence` 126 组（7 车×18 画像）、`env_options_test` 85/85、`midsuv_full` 52/52、`energy_compare` 21/21（含 t033 body_label）、`layout` 16/16、`bug_regression` 144/144。`build_release_regress` 91/92，唯一 FAIL 是「产物体积留 ≥600KB 余量」（历史遗留，与功能无关）。
 - 已知边界（如实披露）：MPV/越野车/方盒子SUV 当前**选不出来**——紧凑轿车池全轿车、中型 SUV 池全 SUV，结构已就位但需新品类池采集（可复用 `ah_series`+`param_score`）；HEV 与 ICE 的油耗事实仍按车系级 trims 中位取值（同车系两能源拿到同一批款型），TCO 未吃到 HEV 实测油耗优势，属数据层待修。
 - 文档：`references/用车条件因素库.md` 重写（11 项表 / 删除台账 / 限牌为何保留 / 车身形式边界 / 第八节「为什么四档而不是三分」）、`references/燃油混动打分口径.md` 第 4 条、`__init__.py`、`cross_energy_sections.method_boundary`。SKILL 10.55.0→10.56.0。
+
+## v10.57.0 形式结论合并为 3 家族（油混并回燃油）（2026-11-24）
+- 用户：「油混合油车如果差别不大，是不是可以合并，就当燃油车了，业内、大众好像也没把两者强行区分」。
+- 判断：环境层确实几乎没有区分——11 项条件里 9 项 HEV 与 ICE 同分，只在高里程（>2.5万，ICE −1 / HEV 0）与增购第二辆（ICE −1.0 / HEV 0）各差 1.0；H5 限牌 −8、H6 营运 −10 完全同罚；两者都不进新能源目录、无绿牌、购置税 10%。**「形式均分第一名=油混」这种结论，等于把燃油家族里最省油的子类抬成一种独立能源形式，确实误导。**
+- 修法：`engine.py` 加 `FORM_FAMILY`（ICE+HEV→FUEL、PHEV+EREV→NEV、BEV→BEV）与 `FAMILY_CN`，`recommend_form` 按家族聚合，同时输出 `members`（家族内逐能源 n/均分）；`form_name` 统一取名；`form_narrative` 文案改为「纯电形式最合适（均分 72.7）…；家族内部：油混 73.0（9 款）、燃油 68.7（22 款），差距不构成独立能源形式的差别」。`engine.js` 同步镜像（`recommendForm`/`formNarrative`/`formName`），`env_equivalence` 形式结论一致性断言转绿证明两端等价。
+- **不合并的部分（防止结论失真）**：逐车 power 标签仍保留 HEV/ICE，8 维产品力与 TCO 按各自事实算（同车系 9 对实测 +2.4~+9.4，雷凌 −3.2 / 轩逸 −2.4 是反例；残值 50% vs 46.07%）；页面 `form_fit` 表新增「其中（家族内明细）」列。
+- 结论级影响（唯一一处）：45 款池默认画像下家族均分 = 纯电 72.7（12 款）/ 燃油含油混 70.0（31 款），形式首位由「油混」变为「纯电」。这是更接近真实取舍的结论（默认画像有家充、无长途、不限牌），不是打分变化。
+- 回归：selftest 新增 4 条家族合并断言（FUEL 家族存在/成员含 ICE+HEV/HEV 不再单列/家族均分为加权均值）；`env_equivalence` 126 组（含形式结论一致性）、`env_options` 85/85、`filter_default` 16/16、`dynamic_blocks` 11/11、`energy_compare` 21/21、`midsuv_full` 52/52、`energy_router` 32/32、`layout` 16/16、`bug_regression` 144/144、`param_score` 7 项全绿；三张页面重建，默认榜前十不变。
+- 文档：SKILL「跨能源形式结论」条目改写为家族口径、`references/用车条件因素库.md` 新增第九节（合并依据/不合并项/结论级影响）。SKILL 10.56.0→10.57.0。

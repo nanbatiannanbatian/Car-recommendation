@@ -336,15 +336,21 @@ function verdicts(car,cond,eff,d){
   return v;
 }
 
-// ===== 能源形式聚合结论 + 画像自检（v10.53.0，与 engine.py 同源）=====
+// ===== 能源形式聚合结论 + 画像自检（v10.53.0 / 形式合并 v10.57.0，与 engine.py 同源）=====
 const FORM_CN={ICE:'燃油',HEV:'油混',PHEV:'插混',EREV:'增程',BEV:'纯电'};
+// v10.57.0：形式结论按 3 个家族（燃油含油混 / 插混·增程 / 纯电）；逐车标签仍保留油混 vs 燃油
+const FORM_FAMILY={ICE:'FUEL',HEV:'FUEL',PHEV:'NEV',EREV:'NEV',BEV:'BEV'};
+const FAMILY_CN={FUEL:'燃油（含油混）',NEV:'插混·增程',BEV:'纯电'};
 const FORM_MIN_N=3;   // 形式均分最小样本量：<3 款标「样本不足」，不参与形式推荐
+function formName(code){ return FAMILY_CN[code]||FORM_CN[code]||code; }
 function recommendForm(rows,cond){
   const agg={};
   for(const r of rows){
-    const p=r.power;
-    if(!agg[p]) agg[p]={power:p,n:0,sum:0,adjSum:0,hard:0,bad:0,best:null,bestScore:-1e9};
-    const a=agg[p];
+    const p=r.power, fam=FORM_FAMILY[p]||p;
+    if(!agg[fam]) agg[fam]={power:fam,n:0,sum:0,adjSum:0,hard:0,bad:0,best:null,bestScore:-1e9,members:{}};
+    const a=agg[fam];
+    if(!a.members[p]) a.members[p]={power:p,n:0,sum:0};
+    a.members[p].n+=1; a.members[p].sum+=(r.composite||0);
     a.n+=1; a.sum+=(r.composite||0); a.adjSum+=(r.adj||0);
     if(r.hard&&r.hard.length) a.hard+=1;
     const vs=r.verdicts||{};
@@ -353,9 +359,11 @@ function recommendForm(rows,cond){
   }
   const out=Object.keys(agg).map(p=>{
     const a=agg[p];
+    const members=Object.keys(a.members).map(k=>({power:k,cn:FORM_CN[k]||k,n:a.members[k].n,
+      avg:Math.round((a.members[k].sum/a.members[k].n)*10)/10})).sort((x,y)=>y.avg-x.avg);
     return {power:p,n:a.n,avg:Math.round((a.sum/a.n)*10)/10,
             avg_adj:Math.round((a.adjSum/a.n)*100)/100,
-            hard:a.hard,bad:a.bad,best:a.best};
+            hard:a.hard,bad:a.bad,best:a.best,members:members};
   });
   out.sort((x,y)=> (y.avg-x.avg) || (x.hard-y.hard) || (y.n-x.n));
   const eligible=out.filter(x=>x.n>=FORM_MIN_N);
@@ -373,21 +381,29 @@ function recommendForm(rows,cond){
   return out;
 }
 function formNarrative(forms,cond){
+  const tag=f=>formName(f.power);
+  const memNote=f=>{
+    const mem=f.members||[];
+    if(mem.length<=1) return '';
+    return '（家族内部：'+mem.map(m=>m.cn+' '+m.avg.toFixed(1)+'（'+m.n+' 款）').join('、')+'）';
+  };
   if(!forms||!forms.length) return '池内无车，无法给出形式结论';
   if(forms.length===1){const f0=forms[0];
-    return '池内只有'+(FORM_CN[f0.power]||f0.power)+'一种能源形式（'+f0.n+' 款），不存在跨形式取舍，形式适配结论不适用。';}
+    return '池内只有'+formName(f0.power)+'一种能源形式（'+f0.n+' 款），不存在跨形式取舍，形式适配结论不适用。';}
   const eligible=forms.filter(f=>f.n>=FORM_MIN_N);
   const pool=eligible.length?eligible:forms;
   const top=pool[0], second=pool[1];
-  let txt='本画像下'+(FORM_CN[top.power]||top.power)+'形式最合适（均分 '+top.avg.toFixed(1)+'，池内 '+top.n+' 款，最强一款 '+top.best+'）';
+  let txt='本画像下'+tag(top)+'形式最合适（均分 '+top.avg.toFixed(1)+'，池内 '+top.n+' 款，最强一款 '+top.best+'）';
   if(second){
     const gap=Math.round((top.avg-second.avg)*10)/10;
-    if(gap>=2) txt+='，比'+(FORM_CN[second.power]||second.power)+'（'+second.avg.toFixed(1)+'）明显领先 '+gap.toFixed(1)+' 分';
-    else if(gap>0) txt+='，与'+(FORM_CN[second.power]||second.power)+'（'+second.avg.toFixed(1)+'）只差 '+gap.toFixed(1)+' 分，按具体车型选更靠谱';
-    else txt+='，与'+(FORM_CN[second.power]||second.power)+'基本同级';
+    if(gap>=2) txt+='，比'+tag(second)+'形式（均分 '+second.avg.toFixed(1)+'）明显领先 '+gap.toFixed(1)+' 分';
+    else if(gap>0) txt+='，与'+tag(second)+'形式（均分 '+second.avg.toFixed(1)+'）只差 '+gap.toFixed(1)+' 分，按具体车型选更靠谱';
+    else txt+='，与'+tag(second)+'基本同级';
   }
   const thin=forms.filter(f=>f.n<FORM_MIN_N);
-  if(thin.length) txt+='；'+thin.map(f=>(FORM_CN[f.power]||f.power)+f.n+'款').join('、')+'样本不足，不作形式结论';
+  if(thin.length) txt+='；'+thin.map(f=>formName(f.power)+f.n+'款').join('、')+'样本不足，不作形式结论';
+  const note=memNote(top)+(second?memNote(second):'');
+  if(note) txt+='；'+note+'差距不构成「独立能源形式」的差别，逐车仍看具体车型';
   if(top.hard) txt+='；但该形式有 '+top.hard+' 款触发硬条件（无固定充电/极寒/长途续航等），需逐车核';
   return txt+'。';
 }

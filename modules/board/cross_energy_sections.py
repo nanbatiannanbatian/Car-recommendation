@@ -200,31 +200,38 @@ def sections_html(rows, meta=None):
     for f in forms:
         fits = {"最适配": "适配", "可考虑": "可观察", "次选": "次选",
                 "不建议": "不建议", "样本不足": "样本不足"}.get(f["label"], f["label"])
+        mem = f.get("members") or []
+        inner = "、".join(f"{m['cn']} {'%.1f' % m['avg']}（{m['n']} 款）" for m in mem) if len(mem) > 1 else "—"
         frows.append(
-            f"<tr><td><b>{POWER_CN.get(f['power'], f['power'])}</b></td>"
+            f"<tr><td><b>{ENG.form_name(f['power'])}</b></td>"
             f"<td class='num'>{f['rank'] if f.get('rank') else '—'}</td><td class='num'>{f['n']}</td>"
             f"<td class='num'><b>{f['avg']:.1f}</b></td>"
             f"<td class='num'>{f['avg_adj']:+.2f}</td>"
+            f"<td style='font-size:11px'>{inner}</td>"
             f"<td class='num'>{f['hard']}</td><td class='num'>{f['bad']}</td>"
             f"<td>{_esc(f['best'])}</td><td>{fits}</td></tr>")
     if len(forms) == 1:
         # 单形式池（如纯电轿车榜）：不存在跨形式比较，别拿 1 行「最适配」糊弄读者
-        only = POWER_CN.get(forms[0]["power"], forms[0]["power"])
+        only = ENG.form_name(forms[0]["power"])
         sec("form_fit",
             f"<div class='note'><b>单形式池</b>：本榜池内只有{only}一种能源形式（{forms[0]['n']} 款），"
             "不存在跨形式取舍，形式适配结论不适用；逐车比较看下方主榜与场景调节。</div>"
             f"<p>池内均分 <b>{forms[0]['avg']:.1f}</b>，最强一款 <b>{_esc(forms[0]['best'])}</b>；"
-            "跨能源形式（燃油/油混/插混/增程/纯电）在同一画像下谁更合适，见"
+            "跨能源形式（燃油含油混/插混·增程/纯电）在同一画像下谁更合适，见"
             "<a href='../energy_compare.html'>跨能源交互比较页</a>。</p>")
     else:
         sec("form_fit",
-            "<div class='note'><b>先定形式、再选车</b>：同一价位里燃油/油混/插混/增程/纯电混在一起时，"
+            "<div class='note'><b>先定形式、再选车</b>：同一价位里燃油（含油混）/插混·增程/纯电混在一起时，"
             "先看「你的前置条件更适配哪种能源形式」，再看该形式内的具体车型。"
-            "形式均分 = 池内该能源车型综合分均值（产品力 + 场景调节），受池内车源结构影响，只作形式层面参考。"
+            "形式均分 = 池内该能源形式车型综合分均值（产品力 + 场景调节），受池内车源结构影响，只作形式层面参考。"
+            "<b>形式按 3 个家族给</b>：油混与纯燃油在牌照/购置税/营运口径上完全同待遇（H5 −8、H6 −10 同罚），"
+            "条件层面 11 项里 9 项同分，故合并为「燃油（含油混）」；家族内油混 vs 燃油的均分差单列在「其中」列，"
+            "不靠拆成两种能源形式来暗示油混是独立品类。"
             "本表为**全池口径**（不叠加价格/车身/能源筛选）；顶部交互面板随筛选实时重算，两者车数不同属正常。</div>"
             f"<p><b>结论：</b>{_esc(narr)}</p>"
             "<div style='overflow-x:auto'><table><thead><tr><th>能源形式</th><th>名次</th><th>池内车数</th>"
-            "<th>形式均分</th><th>场景调节均值</th><th>硬条件车数</th><th>不建议项</th><th>最强一款</th><th>判定</th>"
+            "<th>形式均分</th><th>场景调节均值</th><th>其中（家族内明细）</th><th>硬条件车数</th><th>不建议项</th>"
+            "<th>最强一款</th><th>判定</th>"
             "</tr></thead><tbody>" + "".join(frows) + "</tbody></table></div>"
             "<p class='method'>纯电优先原则已内置：无硬条件冲突的纯电 +0.5；但无固定充电（且单位不可充）、极寒、"
             "高频长途、短持有等条件会触发硬条件或软扣分——「尽量纯电」不等于「无条件纯电」。</p>")
