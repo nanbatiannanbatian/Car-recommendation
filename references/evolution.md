@@ -1636,3 +1636,12 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
 - 结论级影响（唯一一处）：45 款池默认画像下家族均分 = 纯电 72.7（12 款）/ 燃油含油混 70.0（31 款），形式首位由「油混」变为「纯电」。这是更接近真实取舍的结论（默认画像有家充、无长途、不限牌），不是打分变化。
 - 回归：selftest 新增 4 条家族合并断言（FUEL 家族存在/成员含 ICE+HEV/HEV 不再单列/家族均分为加权均值）；`env_equivalence` 126 组（含形式结论一致性）、`env_options` 85/85、`filter_default` 16/16、`dynamic_blocks` 11/11、`energy_compare` 21/21、`midsuv_full` 52/52、`energy_router` 32/32、`layout` 16/16、`bug_regression` 144/144、`param_score` 7 项全绿；三张页面重建，默认榜前十不变。
 - 文档：SKILL「跨能源形式结论」条目改写为家族口径、`references/用车条件因素库.md` 新增第九节（合并依据/不合并项/结论级影响）。SKILL 10.56.0→10.57.0。
+
+## v10.58.0 款型按动力形式拆组（TCO 油耗口径修复，2026-11-24）
+- 背景（v10.57.0 遗留的已知缺陷）：`build_ice_scores.trims_of(rec["specs"])` 取的是整条车系款型，导致同车系的油混与燃油拿到同一批款型（卡罗拉两版都 14 款、中位都 5.64L；星瑞都 6.2L），TCO 里的油耗差被抹平，油混 8 年成本优势被低估。
+- 根因不在聚合层：`ah_series.aggregate` 早已按能源类型分好组（轩逸 ICE 9 款 fuel_wltc 5.99 / HEV 5 款 4.13），只是产出 trims 时没按动力挑。
+- 修法（通用，不写车型白名单）：`ah_series.spec_power()` 判单台款型的动力——参数页「能源类型」优先（汽油+48V 轻混仍算 ICE、汽油电驱/超混电驱归 HEV），缺失才看款型名关键词（双擎/混动/电驱→HEV、插电/插混→PHEV、增程→EREV、纯电→BEV）；都拿不到 → `unknown`，不猜。`split_specs_by_power` 出分组+统计，`specs_for_power` 挑款型并给来源标记：拆得开 `per_spec`、拆不开退回全车系 `series_all`（披露，不伪造归属）。`build_ice_scores` 逐动力取 `trims`，产出带 `trims_src`/`trims_n`；`fill_bev` 走 BEV 分组。
+- 数据结果（重算 33 款，零联网走缓存）：卡罗拉 HEV 4.13 vs ICE 5.88、轩逸 HEV 4.13 vs ICE 5.94、雷凌 HEV 4.19 vs ICE 5.74、星瑞 HEV 4.10 vs ICE 6.20、UNI-V HEV 4.28 vs ICE 6.37（此前两两相等）。全部 `per_spec`，无 `series_all` 退回。
+- 结论级影响：45 款池 TCO 分开（UNI-V 油混 0.36 元/km vs 燃油 0.54；星瑞油混 0.34 vs 0.52）；**盈亏平衡点（家充纯电 vs 池内最优燃油/油混）由 4838.7 → 14213.2 km/年**，因此「5000km 以下档」的依据从「正好在平衡点左侧」更正为「远低于平衡点、纯电固定成本收不回」——措辞同步改到 `engine.py` ⑮、`FACTORS` hint、`verdicts`、方法区默认值依据、SKILL、因素库。综合分与名次零变化（TCO 仍只披露不入分）。
+- 回归：新增 `power_split_regress.py`（23 项：A 文本映射 12 条 / B 名兜底 6 条+优先级 / C 未知不猜 / D 退回披露+空车系 / D2 混合车系零交集+油耗分档 / E 真实缓存卡罗拉油混低 15%+ / F 端到端 `trims_src` + 两动力不同批）。全套：selftest、`env_equivalence` 126 组、`env_options` 85/85、`filter_default` 16/16、`dynamic_blocks` 11/11、`energy_compare` 21/21、`midsuv_full` 52/52、`energy_router` 32/32、`layout` 16/16、`bug_regression` 144/144、`param_score` 7 项全绿；三张页面重建。
+- 文档：SKILL 新增「款型必须按动力形式拆开」条目（含规则与披露口径）、TCO basis 文案写明油耗取该动力自己的款型中位、`references/用车条件因素库.md` 平衡点更新。SKILL 10.57.0→10.58.0。

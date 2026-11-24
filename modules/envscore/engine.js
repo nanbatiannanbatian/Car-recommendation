@@ -266,7 +266,7 @@ function verdicts(car,cond,eff,d){
   }
   const ak=cond.annual_km;
   if(ak==='under5'){
-    if(P==='BEV') v.annual_km=['不建议','超低里程（<5000km/年）：低于盈亏平衡点（约4800km/年），纯电省回的能源差额抵不过保险溢价与残值差'];
+    if(P==='BEV') v.annual_km=['不建议','超低里程（<5000km/年）：远低于盈亏平衡点（约1.4万km/年），纯电省回的能源差额抵不过保险溢价与残值差'];
     else v.annual_km=['适配','超低里程：能源成本占比极小，油车/油混总花费更低'];
   }else if(ak==='under10'){
     if(P==='BEV') v.annual_km=[(cond.home_charger!=='none'?'谨慎':'不建议'),'低里程：纯电能源节省无法覆盖保险溢价与残值差（TCO 测算见持有成本区块）'];

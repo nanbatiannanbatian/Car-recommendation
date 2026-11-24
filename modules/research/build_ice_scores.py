@@ -131,6 +131,10 @@ def car_from_series(rec, group, band, sales):
     if not sc:
         return None, "可用维 < %d（参数/口碑不足，证据不足）" % PS.MIN_DIMS
     model = rec.get("official_name") or rec.get("name")
+    # v10.58.0：款型按动力形式拆开再取油耗/续航（否则同车系的油混与燃油拿到同一批款型，
+    # TCO 里油混的低油耗被抹平）。规则唯一来源 = ah_series.spec_power（能源类型 > 款型名关键词），
+    # 不只对这几款车生效——任何车型走同一条规则。
+    p_specs, trims_src = AH.specs_for_power(rec.get("specs") or [], power)
     return {
         "model": model, "power": power, "cls": rec.get("level") or "",
         "body": "轿车", "price_guide": [pmin, pmax],
@@ -138,7 +142,8 @@ def car_from_series(rec, group, band, sales):
         "sales": sales_of(rec.get("name"), model, sales),
         "scores": sc["scores"], "product": sc["product"], "coverage": sc["coverage"],
         "evidence": sc["evidence"], "explain": sc["explain"],
-        "trims": trims_of(rec.get("specs") or [], 14),
+        "trims": trims_of(p_specs, 14),
+        "trims_src": trims_src, "trims_n": len(p_specs),
         "koubei": rec.get("koubei"), "pph": rec.get("pph"),
         "specs_count": len(rec.get("specs") or []),
         "sources": {"series": AH.SERIES_URL.format(sid=rec.get("sid")),
@@ -205,7 +210,7 @@ def fill_bev(names, band=(6, 16), refresh=False):
             "kwh": g["battery_kwh"], "cltc": int(g["cltc"]),
             "price_guide": [g.get("price_min"), g.get("price_max")],
             "curb_kg": g.get("curb_kg"), "len": g.get("len"), "wid": g.get("wid"), "hgt": g.get("hgt"),
-            "trims": trims_of(rec.get("specs") or [], 14),
+            "trims": trims_of(AH.specs_for_power(rec.get("specs") or [], "BEV")[0], 14),
             "sources": {"config": AH.CONFIG_URL.format(sid=rec.get("sid"))},
         })
     return patch, gaps

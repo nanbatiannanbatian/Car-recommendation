@@ -83,11 +83,62 @@ def map_energy(txt):
         return "HEV"
     if "油电" in t or "非插电" in t:
         return "HEV"
+    if "混动" in t or "混合动力" in t:   # 只写「混动/混合动力」未说明是否插电：按非插电油混处理
+        return "HEV"
     if t.startswith("纯电"):
         return "BEV"
     if t.startswith("汽油") or t.startswith("柴油"):
         return "ICE"       # 含汽油+CNG、汽油+48V轻混等弱混/双燃料变体
     return None
+
+
+# 款型名里的动力线索（仅在参数页「能源类型」缺失时兜底用；顺序有意义，先匹配先赢）
+# 目的：把「双擎/超混电驱/插电混动/增程/纯电」这类款型名拆到具体动力，任何车型通用，不写车型白名单。
+NAME_HINTS = (
+    ("插电", "PHEV"), ("插混", "PHEV"),
+    ("增程", "EREV"),
+    ("双擎", "HEV"), ("混动", "HEV"), ("电驱", "HEV"), ("HEV", "HEV"),
+    ("纯电", "BEV"),
+)
+
+
+def spec_power(spec):
+    """单台款型 → (动力形式, 判据来源)。判据优先级：参数页能源类型 > 款型名关键词。
+    返回 (None, "unknown") 表示拿不到——调用方据此决定是并入车系主形式还是丢弃，不许猜。"""
+    txt = clean(field(spec, ID["energy_text"]) or "")
+    p = map_energy(txt)
+    if p:
+        return p, "energy_text"
+    nm = clean(spec.get("name") or "")
+    for k, v in NAME_HINTS:
+        if k in nm:
+            return v, "name_hint"
+    return None, "unknown"
+
+
+def split_specs_by_power(specs):
+    """款型按动力形式拆组 → ({power: [spec]}, 统计)。统计里的 unknown 不做推断，由调用方决定归属。"""
+    out, stats = {}, {"n_specs": 0, "by_source": {}, "unknown": 0}
+    for s in specs or []:
+        p, src = spec_power(s)
+        stats["n_specs"] += 1
+        stats["by_source"][src] = stats["by_source"].get(src, 0) + 1
+        if p is None:
+            stats["unknown"] += 1
+            continue
+        out.setdefault(p, []).append(s)
+    return out, stats
+
+
+def specs_for_power(specs, power):
+    """挑出属于某动力形式的款型 → (specs, 来源标记)。
+    来源标记：per_spec=按款型判据拆到该动力（正确）；series_all=该动力拆不出款型，退回全车系并披露。
+    绝不在拆不出时伪造款型归属——退回全量是「不知道」，不是「知道」。"""
+    groups, _ = split_specs_by_power(specs)
+    own = groups.get(power) or []
+    if own:
+        return own, "per_spec"
+    return list(specs or []), ("series_all" if specs else "none")
 
 # 参数页字段 id（单一事实源在 param_fields.py；此处只取本采集器要用的）
 from modules.research.param_fields import KNOWN_FIELDS  # noqa: E402
