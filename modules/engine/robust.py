@@ -735,6 +735,20 @@ def run_robust(matrix, weights, types, names, top_k=3,
         for i, nm in enumerate(names):
             if r["ranks"][i] <= top_k:
                 _fam_hits[nm].add(fam)
+    # v10.70：跨权重家族命中——同一家族在**任意权重方案**下进过前三即记1票。
+    # 原 family_hits 只看第一套权重(base_runs)，方法间高度相关→大面积0/6，
+    # 无法回答"换权重还稳不稳"。这里用全部 ok runs（6套权重×10算法），
+    # 每个家族仍只算1票（防抱团语义保留），但票来自任意权重视角。
+    _fam_hits_all = {nm: set() for nm in names}
+    for r in ok:
+        if "ranks" not in r:
+            continue
+        fam = FAMILY_OF.get(r.get("method"))
+        if not fam:
+            continue
+        for i, nm in enumerate(names):
+            if r["ranks"][i] <= top_k:
+                _fam_hits_all[nm].add(fam)
     n_fam = len(METHOD_FAMILIES)
 
     # v9.7.48：连续名次指标（补二值"进前top_k"截断的信息损失）。
@@ -770,6 +784,10 @@ def run_robust(matrix, weights, types, names, top_k=3,
             "family_hits": len(_fam_hits[nm]),
             "family_n": n_fam,
             "family_names": sorted(_fam_hits[nm]),
+            # v10.70 跨权重家族命中（第一档判据优先用这个，多权重视角不再全0）
+            "family_freq_all": len(_fam_hits_all[nm]) / n_fam if n_fam else 0,
+            "family_hits_all": len(_fam_hits_all[nm]),
+            "family_names_all": sorted(_fam_hits_all[nm]),
             # v9.7.48：连续名次（基准权重跨算法），补二值命中截断的盲区
             "rank_mean": (sum(_base_pos[nm]) / len(_base_pos[nm])) if _base_pos[nm] else None,
             "rank_median": (sorted(_base_pos[nm])[len(_base_pos[nm]) // 2]) if _base_pos[nm] else None,

@@ -926,9 +926,13 @@ def tier_rules(cfg: dict) -> dict:
         # v10.30.0：水桶车稳健通道——全维≥min_dim 且名次极稳(区间≤max_span、均值≤max_mean)，
         # 其余第一档门槛全过时，即使没进前三也入第一档（标"安心首选·水桶无短板"）。
         # 依据 VIKOR 妥协解(最小化最大遗憾保护均衡车)+SMAA 名次稳健性+业内对无短板的认可。
-        # 默认关闭，只有配置显式启用的品类才走；只扩清单不改分数/权重/名次。
+        # v10.70 根因修复：改为**默认启用**——此前仅1/11品类开了它，其余品类的第一档
+        # 只靠"5/6家族票"硬门槛；而 family_freq 只在第一套权重下算(base_runs)，
+        # 单权重下算法高度相关→大面积0/6(中大型榜19/22款0/6)，度量失效误杀好车。
+        # 稳健通道的 rank_mean/rank_span 是跨全部权重方案×算法算的，正好兜底。
+        # 只扩清单不改分数/权重/名次；显式 enabled=false 才关闭。
         "t1_robust": {
-            "enabled": bool((t.get("t1_robust") or {}).get("enabled", False)),
+            "enabled": bool((t.get("t1_robust") or {}).get("enabled", True)),
             "min_dim": float((t.get("t1_robust") or {}).get("min_dim", 8.0)),
             "max_rank_span": int((t.get("t1_robust") or {}).get("max_rank_span", 5)),
             "max_rank_mean": float((t.get("t1_robust") or {}).get("max_rank_mean", 7.0)),
@@ -1068,6 +1072,9 @@ def tier_report(cands: list[dict], cfg: dict, weights: list[float] | None = None
                "family_hits": a.get("family_hits"),
                "family_n": a.get("family_n"),
                "family_names": a.get("family_names") or [],
+               # v10.70 跨权重家族票（判档实际用这组，审计可见）
+               "family_hits_all": a.get("family_hits_all"),
+               "family_freq_all": a.get("family_freq_all"),
                # v9.7.48：连续名次（强推荐OR路径用，补二值命中盲区）
                "rank_mean": a.get("rank_mean"),
                "rank_span": a.get("rank_span"),
@@ -1091,10 +1098,16 @@ def tier_report(cands: list[dict], cfg: dict, weights: list[float] | None = None
         blockers = []
         rank_blockers = []  # v10.30.0：只记「进前三」类卡点，稳健通道只豁免这两条、其余门槛不放水
         # v9.7.43：第一档用家族去重命中率（同家族算法算1票，防MG07那种6票全抱团虚高）
-        _ff = a.get("family_freq")
-        _ff_hits = a.get("family_hits")
+        # v10.70：优先用「跨权重家族命中」——原 family_hits 只看第一套权重，
+        # 单权重下算法高度相关→大面积0/6（度量失效）。跨权重票来自6套权重×10算法，
+        # 每家族仍1票（防抱团不变），才真正回答"换权重还稳不稳"。
+        _ff = a.get("family_freq_all")
+        _ff_hits = a.get("family_hits_all")
         _ff_n = a.get("family_n") or 6
         _is_family = _ff is not None
+        if not _is_family:  # 兼容旧数据：无跨权重新字段时回退原单权重家族票
+            _ff = a.get("family_freq")
+            _ff_hits = a.get("family_hits")
         if not _is_family:
             # 兼容旧数据：无家族字段时回退原算法命中
             _ff, _ff_hits, _ff_n = a["method_freq"], a["method_hits"], a["method_n"]
@@ -1106,7 +1119,7 @@ def tier_report(cands: list[dict], cfg: dict, weights: list[float] | None = None
             _pass_hit = _ff >= rules["t1_min_method_freq"]
         if not _pass_hit:
             _need = f"{_min_hits}/{_ff_n}票" if _min_hits is not None else f"{rules['t1_min_method_freq']:.0%}"
-            _b = f"独立算法家族命中 {_ff_hits}/{_ff_n}={_ff:.0%}<{_need}"
+            _b = f"独立算法家族命中(跨权重) {_ff_hits}/{_ff_n}={_ff:.0%}<{_need}"
             blockers.append(_b); rank_blockers.append(_b)
         if a["topk_freq"] < rules["t1_min_joint_freq"]:
             _b = f"全情景命中 {a['topk_freq']:.0%}<{rules['t1_min_joint_freq']:.0%}"

@@ -13,7 +13,7 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 10.69.0
+version: 10.70.0
 author: "nanbatiannanbatian"
 ---
 
@@ -263,6 +263,16 @@ HTML/报告用 `--as-of <YYYYMM>` 标注事实列数据月，禁止停在"—"�
 - 已核验的领域快照（如 `runs/midsedan_bev_1218_202610/candidates_allprice.json` 25款）可作候选，**分数一律复用其中已核验的 `scores`**，不许用 Agent 补采分顶替。
 - "销量榜 Top" ≠ 候选全集：只能做候选发现器，绝不直接当入池名单（会系统性漏车）。
 - 用 `runs/` 下无指纹快照必须 `--force-stale`，并在报告显著标注"过期/强制出榜"。
+
+**①a-1 稳健第一档口径（v10.70，用户"5/6是不是太高"）**
+- **跨权重家族票**：第一档判据的"独立算法家族命中"改用 `family_hits_all`——
+  某家族在**任一套权重**下进前三即记1票（原 family_hits 只看第一套权重，
+  单权重下算法高度相关致中大型榜 19/22 款 0/6，度量失效）；每家族仍1票，
+  防抱团语义不变。旧数据无新字段时回退原票。
+- **稳健通道默认启用**：`t1_robust`（全维≥8、名次均值≤7、跨度≤5、其余门槛全过
+  可进第一档）此前 11 品类仅1个开，现默认启用（显式 enabled=false 才关）。
+  该通道的 rank_mean/span 跨6套权重×10算法算，正好补二值命中截断盲区。
+- 判档口径不变：5/6 门槛本身合理，不动分数/权重/名次，只修"票怎么算"。
 
 **①a0 症状自动生成 + 级别自动判定（v10.69，用户"手写JSON是补丁/级别别问我"）**
 - **生命周期症状自动生成**：`modules/research/lifecycle_gate_build.py` 从候选池逐月销量
