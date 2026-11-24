@@ -110,23 +110,34 @@ function idleCost(car,cond){
 function tco(car,cond){
   const T=PHYS.tco;
   const P=car.power;
-  const price=car.price||car.priceLow||0;
+  // 车价链路单位是万元（H2「≤15万」/页面报价都按万元），进 TCO 先换成元（v10.59.0 修正单位错配）
+  const price=(car.price||car.priceLow||0)*10000;
   const km=PHYS.annualKmMid[cond.annual_km];
   const unit=unitEnergyCost(car,cond);
   const energy8=unit*km*T.years;
   const ins8=(P==='BEV'||P==='PHEV'||P==='EREV'?T.insNev:T.insIce)*T.years;
   const maint8=(T.maint[P]||T.maint.ICE)*T.years;
   const isNev=(P==='BEV'||P==='PHEV'||P==='EREV');
-  const tax=price/1.13*(isNev?T.taxNevRate:T.taxIceRate);
+  let tax=price/1.13*(isNev?T.taxNevRate:T.taxIceRate);
+  if(isNev&&T.taxNevCap!=null) tax=Math.min(tax,T.taxNevCap);
   const residualLoss=price*(1-T.residual3[P]);
   const batteryRisk8=(T.batteryRisk[P]||0)*T.years;
   const idle8=idleCost(car,cond);
-  const total=energy8+ins8+maint8+tax+residualLoss+batteryRisk8+idle8;
-  return {power:P,price:price,annualKm:km,unitEnergy:+unit.toFixed(3),
+  // v10.59.0：轮胎按里程折损 + 非事故易损/电子件年预算（与 engine.py 同口径）
+  const tireLife=(T.tireLifeKm&&T.tireLifeKm[P])||60000;
+  const tirePrice=(T.tirePrice4&&T.tirePrice4[P])||2400;
+  const tireUnit=tirePrice/tireLife;
+  const tire8=tireUnit*km*T.years;
+  const wear8=((T.wear&&T.wear[P])||0)*T.years;
+  const total=energy8+ins8+maint8+tax+residualLoss+batteryRisk8+idle8+tire8+wear8;
+  return {power:P,price:price,annualKm:km,unitEnergy:+unit.toFixed(3),unitTire:+tireUnit.toFixed(4),
     energy8y:Math.round(energy8),ins8y:Math.round(ins8),maint8y:Math.round(maint8),
+    tire8y:Math.round(tire8),wear8y:Math.round(wear8),
     purchaseTax:Math.round(tax),residualLoss:Math.round(residualLoss),
     batteryRisk8y:Math.round(batteryRisk8),idle8y:idle8,elecPrice:homeElecPrice(cond),
     tco8y:Math.round(total),
+    variablePerKm:+(unit+tireUnit).toFixed(3),
+    fixed8y:Math.round(total-energy8-tire8),
     tcoPerKm:+(total/(km*T.years)).toFixed(3),basis:PHYS.tcoBasis};
 }
 function breakevenKm(cars,cond){
@@ -136,11 +147,28 @@ function breakevenKm(cars,cond){
   const b=tco(bev[0],Object.assign({},cond,{annual_km:'15to25',home_charger:'home'}));
   let bestIce=null;
   for(const c of ice){ const t=tco(c,cond); if(!bestIce||t.tco8y<bestIce.tco8y) bestIce=t; }
-  const fixedB=b.tco8y-b.unitEnergy*PHYS.annualKmMid['15to25']*PHYS.tco.years;
-  const fixedI=bestIce.tco8y-bestIce.unitEnergy*PHYS.annualKmMid['15to25']*PHYS.tco.years;
-  const unitDiff=bestIce.unitEnergy-b.unitEnergy;
+  const fixedB=b.fixed8y;
+  const fixedI=bestIce.fixed8y;
+  const unitDiff=bestIce.variablePerKm-b.variablePerKm;
   if(unitDiff<=0) return null;
   return Math.round((fixedB-fixedI)/(PHYS.tco.years*unitDiff));
+}
+function breakevenKmRange(cars,cond,spread){
+  const sp=(spread==null?0.3:spread);
+  const mid=breakevenKm(cars,cond);
+  if(mid==null) return null;
+  // 固定项整体缩放做区间（非能源成本是估算，点值会假精确）
+  const bev=cars.filter(c=>c.power==='BEV');
+  const ice=cars.filter(c=>c.power==='ICE'||c.power==='HEV');
+  if(!bev.length||!ice.length) return null;
+  const b=tco(bev[0],Object.assign({},cond,{annual_km:'15to25',home_charger:'home'}));
+  let bestIce=null;
+  for(const c of ice){ const t=tco(c,cond); if(!bestIce||t.tco8y<bestIce.tco8y) bestIce=t; }
+  const unitDiff=bestIce.variablePerKm-b.variablePerKm;
+  if(unitDiff<=0) return {km:mid,low:null,high:null,spread:sp};
+  const at=s=>Math.round((b.fixed8y*s-bestIce.fixed8y*s)/(PHYS.tco.years*unitDiff));
+  const lo=at(1-sp), hi=at(1+sp);
+  return {km:mid,low:Math.min(lo,hi),high:Math.max(lo,hi),spread:sp};
 }
 
 // ===== 场景调节（与 engine.py adjust 同源）=====
