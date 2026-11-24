@@ -13,7 +13,7 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 10.60.0
+version: 10.61.0
 author: "nanbatiannanbatian"
 ---
 
@@ -179,6 +179,12 @@ python3 energy_router.py "<用户原始提问>"    # 返回 board_type/powers/ne
 - **用车条件分组与默认过滤（v9.7.50，v10.56.0 精简到 11 项，判据见上一条）**：核心能源决策 **9 项**（营运/充电/冬季气候带/年里程/单次里程/长途频率/限牌/持有/高速）**默认平铺**；**2 项**（家庭车队/补能耐心）收进「进阶条件」折叠区、默认收起。**累计删 9 项**：v10.55.0 删夏季气温/驾驶风格/空调/电价档/露营/驻车用电/停放环境（≤2 分微调或只改 TCO 展示）；v10.56.0 删地形（路线级平均算不准，改提示自行上浮电耗 10~25%）、方盒子造型（改由车型自身风阻承担，并在车身形式筛选里区分 轿车/SUV/MPV/越野车/方盒子SUV，枚举从池内实际取值派生）。**限牌城市与年里程必须保留**：限牌是 7 条硬条件里唯一判"这车在当地能不能用"的项（H5/H7，删了会让限牌城市用户看到油车进前十）；年里程新增 **5000km 以下档**（池内实算盈亏平衡约 1.5 万 km/年（区间 1.1~2.0 万），低里程端远在平衡点左侧，纯电的保险/残值溢价收不回；v10.58.0 修正油耗口径、v10.59.0 补齐非能源成本并修正车价单位前的 4839km/年，是「同车系油混与燃油共用一批款型」的偏小值，已更正）。**默认过滤必须随榜口径注入**：`build_energy_compare.build(def_low,def_high,def_body)` 传该榜级别/价位（中型SUV榜=12-18万/SUV）——历史上因沿用示例默认「12-14万轿车」导致 SUV 榜默认空表，回归 `filter_default_test.js`（16项，分组期望值从页面 `FACTOR_GROUPS` 派生，禁止硬编码）。
 - **全环境项回归（`env_options_test.js`，92项）**：遍历 11 项×每个选项，断言非中性选项至少对某车生效（软分/硬条件/续航/**TCO** 之一变化）、无 NaN/越界、关键硬条件阈值正确（无桩纯电−15/极寒低价−12/限牌油车−8/营运油车−10/over8纯电+1.0/单位充电不触发−15）、极端组合合法，并校验形式结论排序与画像自检。中性选项白名单需 hint 有据。**已抓出并修复**：`hold_years=over8` 曾漏实现（已补软调节）。
 - 出 B 类固定榜命令：`python3 build_midsuv_full.py`（中型SUV 12-18万，读候选池+补采分→构造 cars→注入区块→交互 HTML）；
+  `python3 build_large_suv_bev.py`（**中大型纯电SUV 榜（v10.61.0，单形式池）**：官方二级分类=中大型SUV +
+  车系页有纯电分组 + 指导价低配 15–90 万；名单只写车名（`categories/universe_large_suv_bev.json`），
+  级别/价格/三电/参数全部由 `ah_series` 解析，8 维走 `param_score` 参数驱动，电耗优先「车重+风阻+迎风面积」
+  物理估算、缺风阻才退回电量÷CLTC；安全维只在有官方碰撞判档（`official_safety_scores` / C-NCAP 得分率映射）时计权，
+  无判档留空不加权；大型SUV（ES8/M8/M9/N9/L90/HL/N8L/9X/S09/LS9）与中型SUV 按官方级别明确不入。
+  单形式池没有「纯电 vs 燃油」对象，摘要区平衡里程显示 — 并在页首注明口径；数据边界与其它榜一致：`categories/*.json`、`data/gen/*` 属开发树事实库，不随发布包（包里只有代码与文档，零 JSON 铁律不变））；
   `python3 build_compact_sedan.py`（**6-16万 紧凑型轿车（多能源形式）**：官方分类=紧凑型车 + 车身轿车 +
   指导价低配 6–16万；纯电三电完整才入榜，燃油/油混/插混/增程由 `build_ice_scores.py` 参数驱动 8 维**自动打分**，
   缺电量/CLTC 的纯电自动从汽车之家参数页补采，补不到才进「未入榜·待补采」。多形式池自动启用
