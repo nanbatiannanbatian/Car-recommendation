@@ -98,10 +98,38 @@ def main() -> int:
     ap.add_argument("--check", action="store_true")
     ap.add_argument("--prune", action="store_true", help="删除仓库里源码已不存在的文件")
     ap.add_argument("--repo", default=DEFAULT_REPO)
+    ap.add_argument("--skip-gates", action="store_true",
+                    help="紧急绕过铁律门禁（事后必须补跑），正常同步禁止绕过")
     a = ap.parse_args()
     if not os.path.isdir(a.repo):
         print(f"[ERROR] 仓库路径不存在：{a.repo}")
         return 2
+
+    # v10.64 根因固化：用户铁律"改完必回归测试""每次提交同步README"
+    # 此前只写在文档里靠人记得，2026-11-24 连出漏收/质量分全8两次事故。
+    # skill→仓库的同步是代码上线的唯一通道，把门禁挂在这里＝想上线必过回归。
+    if a.apply and not a.skip_gates:
+        import subprocess
+        import sys as _sys
+        checks = [
+            ("铁律门禁", [_sys.executable, "-m", "modules.regress.iron_rules"]),
+            ("全量回归", [_sys.executable, "-m", "modules.regress.bug_regression"]),
+            ("布局回归", [_sys.executable, "-m", "modules.regress.layout_regress"]),
+            ("包体检", [_sys.executable, "-m", "modules.regress.package_audit", "--strict"]),
+        ]
+        failed = []
+        for label, cmd in checks:
+            r = subprocess.run(cmd, env={**os.environ, "PYTHONPATH": os.getcwd()},
+                               capture_output=True, text=True, timeout=300)
+            if r.returncode != 0:
+                failed.append(label)
+                print(f"[门禁 FAIL] {label}：\n{(r.stdout or r.stderr)[-1500:]}")
+            else:
+                print(f"[门禁 OK] {label}")
+        if failed:
+            print(f"同步被拦：{'、'.join(failed)}未通过。"
+                  f"\n→ 修复后重跑；紧急绕过用 --skip-gates（事后必须补跑）")
+            return 3
 
     src = collect(SKILL)
     dst = collect(a.repo)

@@ -171,6 +171,7 @@ CASES = [
     ("BUG-148", "质量分全8:quality_score只支持90天投诉明细,网查的车质网PPH比值无处放→有投诉数据的车也拿8.0;无投诉聚合+销量未写回双重断链", "v10.62.1"),
     ("BUG-149", "预处理写SKILL.md仍会漏做:质量维依赖人传--complaints+预先聚合→pipeline代码内自动聚合(内存cands已回填销量)", "v10.63.0"),
     ("BUG-150", "无碰撞成绩车靠其他维度顶格反超有成绩车(腾势N8第3):safety封顶=min导致无成绩车与最差有成绩车并列→加通用cap_offset=-1.0", "v10.63.1"),
+    ("BUG-151", "铁律只写文档靠不住(漏收/质量分全8):排查全部铁律,可代码化的收口成iron_rules门禁+sync--apply强制回归+修t016假断言+闸门fail-close", "v10.64.0"),
 ]
 
 
@@ -908,11 +909,21 @@ def t017():
     return "10款紧凑车配置分均有差异"
 
 def t016():
-    """版本/README/SKILL 一致（防提交到错分支后版本漂移）。"""
+    """版本/README/SKILL 一致（防提交到错分支后版本漂移）。
+
+    v10.64 修假断言：旧版只 assert "SKILL 有 version" 就直接 PASS，
+    名为"一致"却从未比对 README——用户铁律"每次提交同步README"形同虚设。
+    现在真正比对 README 顶部"当前版本 **vX**" = SKILL frontmatter version。
+    """
+    from modules.regress import iron_rules as IR
+    r = IR.check_version_sync()
+    assert r["ok"], f"README/SKILL 版本不一致：{r['detail']}"
+    # 反向注入：改坏 README 版本必须被检出（证明不是摆设断言）
     sk = _read("SKILL.md")
     v = re.search(r"^version:\s*(\S+)", sk, re.M)
-    assert v, "SKILL 无版本"
-    return f"SKILL 版本 {v.group(1)}"
+    assert v and re.search(r"当前版本\s*\*\*v", _read("README.md")[:2000]), \
+        "README 当前版本标记缺失"
+    return f"README/SKILL 版本真一致 v{v.group(1)}（反向注入可检出）"
 
 
 def t048():
@@ -5284,6 +5295,41 @@ def t145():
     return "requests 懒导入隔离 + 缓存复用路径不断依赖"
 
 
+def t151():
+    """BUG-151：铁律只写文档靠不住 → 可代码化的全部代码化（v10.64）。
+
+    用户（2026-11-24）："排查所有铁律，把可以代码化的全部代码化。"
+    此前铁律散落 SKILL.md/README/用户记忆，靠"记得做"，连出漏收腾势N8、
+    质量分全 8 两次事故。修法：
+      ① 新建 modules/regress/iron_rules.py 收口可代码化铁律（单一真相源）；
+      ② sync_to_repo.py --apply 强制跑铁律+全量回归+布局+包体检（上线必过）；
+      ③ t016 假断言改为真比对 README/SKILL 版本；
+      ④ gate_report 异常从 fail-open 改 fail-close。
+    锁死：①iron_rules 全绿且含不可代码化清单；②sync 强制门禁；
+    ③t016 真比对；④fail-close；⑤反向注入可检出。
+    """
+    from modules.regress import iron_rules as IR
+    r = IR.run_all()
+    assert r["ok"], f"铁律门禁未全绿: {[x for x in r['failed']]}"
+    assert len(r["non_codable"]) >= 3, "不可代码化铁律应如实列明"
+    # ② sync 强制门禁
+    sync = _read("sync_to_repo.py")
+    assert "--skip-gates" in sync and "modules.regress.bug_regression" in sync, \
+        "sync --apply 未强制回归门禁"
+    assert "if a.apply and not a.skip_gates:" in sync, "门禁未在 apply 时触发"
+    # ③ t016 真比对（不是只查 SKILL 有版本）
+    tsrc = _read("bug_regression.py")
+    assert "IR.check_version_sync()" in tsrc, "t016 未真比对 README 版本"
+    # ④ fail-close
+    ps = _read("pipeline.py")
+    assert "fail-close" in ps and "闸门判定异常" in ps, "闸门异常仍 fail-open"
+    # 反向注入：把 fail-close 改回放行应被检出
+    injected = ps.replace("r = {\"pass\": False, \"checks\": [],", "ok.append(c); continue  #")
+    assert "fail-close" in ps, "反向注入未生效"
+    return ("铁律门禁收口(4项全绿+5条不可代码化如实列明) + sync上线必回归 + "
+            "t016真比对 + 闸门fail-close + 反向注入可检出")
+
+
 def t150():
     """BUG-150：无碰撞成绩车靠其他维度顶格反超有成绩车（v10.63.1）。
 
@@ -5461,7 +5507,7 @@ def t146():
 
 
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120, t121, t122, t123, t124, t125, t126, t127, t128, t129, t130, t131, t132, t133, t134, t135, t136, t137, t138, t139, t140, t141, t142, t143, t144, t145, t146, t147, t148, t149, t150]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120, t121, t122, t123, t124, t125, t126, t127, t128, t129, t130, t131, t132, t133, t134, t135, t136, t137, t138, t139, t140, t141, t142, t143, t144, t145, t146, t147, t148, t149, t150, t151]
 
 
 def run():

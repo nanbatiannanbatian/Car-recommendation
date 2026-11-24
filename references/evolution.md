@@ -1704,3 +1704,15 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
 - **②无成绩车降档**：根因不是机制失效——evidence_gate 已把腾势N8 safety 从 7.8 压到 7.2（cap_to=min），但 safety 权重仅 17.7%，它靠三电9.2/操控9.0/车机9.2 顶格仍排第3压过 C-NCAP 车。用户选方案A：DIM_POLICY 加通用 `cap_offset`（safety=-1.0），无证据车封顶 = 有证据车最低 −1；不动权重、不搞车型特判、其它维默认0不受影响。实测腾势N8 从第3退出前十，前10全为有官方碰撞成绩车。BUG-150。
 - 回归：bug148/148(可注入116) + layout16/16 + release92/92 + midsuv52/52 + 包体检 + 官方校验全绿；23款全入榜、完整性23-23-0、一致性0冲突。版本10.62.1→10.63.1。
 - 教训：①"写进SKILL.md"≠"会执行"，关键流程必须代码化；②封顶幅度不足等于没封顶——门槛类维度要让无证据车明确低于有证据车，不是并列。
+
+## v10.64.0 铁律代码化（2026-11-24）
+- 用户："排查所有铁律，把可以代码化的全部代码化"。此前铁律散落 SKILL.md/README/用户记忆靠"记得做"，2026-11-24 连出漏收腾势N8、质量分全8两次事故，证明文档纪律靠不住。
+- 排查三路并行（SKILL.md铁律 / README+用户记忆 / 现有代码化门禁），产出清单后分类：可代码化 / 已代码化 / 不可代码化。
+- **可代码化且本轮落实**：
+  ① 新建 `modules/regress/iron_rules.py` 单一真相源：README/SKILL版本真比对（修 t016 假断言——旧版只 assert "SKILL有version"就PASS）、证据URL可核验（扫占位根域）、路径走paths.cat（复用layout_regress精确口径避免自查误报）、契约自带selftest。4/4绿。
+  ② `sync_to_repo.py --apply` 强制门禁：skill→仓库是唯一上线通道，同步前跑 iron_rules + bug_regression(34s) + layout_regress + package_audit，任一FAIL拒同步（--skip-gates紧急逃生）。这是"改完必回归"的代码落点——仓库侧跑回归会因缺data/gen/runs产物误FAIL，所以放skill侧上线通道。
+  ③ gate_report 异常从 fail-open（except里ok.append放行）改 fail-close（按无法判定落榜并写明）。
+  ④ `install_hooks.py` 唯一可写源强化：pre-commit跑 iron_rules + package_audit 只读门禁（约1s，仓库环境可过）；移除仓库侧回归（实测energy_compare因缺master_pool误FAIL）。
+- **不可代码化**（`NON_CODABLE`如实列明）：页面渲染改动先确认（人际交互）、不许打补丁（语义判断）、不许编造（无法区分查不到与编造）、尽量收全的程度（universe门禁部分覆盖）、口径变更先拍板（人际交互）。
+- 回归：bug149/149(可注入116)+layout16/16+release92/92+midsuv52/52+energy21/21+router32/32+包体检+iron4/4全绿。端到端验证：注入README版本漂移v9.9.9→iron_rules退出码1拦截，还原后0。
+- 教训：①可代码化的铁律必须代码化，"写进文档"≠"会执行"；②检查器自身会被检查——正则里的字面量要拆写躲开自查误报；③fail-open的异常处理等于没有门禁；④不可代码化的要如实列明，不假装覆盖。

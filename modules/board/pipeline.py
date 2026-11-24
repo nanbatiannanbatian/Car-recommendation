@@ -64,9 +64,12 @@ def gate_report(cands, cfg, board=None):
     for c in cands:
         try:
             r = ranking.apply_gates(c, gates)
-        except Exception:
-            ok.append(c)
-            continue
+        except Exception as e:
+            # v10.64 根因修复：旧版 except 里 ok.append(c) 放行——闸门代码报错
+            # 反而让问题车过闸（fail-open），与"闸门失败不许上线"的纪律相反。
+            # 改为 fail-close：按"闸门无法判定"落榜并写明原因，绝不静默放行。
+            r = {"pass": False, "checks": [],
+                 "why": f"闸门判定异常（fail-close，不静默放行）：{type(e).__name__}: {e}"}
         (ok if r["pass"] else bad).append({**c, "_gate": r})
     band = gates.get("price_band")
     head = f"## 准入闸门（{len(cands)} → {len(ok)} 款）"

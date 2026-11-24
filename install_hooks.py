@@ -7,8 +7,13 @@
     python install_hooks.py            # 装到默认仓库路径
     python install_hooks.py <repo路径> # 指定仓库
 
-设计：钩子只跑 <1s 的 package_audit 源码检查（自包含/死链/文档命令/活跃标识符），
-不跑 41s 的 bug_regression（显式命令才跑），带 SKIP_AUDIT=1 逃生阀。
+设计（v10.64 强化）：
+  · 钩子跑 iron_rules（README/SKILL 版本一致、证据URL、路径收口、契约自检）
+    + package_audit 源码检查（只读源码，仓库环境可过，约 1s）；
+  · 不跑任何回归——仓库按零JSON策略不带 data/gen、runs/ 产物，回归在仓库会误 FAIL。
+    回归已固化在 sync_to_repo.py --apply（skill→仓库唯一上线通道，有全量数据），
+    所以"改完必回归"不会漏；仓库侧提交只做只读门禁；
+  · 带 SKIP_AUDIT=1 逃生阀，事后必须补跑。
 详见钩子内容与设计理由。
 """
 import os
@@ -19,8 +24,9 @@ HOOK_NAME = "pre-commit"
 DEFAULT_REPO = Path("C:/Users/海南岛南霸天/WorkBuddy/2026-11-13-15-03-08/omni-debate-github")
 
 HOOK_BODY = r'''#!/bin/sh
-# pre-commit 快速门禁（v10.40.0）——确定性工具取代人工逐行检查
-# 每次提交跑 <1s 的判定性检查；41s 的全量 bug_regression 不在此（显式命令跑）
+# pre-commit 只读门禁（v10.64 强化）——确定性工具取代人工逐行检查
+# 铁律门禁(README版本/证据URL/路径/契约) + 包体检，约1s，仓库环境可过
+# 回归不在此（仓库缺 data/gen/runs 产物会误FAIL）——固化在 sync --apply（上线通道）
 # 逃生阀：SKIP_AUDIT=1 git commit ...（紧急情况用，事后补跑）
 
 if [ "${SKIP_AUDIT:-0}" = "1" ]; then
@@ -39,23 +45,33 @@ if ! echo "$STAGED" | grep -qE '\.(py|md|json)$|(^|/)SKILL\.md$|(^|/)README\.md$
   exit 0
 fi
 
-echo "[pre-commit] 快速体检（包自包含/死链/文档命令/活跃标识符，~0.4s）..."
+echo "[pre-commit] 铁律门禁 + 快速体检（~2s）..."
 FAILED=0
 
-# 包体检源码树部分——在 skill 目录与 GitHub 仓库都能过（自包含，不依赖随包 JSON）。
-# 不跑发布包 zip 部分（钩子时 zip 可能过期）；不跑 layout_regress（它查人工事实库存在，
-# 而仓库按零JSON策略不带这些文件，只在 skill 目录 PASS——钩子在仓库跑会误拦）。
+# ① 用户铁律门禁（v10.64）：README/SKILL 版本一致、证据URL可核验、路径收口、契约自检。
+# 在 skill 目录与仓库都能过（只读源码，不依赖 runs/ 产物）。
+if ! PYTHONPATH=. "$PY" -m modules.regress.iron_rules > /tmp/iron_hook.log 2>&1; then
+  echo "[pre-commit][FAIL] 铁律门禁未通过，详情: /tmp/iron_hook.log"
+  tail -10 /tmp/iron_hook.log
+  FAILED=1
+fi
+
+# ② 包体检源码树部分——不跑 zip 部分（钩子时 zip 可能过期）。
 if ! PYTHONPATH=. "$PY" -m modules.regress.package_audit > /tmp/pkg_audit_hook.log 2>&1; then
   echo "[pre-commit][FAIL] 包体检未通过，详情: /tmp/pkg_audit_hook.log"
   tail -8 /tmp/pkg_audit_hook.log
   FAILED=1
 fi
 
+# ③ 不做仓库侧回归：energy_compare/midsuv/bug 全量都依赖 data/gen、runs/ 产物，
+#    仓库按零JSON策略不带这些文件（实测会误 FAIL）。回归已固化在
+#    sync_to_repo.py --apply（skill 目录有全量数据，上线必经），仓库侧只做只读门禁。
+
 if [ "$FAILED" = "1" ]; then
   echo ""
   echo "提交被拦。处理："
   echo "  - 修复后重新 git add && git commit"
-  echo "  - 全量回归（含41s bug_regression）: PYTHONPATH=. python -m modules.regress.bug_regression"
+  echo "  - 全量回归（34s）: PYTHONPATH=. python -m modules.regress.bug_regression"
   echo "  - 紧急绕过: SKIP_AUDIT=1 git commit ... （事后必须补跑）"
   exit 1
 fi

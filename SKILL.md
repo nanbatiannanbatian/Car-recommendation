@@ -13,7 +13,7 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 10.63.1
+version: 10.64.0
 author: "nanbatiannanbatian"
 ---
 
@@ -263,6 +263,19 @@ HTML/报告用 `--as-of <YYYYMM>` 标注事实列数据月，禁止停在"—"�
 - 已核验的领域快照（如 `runs/midsedan_bev_1218_202610/candidates_allprice.json` 25款）可作候选，**分数一律复用其中已核验的 `scores`**，不许用 Agent 补采分顶替。
 - "销量榜 Top" ≠ 候选全集：只能做候选发现器，绝不直接当入池名单（会系统性漏车）。
 - 用 `runs/` 下无指纹快照必须 `--force-stale`，并在报告显著标注"过期/强制出榜"。
+
+**①b 铁律代码化（v10.64）**
+用户铁律不再只靠文档纪律——可代码化的全部收口到 `modules/regress/iron_rules.py`（单一真相源）：
+- **README/SKILL 版本一致**：`iron_rules.check_version_sync` 真比对（修 t016 假断言）；
+- **证据 URL 可核验**：扫 trims.json 占位根域；**路径走 paths.cat**：禁硬编码 categories 拼接；
+- **契约自带 selftest**：trims_schema/candidate_schema/quality_score/trim_coverage 自检；
+- **改完必回归**：固化在 `sync_to_repo.py --apply`——skill→仓库是唯一上线通道，同步前强制跑
+  iron_rules + bug_regression(34s) + layout_regress + package_audit，任一失败拒绝同步（紧急 `--skip-gates` 事后补跑）；
+- **闸门 fail-close**：gate_report 异常不再静默放行，按"无法判定"落榜并写明原因；
+- 不可代码化的铁律（页面渲染改动先确认 / 不许打补丁 / 不许编造 / 尽量收全的程度 / 口径变更先拍板）
+  在 `iron_rules.NON_CODABLE` 如实列明，不假装覆盖。
+- pre-commit 钩子（`install_hooks.py` 唯一可写源）跑只读门禁 iron_rules + package_audit；
+  回归不在仓库侧跑（缺 data/gen/runs 产物会误 FAIL），由 sync --apply 覆盖。
 
 **② 出榜流程（唯一命令）**
 ```bash
