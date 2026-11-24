@@ -30,6 +30,10 @@ HERE = str(paths.ROOT)
 sys.path.insert(0, HERE)
 # 物理模型单一事实源：从 ev_range_model import，杜绝两处系数漂移（不打补丁原则）
 from modules.physics import ev_range_model as ERM
+# v10.52.0：用车条件因素表/分组/默认画像/硬条件+TCO 常量统一从 engine.py import
+# （规则单一事实源；engine.js 是浏览器交互镜像，由等价回归守护）
+from modules.envscore.engine import (FACTORS, FACTOR_GROUPS, DEFAULT_COND, TCO,
+                                     CORE_FACTORS, ANNUAL_KM_MID, tco_js)
 MP = str(paths.cat("master_pool.json"))
 TR = str(paths.cat("trims.json"))
 FL = str(paths.cat("fact_library.json"))  # 真实电耗/电量
@@ -96,133 +100,9 @@ POWER_META = {
     "BEV":  {"name": "纯电动",   "short": "纯电", "color": "#1f6f8b", "desc": "只用电，家充成本最低，冬季/高速续航打折"},
 }
 
-# 用车条件下拉框定义（此处只承载文案与默认值；调节分值在页面 JS 的 computeAdjust 中按具体车型计算）
-FACTORS = {
-    "operation": {
-        "label": "是否营运", "default": "no",
-        "desc": "营运车辆（网约/出租）以纯电为主，运营成本是核心",
-        "options": [
-            {"v": "no",  "label": "非营运（家用为主）", "hint": "按家用场景综合权衡"},
-            {"v": "yes", "label": "营运（网约/出租）",  "hint": "高频行驶+成本敏感，纯电车型加分、燃油/油混减分"},
-        ],
-    },
-    "winter_temp": {
-        "label": "冬季最低气温", "default": "m10to0",
-        "desc": "用于计算纯电有效续航：−10℃约衰减20–45%，−20℃可达40–60%",
-        "options": [
-            {"v": "above0",  "label": "0℃以上（华南）",        "hint": "温度系数0.95，纯电几乎无冬季衰减"},
-            {"v": "m10to0",  "label": "-10~0℃（江淮/长三角）", "hint": "温度系数0.85（默认）"},
-            {"v": "m20tom10","label": "-20~-10℃（华北/山东）", "hint": "温度系数0.68，纯电衰减明显"},
-            {"v": "underm20","label": "-20℃以下（东北/内蒙）", "hint": "温度系数0.50，纯电续航可能腰斩"},
-        ],
-    },
-    "annual_km": {
-        "label": "年行驶里程", "default": "15to25",
-        "desc": "成本平衡点约0.83–1.5万公里：低于此油车省心，高于此电车省钱",
-        "options": [
-            {"v": "under10", "label": "1万公里以下",     "hint": "跑得少，纯电小幅减分、油车加分"},
-            {"v": "10to15",  "label": "1万~1.5万公里",   "hint": "接近平衡点，不调节"},
-            {"v": "15to25",  "label": "1.5万~2.5万公里", "hint": "超过平衡点（默认）"},
-            {"v": "over25",  "label": "2.5万公里以上",   "hint": "高里程，纯电省钱优势加分"},
-        ],
-    },
-    "single_trip": {
-        "label": "单次最长连续里程", "default": "300to500",
-        "desc": "核心调节项：需求里程超过纯电有效续航时，按缺口扣分",
-        "options": [
-            {"v": "under150", "label": "150km 以下",   "hint": "需求约100km，纯电普遍胜任"},
-            {"v": "150to300", "label": "150~300km",    "hint": "需求约220km"},
-            {"v": "300to500", "label": "300~500km",    "hint": "需求约400km（默认）"},
-            {"v": "over500",  "label": "500km 以上",   "hint": "需求约600km，纯电续航不足将明显扣分"},
-        ],
-    },
-    "long_trip_freq": {
-        "label": "长途频率（该里程一年几次）", "default": "few",
-        "desc": "长途次数多时，纯电补能时间成本高，可油可电更灵活",
-        "options": [
-            {"v": "rare",    "label": "几乎没有",        "hint": "纯电小幅加分"},
-            {"v": "few",     "label": "一年 1~5 次",     "hint": "偶发长途（默认）"},
-            {"v": "monthly", "label": "一年 6~20 次",    "hint": "较频繁，纯电减分、油/混动加分"},
-            {"v": "weekly",  "label": "每月都有/更频繁", "hint": "高频长途，纯电明显减分"},
-        ],
-    },
-    "home_charger": {
-        "label": "充电条件", "default": "home",
-        "desc": "家充是电车经济性的前提；无稳定充电时插混长期亏电油耗会恶化",
-        "options": [
-            {"v": "home",   "label": "有家用充电桩",       "hint": "纯电/插混/增程加分（默认）"},
-            {"v": "public", "label": "无家充但有稳定公充", "hint": "不额外调节"},
-            {"v": "none",   "label": "完全没有固定充电",   "hint": "纯电大幅减分，插混/增程减分，油车/油混加分"},
-        ],
-    },
-    "plate_limit": {
-        "label": "是否限牌城市", "default": "no",
-        "desc": "限牌城市新能源可直接上牌，燃油/油混需摇号或拍牌",
-        "options": [
-            {"v": "no",  "label": "不限牌", "hint": "不调节（默认）"},
-            {"v": "yes", "label": "限牌城市", "hint": "新能源加分、燃油/油混减分"},
-        ],
-    },
-    "hold_years": {
-        "label": "计划持有年限", "default": "5to8",
-        "desc": "持有越久，残值影响越摊薄，电车的能源节省越明显",
-        "options": [
-            {"v": "under3", "label": "3 年内换车", "hint": "纯电折旧快，减分；油车加分"},
-            {"v": "3to5",   "label": "3~5 年",     "hint": "不调节"},
-            {"v": "5to8",   "label": "5~8 年",     "hint": "默认"},
-            {"v": "over8",  "label": "8 年以上",   "hint": "纯电加分"},
-        ],
-    },
-    "highway_ratio": {
-        "label": "高速工况占比", "default": "20to40",
-        "desc": "增程高速油耗最高（油→电→轮二次损耗）；插混直驱高速效率更优。高速还会降低纯电有效续航",
-        "options": [
-            {"v": "under20", "label": "20% 以下（市区为主）", "hint": "高速系数1.0，纯电小幅加分"},
-            {"v": "20to40",  "label": "20%~40%",             "hint": "高速系数0.92（默认）"},
-            {"v": "40to60",  "label": "40%~60%",             "hint": "高速系数0.82，增程减分"},
-            {"v": "over60",  "label": "60% 以上（常年高速）", "hint": "高速系数0.72，增程明显减分、纯电续航打折"},
-        ],
-    },
-    "boxy": {
-        "label": "方盒子造型", "default": "no",
-        "desc": "方盒子车型车重风阻大，高速能耗显著上升（如钛7这类承载式方盒子）",
-        "options": [
-            {"v": "no",  "label": "普通造型", "hint": "按实际风阻参数计算（默认）"},
-            {"v": "yes", "label": "看重方盒子/风味越野", "hint": "按方盒子修正能耗，叠加高频高速时混动意义打折"},
-        ],
-    },
-    "drive_style": {
-        "label": "驾驶风格", "default": "normal",
-        "desc": "暴力驾驶（急加速/高速）显著增加能耗，CLTC理想工况未计入",
-        "options": [
-            {"v": "mild",       "label": "温和（省电驾驶）",  "hint": "能耗 ×0.92"},
-            {"v": "normal",     "label": "正常",             "hint": "能耗 ×1.0（默认）"},
-            {"v": "aggressive", "label": "暴力（经常急加速）", "hint": "能耗 ×1.15"},
-        ],
-    },
-    "ac_usage": {
-        "label": "空调使用", "default": "normal",
-        "desc": "CLTC理想工况空调负载低；实际开空调（尤其冬夏）会增加能耗",
-        "options": [
-            {"v": "off",    "label": "很少开空调",   "hint": "能耗 ×0.97"},
-            {"v": "normal", "label": "正常开空调",   "hint": "能耗 ×1.0（默认）"},
-            {"v": "heavy",  "label": "空调常开/开大风", "hint": "能耗 ×1.10"},
-        ],
-    },
-}
-
-
-# 用车条件下拉分组（v9.7.50）：按业内调研的决策权重分三组，帮助用户聚焦。
-# 不改动 FACTORS 的 v/default/options，故回归（env_options_test）行为不变。
-FACTOR_GROUPS = [
-    ("核心能源决策", ["home_charger", "winter_temp", "annual_km", "single_trip",
-                   "long_trip_freq", "plate_limit", "hold_years", "highway_ratio"],
-     "以下 8 项直接决定燃油/混动/纯电谁更合适（依据：家充是油电分水岭、−10℃纯电平均衰减32.7%、绿牌通行红利等）"),
-    ("能耗微调", ["boxy", "drive_style", "ac_usage"],
-     "以下 3 项主要影响电耗与有效续航，不改变能源形式的大方向"),
-    ("特殊场景", ["operation"],
-     "营运/网约等高频场景，家用用户可忽略"),
-]
+# 用车条件因素表（13 项）/ 分组 / 默认画像：单一事实源在 modules/envscore/engine.py，
+# 本页不再持有副本（防两套口径漂移）。调节分值在页面 JS 的 computeAdjust/adjust 中
+# 按具体车型计算，规则与 engine.py 一一对应（env_equivalence_regress 双向等价守护）。
 
 
 def norm(s):
@@ -346,7 +226,7 @@ def load_cars():
             "model": c["model"],
             "brand": t.get("brand", ""),
             "cls": t.get("cls", ""),
-            "body": t.get("body", ""),
+            "body": body_label(t, c),
             "power": power,
             "price": t.get("price_wan"),
             "priceLow": guide[0] if len(guide) > 0 else None,
@@ -367,6 +247,27 @@ def load_cars():
 
 def js(obj):
     return json.dumps(obj, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
+
+
+# 车身形式归一（v10.56.0）：「方盒子造型」不再作为用车条件，改由车型自身承担：
+#   ① 官方车身类型（三厢/两厢/SUV/MPV）直接映射；
+#   ② 只有拿到客观字段才升级子类——offroad 标记/非承载结构 → 越野车；
+#      boxy 标记（方盒子车系，如风阻 Cd≥0.33 且车高/车长≥0.36 的 SUV）→ 方盒子SUV。
+#   拿不到就停在「SUV」，不靠外形主观猜（项目纪律：不编造）。
+BODY_ALIAS = {"三厢车": "轿车", "两厢车": "轿车", "轿车": "轿车", "SUV": "SUV", "MPV": "MPV", "皮卡": "皮卡"}
+
+
+def body_label(t, c):
+    explicit = (t.get("body_form") or c.get("body_form") or "").strip()
+    if explicit:
+        return BODY_ALIAS.get(explicit, explicit)
+    base = BODY_ALIAS.get((t.get("body") or "").strip(), (t.get("body") or "").strip())
+    if base == "SUV":
+        if c.get("offroad") or c.get("unibody") is False:
+            return "越野车"
+        if c.get("boxy"):
+            return "方盒子SUV"
+    return base
 
 
 ENGINE_JS_PATH = paths.MODULES / "envscore" / "engine.js"
@@ -395,14 +296,19 @@ def build(cars_override=None, out=None, extra_head="", extra_tail="", title=None
     if title:
         html = html.replace("<title>选车适配调节器 · 产品力主榜 + 用车条件修正</title>",
                             f"<title>{title}</title>")
+    # 车身形式选项从车型池实际取值派生（v10.56.0）：池里有 MPV / 越野车 / 方盒子SUV 时自动出现，
+    # 不再硬编码「轿车/SUV」，避免出现选中即空表的死选项。
+    bodies = [b for b in dict.fromkeys((c.get("body") or "") for c in cars) if b]
+    if def_body not in bodies:
+        def_body = bodies[0] if bodies else "ALL"
     body_opts = "".join(
-        f'<option value="{v}"{" selected" if v == def_body else ""}>{label}</option>'
-        for v, label in (("轿车","轿车"),("SUV","SUV"),("ALL","全部")))
+        f'<option value="{v}"{" selected" if v == def_body else ""}>{v}</option>'
+        for v in bodies) + f'<option value="ALL"{" selected" if def_body == "ALL" else ""}>全部</option>'
     reps = {
         "__DEF_LOW__": str(def_low),
         "__DEF_HIGH__": str(def_high),
         "__DEF_BODY__": def_body,
-        "__DEF_FILTER_HINT__": f"默认 {def_low}–{def_high} 万 · {dict(轿车='轿车',SUV='SUV',ALL='全部').get(def_body,def_body)}",
+        "__DEF_FILTER_HINT__": f"默认 {def_low}–{def_high} 万 · {'全部' if def_body == 'ALL' else def_body}",
         "__BODY_OPTIONS__": body_opts,
         "__EXTRA_HEAD__": extra_head,
         "__EXTRA_TAIL__": extra_tail,
@@ -418,7 +324,15 @@ def build(cars_override=None, out=None, extra_head="", extra_tail="", title=None
                              "medRatio":BASE_CDA_PER_TON,"hwyBase":HWY_BASE_MULT,"cityBase":CITY_BASE_MULT,
                              "temp":TEMP_CONS,"drive":DRIVE_MULT,"ac":AC_MULT,
                              "acSeason":ERM.AC_BASE,
-                             "volt":VOLTAGE_MULT,"swapAdv":SWAP_ADVANTAGE}),
+                             "volt":VOLTAGE_MULT,"swapAdv":SWAP_ADVANTAGE,
+                              # v10.56.0：地形/露天冬季条件已删，对应乘子不再注入（JS 侧已无引用）
+                              # v10.52.0：TCO 常量注入（JS tco() 与 engine.py 同源；键名 camelCase 由 engine.tco_js 派生）
+                              "tco": tco_js(), "annualKmMid": ANNUAL_KM_MID,
+                             "tcoBasis":"8年持有；能源按画像年里程、充电条件与电价档（谷电0.35/居民0.55/物业商用0.90元/度，逐车电耗/油耗事实优先）；"
+                                        "保费新能源5500 vs 燃油3500元/年（精算师协会2026-03口径）；保养中位；"
+                                        "残值用3年保值率近似（BEV45.1%/PHEV42.2%/EREV42%/HEV50%/ICE46.07%，流通协会+精真估2026）；"
+                                        "购置税2026-2027新能源减半5%、燃油/油混10%；"
+                                        "以旧换新补贴因资格各异未计入"}),
         "__N_CARS__": str(len(cars)),
         "__N_CLTC__": str(sum(1 for c in cars if c["cltc"])),
         "__N_PHYS__": str(sum(1 for c in cars if c.get("weight") and c.get("cd"))),
@@ -529,6 +443,18 @@ details.adj summary{cursor:pointer;outline:none;text-decoration:underline dotted
 .tier-badge.t1{background:#e7f4ea;color:#1a7f37}
 .tier-badge.t2{background:#fbf3e6;color:#9a6700}
 .tier-badge.t3{background:#fbe9e7;color:#b42318}
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-top:10px}
+.form-card{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:#fcfbf8}
+.form-card.top{border-color:#1f6f8b;background:#eef7fa;box-shadow:0 0 0 1px #1f6f8b inset}
+.form-card .fc-head{display:flex;align-items:center;gap:6px;font-weight:700;font-size:13.5px}
+.form-card .fc-avg{font-size:22px;font-weight:700;color:var(--accent2);margin:4px 0 2px}
+.form-card .fc-sub{font-size:11px;color:var(--sub);line-height:1.5}
+.form-card .fc-badge{font-size:10px;padding:1px 6px;border-radius:4px;background:#e7f4ea;color:#1a7f37}
+.form-card .fc-badge.mid{background:#fbf3e6;color:#9a6700}
+.form-card .fc-badge.bad{background:#fbe9e7;color:#b42318}
+.diag{margin-top:12px;font-size:12px;line-height:1.7}
+.diag .d-item{padding:3px 0;border-bottom:1px dashed var(--line)}
+.diag .warn{color:#b42318}.diag .info{color:#5b6470}
 @media(max-width:1000px){.layout{grid-template-columns:1fr}.cond-panel{position:static}.two{grid-template-columns:1fr}.mform{grid-template-columns:1fr 1fr}}
 </style>
 </head>
@@ -538,7 +464,7 @@ __EXTRA_HEAD__
 <header>
   <h1>选车适配<em>调节器</em> · 产品力主榜 + 用车条件修正</h1>
   <div class="sub">车好不好，主要看 8 维产品力分（<b>统一维度：电车评三电、油车评三大件，同一把尺子</b>）；你的用车条件只做加减分修正。例如"单次要开 500km、这车有效续航仅 400km"，就在续航不足项扣分。改动条件即时重排车型。</div>
-  <div class="note"><b>核心公式：</b>车型综合分 = 产品力主分（统一 8 维加权，75–90 分）+ 场景调节（软调节封顶±10）+ <b>硬条件惩罚（全额计入、降档、标注）</b>。第 1 维"动力总成"对电车=三电、油车=三大件、混动=两者，共用 18% 权重。<b>有效续航用物理模型</b>：基准电耗（真实数据优先，缺失用 4.48×车重+5.88×CdA 回归估算）× 工况倍率（风阻大的车高速更费）× 温度 × 驾驶风格 × 空调 × 电压平台，电量÷场景电耗×100。物理参数（整备质量/风阻/电压/换电）采集自汽车之家参数页。<b>换电车型</b>在无桩/极寒/短持有场景有优势。点续航或调节分数可看完整算式。所有数据内嵌本页，离线可用。</div>
+  <div class="note"><b>核心公式：</b>车型综合分 = 产品力主分（统一 8 维加权，75–90 分）+ 场景调节（软调节封顶±10）+ <b>硬条件惩罚（全额计入、降档、标注）</b>。第 1 维"动力总成"对电车=三电、油车=三大件、混动=两者，共用 18% 权重。<b>有效续航用物理模型</b>：基准电耗（真实数据优先，缺失用 4.48×车重+5.88×CdA 回归估算）× 工况倍率（风阻大的车高速更费）× 温度 × 暖风 × 电压平台，电量÷场景电耗×100。物理参数（整备质量/风阻/电压/换电）采集自汽车之家参数页。<b>换电车型</b>在无桩/极寒/短持有场景有优势。点续航或调节分数可看完整算式。<b>前置条件</b>：跨能源混合比较必须先选定 11 项用车条件画像（缺省=人群默认画像，页面顶部画像卡明示），定稿榜=该画像下的快照；页面顶部「前置条件 → 能源形式适配结论」先给出「你这种条件适合哪种能源形式」，并做画像自检（矛盾组合会提示）。所有数据内嵌本页，离线可用。</div>
   <div class="note warn" id="dataNote"></div>
 </header>
 
@@ -569,6 +495,13 @@ __EXTRA_HEAD__
   </div>
 
   <div>
+    <div class="panel" style="margin-bottom:20px">
+      <div class="section-title"><span class="bar"></span>前置条件 → 能源形式适配结论</div>
+      <div class="summary-box" id="formNarr"></div>
+      <div class="form-grid" id="formGrid"></div>
+      <div class="diag" id="profileDiag"></div>
+    </div>
+
     <div class="panel">
       <div class="section-title"><span class="bar"></span>车型综合榜 <span style="font-size:11px;color:var(--sub);font-weight:400" id="carCount"></span></div>
       <div class="summary-box" id="summary"></div>
@@ -580,6 +513,7 @@ __EXTRA_HEAD__
             <th data-k="power">能源</th><th data-k="price" class="num">价格(万)</th>
             <th data-k="cltc" class="num">CLTC(km)</th><th data-k="cons" class="num">电耗</th><th data-k="eff" class="num">有效续航▾</th>
             <th data-k="product" class="num">产品力</th><th data-k="adj" class="num">场景调节</th>
+            <th data-k="tco" class="num">持有成本8年▾</th>
             <th data-k="composite" class="num sorted">综合分</th>
           </tr></thead>
           <tbody id="carBody"></tbody>
@@ -598,13 +532,18 @@ __EXTRA_HEAD__
       <h2>方法、默认值与数据边界</h2>
       <div class="two">
         <div>
-          <p><b>打分逻辑：</b>综合分 = 产品力主分 + 软调节（封顶±10）+ 硬条件惩罚（全额、不封顶）。产品力用统一 8 维框架（动力总成18%/安全16.2%/智驾13.5%/空间12.6%/性价比11.7%/质量品控10%/操控9%/车机座舱9%）×10。硬条件触发时扣大分并<b>降一档</b>（T1→T2→T3）、车型旁标红警示：无桩纯电(−15)、极寒+低价纯电(−12)、短持有纯电(−8)、长途续航不足(−10)、限牌油车(−8)、营运油车(−10)。<b>换电车型</b>相反：无桩/极寒/短持有/长途场景给正分（据网搜共识：3分钟补能、电池恒温、车电分离保值）。</p>
-          <p><b>物理续航模型（透明可核）：</b>基准电耗 = 事实库真实电耗（51款），缺失用回归 <code>4.48×车重(t) + 5.88×Cd×迎风面积 + 0.61</code> 估算（39款拟合、MAE 0.69）。迎风面积≈宽×高×0.84。<code>场景电耗 = 基准 × 工况倍率 × 温度 × 驾驶 × 空调 × 电压</code>，<code>有效续航 = 电量 ÷ 场景电耗 ×100</code>。工况倍率：市区1.04、高速基准1.70并按每车 <b>CdA/吨</b> 偏离中位数(0.314)差异化（风阻大高速更费，解释方盒子效应）；温度&gt;0℃1.0/−10℃1.08/−20℃1.28/极寒1.6；驾驶温和0.92/暴力1.15；空调0.97–1.10；电压800V·SiC约0.975（影响小，主要影响充电速度）。经验值：轿车市区12/高速19.5、SUV市区13/高速21.5、方盒子高速24 kWh/100km，实测校验高速达成率约51–63%（懂车帝实测55%吻合）。</p>
+          <p><b>打分逻辑：</b>综合分 = 产品力主分 + 软调节（封顶±10）+ 硬条件惩罚（全额、不封顶）。产品力用统一 8 维框架（动力总成18%/安全16.2%/智驾13.5%/空间12.6%/性价比11.7%/质量品控10%/操控9%/车机座舱9%）×10。硬条件触发时扣大分并<b>降一档</b>（T1→T2→T3）、车型旁标红警示：无桩纯电(−15)、极寒+低价纯电(−12)、短持有纯电(−8)、长途续航不足(−10)、限牌油车(−8)、营运油车(−10)、<b>限牌京沪·插混增程无绿牌优势(−8，v10.52.0 新增：北京插混增程按油车管理需燃油指标、上海插混无免费绿牌)</b>。<b>纯电优先原则（v10.52.0）</b>：无硬条件冲突的纯电车型 +0.5——「纯电尽量纯电，条件不符再扣分」的代码化。<b>换电车型</b>相反：无桩/极寒/短持有/长途场景给正分（据网搜共识：3分钟补能、电池恒温、车电分离保值）。</p>
+          <p><b>物理续航模型（透明可核）：</b>基准电耗 = 事实库真实电耗，缺失用回归 <code>4.48×车重(t) + 5.88×Cd×迎风面积 + 0.61</code> 估算（39款拟合、MAE 0.69）。迎风面积≈宽×高×0.84。<code>场景电耗 = 基准 × 工况倍率 × 温度(仅电池) × 暖风基础 × 电压</code>，<code>有效续航 = 电量 ÷ 场景电耗 ×100</code>。工况倍率：市区/高速按高速占比加权，高速基准按每车 <b>CdA/吨</b> 偏离中位数差异化——<b>车身形状的影响由车型自身风阻承担</b>（方盒子车 Cd 高、自然更费），不再需要用户勾选"我买的是方盒子"。温度&gt;0℃1.00/−10℃1.05/−20℃1.12/极寒1.20；电压800V·SiC约0.975（影响小，主要影响充电速度）。实测校验高速达成率约51–63%（懂车帝实测55%吻合）。<b>山区/高原不在模型内</b>：路线级爬坡差异（丘陵 +10~20%、高山 +25~40%，每爬升 100m 约 0.5kWh）请自行上浮预期，页面不假装能算准。</p>
         </div>
         <div>
-          <p><b>其余调节项：</b>长途频率高→纯电减分、油/混动加分；无家充→纯电大幅减分、插混/增程减分、油车加分；营运→纯电加分；限牌→新能源加分；常年高速→增程明显减分、纯电续航打折；方盒子叠加高频高速→增程/纯电/插混减分；短持有→纯电减分；高里程→纯电加分。插混/增程因有油箱兜底，不扣"里程不足"分，但增程高速油耗高会体现为减分。</p>
-          <p><b>默认值依据：</b>年里程 1.5–2.5 万（超过成本平衡点 0.83–1.5 万）；冬季 −10~0℃；单次 300–500km、一年 1–5 次；有家充；不限牌；持有 5–8 年；高速 20–40%；非营运。为人群常见画像，可按实际修改。</p>
-          <p><b>数据边界：</b>候选池 __N_CARS__ 款车（其中 __N_CLTC__ 款有续航数据、__N_PHYS__ 款有完整物理参数），当前仅收录纯电(BEV)与插混(PHEV)的<b>官方核验</b>逐配置数据；燃油/油混/增程无数据入池——这是数据现状而非"更差"，不编造车型。物理参数（整备质量/风阻Cd/长宽高/电压/换电）由汽车之家参数页采集，来源逐车可查（见 vehicle_physics.json），采集不到的字段留空、用回归估算并在算式里标注。无电量数据的车不估算续航。</p>
+          <p><b>其余调节项：</b>长途频率高→纯电减分、油/混动加分；无家充→纯电大幅减分、插混/增程减分、油车加分（<b>单位/公司可充电</b>单独一档：白天补能、成本接近家充，不按「无固定充电」处罚）；营运→纯电加分；限牌→新能源加分（京沪细分：插混/增程同罚）；常年高速→增程明显减分、纯电续航打折；短持有→纯电减分；年里程：2.5万以上纯电加分，<b>5000km 以下纯电 −2.0</b>（低于盈亏平衡点约 4800km/年）、5000~1万 −1.0；<b>补能耐心不足+长途→纯电明显减分、可油可电加分</b>；<b>低里程无桩纯电→追加减分（TCO 固定成本摊薄慢）</b>。插混/增程因有油箱兜底，不扣"里程不足"分，但增程高速油耗高会体现为减分。</p>
+          <p><b>条件表 11 项（v10.56.0，删清"问得多、结论不变"的项）：</b>
+          核心 9 项——营运 / 充电条件 / <b>冬季气候带</b>（按常驻城市选：南方·江淮·华北·东北，括号内温度只用于续航）/ 年里程（含 5000km 以下档）/ 单次最长里程 / 长途频率 / 限牌城市 / 持有年限 / 高速占比；
+          进阶 2 项——<b>家庭车辆结构</b>（增购第二辆且已有油车：纯电 +2.0，第二辆再买燃油 −1.0，J.D. Power 2025 增购占新能源购买 28.1%）、<b>补能耐心</b>。
+          已删 9 项与理由（逐项扰动实测，见 references/用车条件因素库.md）：夏季气温 / 驾驶风格 / 空调强度 / 停放环境 / 驻车用电 / 露营外放电 / 电价档（单项最大影响 ≤2 分或只改 TCO 展示）；<b>地形</b>（无硬条件、路线级平均算不准，改为上文"自行上浮预期"）；<b>方盒子造型</b>（改成车型自身风阻 + 车身形式筛选，不再让用户替车型回答风阻问题）。</p>
+          <p><b>持有成本 TCO（披露，不入分）：</b>8 年合计 = 能源（逐车电耗/油耗事实优先 × 画像年里程 × 充电条件，油价8.36元/L·家充按谷电0.35元/度·公充1.5元/度·单位0.75元/度）+ 保费（新能源5500 vs 燃油3500元/年）+ 保养（中位口径）+ 购置税（2026-2027 新能源减半5%、燃油/油混10%）+ 残值损失（3年保值率近似：纯电45.1%/插混42.2%/增程42%/油混50%/燃油46.07%）+ 电池风险金（纯电2500元/年·插混增程800元/年，中保研电池零整比49.6%口径）。摘要区给出<b>家充纯电 vs 池内最优燃油/油混的盈亏平衡里程</b>（约 4800km/年，谷电口径）。</p>
+          <p><b>默认值依据：</b>年里程 1.5–2.5 万（成本平衡点约 4800km/年，谷电口径）；冬季气候带默认江淮（长江流域）；单次 300–500km、一年 1–5 次；有家充；不限牌；持有 5–8 年；高速 20–40%；非营运；可接受补能等待；家庭唯一用车。为人群常见画像，可按实际修改。</p>
+          <p><b>数据边界：</b>候选池 __N_CARS__ 款车（其中 __N_CLTC__ 款有续航数据、__N_PHYS__ 款有完整物理参数）。能源形式覆盖 BEV/PHEV/EREV/HEV/ICE 五种——纯电/插混为<b>官方核验</b>逐配置数据；燃油/油混/增程的 8 维分与逐配置来自<b>人工补采</b>（每维附信源 URL，见 runs/ 下 scores batch）与汽车之家结构化提取；<b>无电量数据的车</b>不编造续航、不参与续航调节（纯电显示「数据待核」），缺物理参数的车用回归估算电耗并标注来源。物理参数（整备质量/风阻Cd/长宽高/电压/换电）由汽车之家参数页采集，来源逐车可查（见 vehicle_physics.json）。TCO 为披露测算非定价承诺，实际花费因驾驶习惯/地区电价/保险折扣而异。</p>
         </div>
       </div>
     </div>
@@ -691,6 +630,61 @@ function makeCond(fid,f){
   return d;
 }
 function readCond(){const c={};for(const fid of Object.keys(FACTORS))c[fid]=document.getElementById('c_'+fid).value;return c;}
+// TCO 明细格式化（与 engine.py tco() 同口径）
+function tcoHtml(t){
+  if(!t) return '无价格数据，不测算';
+  const wan=x=>(x/10000).toFixed(2)+'万';
+  return '能源×8年 '+wan(t.energy8y)+'（'+t.unitEnergy.toFixed(3)+'元/km × '+t.annualKm+'km × 8）<br>'+
+    '保费×8年 '+wan(t.ins8y)+'（新能源5500 vs 燃油3500元/年口径）<br>'+
+    '保养×8年 '+wan(t.maint8y)+'<br>购置税 '+wan(t.purchaseTax)+'（2026-2027新能源减半5%/燃油油混10%）<br>'+
+    '残值损失(3年口径近似) '+wan(t.residualLoss)+'（'+({BEV:'纯电45.1%',PHEV:'插混42.2%',EREV:'增程42%',HEV:'油混50%',ICE:'燃油46.07%'})[t.power]+'）<br>'+
+    '电池风险金×8年 '+wan(t.batteryRisk8y)+'<br>'+
+    '<b>8年合计 '+wan(t.tco8y)+' ≈ '+(t.tcoPerKm*8).toFixed(2)+'元/km（含购车残值口径）</b><br>'+
+    '<span style="color:#8a929b">'+t.basis+'</span>';
+}
+// 逐条件判定徽章：非"适配"的判定上钻（最多3枚）
+function verdictChips(v){
+  const LV={适配:['#e7f4ea','#1a7f37'],谨慎:['#fbf3e6','#9a6700'],不建议:['#fbe9e7','#b42318']};
+  const out=[];
+  for(const [fid,val] of Object.entries(v||{})){
+    if(!val||val[0]==='适配') continue;
+    const lc=LV[val[0]]||LV['谨慎'];
+    out.push('<span title="'+fid+'：'+(val[1]||'')+'" style="display:inline-block;background:'+lc[0]+';color:'+lc[1]+';border-radius:4px;font-size:9.5px;padding:0 5px;margin-left:5px">'+val[0]+'·'+({operation:'营运',winter_temp:'气候带',annual_km:'年里程',single_trip:'单次里程',long_trip_freq:'长途频率',home_charger:'充电',plate_limit:'限牌',hold_years:'持有',highway_ratio:'高速',charge_patience:'补能耐心',fleet:'车队'})[fid]+'</span>');
+    if(out.length>=3) break;
+  }
+  return out.join('');
+}
+
+// 前置条件 → 能源形式适配结论（v10.53.0）：形式均分 + 画像自检，回答「我这种条件适合哪种能源」
+function renderForm(rows,cond){
+  const forms=recommendForm(rows,cond);
+  const narr=document.getElementById('formNarr');
+  if(narr) narr.innerHTML='<b>结论：</b>'+formNarrative(forms,cond)+
+    '<div class="formula">形式均分 = 池内该能源车型综合分均值（产品力 + 场景调节）；仅作形式层面参考，逐车结论仍以下方主榜为准</div>';
+  const grid=document.getElementById('formGrid');
+  if(grid){
+    grid.innerHTML=forms.map(function(f){
+      const cardCls=f.label==='最适配'?'form-card top':'form-card';
+      const bCls=f.label==='不建议'?'fc-badge bad':(f.label==='最适配'?'fc-badge':'fc-badge mid');
+      const col=PM[f.power]?PM[f.power].color:'#888';
+      return '<div class="'+cardCls+'"><div class="fc-head"><span class="pill" style="background:'+col+'">'+
+        (PM[f.power]?PM[f.power].short:f.power)+'</span><span class="'+bCls+'">'+f.label+'</span>'+
+        '<span style="margin-left:auto;font-size:10.5px;color:#5b6470">均分</span></div>'+
+        '<div class="fc-avg">'+f.avg.toFixed(1)+'</div>'+
+        '<div class="fc-sub">池内 '+f.n+' 款 · 场景调节均值 '+(f.avg_adj>0?'+':'')+f.avg_adj.toFixed(2)+
+        (f.hard?' · <span style="color:#b42318">'+f.hard+' 款硬条件</span>':' · 无硬条件')+
+        '<br>最强一款：'+f.best+'</div></div>';
+    }).join('');
+  }
+  const diag=document.getElementById('profileDiag');
+  if(diag){
+    const ws=checkProfile(cond);
+    diag.innerHTML=ws.length
+      ? '<b>画像自检（'+ws.length+' 条）：</b>'+ws.map(function(w){
+          return '<div class="d-item '+(w.level==='warn'?'warn':'info')+'">'+(w.level==='warn'?'⚠ ':'· ')+w.text+'</div>';}).join('')
+      : '<b>画像自检：</b><span style="color:#1a7f37">条件自洽，未发现矛盾组合</span>';
+  }
+}
 
 __ENGINE_JS__
 
@@ -719,11 +713,12 @@ function render(){
     const capped=Math.abs(soft*scale)>10;
     const hardDown=a.hard.some(h=>h.downgrade);
     const rc=rangeCalc(c,cond);
+    const tc=tco(c,cond);
     // 档位：基础按综合分，触发硬条件降一档
     let tier=compositeTier(c.product+adj);
     if(hardDown) tier=tier==='T1'?'T2':(tier==='T2'?'T3':'T3');
     return {...c, eff:rc?rc.range:null, rc, adjTotal:a.total, adj, capped, adjItems:a.items,
-            hard:a.hard, tier, composite:c.product+adj};
+            hard:a.hard, tier, composite:c.product+adj, tco:tc, verdicts:a.verdicts};
   });
 
   const k=carSort.k;
@@ -734,6 +729,8 @@ function render(){
     return carSort.dir*(a-b);
   });
   rows.forEach((r,i)=>r.rank=i+1);
+  // v10.53.0：形式聚合结论 + 画像自检（随条件实时更新，属推演态）
+  renderForm(rows,cond);
   // 可选扩展钩子：外部注入的正式榜区块可订阅重排结果，随条件实时重绘。默认无订阅，行为不变。
   if(typeof window!=='undefined' && typeof window.onBoardRerender==='function'){
     try{ window.onBoardRerender(rows, cond, scale); }catch(e){ console.error('onBoardRerender',e); }
@@ -746,13 +743,15 @@ function render(){
       '当前条件下，<b>'+t.model+'</b> 综合分居首（'+t.composite.toFixed(1)+'）= 产品力 '+t.product.toFixed(1)+
       ' + 场景调节 '+(t.adj>=0?'+':'')+t.adj.toFixed(1)+'。'+
       '<div class="formula">综合分 = 产品力主分 + 软调节(封顶±10，力度'+Math.round(scale*100)+'%) + 硬条件惩罚(全额·降档)</div>';
+    const be=breakevenKm(CARS,cond);
+    if(be!=null) document.getElementById('summary').innerHTML+='<div class="formula">家充纯电 vs 池内最优燃油/油混：8年TCO盈亏平衡约 <b>'+be+' km/年</b>（低于此里程油车/油混更省，以上纯电更省）</div>';
   }else{
     document.getElementById('summary').innerHTML='当前过滤条件下无匹配车型，请放宽预算区间或车身类型。';
   }
 
   document.getElementById('carCount').textContent='（'+rows.length+' 款符合条件）';
   const tb=document.getElementById('carBody'); tb.innerHTML='';
-  if(!rows.length) tb.innerHTML='<tr><td colspan="12" style="text-align:center;color:#888;padding:24px">无匹配车型</td></tr>';
+  if(!rows.length) tb.innerHTML='<tr><td colspan="14" style="text-align:center;color:#888;padding:24px">无匹配车型</td></tr>';
   rows.forEach(r=>{
     const tr=document.createElement('tr');
     const adjCls=r.adj>0?'adj-pos':(r.adj<0?'adj-neg':'adj-zero');
@@ -764,9 +763,10 @@ function render(){
     const cap=r.capped?'<div class="cap">注：软调节已封顶至 ±10</div>':'';
     const hardHtml=r.hard.length?('<div class="cap" style="color:#b42318"><b>硬条件：</b>'+
       r.hard.map(h=>'· '+h.label+' ('+(h.pt>0?'+':'')+h.pt+')：'+h.reason+(h.downgrade?' [已降档]':'')).join('<br>')+'</div>'):'';
-    // 车型名旁的警示/换电徽章
+    // 车型名旁的警示/换电徽章 + 逐条件判定徽章（非适配项，最多3枚）
     const badges=(r.swap?'<span style="display:inline-block;background:#e7f4ea;color:#1a7f37;border-radius:4px;font-size:9.5px;padding:0 5px;margin-left:5px">换电</span>':'')+
-      (r.hard.some(h=>h.downgrade)?'<span style="display:inline-block;background:#fbe9e7;color:#b42318;border-radius:4px;font-size:9.5px;padding:0 5px;margin-left:5px">⚠硬条件不符</span>':'');
+      (r.hard.some(h=>h.downgrade)?'<span style="display:inline-block;background:#fbe9e7;color:#b42318;border-radius:4px;font-size:9.5px;padding:0 5px;margin-left:5px">⚠硬条件不符</span>':'')+
+      verdictChips(r.verdicts);
     const tierCls=r.tier==='T1'?'t1':(r.tier==='T2'?'t2':'t3');
     tr.innerHTML=
       '<td>'+r.rank+'</td><td><b>'+r.model+'</b>'+badges+'</td>'+
@@ -782,6 +782,8 @@ function render(){
       '<td class="num">'+r.product.toFixed(1)+'</td>'+
       '<td class="num"><details class="adj"><summary class="'+adjCls+'">'+adjTxt+'</summary>'+
         '<div class="adjbox">调节明细（软 '+(r.adjTotal>0?'+':'')+r.adjTotal.toFixed(1)+'；硬条件不缩放）<br>'+detail+cap+hardHtml+'</div></details></td>'+
+      '<td class="num"><details class="adj"><summary>'+(r.tco?(r.tco.tco8y/10000).toFixed(1)+'万':'—')+'</summary>'+
+        '<div class="adjbox"><b>8年持有成本测算（仅披露不入分）</b><br>'+tcoHtml(r.tco)+'</div></details></td>'+
       '<td class="num"><b>'+r.composite.toFixed(1)+'</b></td>';
     tb.appendChild(tr);
   });
@@ -826,3 +828,5 @@ __EXTRA_TAIL__
 
 if __name__ == "__main__":
     build()
+
+

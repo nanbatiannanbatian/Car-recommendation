@@ -52,7 +52,12 @@ ALLOWED = {
 # v10.1 起为空：唯一的例外 research/auto_trims -> engine.trims.validate 已通过
 # 契约层（modules/contracts/trims_schema.py）消解，不再需要登记。
 # 新增例外必须在此写原因，否则 layout_regress 会报依赖违规。
-EXCEPTIONS: dict[tuple[str, str, str], str] = {}
+EXCEPTIONS: dict[tuple[str, str, str], str] = {
+    ("research", "build_ice_scores", "engine"): (
+        "构建期装配：research 采集事实 → engine.param_score 打分 → 落盘 data/gen。"
+        "它是「跑一次生成数据集」的构建脚本，不是运行时依赖（board 只读产物 JSON）；"
+        "若拆层需把打分搬进 board，代价是同一份事实两条打分路径，反而更容易漂移。"),
+}
 
 PASS: list[str] = []
 FAIL: list[tuple[str, str]] = []

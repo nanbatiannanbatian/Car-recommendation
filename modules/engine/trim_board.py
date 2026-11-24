@@ -117,6 +117,16 @@ def spec_from_trim(trim: dict, base_spec: dict | None = None) -> dict:
     # 走 spec_score 分档 + rule_adjust 逐项中位锚，高低功率得到温和相对差。
     if trim.get("max_power_kw") is not None:
         s["max_power_kw"] = trim["max_power_kw"]
+    # v10.51.0：底盘事实（悬架形式/驱动形式）→ 操控维规则（spec_score.control_parts
+    # 消费 susp_front/susp_rear/drive）。结构化优先：trim 有值则覆盖文本提取值
+    # （_spec_of 先 extract 后本映射，同字段以结构化为准——与 voltage_v 同纪律）。
+    # 汽车之家底盘组当前整组为空，值来自 chassis_fetch 文章通道/人工核验（带引文）。
+    if trim.get("susp_front"):
+        s["susp_front"] = trim["susp_front"]
+    if trim.get("susp_rear"):
+        s["susp_rear"] = trim["susp_rear"]
+    if trim.get("drive_form"):
+        s["drive"] = trim["drive_form"]
     kcs = [str(x) for x in (trim.get("key_configs") or [])]
     if any("激光雷达" in x for x in kcs):
         s["adas_lidar"] = True

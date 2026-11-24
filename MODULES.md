@@ -38,6 +38,8 @@ modules/
     lifecycle_fetch.py       在售状态拉取（懂车帝 / VDH）
     lifecycle_detect.py      销量变点检测（停产/清库/爬坡）
     build_ice_pool.py        汽车之家车系索引建池
+    ah_series.py             汽车之家车系事实采集（级别/能源/口碑/PPH + 参数页 var config，带 30 天缓存）
+    build_ice_scores.py      燃油/油混/插混 8 维打分数据集生成（车系名单 → 事实 → param_score → data/gen JSON）
     auto_trims.py            逐配置阶梯自动补录（含索引 miss 的站点检索兜底）
     trim_sources.py          多源调度：索引→站点检索→内容页存在性核对，每步留痕
     trim_ingest.py           外部配置表规范化导入
@@ -50,9 +52,12 @@ modules/
   physics/
     ev_range_model.py        续航物理模型（常量单一事实源，零依赖）
   envscore/
-    engine.js                环境分/续航引擎唯一事实源（hwyMult/rangeCalc/adjust/compositeTier）
-    build_energy_compare.py  页面生成器（把 engine.js 内联成自包含 HTML）
+    engine.py                环境分/续航/TCO 唯一事实源（20项用车条件/7条硬条件/adjust/range_calc/tco/
+                             recommend_form 形式结论/check_profile 画像自检；纯函数零IO）
+    engine.js                浏览器镜像（同上函数，env_equivalence_regress 双向等价守护）
+    build_energy_compare.py  页面生成器（把 engine.js 内联成自包含 HTML，含「前置条件→形式结论」面板）
   engine/
+    param_score.py           参数驱动 8 维打分（能源中性；缺维不填、主力款配对、混动系统功率估算）
     leaderboard.py           8 维加权分 + 三档 + 上表
     ranking.py               口径协议与硬闸门
     energy_router.py         A/B 榜型自动判定
@@ -78,12 +83,15 @@ modules/
     ice_board.py / ice_funnel.py / ice_sensitivity.py
     ev_battery_board.py / ev_cell_board.py
     build_midsuv_full.py / build_midsuv_202610.py / build_midsedan_202609.py
+    build_mixed_sedan.py          # 12-14万轿车跨能源演示池（五形式混排，含形式结论）
+    build_compact_sedan.py        # 6-16万紧凑型轿车榜（纯电+燃油/油混/插混自动合榜，缺三电自动补采）
     filings_board.py / cross_energy_sections.py
   regress/
     bug_regression.py        67 项历史 bug 断言 + 63 条反向注入
     negative_regression.py   失败回测框架
     layout_regress.py        结构回归（本文件所述的边界）
     energy_compare_regress.py / energy_router_regress.py / midsuv_full_regress.py
+    param_score_regress.py   燃油/油混/插混 8 维打分回归（权重一致/缺维不填/PPH/能源映射/主力款配对/产物合法）
     build_release_regress.py 打包回归
     *.js                     node 跑生成页面的 DOM 实跑
 data/gen/                    生成物（可重建，打包排除）

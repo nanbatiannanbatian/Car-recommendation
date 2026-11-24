@@ -1,4 +1,4 @@
-// filter_default_test.js — 验证默认过滤不空表 + 条件分组 + 方盒子文案（v9.7.50）
+// filter_default_test.js — 验证默认过滤不空表 + 条件分组 + 车身形式筛选（v10.56.0）
 // 由 midsuv_full_regress.py 调用。退出码0=全过。
 const fs=require('fs');
 const pagePath=process.argv[2];
@@ -13,9 +13,16 @@ const bodySel=(html.match(/<select id="bodyFilter">([\s\S]*?)<\/select>/)||[])[1
 ok('默认预算=12-18万', pLow==='12'&&pHigh==='18', pLow+'-'+pHigh);
 ok('默认车身=SUV选中', /value="SUV" selected/.test(bodySel));
 ok('resetAll默认SUV', /bodyFilter'\)\.value='SUV'/.test(html));
-ok('方盒子文案已改', html.includes('方盒子造型')&&!html.includes('方盒子/风味越野造型'));
-ok('三组条件渲染', ['核心能源决策','能耗微调','特殊场景'].every(g=>html.includes(g)));
+ok('车身形式筛选存在', html.includes('id="bodyFilter"')&&html.includes('SUV'));
+ok('两组条件渲染', ['核心能源决策','进阶条件'].every(g=>html.includes(g)));
 ok('分组JS存在', html.includes('FACTOR_GROUPS')&&html.includes('makeCond'));
+// 分组期望值从页面注入的 FACTOR_GROUPS 派生（防硬编码随因素增减漂移）
+const gm=html.match(/const FACTOR_GROUPS=(\[[^\n]*\]);/);
+let GRP=null; try{GRP=gm?JSON.parse(gm[1]):null;}catch(e){}
+ok('FACTOR_GROUPS 可解析', !!GRP);
+const DIR_EXP=GRP?GRP[0][1].length:12;
+const ADV_EXP=GRP?GRP.slice(1).reduce((s,g)=>s+g[1].length,0):8;
+const ALL_EXP=GRP?GRP.reduce((s,g)=>s+g[1].length,0):20;
 
 // 2) 动态：readCond 能读到每组默认值，默认过滤下有车（非空表）
 const scripts=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m=>m[1]).join('\n');
@@ -42,16 +49,16 @@ const FACTORS=JSON.parse(fm[1]);
 for(const [fid,f] of Object.entries(FACTORS)){const e=mkEl('c_'+fid);e.value=f.default;els['c_'+fid]=e;}
 try{eval(scripts);}catch(e){console.error('EVAL ERROR',e.message);process.exit(2);}
 
-// 结构验证：conds 直属应是核心8项（.fg），details 容器应收纳其余4项
+// 结构验证：conds 直属应是核心项（.fg），details 容器应收纳其余项
 const conds=els.conds;
 const directFg=conds?conds.children.filter(c=>c.className==='fg'):[];
 const details=conds?conds.children.filter(c=>c.tag==='details'):[];
-ok('核心8项默认平铺', directFg.length===8, '直属fg='+directFg.length);
+ok(`核心${DIR_EXP}项默认平铺`, directFg.length===DIR_EXP, '直属fg='+directFg.length);
 ok('高级选项details存在', details.length===1, 'details='+details.length);
 const advFg=details.length?details[0].children.filter(c=>c.className==='fg'):[];
-ok('4项收进折叠区', advFg.length===4, '折叠fg='+advFg.length);
+ok(`${ADV_EXP}项收进折叠区`, advFg.length===ADV_EXP, '折叠fg='+advFg.length);
 ok('折叠区默认收起', details.length&&!details[0].open);
-ok('12项合计无遗漏', directFg.length+advFg.length===12, (directFg.length+advFg.length)+'');
+ok(`${ALL_EXP}项合计无遗漏`, directFg.length+advFg.length===ALL_EXP, (directFg.length+advFg.length)+'');
 
 const summary=els.summary?els.summary.innerHTML:'';
 const count=els.carCount?els.carCount.textContent:'';

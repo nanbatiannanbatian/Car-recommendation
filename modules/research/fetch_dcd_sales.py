@@ -34,8 +34,6 @@ import os
 import re
 import sys
 
-import requests
-
 URL = "https://www.dongchedi.com/motor/pc/car/rank_data"
 HDR = {
     "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -47,6 +45,14 @@ PAGE = 100
 
 
 def fetch_page(month, ne, offset, count=PAGE, rank_type="11", retries=2):
+    # v10.51.1：requests 改函数内懒导入（import 隔离）。
+    # 根因（2026-11-24 实证）：顶层 import requests 使整个模块在缺 requests 的
+    # 环境无法 import → sales_backfill.fetch_snapshot 的**快照缓存复用路径**
+    # （缓存命中时根本不需要联网）被一起打死，销量回填静默降级到手填值，
+    # 页面「月销仅为车系上界」标签与名次区间随之漂移。可选依赖不得阻断
+    # 缓存复用——函数级导入后，缓存命中零网络，缺依赖只影响真抓取。
+    import requests
+
     p = {"aid": "1839", "app_name": "auto_web_pc", "city_name": "",
          "count": str(count), "offset": str(offset), "month": str(month),
          "new_energy_type": str(ne), "rank_data_type": str(rank_type),

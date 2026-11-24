@@ -14,6 +14,7 @@ import paths
 HERE = str(paths.ROOT)
 sys.path.insert(0, HERE)
 from modules.envscore import build_energy_compare as EC
+from modules.envscore import engine as ENG
 from modules.board import cross_energy_sections as CES
 from modules.engine import energy_router as ER
 
@@ -141,10 +142,17 @@ def main():
     cars, meta, route = build_cars(cands, scores, mp, trims, vp, fl_by)
     print(f"榜型自动判定: {route['board_type']}类 {ER.powers_cn(route['powers'])}")
     print(f"入池 {len(cars)} 款车")
-    nav, secs = CES.sections_html(cars, {
+    # v10.52.0：定稿区块服务端渲染——engine.analyze 先算好（默认画像快照），
+    # 不再依赖页面首次加载 JS 计算（可复现/可回归审计）。
+    rows = ENG.analyze(cars, ENG.DEFAULT_COND)
+    nav, secs = CES.sections_html(rows, {
         "dims": EC.DIMS,
         "trims": meta["trims"],
         "rationale": meta["rationale"],
+        "profile": ENG.DEFAULT_COND,
+        "profile_source": "人群默认画像（11 项用车条件）",
+        "pool_powers": sorted({c["power"] for c in cars}),
+        "cars_raw": cars,
     })
     EC.build(
         cars_override=cars,
@@ -155,13 +163,18 @@ def main():
         def_low=12, def_high=18, def_body="SUV",  # 本榜口径：12–18万中型SUV（避免默认轿车12-14万导致空表）
     )
     # 校验
-    html = open(OUT,encoding="utf-8").read()
-    assert "boardNav" in html and "14 区块" in html, "导航缺失"
+    html = open(OUT, encoding="utf-8").read()
+    assert "boardNav" in html and f"{len(CES.BLOCKS)} 区块" in html, "导航缺失"
     for bid,_ in CES.BLOCKS:
         assert f'id="sec-{bid}"' in html, f"区块缺失 {bid}"
     assert "__EXTRA_" not in html, "占位符未替换"
-    print(f"校验通过：14区块齐全 + 交互引擎内嵌。文件 {OUT}")
+    print(f"校验通过：{len(CES.BLOCKS)}区块齐全 + 交互引擎内嵌。文件 {OUT}")
 
 
 if __name__ == "__main__":
     main()
+
+
+
+
+

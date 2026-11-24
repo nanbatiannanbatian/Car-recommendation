@@ -33,15 +33,16 @@ const verify=`
 eval(scripts + verify);
 const X=window.__expose;
 
-// 1) 首次加载：定稿区被填充
-const fixedThree0=document.getElementById('fixed-three').innerHTML;
-const fixedRobust0=document.getElementById('fixed-robust').innerHTML;
+// 1) 首次加载：定稿区块是服务端渲染的静态 HTML（页面文件里就有，不靠 JS 首算）
+const secIds=[...html.matchAll(/id="sec-([a-z_]+)"/g)].map(m=>m[1]);
 ok('钩子onBoardRerender已定义', typeof window.onBoardRerender==='function');
-ok('首次加载三榜定稿已算', fixedThree0.length>50 && fixedThree0.includes('纯产品力榜'), fixedThree0.length+'字符');
-ok('首次加载稳健性定稿已算', fixedRobust0.length>100 && fixedRobust0.includes('跨度'), fixedRobust0.length+'字符');
+ok('定稿区块已服务端渲染(20)', secIds.length===20, secIds.length+'');
+ok('定稿含形式适配结论区块', secIds.includes('form_fit') && html.includes('形式均分'));
+ok('定稿含画像自检', html.includes('画像自检'));
+ok('旧JS首算容器已移除', !html.includes('id="fixed-three"') && !html.includes('id="fixed-robust"'));
 ok('首次推演态=默认画像', document.getElementById('sim-state').textContent.includes('默认画像'),
    document.getElementById('sim-state').textContent);
-ok('稳健性含6场景', ['无家充','北方极寒','长途高频','营运','限牌城市','默认画像'].every(s=>fixedRobust0.includes(s)));
+ok('稳健性含全部场景', ['无家充','北方极寒','长途高频','营运','限牌城市','京沪限牌','短持有','增购第二辆'].every(s=>html.includes(s)));
 
 // 2) 模拟用户改推演条件：构造 rows 调 onBoardRerender（推演路径）
 const base={}; for(const k of Object.keys(X.FACTORS)) base[k]=X.FACTORS[k].default;
@@ -59,15 +60,16 @@ function rowsFor(c,scale){
 const custom={...base,home_charger:'none',plate_limit:'yes',operation:'yes'};
 window.onBoardRerender(rowsFor(custom,1.5),custom,1.5);
 
-ok('改条件后定稿三榜不变', document.getElementById('fixed-three').innerHTML===fixedThree0);
-ok('改条件后定稿稳健性不变', document.getElementById('fixed-robust').innerHTML===fixedRobust0);
+// 定稿区块是页面静态内容：脚本不得去写 sec-* 容器（否则就是"推演改写了定稿"）
+ok('推演不改写定稿区块', !Object.keys(els).some(k=>k.startsWith('sec-')));
 const st=document.getElementById('sim-state').textContent;
 ok('改条件后推演态标识变化', st.includes('自定义') && st.includes('推演态'), st);
 
-// 3) 恢复默认→标识回到"与定稿一致"，定稿仍不变
+// 3) 恢复默认→标识回到"与定稿一致"
 window.onBoardRerender(rowsFor(base,1),base,1);
 ok('恢复默认后标识回默认', document.getElementById('sim-state').textContent.includes('默认画像'));
-ok('恢复默认后定稿三榜仍不变', document.getElementById('fixed-three').innerHTML===fixedThree0);
+ok('恢复默认后仍不写定稿区块', !Object.keys(els).some(k=>k.startsWith('sec-')));
 
 if(fail.length){console.error('\n失败 '+fail.length+' 项:');fail.forEach(f=>console.error('  '+f));process.exit(1);}
-console.log('\ndynamic_blocks_test: '+pass+'/'+pass+' 通过（定稿固定/推演分离成立）');
+console.log('\ndynamic_blocks_test: '+pass+'/'+pass+' 通过（定稿服务端渲染/推演分离成立）');
+

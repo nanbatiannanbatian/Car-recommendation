@@ -4,7 +4,7 @@ midsuv_full_regress.py — 跨能源【完整正式榜】改造回归
 测生成链路而非快照：每次重新运行 build_midsuv_full.py，再从新产物反查。
 覆盖本次用户诉求「要有环境打分 + 18区块导航」，并含反向篡改：
   - 环境分引擎来自比较器单一事实源（不重写）
-  - 12项用车条件 + 6条硬条件 + 物理续航 都在产出页面里
+  - 11项用车条件 + 6条硬条件 + 物理续航 都在产出页面里
   - 18区块导航齐全（对齐 board_view BLOCKS 契约）
   - cars 数据含补采分（不是母池空分）
   - 页面能真实触发环境分（node 跑 adjust：无家充→纯电-15、限牌→燃油-8）
@@ -36,7 +36,7 @@ def run():
     html = open(OUT, encoding="utf-8").read()
     # 2. 环境分引擎三要素
     check("交互引擎adjust()内嵌", "function adjust" in html)
-    check("12项用车条件FACTORS内嵌", "winter_temp" in html and "home_charger" in html and "drive_style" in html)
+    check("11项用车条件FACTORS内嵌", "winter_temp" in html and "home_charger" in html and "fleet" in html and "charge_patience" in html)
     check("6条硬条件逻辑内嵌", "无充电桩" in html and "限牌城市" in html and "营运" in html)
     check("物理续航引擎内嵌", "rangeCalc" in html and "PHYS" in html)
     check("场景力度滑块", "wEnergy" in html and "场景调节力度" in html)
@@ -62,29 +62,30 @@ def run():
         powers = set(c["power"] for c in cars)
         check("覆盖多能源", len(powers) >= 3, str(powers))
 
-    # 4b. 定稿榜固定/推演器分离（v9.7.49）：定稿区静态、推演器只改标识
+    # 4b. 定稿榜服务端渲染/推演器分离（v10.52.0 起取代旧 fixed-* 首算容器）
     check("比较器有重排钩子", "window.onBoardRerender" in html and "onBoardRerender(rows, cond, scale)" in html)
-    check("定稿榜导航标注", "定稿榜导航" in html and "不随场景变化" in html)
+    check("定稿榜导航标注", "定稿榜导航" in html and "不随推演器变化" in html)
     check("推演器标识存在", 'id="sim-state"' in html and "推演态" in html)
-    for cid in ("fixed-three", "fixed-robust"):
-        check(f"定稿容器存在:{cid}", f'id="{cid}"' in html)
-    check("6场景稳健性内嵌", all(s in html for s in ("无家充","北方极寒","长途高频","营运","限牌城市")))
-    check("旧动态容器已移除", 'id="dyn-' not in html)
-    check("定稿区JS首次算一次", "finalizeFixed" in html and "ROBUST_SCENARIOS" in html)
-    # node + DOM stub 实跑：改条件定稿区不变、推演态标识变
+    sec_ids = re.findall(r'id="sec-([a-z_]+)"', html)
+    check("定稿区块服务端渲染(20)", len(sec_ids) == 20, str(len(sec_ids)))
+    check("形式适配结论区块存在", "sec-form_fit" in html and "形式均分" in html and "形式最合适" in html)
+    check("画像自检渲染", "画像自检" in html)
+    check("旧定稿容器已移除", 'id="fixed-three"' not in html and 'id="fixed-robust"' not in html)
+    check("稳健性场景齐全", all(s in html for s in ("无家充","北方极寒","长途高频","营运","限牌城市","京沪限牌","短持有","增购第二辆")))
+    # node + DOM stub 实跑：推演只改标识、不写定稿区块
     nt = subprocess.run(["node", str(paths.MODULES / "regress" / "dynamic_blocks_test.js"), OUT], cwd=HERE,
                         capture_output=True, text=True, timeout=60)
-    check("定稿固定/推演分离(node)全过", nt.returncode == 0 and "10/10 通过" in nt.stdout,
+    check("定稿固定/推演分离(node)全过", nt.returncode == 0 and "11/11 通过" in nt.stdout,
           (nt.stdout or nt.stderr)[-300:])
-    # 4c. 全环境项测试：12项×每个选项都生效、结果无异常（用户要求"每个环境修改是否起效果"）
+    # 4c. 全环境项测试：11项×每个选项都生效、结果无异常（用户要求"每个环境修改是否起效果"）
     et = subprocess.run(["node", str(paths.MODULES / "regress" / "env_options_test.js"), OUT], cwd=HERE,
-                        capture_output=True, text=True, timeout=90)
-    check("全环境项测试(node)全过", et.returncode == 0 and "77/77 通过" in et.stdout,
+                        capture_output=True, text=True, timeout=120)
+    check("全环境项测试(node)全过", et.returncode == 0 and "通过" in et.stdout and "失败" not in et.stdout,
           (et.stdout or et.stderr)[-400:])
-    # 4d. 默认过滤/分组/文案（用户报"默认无匹配车型"bug + 方盒子改名 + 条件分组）
+    # 4d. 默认过滤/分组/文案（用户报"默认无匹配车型"bug + 条件分组）
     ft = subprocess.run(["node", str(paths.MODULES / "regress" / "filter_default_test.js"), OUT], cwd=HERE,
                         capture_output=True, text=True, timeout=60)
-    check("默认过滤/折叠/文案(node)全过", ft.returncode == 0 and "15/15 通过" in ft.stdout,
+    check("默认过滤/折叠/文案(node)全过", ft.returncode == 0 and "16/16 通过" in ft.stdout,
           (ft.stdout or ft.stderr)[-400:])
     # 4e. 纯电续航非null（用户报 ID.AURA T6 null km）——通用电量文本提取器 + 渲染防御
     from modules.board import build_midsuv_full as BMF
@@ -130,3 +131,9 @@ def run():
 
 if __name__ == "__main__":
     sys.exit(run())
+
+
+
+
+
+

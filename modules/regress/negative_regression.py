@@ -120,6 +120,17 @@ NEG_TARGETS = {
     "t106": ["trims_store", "def write_back"],
     # t107 断言电池容量项存在 + 三电子维度拆分 + 配置匹配不粘连
     "t107": ["POWERTRAIN_GROUPS"],
+    # v10.51.0：底盘事实结构化通道（BUG-140~144）反向探针——
+    # 抹掉关键源码串后对应测试必 FAIL，证明断言非摆设。
+    "t140": ["AH_CHASSIS_IDS"],
+    "t141": ["SUSP_KEYS"],
+    "t142": ['trim.get("susp_front")'],
+    "t143": ["def merge_into_db"],
+    "t144": ["chassis_coverage"],
+    # v10.51.1：requests 懒导入隔离（抹掉函数定义→懒导入源码断言 FAIL）
+    "t145": ["def fetch_page", "def _fetch_config_json"],
+    # v10.51.2：底盘采集通用化（抹掉通用化入口→自动发现/全库补齐断言 FAIL）
+    "t146": ["def fill_all", "def discover_article_urls"],
 }
 
 # 数据断言型：测试名 -> (文件路径, 车型/键, 篡改模式)
@@ -173,8 +184,9 @@ NEG_DATA = {
     "t083": ("space_consistency.calibrate_space", None, "no_space_cap"),
     # t084：关掉空间要素提取器（回到「前备箱/得房率记了却没用」），断言必须 FAIL
     "t084": ("space_features.extract_space_features", None, "no_sf_extract"),
-    # t085：关掉核算字段提取（回到「evidence 硬参数提不出、规则从没跑」），断言必须 FAIL
-    "t085": ("score_audit.extract_spec_fields", None, "no_audit_extract"),
+    # t085：v10.51.0 审计统一走 _spec_of 后，截断 extract_spec_fields 不再让
+    # t085 FAIL（结构化字段兜底=好事，但探针必须打整条组装链才有效）→ 改打 _spec_of
+    "t085": ("rule_adjust._spec_of", None, "no_spec_of"),
     # t086：关掉严格证据解析（回到「Model Y 的 C-IASI 全在 evidence 里却没人回填」），断言必须 FAIL
     "t086": ("crash_systems.parse_score_from_evidence", None, "no_evidence_crash"),
     # t087：关掉权威库回流（回到「蔚来ET5 等库里有成绩却取不到」），断言必须 FAIL
@@ -222,6 +234,7 @@ def _func_probe(name, fn, dotted, mode):
         "no_authoritative_fill": lambda *a, **kw: [],                       # 权威库回流失效（蔚来ET5 C-IASI 又取不到）
         "no_multi_scores": lambda *a, **kw: [],                             # 多成绩收集失效（又变成只取第一个+次要成绩丢失）
         "no_fusion": lambda *a, **kw: [],                                    # 多测评融合失效（数字图标车又无成绩、木桶不生效）
+        "no_spec_of": lambda *a, **kw: {},                                   # spec 组装链失效（结构化底盘/电池字段进不了审计与出榜）
         "always_missing": lambda *a, **kw: {"status": "missing", "source": "", "trims": [],
                                            "attempts": [], "evidence": {}, "sid": None,
                                            "ah_name": ""},                # 调度退化为直接失败

@@ -313,7 +313,9 @@ def migrate(dry_run: bool = False) -> dict:
                 "battery_cooling", "wheelbase_mm", "length_mm", "width_mm",
                 "height_mm", "trunk_l", "frunk_l", "cd", "body_structure",
                 "zero_to_100_s", "max_power_kw", "max_torque_nm",
-                "curb_weight_kg", "max_loaded_kg", "launch_month")
+                "curb_weight_kg", "max_loaded_kg", "launch_month",
+                # v10.51.0：底盘三字段（chassis_fetch 文章通道/人工核验回填）
+                "drive_form", "susp_front", "susp_rear")
 
     filled: list[str] = []
     moved: list[str] = []

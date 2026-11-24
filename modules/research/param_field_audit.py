@@ -39,8 +39,13 @@ USED_BY_NAME = {
 
 def _extracted_ids() -> set[int]:
     from modules.research import auto_trims as AT
+    from modules.research import param_fields as PF
     return (set(AT.AH_BASE_IDS.values()) | set(AT.AH_BODY_IDS.values())
-            | set(AT.AH_BAT_IDS.values()) | set(USED_BY_NAME))
+            | set(AT.AH_BAT_IDS.values()) | set(PF.AH_CHASSIS_IDS.values())
+            # v10.52.0：多能源形式字段（混合能源榜；纯电款型恒 null）
+            | set(PF.AH_ENGINE_IDS.values()) | set(PF.AH_GEARBOX_IDS.values())
+            | set(PF.AH_FUEL_IDS.values()) | set(PF.AH_TANK_V2L_IDS.values())
+            | set(USED_BY_NAME))
 
 
 def unassigned_fields() -> list[tuple[int, tuple[str, str]]]:
@@ -109,6 +114,11 @@ def selftest() -> int:
     for fid in (9027, 1290, 9015, 1169, 1175, 1250):
         assert fid in PF.KNOWN_FIELDS, f"关键字段 {fid} 不在台账里"
         assert fid in got, f"关键字段 {fid} 未被提取"
+    # v10.51.0：底盘字段同样必须「台账有 + 已提取」（id 定位，跨车系稳定）
+    for fid in (1231, 1226, 1227, 1228):
+        assert fid in PF.KNOWN_FIELDS, f"底盘字段 {fid} 未登记台账"
+        assert fid in got, f"底盘字段 {fid} 未被提取"
+        assert fid not in PF.SKIPPED, f"底盘字段 {fid} 不应同时在 SKIPPED 里"
     print(f"SELFTEST PASS · 参数页字段台账自洽（台账 {len(PF.KNOWN_FIELDS)} 项 / "
           f"已提取 {len([f for f in PF.KNOWN_FIELDS if f in got])} / "
           f"已解释跳过 {len(PF.SKIPPED)} / 无归属 0）")

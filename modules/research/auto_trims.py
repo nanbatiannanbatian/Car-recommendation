@@ -32,8 +32,6 @@ import re
 import sys
 import time
 
-import requests
-
 import paths
 
 HERE = str(paths.ROOT)
@@ -99,10 +97,19 @@ AH_BASE_IDS = {          # 「基本参数」组
     "dims_mm": 1148,          # 长*宽*高(mm) 合并字段（车身组分列缺失时的兜底）
 }
 
-# 「底盘转向」「车轮制动」两组对**纯电车整组为空**（实测极氪7X/启源Q06：
-# 有值数均为 0）——汽车之家给燃油车填「前/后悬架类型、驱动方式」，
-# 纯电车不填。所以操控规则里的悬架/驱动**拿不到官方值**，
-# 只能靠各车取证文本提取（score_audit._EXTRACT）。这条写进已知边界，不假装能采到。
+# 「底盘转向」「车轮制动」两组的提取（v10.51.0）。
+# 2026-11-23 实测修正（旧边界文档「汽车之家给燃油车填、纯电车不填」**失实**）：
+#   config JSON 里这两组对**所有能源类型**整组为空——燃油凯美瑞(sid 110)/迈腾(496)、
+#   纯电极氪7X(7777)/Model Y(5769)、增程+纯电同系深蓝S07(6817)/阿维塔07(7652)
+#   底盘组有值数均为 0（移动版与桌面版一致）。底盘表在渲染页由 AJAX 异步加载，
+#   SSR HTML 与 config JSON 都不含值。所以汽车之家这条结构化通道当前**采不到**
+#   底盘事实——这是源边界，如实记 null，不假装采到。
+# 底盘事实的合规通道见 modules/research/chassis_fetch.py：
+#   S1 本解析器（汽车之家 config，未来源恢复自动生效）
+#   S2 文章正文提取（易车/腾讯/搜狐等媒体稿，带 url+quote 引文）
+#   S3 人工核验条目（trims_manual / score_trim_overrides.field_patches）
+# id 表单一事实源在 param_fields.AH_CHASSIS_IDS（零依赖模块，多消费者共享）。
+from modules.research.param_fields import AH_CHASSIS_IDS  # noqa: E402  (id 表单一源)
 
 # 官方产品名 → 电芯厂商。这是厂商自己的产品命名（刀片=弗迪、麒麟=宁德），
 # 属可核验的官方字段映射，不是推断；映射结果在 note 里标明来源字段。
@@ -369,12 +376,19 @@ def find_sid_remote(model, index=None, timeout=25):
 def _fetch_config_json(sid) -> tuple[dict | None, str]:
     """抓参数页的 config JSON。优先移动版（字段名不混淆），桌面版兜底。
 
+    v10.51.1：requests 改函数内懒导入（import 隔离）——顶层 import 会使整个
+    auto_trims 在缺 requests 的环境无法 import（回归 t075/本模块所有消费者
+    一起挂，且 chassis_fetch 的 S1 汽车之家通道也被连带降级）。可选依赖
+    不得阻断模块导入。
+
     为什么要移动版优先（2026-11-21 实测）：
-      桌面版把「快充/慢充/高压平台」等关键词用 <span class='hs_kwNN_configFG'>
+      桌面版把「快充/慢充/高压平台」等关键词用 <span class='hs_kwNN_configFG'></span>
       挖空，clean() 之后「电池快充时间(小时)」和「电池慢充时间(小时)」都退化成
       「电池(小时)」——同名字段互相覆盖，快充永远取不到。移动版字段名完整，
-      两版的字段 id 一致，所以移动版取干净名字、桌面版按 id 兜底。
+      两版字段 id 一致，所以：优先移动版取干净字段名，桌面版作兜底（靠 id 定位）。
     """
+    import requests
+
     last = ""
     for url in (CONFIG_URL_MOBILE, CONFIG_URL):
         try:
@@ -420,11 +434,14 @@ def parse_config(sid, pure_ev_only=True):
                 return i
         return len(_GROUP_PRIORITY)
     # id → 字段名 的反向表（合并三张 id 表；同 id 冲突时先到先得：
-    # 基本参数 优先于 电池 优先于 车身，与 _GROUP_PRIORITY 一致）
+    #   基本参数 优先于 电池 优先于 车身，与 _GROUP_PRIORITY 一致）
     _ALL_IDS: dict[int, str] = {}
     for _d in (AH_BASE_IDS, AH_BODY_IDS, AH_BAT_IDS):
         for _k, _v in _d.items():
             _ALL_IDS.setdefault(_v, _k)
+    # v10.51.0：底盘组 id 反向表（AH_CHASSIS_IDS 全局唯一，无跨组冲突）
+    _CHASSIS_IDS_REV = {v: k for k, v in AH_CHASSIS_IDS.items()}
+    chas: dict[str, dict] = {}         # specid → 底盘字段（按 id 定位）
     pt = sorted(pt, key=_prio)
     for gi, grp in enumerate(pt):
         gname = str(grp.get("groupname") or grp.get("name") or "")
@@ -445,6 +462,14 @@ def parse_config(sid, pure_ev_only=True):
                 if key and slot.get(key) in (None, "", "-", "—"):
                     slot[key] = val
                     slot.setdefault("_names", {})[key] = val
+                # v10.51.0：底盘转向组（驱动方式/前悬/后悬/四驱形式）——
+                # 汽车之家 config 当前对所有能源类型整组为空，这里如实记，
+                # 源恢复即自动生效；chassis_fetch 的文章通道是今天的合规主通道。
+                ckey = _CHASSIS_IDS_REV.get(fid)
+                if ckey:
+                    cslot = chas.setdefault(sid2, {})
+                    if cslot.get(ckey) in (None, "", "-", "—"):
+                        cslot[ckey] = val
             # 按 specid 记录能源类型（同一列在基本参数/底盘两组里会重复出现）
             if nm == "能源类型":
                 for sid2, val in zip(ids, vals):
@@ -629,6 +654,19 @@ def parse_config(sid, pure_ev_only=True):
         max_loaded_kg = _num_of("max_loaded_kg")
         launch_month = _bv("launch_month")
 
+        # ── 底盘转向组（v10.51.0）────────────────────────────────────
+        # 汽车之家 config JSON 的底盘组当前对**所有能源类型**整组为空（实测
+        # 燃油/纯电/增程皆 0 值，2026-11-23 复核），这里按 id 提取后如实记
+        # None——缺数据 ≠ 差，也不假装有值。合规主通道是 chassis_fetch.py
+        # 的文章正文提取（带引文）与人工核验条目。
+        c = chas.get(sid2, {})
+        def _chs(key):
+            v = c.get(key)
+            return None if v in (None, "", "-", "—") else v
+        drive_form = _chs("drive_form") or _chs("drive_4wd")
+        susp_front = _chs("susp_front")
+        susp_rear = _chs("susp_rear")
+
         yr = re.search(r"(20\d{2})款", name)
         bits = ["自动解析自汽车之家参数页"]
         if cell_src:
@@ -642,6 +680,9 @@ def parse_config(sid, pure_ev_only=True):
         if swap:
             bits.append(f"补能方式取自「换电」（{swap}）")
         bits.append("质保/上市时长/媒体配置亮点未取得，记 null")
+        if drive_form is None and susp_front is None and susp_rear is None:
+            bits.append("底盘转向组（驱动方式/前/后悬架）汽车之家 config 当前整组为空，"
+                        "记 null（合规通道：chassis_fetch 文章正文提取/人工核验）")
         out.append({
             "name": name, "price": round(price, 2),
             "energy_type": energy or None,
@@ -659,6 +700,8 @@ def parse_config(sid, pure_ev_only=True):
             "zero_to_100_s": zero_to_100_s, "max_power_kw": max_power_kw,
             "max_torque_nm": max_torque_nm, "curb_weight_kg": curb_weight_kg,
             "max_loaded_kg": max_loaded_kg, "launch_month": launch_month,
+            # v10.51.0：底盘转向组（汽车之家当前整组为空 → null；源恢复自动生效）
+            "drive_form": drive_form, "susp_front": susp_front, "susp_rear": susp_rear,
             "key_configs": [], "group": (yr.group(1) + "款") if yr else "在售",
             "note": "；".join(bits),
         })
@@ -709,6 +752,15 @@ def _missing_fields(trims_list: list[dict]) -> list[str]:
         missing.append("cell_supplier")
     if not any(t.get("charge") for t in trims_list):
         missing.append("charge")
+    # v10.51.0：底盘三字段——汽车之家底盘组当前整组为空，几乎所有自动条目
+    # 都会列这里；这正是「缺口显式化」的目的（静默 null 伪装成「数据源没有」
+    # 是 2026-11-22 盘点的病根，partial_fields 让它可被审计/披露）。
+    if not any(t.get("susp_front") for t in trims_list):
+        missing.append("susp_front")
+    if not any(t.get("susp_rear") for t in trims_list):
+        missing.append("susp_rear")
+    if not any(t.get("drive_form") for t in trims_list):
+        missing.append("drive_form")
     missing += ["launch_date", "key_configs", "supplier_verification"]
     return missing
 
@@ -848,7 +900,10 @@ def refresh_entries(db: dict, index: dict, cands: list[dict],
                       "wheelbase_mm", "length_mm", "width_mm", "height_mm",
                       "trunk_l", "frunk_l", "cd", "body_structure",
                       "zero_to_100_s", "max_power_kw", "max_torque_nm",
-                      "curb_weight_kg", "max_loaded_kg", "launch_month"):
+                      "curb_weight_kg", "max_loaded_kg", "launch_month",
+                      # v10.51.0：底盘转向组（汽车之家当前为空；chassis_fetch
+                      # 文章通道回填的值不受 refresh 影响——空值不覆盖已有值）
+                      "drive_form", "susp_front", "susp_rear"):
                 nv = t.get(k)
                 if nv in (None, "", "—"):
                     continue
@@ -1005,6 +1060,17 @@ def main():
         print(f"\n[ok] 新增 {len(added)} 款，跳过 {len(skipped)} 款；"
               f"写回：人工库 {st['manual']} 条 / 自动库 {st['auto']} 条，"
               f"校验通过 → {out}")
+        # v10.51.2：新车入库后底盘链自动补齐（通用化——任何新车走同一条链；
+        # 失败只披露不影响入库，底盘缺口由 pipeline 哨兵持续可见）。
+        try:
+            from modules.research import chassis_fetch as CF
+            crep = CF.fill_models([e["model"] for e in added], apply=True)
+            print(f"[chassis] 新入库 {len(added)} 款底盘链补齐：采集成功 "
+                  f"{crep['n_collected']} 款 → runs/chassis_fill_report_{CF.TODAY}.json",
+                  file=sys.stderr)
+        except Exception as ex:                       # noqa: BLE001
+            print(f"[chassis] 底盘补齐跳过（不影响入库）: {type(ex).__name__}: {str(ex)[:80]}",
+                  file=sys.stderr)
     else:
         print(f"\n[dry-run] 将新增 {len(added)} 款")
     if skipped:

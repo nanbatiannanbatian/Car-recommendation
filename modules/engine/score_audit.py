@@ -38,9 +38,9 @@ DIM_LINKS = {
     "cabin":      {"rule": True,  "wired": "partial", "module": "engine/experience_score.py + spec_score.score_cabin",
                    "note": "有实测调整+封顶，基础分人工；8295/屏幕规则没接"},
     "control":    {"rule": True,  "wired": "partial", "module": "engine/experience_score.py + spec_score.score_control",
-                   "note": "有麋鹿证据调整+封顶，基础分人工；悬架/驱动/零百规则没接"},
-    "powertrain": {"rule": True,  "wired": False, "module": "engine/spec_score.py",
-                   "note": "有 800V/快充/电芯/续航算分规则，但依赖字段没进候选池，纯人工分"},
+                   "note": "有麋鹿证据调整+封顶，基础分人工；悬架/驱动/零百规则增量经 rule_adjust 接结构化底盘字段（v10.51.0 chassis_fetch 通道），文本提取兜底"},
+    "powertrain": {"rule": True,  "wired": "partial", "module": "engine/spec_score.py + rule_adjust",
+                   "note": "有 800V/快充/电芯/续航算分规则；v10.51.0 起审计与出榜同走 _spec_of（trims 结构化字段优先于文本），覆盖率不再为 0；基础分仍人工，规则只供增量"},
     "value":      {"rule": True,  "wired": "partial", "module": "engine/spec_score.py + experience_score",
                    "note": "有同榜比价规则+保值率调整，但比价规则没接（价格字段有但没喂给 score_value）"},
 }
@@ -96,13 +96,24 @@ def link_audit() -> list[dict]:
     return rows
 
 
-def compute_objective(c: dict, peer_prices: list[float] | None = None) -> tuple[dict, dict, list[str]]:
+def compute_objective(c: dict, peer_prices: list[float] | None = None,
+                      trims_db: dict | None = None) -> tuple[dict, dict, list[str]]:
     """用 spec_score 的同一套规则，从 evidence 提取的字段算客观分。
+
+    v10.51.0：与出榜链**同一 spec 组装入口**（rule_adjust._spec_of）——
+    此前这里只从 evidence 文本正则提取，而出榜链是「文本提取 + trims 结构化
+    字段（电压/轴距/零百/底盘三字段）」的叠加，审计与出榜两套口径（同项目
+    BUG-051 类的病）。现在统一走 _spec_of，结构化字段优先于文本正则。
+    trims_db 可传入（diff_audit 整批只加载一次）；缺省时自建。
 
     Returns (scores, reasons, imputed)。不改候选。复用 spec_score 保证与既有规则一致。
     """
     from modules.engine import spec_score as SS
-    spec = extract_spec_fields(c)
+    from modules.engine import rule_adjust as RA
+    from modules.engine import trim_board as TB
+    if trims_db is None:
+        trims_db = TB.load_trims()
+    spec = RA._spec_of(c, trims_db)
     price = None
     pg = c.get("price_guide")
     if isinstance(pg, (list, tuple)) and pg:
@@ -132,9 +143,12 @@ def diff_audit(cands: list[dict], threshold: float = 0.5, skip_wired=True) -> di
 
     diffs = []
     coverage = defaultdict(int)
+    # trims 合并读视图整批加载一次（compute_objective 内部不再逐车重复读文件）
+    from modules.engine import trim_board as TB
+    _tdb = TB.load_trims()
     for c in cands:
         peers = by_cls.get(c.get("cls") or "全部") or []
-        obj, reasons, imputed = compute_objective(c, peers)
+        obj, reasons, imputed = compute_objective(c, peers, trims_db=_tdb)
         for dim in ("adas", "powertrain", "space", "control", "safety", "cabin", "value"):
             if dim in skip_dims:
                 continue
@@ -188,7 +202,9 @@ def selftest() -> int:
     # 链路盘点：分类正确
     links = {r["dim"]: r["gap"] for r in link_audit()}
     assert links["safety"] == "WIRED", links
-    assert links["powertrain"] == "RULE_NOT_WIRED", links
+    # v10.51.0：powertrain 由 RULE_NOT_WIRED 升 PARTIAL_WIRED——审计与出榜统一
+    # 走 _spec_of 后 trims 结构化字段进审计，规则真跑了（BUG-085 的根治）。
+    assert links["powertrain"] == "PARTIAL_WIRED", links
     assert links["quality"] == "RULE_NOT_WIRED", links
     assert links["space"] == "PARTIAL_WIRED", links
 

@@ -25,5 +25,6 @@
     ice_crash / ice_sales   非纯电碰撞证据与销量
     build_ice_pool    汽车之家车系索引建池
     auto_trims        逐配置阶梯自动补录
+    chassis_fetch     底盘事实采集（悬架形式/驱动形式，多源链+引文）
     discover / universe_build   漏车发现 / 权威清单盘点
 """

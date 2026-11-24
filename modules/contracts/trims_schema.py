@@ -29,12 +29,22 @@ TRIM_FIELDS = ("name", "price", "battery_kwh", "battery_type", "cell_supplier",
                # v10.12.1：第二批——「车身」「基本参数」组补提取。
                # 起因：盘点发现汽车之家参数页的可用字段**远多于**原先提取的 6 项，
                # 轴距/后备厢/零百/风阻/整备质量/上市时间全部躺在内存里被丢弃，
-               # 而空间维（轴距封顶）、储物披露、操控规则、生命周期**都已经在用这些概念**。
+               # 而空间维（轴距封顶）、储物披露、操控规则、生命周期**已经在用这些概念**。
                # 字段名常被 CSS 混淆成「(mm)」「备厢(L)」之类，只能靠 id 定位。
                "wheelbase_mm", "length_mm", "width_mm", "height_mm",
                "trunk_l", "frunk_l", "cd", "body_structure",
                "zero_to_100_s", "max_power_kw", "max_torque_nm",
-               "curb_weight_kg", "launch_month", "max_loaded_kg", "battery_cooling")
+               "curb_weight_kg", "launch_month", "max_loaded_kg", "battery_cooling",
+               # v10.51.0：底盘三字段（操控维规则的结构化事实源）。
+               # 根因（2026-11-23 用户追问「底盘数据为什么缺」）：汽车之家 config JSON
+               # 的「底盘转向」「车轮制动」两组对**所有能源类型**整组为空（实测燃油
+               # 凯美瑞/迈腾同样 0 值，旧边界文档「燃油车有值」已失实）；易车参数页
+               # WAF 验证码挡脚本、懂车帝反爬、官网 SPA 无 SSR 参数表——结构化参数表
+               # 通道当前只有汽车之家一家且底盘组为空。底盘事实的合规通道是
+               # 文章正文提取（chassis_fetch.py，带 url+quote 引文）与人工核验。
+               # 粒度：悬架形式车系级（逐配置同名），驱动形式逐配置（后驱/四驱/空悬
+               # 按配置不同）。无证据一律显式 null，不推断、不插补。
+               "susp_front", "susp_rear", "drive_form")
 # consumption = 官方电耗（kWh/100km），来自汽车之家参数页「百公里耗(kWh/100km)」。
 # 2026-11-21 新增：此前电耗只有人工采集的 vehicle_physics.json（51/67 覆盖），
 # 自动采集这一路一直漏采，导致能效强/弱的车在三电维上被系统性低估或高估。
@@ -127,11 +137,23 @@ def selftest() -> None:
                 {"name": "标准版", "price": 15.0, "battery_kwh": 60, "battery_type": "磷酸铁锂",
                  "cell_supplier": "宁德时代", "supplier_class": "single_named", "cltc_km": 500,
                  "charge": [30, 80], "motor_kw": 150, "key_configs": [], "group": "2026款",
-                 "consumption": 13.5, "charge_power_kw": 80.0, "swap": None, "note": "—"},
+                 "consumption": 13.5, "charge_power_kw": 80.0, "swap": None, "note": "—",
+                 "voltage_v": 800, "wheelbase_mm": 2900, "length_mm": 4700, "width_mm": 1900,
+                 "height_mm": 1650, "trunk_l": 500, "frunk_l": None, "cd": 0.25,
+                 "body_structure": "5门5座SUV", "zero_to_100_s": 6.5, "max_power_kw": 150,
+                 "max_torque_nm": 300, "curb_weight_kg": 1900, "launch_month": "2026.01",
+                 "max_loaded_kg": None, "battery_cooling": "液冷",
+                 "susp_front": "双叉臂", "susp_rear": "多连杆", "drive_form": "后置后驱"},
                 {"name": "长续航", "price": 17.0, "battery_kwh": 80, "battery_type": "磷酸铁锂",
                  "cell_supplier": "宁德时代", "supplier_class": "single_named", "cltc_km": 650,
                  "charge": [30, 80], "motor_kw": 170, "key_configs": [], "group": "2026款",
-                 "consumption": 14.2, "charge_power_kw": 80.0, "swap": None, "note": "—"},
+                 "consumption": 14.2, "charge_power_kw": 80.0, "swap": None, "note": "—",
+                 "voltage_v": 800, "wheelbase_mm": 2900, "length_mm": 4700, "width_mm": 1900,
+                 "height_mm": 1650, "trunk_l": 500, "frunk_l": None, "cd": 0.25,
+                 "body_structure": "5门5座SUV", "zero_to_100_s": 6.8, "max_power_kw": 170,
+                 "max_torque_nm": 320, "curb_weight_kg": 1950, "launch_month": "2026.01",
+                 "max_loaded_kg": None, "battery_cooling": "液冷",
+                 "susp_front": "双叉臂", "susp_rear": "多连杆", "drive_form": "后置后驱"},
             ],
         }],
         "out_of_board_examples": [],

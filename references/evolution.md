@@ -1573,3 +1573,57 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
 - 回归：bug_regression 135/137（BUG-075/104 为环境缺 requests 模块——pip 被代理 SSL 拦截装不上，与改动无关，开发环境全绿）；失败回测 107/108 检出（t075 同环境原因探针不适用）；layout 16/16；midsuv_full 46/46；build_release/energy_router/energy_compare 全绿；render/board_view/cell_brand_verify/spec_score selftest 全过。新增 BUG-137/138/139 三用例 + t035 真断言重写 + 负向探针 3 条。
 - 榜单产物：runs/midsuv_bev_202611_v53（20 款全价位）、midsuv_bev_u18_202611_v53（11 款）、midsedan_bev_allprice_202611_v53（28 款）。
 - 文档/同步：SKILL 10.49.0→10.50.0、README 当前版本行、evolution.md 本节。sync --apply → commit → push。
+
+## v10.51.0 底盘事实结构化通道（用户追问底盘数据为什么缺，根因根治，2026-11-24）
+- 用户："底盘数据（悬架形式/驱动形式）为什么缺？之前记得 research 模块会从易车/懂车帝/汽车之家/官网获取，是代码问题吗？根因上修。"
+- **诊断（全实测）**：①汽车之家 config JSON「底盘转向/车轮制动」两组对**所有能源类型**整组为空（燃油凯美瑞 sid110/迈腾496、纯电极氪7X 7777/Model Y 5769、增程+纯电同系深蓝S07 6817/阿维塔07 7652 均 0 值，移动+桌面一致）——旧边界文档「燃油车有值」失实，非代码回归；②易车参数页腾讯云 TCaptcha WAF；③懂车帝反爬（无 __NEXT_DATA__）；④官网多为 SPA 壳，但**阿维塔官网配置表（avatr.com/configuration?car=11）与蔚来官网配置表（nio.cn）是 SSR 可直连抓取的结构化底盘源**。代码侧真缺口：trims 契约无底盘字段、auto_trims 不提取、spec_from_trim 不映射、score_audit 只文本正则、param_fields 台账不覆盖、边界文案失实。
+- **修法（三层）**：①契约层 trims_schema +susp_front/susp_rear/drive_form，trims_store FILLABLE+3；②采集层 auto_trims 按 id 提取汽车之家底盘组（AH_CHASSIS_IDS 单一持有于 param_fields，id 台账 13 项=4 提取+9 解释跳过）；**新模块 research/chassis_fetch.py** 多源链 S1 汽车之家结构化>S2 文章正文提取（带 url+quote+date 引文）>S2b 搜索兜底低置信>S3 人工核验，extract_from_text 正则+别名归一+驱动裸词子串去重，merge_into_db 只填空不覆盖+驱动逐配置三级赋值（curated 显式映射>系列单一形式>配置名关键词×系列声明，都不猜，多形式无关键词显式 null）+chassis_sources 留痕+原子写双库；③消费层 trim_board.spec_from_trim 底盘映射（结构化优先文本）、score_audit.compute_objective 统一走 rule_adjust._spec_of（消除审计/出榜两套口径）、pipeline 底盘覆盖率门禁（告警不阻断）+summary["chassis_coverage"]+report 披露段、board_view/render 失实边界文案修正。
+- **存量迁移**：apply_facts({}) 把底盘三键补齐 365/365 自动+84/84 人工配置条目。
+- **数据回填**：21 款 midsuv_bev 车底盘事实逐条联网研究（host web_search，url+quote+date 引文）→ runs/chassis_facts_20261123.json → --facts-json --apply 落地（auto 17+manual 3；Q06 drive_by_trim 纠后驱）。覆盖率 SUV 20/20、u18 11/11 full。纠偏实例：ES6 前悬五连杆/全系四驱、T6 全系后驱（170kW 上市稿证伪有驾四驱说）、G6 2026 款全系后驱、bZ5/T5 前置前驱。问界M5纯电版无 trims 条目，如实披露不假装。
+- **效果与纪律**：主榜分数**零变化**——中位锚设计（后驱为池内多数形式=中位，结构化后 18/20 车拿到驱动项但 delta=0；唯一非零 ES6 四驱+零百 2.98 早已被文本覆盖 +0.25）。真正的变化在数据层（可重算可审计）、审计链（compute_objective 统一口径）、披露层（覆盖率门禁+边界文案）。轿车榜 0/29 如实披露缺口（未回填，不假装覆盖）。
+- **回归**：chassis_fetch selftest（文本提取/config 解析/逐配置赋值/只填空不覆盖）；trims_schema selftest fixture 补全（修掉 v10.12.1 起存量假绿）；param_field_audit 台账 94 项自洽；bug_regression 新增 BUG-140~144+t140~t144；negative 探针 5 条+t085 改打 _spec_of；layout 16/16。
+- **踩坑**：①bug_regression/negative_regression 是 CRLF 文件，edit 工具匹配失败→python 脚本字节级替换（insert_t140.py/patch_t085.py 先例）；②t143/t085 断言随赋值规则升级而更新（断言维护跟架构走，非调绿）；③沙箱原生 python 缺 requests（pip 被代理 SSL 拦截）→测试用 sys.modules 桩。
+- 榜单产物：runs/midsuv_bev_202611_v54（20/20 底盘覆盖）、midsuv_bev_u18_202611_v54（11/11）、midsedan_bev_allprice_202611_v54（0/29 缺口如实披露）。SKILL 10.50.0→10.51.0。
+
+## v10.51.1 import 隔离根治（v54 首跑验证暴露，2026-11-24）
+- v54 首跑后 A/B 对账发现两个非预期差异，追到底都是**环境/运行层根因**而非评分回归：
+- **根因A（quality 漂移）**：首跑漏带 --quality——evidence_gate 的 quality 策略 need=pph/force=True（池内 ah_pph_usable 10/20）把无 PPH 车 quality 强制封顶到有样本中位 6.74；QS.apply（--quality）在 gate **之后**（pipeline 后段）用规则分覆盖封顶。v53 三榜 summary 都有 quality 键→v53 带 --quality。修法：重跑补旗标（命令纪律，非代码改动）。
+- **根因B（销量降级，BUG-145）**：fetch_dcd_sales 顶层 `import requests` → 缺 requests 环境整个模块 import 死掉 → sales_backfill.fetch_snapshot 的**快照缓存复用路径**（缓存命中零网络）在 import 阶段被打死 → 销量回填静默降级手填值、「月销仅为车系上界」标签+名次区间漂移。同病：auto_trims 顶层 import requests（t075 环境恒红、chassis_fetch S1 汽车之家通道被连带降级）。修法：两模块 requests 改函数内懒导入（import 隔离）——缓存命中路径零依赖，缺依赖只影响真抓取；实测缓存复用恢复（SUV 19/u18 10/轿车 28 条 applied，零联网）。
+- **回归**：新增 BUG-145+t145（sys.modules['requests']=None 下两模块可导入+缓存路径不断依赖+源码懒导入断言）+负向探针；t075 环境转绿；bug_regression 143/143；失败回测 115 探针检出 115/未检出 0/跳过 1（t030 目标串「车系月销榜前 10」已随 v10.24 修复从源码消失，探针无对象可抹，跳过合理）；layout 16/16。
+- **t129~t134 清单维护**：六个门硬编码检查 v52 三榜目录（v10.27 时代快照），随交付推进更新为 v54（同 v46→v52 历次清单维护模式；历史 run 目录按惯例保留——runs/ 内 v8/v28/v32/v39/v46 均留存）。注：host_safe_delete 对 .workbuddy 路径三次超时未果，遂放弃删目录方案。
+- **A/B 终验**：v53→v54 三榜逐配置总分+八维**零差异**（quality/销量恢复后，变化仅在数据层/披露层）；HTML 版本号动态落 v10.51.1；底盘覆盖 SUV 20/20、u18 11/11、轿车 0/29（如实缺口披露）。
+- 文档/同步：SKILL 10.51.0→10.51.1、README 追加段、evolution.md 本节。
+
+## v10.52.0 定稿榜服务端渲染 + 场景推演器分离（2026-11-24）
+- 用户要求「榜单要能复现、推演是个人探索」，同一页混两种时态会破坏可复现性。
+- 落地：定稿榜由服务端按给定画像算好直接渲染（20 区块，`sec-main_board` 等），场景推演器独立成页中交互区；页面不再有「先按默认、再被 JS 覆盖」的中间态。
+- 回归：`layout_regress` 16/16、`dynamic_blocks_test` 断言推演器与定稿榜分区独立。SKILL 10.51.1→10.52.0。
+
+## v10.53.0 跨能源形式结论前置 + 画像自检（2026-11-24）
+- 用户追问「同价位掺着油车/油混/插混/增程/纯电，怎么选」。裸榜单答不了"哪种能源形式适合我"。
+- 修法：①`engine.recommend_form()` 按形式聚合均分/硬条件车数/不建议项数，`FORM_MIN_N=3`（样本 <3 台标「样本不足」，1 台车不能代表一种形式）；②`check_profile()` 画像自检逐项给「适配/不建议」；③电价口径收口：`elec_price` 条件删除，家充统一按谷电 0.35 元/度，避免同一套车因电价得出两套结论。
+- 回归：`energy_router_regress` 32/32、`env_equivalence` 全绿。SKILL 10.52.0→10.53.0。
+
+## v10.54.0 燃油/油混/插混 8 维打分自动化（2026-11-24）
+- 背景：池里只有纯电的三电与产品力，燃油/油混/插混靠手工，无法自动扩池。
+- 修法：①`modules/research/ah_series.py` 汽车之家车系页+参数页事实采集（30 天缓存 `runs/_ah_cache/<sid>.json`，串行 0.8s）；②`modules/engine/param_score.py` 能源中性 8 维打分（权重与 `build_energy_compare.DIMS` 同值）；③`modules/research/build_ice_scores.py` 名单→事实→打分→`data/gen/ice_scores_compact.json`（含 `--fill-bev`）；④`map_energy()` 归一：汽油+48V 轻混/CNG→ICE，汽油电驱/超混电驱(e-POWER)→HEV，插电→PHEV，增程→EREV；⑤方法学修正：`aggregate` 只输出价格中位那台款型自己的功率/车重/价格（`main`），混动系统功率保守估算（串联取电机、并联 engine+0.5*motor），`param_score` 接受 `price_ref`。
+- 修 bug：缓存 JSON 字段 id 变字符串（`_coerce` 转 int 并按 specs 重算）、`official_name` 误取对比车系（改按 `seriesId==sid` 认领）、e-POWER 未映射。
+- 回归：`param_score_regress` 7 项 PASS；多形式池接入 `build_compact_sedan.py`（`ice_doc()` 缺文件/超 7 天自动重跑、`bev_patch()` 自动补三电）。SKILL 10.53.0→10.54.0。
+
+## v10.55.0 用车条件 20 项→13 项（用户「条件太多了」）2026-11-24
+- 先量化后删：用 45 款页面反解 `const CARS`，对 20 项条件逐项遍历非默认选项，统计硬条件触发车数/综合分变化车数/单项最大 Δ/前十交集/形式结论是否翻转。
+- 删 7 项：`summer_temp`（≤2 分同向微调）、`drive_style`、`ac_usage`、`parking`、`park_idle`、`outdoor_camp`（只改 TCO 展示不改排序）、`elec_price`（与冬季温度语义重复+口径冲突）。
+- 判据入 SKILL：「只造成 ≤2 分同向微调、或只改 TCO 展示不改排序、或与已保留项语义重复的，一律删；能留下的必须带硬条件或能翻转能源形式结论」。
+- 实现：`FACTOR_GROUPS` 重建「核心能源决策 9 项 + 进阶条件」、`CORE_FACTORS` 9 列；被删常量保留但不再被条件驱动，`adjust/range_calc/tco/verdicts` 遇未知键安全忽略（selftest 断言）。
+- 回归：`env_equivalence` 147 组、`env_options_test` 重写、`t016` 增「已删条件不回流」断言、`bug_regression` 修 BUG-129（版本断言从「页面版本==skill 版本」改为「页面必须有 v10.x 动态标签、禁止回落 v9.7.x」，原断言每次升版必炸）。SKILL 10.54.0→10.55.0。
+
+## v10.56.0 冬季气候带四档 + 年里程补 <5000 档 + 删地形/方盒子（2026-11-24）
+- ①**冬季最低气温改地域四档**（用户提三分，判断三分丢判据）：南方 ×1.00 / 江淮·长江 ×1.05（默认）/ 华北·黄淮 ×1.12 / 东北·内蒙·疆北 ×1.20，每档写代表城市与边界（大连约 −15℃ 按华北档更接近）。理由：三分会让沈阳(−22) 与大连(−15) 同罚、北京(−12) 与西安(−8) 同档，且「南方」里广州(+5℃) 与上海(−3℃) 跨 0℃。内部温度键不变，纯标签层改动，单点改 `FACTORS["winter_temp"]` 即页面与 JS 同步。
+- ②**年里程补 <5000km 档**（用户提，实测支持）：引擎自算盈亏平衡点 4838.7km/年，5000km 以下正好在平衡点左侧，是真实分界而非凑档。规则 纯电 −2.0 / 燃油·油混 +2.0，「低里程+无桩」追加 −1→−1.5。
+- ③**删地形**（用户「公式也算不出来」——部分成立）：模型有乘子（丘陵 1.10/高原 1.06，每爬升 100m≈0.5kWh），但只能代表路线级平均，用户无法自评、近似必然不准 → 删条件，方法区改写「山区/高原请自行上浮电耗 10~25%」，续航算式去掉「× 地形」行。
+- ④**删方盒子造型，改由车型属性承担**：条件项删除，高速倍率只按车型自身 `cd`/`cdaPerTon`；新增 `body_label()` 归一车身形式（官方三厢/两厢→轿车、SUV、MPV、皮卡；仅有客观字段才升级子类 offroad/非承载→越野车、boxy→方盒子SUV，拿不到就停在 SUV，不猜外形）；车身筛选选项从池内实际 body 派生，不显示空品类。
+- ⑤**限牌城市明确不删**（用户提删，反驳保留）：H5 燃油/油混 −8、H7 京沪插混/增程 −8，是 7 条硬条件里唯一判「这车在当地能不能用」的项，实测 33 台触发、单项最大 Δ8.0；删掉会让限牌城市用户看到油车进前十。
+- 结果：条件表 13→11 项（核心 9 + 进阶 2：家庭车队、补能耐心）；`ROBUST_SCENARIOS` 改 9 场景；三张页面重建，默认榜前十不变（UNI-V 83.4 / 影豹 82.4 / 秦PLUS 82.1 / 星瑞 80.4 / 零跑B01 80.3）。
+- 回归：selftest（11 因素）、`env_equivalence` 126 组（7 车×18 画像）、`env_options_test` 85/85、`midsuv_full` 52/52、`energy_compare` 21/21（含 t033 body_label）、`layout` 16/16、`bug_regression` 144/144。`build_release_regress` 91/92，唯一 FAIL 是「产物体积留 ≥600KB 余量」（历史遗留，与功能无关）。
+- 已知边界（如实披露）：MPV/越野车/方盒子SUV 当前**选不出来**——紧凑轿车池全轿车、中型 SUV 池全 SUV，结构已就位但需新品类池采集（可复用 `ah_series`+`param_score`）；HEV 与 ICE 的油耗事实仍按车系级 trims 中位取值（同车系两能源拿到同一批款型），TCO 未吃到 HEV 实测油耗优势，属数据层待修。
+- 文档：`references/用车条件因素库.md` 重写（11 项表 / 删除台账 / 限牌为何保留 / 车身形式边界 / 第八节「为什么四档而不是三分」）、`references/燃油混动打分口径.md` 第 4 条、`__init__.py`、`cross_energy_sections.method_boundary`。SKILL 10.55.0→10.56.0。

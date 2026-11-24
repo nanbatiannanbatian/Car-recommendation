@@ -621,7 +621,8 @@ def render(data, summary, title, as_of):
                          '展开可看各项得分理由。') if _demo else '展开可看每个配置的三电分与得分理由。'
             H.append('<div class="rule">每个配置按 spec_score 规则单独算分，<b>★＝该车最高分配置，也是主榜用来排名的配置</b>。'
                      '看对比请盯「三电」列和最后一列「得分理由」——' + _demo_txt +
-                     '注意：配置表缺悬架/算力等参数，逐配置分有插补维度，只作同车配置相对对比。</div>')
+                     '注意：配置表缺算力等参数（悬架/驱动已由底盘事实通道结构化补齐，v10.51.0），'
+                     '逐配置分仍有插补维度，只作同车配置相对对比。</div>')
             for r in rows:
                 td = tb.get(r["model"])
                 if not td or not td.get("trims"):

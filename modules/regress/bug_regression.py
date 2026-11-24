@@ -160,6 +160,13 @@ CASES = [
     ("BUG-137", "生命周期两套渲染路径分裂:HTML原样透传候选池字段18台车显示「—」/MD走确证层显示「在售」+两套标签表漂移(LC_LABEL 6键/LIFECYCLE_STATUS_CN 15键)+MD列名仍叫「周期」+t035假断言", "v10.50.0"),
     ("BUG-138", "电池来源列电压V丢显:BUG-127归一charge纯电压文本→voltage_v后渲染层三级取数没同步(MONA L05/腾势N7主榜无V、逐配置列与JS下拉同病)", "v10.50.0"),
     ("BUG-139", "电芯联网核验本地链与显示层口径不一致:核验层只查fact_library/fact_ref/trims,候选池cell_brand与master_pool不在链上(池有品牌仍判unavailable走联网)+查询式被占位配置名稀释", "v10.50.0"),
+    ("BUG-140", "底盘事实无结构化采集通道:契约/trims解析/spec映射三层全缺,汽车之家底盘组对所有能源类型整组为空(旧边界文档「燃油车有值」失实),易车WAF/懂车帝反爬/官网SPA", "v10.51.0"),
+    ("BUG-141", "底盘文章正文提取器fixture:正/负/紧凑式/别名归一/驱动裸词子串去重", "v10.51.0"),
+    ("BUG-142", "spec组装两套口径:审计只文本正则而出榜链结构化优先,统一走rule_adjust._spec_of+spec_from_trim底盘映射", "v10.51.0"),
+    ("BUG-143", "底盘写库纪律:只填空不覆盖+逐配置驱动按名赋值(无关键词留null不猜)+chassis_sources留痕+存量键补齐", "v10.51.0"),
+    ("BUG-144", "底盘覆盖率哨兵:param_field_audit台账登记底盘id+pipeline出榜前披露接线+失实边界文案修正", "v10.51.0"),
+    ("BUG-145", "可选依赖requests顶层import打死缓存复用路径(销量回填降级手填值+名次区间漂移+auto_trims/chassis_fetch连带)", "v10.51.1"),
+    ("BUG-146", "底盘采集通用化：全库缺口自动补齐链(搜索发现文章→正文提取→多源共识/冲突披露)+--fill-all+入库流接线+非库车型facts JSON", "v10.51.2"),
 ]
 
 
@@ -2348,11 +2355,13 @@ def t085():
     # 1) 模块自测
     assert SA.selftest() == 0, "score_audit 单元自测失败"
 
-    # 2) 链路盘点：safety 闭环，quality/powertrain 有规则没接，其余部分接
+    # 2) 链路盘点：safety 闭环，quality 有规则没接，其余部分接
+    #    （v10.51.0：powertrain 由 RULE_NOT_WIRED 升 PARTIAL_WIRED——审计与出榜
+    #    统一走 _spec_of 后 trims 结构化字段进审计，规则真跑了，不再是「有规则没数据」）
     links = {r["dim"]: r["gap"] for r in SA.link_audit()}
     assert links["safety"] == "WIRED", f"safety 应闭环: {links}"
-    assert links["quality"] == "RULE_NOT_WIRED" and links["powertrain"] == "RULE_NOT_WIRED", \
-        f"quality/powertrain 应有规则没接: {links}"
+    assert links["quality"] == "RULE_NOT_WIRED" and links["powertrain"] == "PARTIAL_WIRED", \
+        f"quality 没接/powertrain 部分接（结构化字段已进审计）: {links}"
     assert links["adas"] == "PARTIAL_WIRED" and links["space"] == "PARTIAL_WIRED", links
 
     # 3) 真实池提取 + 核算：有硬参数的维度能算，且差异可检出
@@ -2362,9 +2371,17 @@ def t085():
     assert audit["skipped_wired"] == ["safety"], "已闭环 safety 不该产生伪差异"
     assert "adas" in audit["coverage"] and audit["coverage"]["adas"] >= 5, \
         f"adas 有硬参数应可核算: {audit['coverage']}"
-    # powertrain/value 无数据 → coverage 里不该有（这正是「规则有了数据没进池」的证据）
-    assert "powertrain" not in audit["coverage"] and "value" not in audit["coverage"], \
-        f"powertrain/value 缺数据不该算: {audit['coverage']}"
+    # v10.51.0：审计与出榜同一 spec 组装链（_spec_of）——trims 结构化字段
+    # （电池/电压/轴距/零百/底盘三字段）进审计后，powertrain/space/control
+    # 覆盖率不再为 0（此前文本正则覆盖极低，规则等于没跑——这正是 BUG-085
+    # 「规则从没跑过」的根治）；value 仍无结构化产品力链，不进 coverage。
+    assert audit["coverage"].get("powertrain", 0) > 0, \
+        f"powertrain 结构化字段应进审计: {audit['coverage']}"
+    assert audit["coverage"].get("space", 0) > 0, \
+        f"space 结构化字段应进审计: {audit['coverage']}"
+    assert audit["coverage"].get("control", 0) > 0, \
+        f"control 结构化字段应进审计: {audit['coverage']}"
+    assert "value" not in audit["coverage"], f"value 无结构化链不该算: {audit['coverage']}"
     assert audit["diff_count"] > 0, "应检出人工分与规则分的差异"
 
     # 4) 审计绝不改分（深比较）
@@ -4594,11 +4611,13 @@ def t129():
     psrc = _read("pipeline.py")
     assert '"pool_excluded"' in psrc, "summary.pool_excluded 数据层被误删"
     # ④ 真实三榜 HTML：无未入池整段、无旧版本串、版本号=当前版本
+    # 检查清单随交付推进维护（v10.51.1：v52→v54；历史 run 目录按惯例保留，
+    # 门验证"当前交付三榜"而非所有历史产物，同 v46→v52 的历次清单维护）
     from modules.engine.score_fingerprint import skill_version
     ver = skill_version()
     assert ver, "读不到当前 skill 版本"
-    for run in ("midsedan_bev_allprice_202611_v52", "midsuv_bev_202611_v52",
-                "midsuv_bev_u18_202611_v52"):
+    for run in ("midsedan_bev_allprice_202611_v54", "midsuv_bev_202611_v54",
+                "midsuv_bev_u18_202611_v54"):
         p = os.path.join(HERE, "runs", run, "榜单.html")
         if not os.path.exists(p):
             continue
@@ -4609,7 +4628,12 @@ def t129():
         assert "未入池车型及原因" not in visible, f"{run} 页面仍显示未入池整段"
         assert "v9.7.1：" not in visible and "v9.7.16" not in visible and "v9.7.18" not in visible, \
             f"{run} 页面仍有旧版本标记"
-        assert f"v{ver}：每款车取其" in visible, f"{run} 页面版本号未更新为当前 {ver}"
+        # 版本标签：页面必须由源码动态注入 v10.x 版本（禁止回落到写死的 v9.7.x）。
+        # 不断言「等于当前版本」——单能榜是历史结论快照，按其产出时版本标注才诚实；
+        # 强制改标会让旧结论伪装成本版本产物（v10.54.0 修订口径）。
+        m = _re.search(r"v(10\.\d+\.\d+)：每款车取其", visible)
+        assert m, f"{run} 页面缺动态版本号标签"
+        assert _re.match(r"10\.", m.group(1)), f"{run} 页面版本号不是 v10.x"
     # 反向注入：把动态版本号改回写死，检测必须触发（证明断言非摆设）
     injected = rsrc.replace("v{_ver}：每款车取其", "v9.7.1：每款车取其", 1)
     assert "v9.7.1：每款车取其" in injected, "反向注入未生效"
@@ -4651,8 +4675,8 @@ def t130():
     tip_bev = sales_tip({"sales_scope": "pure_bev", "trend_sales": 11166})
     assert "纯电单独" in tip_bev and "上界" not in tip_bev, "纯电口径 hover 不应说上界"
     # ④ 真实 v31 三榜 HTML：无矛盾串、月销格有 title hover
-    for run in ("midsedan_bev_allprice_202611_v52", "midsuv_bev_202611_v52",
-                "midsuv_bev_u18_202611_v52"):
+    for run in ("midsedan_bev_allprice_202611_v54", "midsuv_bev_202611_v54",
+                "midsuv_bev_u18_202611_v54"):
         p = os.path.join(HERE, "runs", run, "榜单.html")
         if not os.path.exists(p):
             continue
@@ -4694,8 +4718,8 @@ def t131():
         assert f"<th>{col}</th>" not in rsrc, f"空间表仍有空列 {col}"
     assert "无统一计算口径" in rsrc and "不编造、不插补" in rsrc, "缺数据边界说明"
     # ③ v32 三榜 HTML：无两区块标题、空间表头只 5 列、无 4 空列名
-    for run in ("midsedan_bev_allprice_202611_v52", "midsuv_bev_202611_v52",
-                "midsuv_bev_u18_202611_v52"):
+    for run in ("midsedan_bev_allprice_202611_v54", "midsuv_bev_202611_v54",
+                "midsuv_bev_u18_202611_v54"):
         p = os.path.join(HERE, "runs", run, "榜单.html")
         if not os.path.exists(p):
             continue
@@ -4747,7 +4771,7 @@ def t132():
     assert all(not any("碰撞" in b for b in (x.get("t1_blockers") or [])) for x in robust_in), \
         "稳健通道不应豁免碰撞实锤门槛"
     # ③ 本榜(202611)判档分有7.9维，诚实不触发——不降阈值迁就单车型
-    p = os.path.join(HERE, "runs", "midsedan_bev_allprice_202611_v52", "summary.json")
+    p = os.path.join(HERE, "runs", "midsedan_bev_allprice_202611_v54", "summary.json")
     if os.path.exists(p):
         sd = _J.load(open(p, encoding="utf-8"))
         assert not (sd.get("robust_t1") or {}).get("中型纯电轿车（全价位）"), \
@@ -4789,7 +4813,7 @@ def t133():
     assert ppw_trim < ppw_min and abs(ppw_trim - round(pf / 28.85, 6)) < 1e-6, \
         f"配置价应降低ppw且分母正确: {ppw_min}→{ppw_trim}"
     # ③ 真实出榜：Model Y value 不再虚高（<9.0，旧值9.54）
-    p = os.path.join(HERE, "runs", "midsuv_bev_202611_v52", "summary.json")
+    p = os.path.join(HERE, "runs", "midsuv_bev_202611_v54", "summary.json")
     if os.path.exists(p):
         sd = _J.load(open(p, encoding="utf-8"))
         my = next((a for a in (sd.get("value_residual") or {}).get("applied") or []
@@ -4836,7 +4860,7 @@ def t134():
         "页面未写明质价比口径"
     # 真实榜：Model Y 质价比残差应明显为负（GAIN=3 后约 -1.13，不再触底但仍在底部；
     # 保值率高会回补最终分，故不能断言 after——J.D. Power resale 因子真实存在）
-    p = os.path.join(HERE, "runs", "midsuv_bev_202611_v52", "summary.json")
+    p = os.path.join(HERE, "runs", "midsuv_bev_202611_v54", "summary.json")
     if os.path.exists(p):
         sd = _J.load(open(p, encoding="utf-8"))
         my = next((a for a in (sd.get("value_residual") or {}).get("applied") or []
@@ -5037,8 +5061,259 @@ def t139():
     return "核验本地链补池内品牌+master_pool + 查询式去占位污染"
 
 
+def t140():
+    """BUG-140：底盘事实无结构化采集通道（契约/解析/映射三层全缺）（v10.51.0）。
+
+    根因（2026-11-23 实证）：汽车之家 config JSON 的「底盘转向」「车轮制动」两组
+    对**所有能源类型**整组为空（燃油凯美瑞/迈腾、纯电极氪7X/Model Y、增程+纯电
+    同系深蓝S07/阿维塔07 底盘组有值数均 0；旧边界文档「燃油车有值」失实）；
+    易车参数页 WAF 验证码、懂车帝反爬、官网 SPA 无 SSR——结构化参数表通道只有
+    汽车之家一家且底盘组为空。代码层从未实现汽车之家之外的结构化参数解析，
+    trims 契约无底盘字段、spec 组装不映射底盘、哨兵不登记底盘 id → 操控维规则
+    （spec_score.control_parts 消费 susp_front/susp_rear/drive）只吃到文本正则
+    的零散字段，覆盖率极低且不可复算。
+    修法：契约 +3 字段；auto_trims 按 id 提取底盘组（源空如实 null）；
+    新模块 chassis_fetch 多源链（汽车之家结构化/文章正文提取带引文/人工核验）。
+    """
+    from modules.contracts import trims_schema as TS
+    from modules.research import auto_trims as AT
+    from modules.research import chassis_fetch as CF
+    from modules.research import param_field_audit as PFA
+    from modules.research import param_fields as PF
+    # ① 契约层：底盘三字段进 TRIM_FIELDS（无证据显式 null 的纪律同其他字段）
+    for k in ("susp_front", "susp_rear", "drive_form"):
+        assert k in TS.TRIM_FIELDS, f"契约缺底盘字段 {k}"
+    # ② 解析层：auto_trims 按 id 提取底盘组（id 表单一事实源在 param_fields）
+    assert "AH_CHASSIS_IDS" in _read("auto_trims.py"), "auto_trims 未接底盘 id 表"
+    assert AT.AH_CHASSIS_IDS == {"drive_form": 1231, "susp_front": 1226,
+                                 "susp_rear": 1227, "drive_4wd": 1228}
+    assert PF.AH_CHASSIS_IDS is AT.AH_CHASSIS_IDS, "id 表出现双副本"
+    # ③ config 解析功能 fixture：有值解析、空值不建条目
+    cfg = {"result": {"paramtypeitems": [
+        {"groupname": "底盘转向", "paramitems": [
+            {"id": 1231, "name": "驱动方式", "valueitems": [
+                {"specid": "s1", "value": "后置后驱"}, {"specid": "s2", "value": ""}]},
+            {"id": 1226, "name": "前悬架类型", "valueitems": [
+                {"specid": "s1", "value": "双叉臂"}, {"specid": "s2", "value": "-"}]},
+        ]}]}}
+    per = CF.chassis_from_config(cfg)
+    assert per["s1"]["drive_form"] == "后置后驱" and per["s1"]["susp_front"] == "双叉臂"
+    assert per.get("s2", {}) == {}, "空值不该建条目"
+    # ④ 哨兵台账：底盘 id 已登记（提取或解释），无漏网
+    unassigned = {f for f, _m in PFA.unassigned_fields()}
+    assert not ({1231, 1226, 1227, 1228} & unassigned), f"底盘 id 未归属: {unassigned}"
+    return "契约+3字段/解析按id提取(源空如实null)/id表单一源/台账登记"
+
+
+def t141():
+    """BUG-141：底盘文章正文提取器 fixture（v10.51.0）。
+
+    结构化参数表通道被反爬/源边界堵死后，合规主通道是文章正文提取（易车文章页/
+    腾讯新闻等可直连抓取）。提取器必须：正 fixture 全字段命中；紧凑式「前双叉臂
+    后五连杆」命中；别名归一（麦花臣→麦弗逊、扭转梁→扭力梁）；驱动裸词子串去重
+    （「四驱」是「双电机四驱」的子串，不许并存歧义）；无底盘事实 → 全 null 不猜；
+    提及但无形式（「后悬架调校」）→ 不误判。
+    """
+    from modules.research import chassis_fetch as CF
+    assert "SUSP_KEYS" in _read("research/chassis_fetch.py"), "提取器关键词表未源码可查"
+    pos = ("底盘方面，它全系标配前双叉臂、后五连杆独立悬架，还搭载液压衬套。"
+           "ZEEKR 7X有双电机四驱和后置后驱两种驱动形式。")
+    ex = CF.extract_from_text(pos)
+    assert ex["susp_front"] == "双叉臂" and ex["susp_rear"] == "五连杆", ex
+    assert "双电机四驱" in ex["drive_forms"] and "后置后驱" in ex["drive_forms"], ex
+    assert "四驱" not in ex["drive_forms"], f"裸词未去重: {ex['drive_forms']}"
+    # 紧凑式 + 驱动裸词
+    ex2 = CF.extract_from_text("前麦弗逊后多连杆，前置前驱。")
+    assert ex2["susp_front"] == "麦弗逊" and ex2["susp_rear"] == "多连杆", ex2
+    ex3 = CF.extract_from_text("前双叉臂后五连杆，适时四驱。")
+    assert ex3["susp_front"] == "双叉臂" and ex3["drive_forms"] == ["适时四驱"], ex3
+    # 负 fixture：不猜
+    ex4 = CF.extract_from_text("这车外观很好看，空间大，续航扎实，充电快。")
+    assert ex4["susp_front"] is None and ex4["susp_rear"] is None
+    assert ex4["drive_forms"] == [] and ex4["confidence"] is None
+    # 提及但无形式 → 不误判
+    ex5 = CF.extract_from_text("后悬架调校偏舒适，前悬滤震不错。")
+    assert ex5["susp_front"] is None and ex5["susp_rear"] is None, ex5
+    return "提取器正/负/紧凑式/别名归一/驱动子串去重 fixture 全过"
+
+
+def t142():
+    """BUG-142：spec 组装两套口径 → 统一 _spec_of（v10.51.0）。
+
+    审计路径（score_audit.compute_objective）原来只从 evidence 文本正则提取，
+    出榜路径（rule_adjust._spec_of）是「文本 + trims 结构化」叠加——同一事实
+    两套口径（BUG-051 类的病）。修法：审计统一走 _spec_of；spec_from_trim
+    映射底盘三字段（结构化优先：trim 有值覆盖文本值）。
+    """
+    import inspect
+    from modules.engine import rule_adjust as RA
+    from modules.engine import score_audit as SA
+    from modules.engine import trim_board as TB
+    # ① 结构化优先：trim 有 susp/drive → 覆盖文本提取值
+    spec = TB.spec_from_trim({"susp_front": "双叉臂", "susp_rear": "五连杆",
+                              "drive_form": "后置后驱"},
+                             {"susp_front": "麦弗逊", "drive": "四驱"})
+    assert spec["susp_front"] == "双叉臂" and spec["susp_rear"] == "五连杆"
+    assert spec["drive"] == "后置后驱", spec
+    # ② trim 无值 → 保留文本提取值（不抹掉）
+    spec2 = TB.spec_from_trim({"name": "x"}, {"susp_front": "麦弗逊", "drive": "后驱"})
+    assert spec2["susp_front"] == "麦弗逊" and spec2["drive"] == "后驱", spec2
+    # ③ 统一入口：审计与出榜同链（源码级断言，反向注入可检出）
+    assert "_spec_of" in inspect.getsource(SA.compute_objective), "审计未走统一 spec 组装"
+    assert "spec_from_trim" in inspect.getsource(RA._spec_of)
+    assert 'trim.get("susp_front")' in _read("engine/trim_board.py"), "映射未接底盘字段"
+    return "审计统一走_spec_of + spec_from_trim 底盘映射结构化优先"
+
+
+def t143():
+    """BUG-143：底盘写库纪律（v10.51.0）。
+
+    只填空不覆盖（人工核验 > 文章提取 > 汽车之家空值）；驱动形式逐配置赋值三级优先级
+    （都不猜）：① curated 显式映射 > ② 系列单一形式（多源一致的全系后驱等）>
+    ③ 配置名关键词 × 系列声明，多形式且无关键词无映射显式留 null（缺数据≠差）；
+    来源挂 chassis_sources（刷新不被模板文案抹掉）；存量条目补齐契约新键。
+    """
+    from modules.research import chassis_fetch as CF
+    assert "def merge_into_db" in _read("research/chassis_fetch.py")
+    # ① 逐配置驱动赋值（三级优先级：curated 映射 > 系列单一形式 > 配置名关键词）
+    assert CF._assign_drive_per_trim("100kWh 四驱 Ultra",
+                                     ["后置后驱", "双电机四驱"]) == "双电机四驱"
+    assert CF._assign_drive_per_trim("75kWh 后驱 Max",
+                                     ["后置后驱", "双电机四驱"]) == "后置后驱"
+    # 系列单一形式 → 全配置（T6/G6 全系后驱场景：已核验系列级事实，非猜）
+    assert CF._assign_drive_per_trim("660 Max 激光雷达版", ["后置后驱"]) == "后置后驱"
+    # 多形式且无关键词无映射 → 显式 null（不猜）
+    assert CF._assign_drive_per_trim("75kWh Max",
+                                     ["后置后驱", "双电机四驱"]) is None
+    # curated 显式映射优先（乐道 Ultra+ 实为四驱场景）
+    assert CF._assign_drive_per_trim("85kWh Ultra+", ["后置后驱", "双电机四驱"],
+                                     {"Ultra+": "双电机四驱"}) == "双电机四驱"
+    # 特斯拉口径归一（后轮驱动→后驱）
+    assert CF._assign_drive_per_trim("后轮驱动版",
+                                     ["后置后驱", "双电机四驱"]) == "后置后驱"
+    # ② 合入纪律：只填空不覆盖 + 来源留痕
+    db = {"entries": [{"model": "测试车", "trims": [
+        {"name": "后驱版", "susp_front": None, "susp_rear": None, "drive_form": None},
+        {"name": "四驱版", "susp_front": "已有值", "susp_rear": None, "drive_form": None}]}]}
+    CF.merge_into_db(db, {"测试车": {"susp_front": "双叉臂", "susp_rear": "五连杆",
+                                     "drive_forms": ["后置后驱", "双电机四驱"],
+                                     "sources": [{"url": "http://x", "quote": "q",
+                                                  "date": "2026-11-23",
+                                                  "confidence": "high"}]}},
+                     "test")
+    tr = db["entries"][0]["trims"]
+    assert tr[0]["susp_front"] == "双叉臂" and tr[0]["drive_form"] == "后置后驱"
+    assert tr[1]["susp_front"] == "已有值", "只填空不覆盖被破坏"
+    assert tr[1]["drive_form"] == "双电机四驱"
+    assert db["entries"][0]["chassis_sources"][0]["mark"] == "test"
+    # ③ 存量键补齐（老条目无新键 → 契约校验会拒，必须显式补 null）
+    db2 = {"entries": [{"model": "老车", "trims": [{"name": "a"}]}],
+           "out_of_board_examples": []}
+    n = CF._ensure_chassis_keys(db2)
+    assert n == 3 and db2["entries"][0]["trims"][0]["susp_front"] is None
+    return "只填空不覆盖 + 驱动三级赋值(映射>单一形式>关键词) + chassis_sources 留痕 + 存量键补齐"
+
+
+def t144():
+    """BUG-144：底盘覆盖率哨兵 + pipeline 披露接线 + 失实边界文案修正（v10.51.0）。
+
+    「该采的采了没」检查器此前只盘汽车之家台账（param_field_audit），底盘字段
+    不在任何检查器内 → 缺口永远静默。修法：台账登记底盘 id；coverage 输出显式
+    缺口清单；pipeline 出榜前披露（告警不阻断）；board_view/render 的失实边界
+    文案（「汽车之家给燃油车填」）同步修正。
+    """
+    from modules.research import chassis_fetch as CF
+    from modules.research import param_field_audit as PFA
+    # ① 台账自洽（含底盘 id 归属）+ 失实边界声明已修正
+    assert PFA.unassigned_fields() == [], PFA.unassigned_fields()
+    pf_src = _read("research/param_fields.py")
+    assert "失实" in pf_src and "所有能源类型" in pf_src, "边界声明未修正"
+    # ② 覆盖率哨兵：对真实候选池跑，结构健全（n/full/partial/none/missing）
+    models = [c["model"] for c in _read_pool()]
+    cov = CF.coverage(models)
+    assert cov["n"] == len(models)
+    assert cov["full"] + cov["partial"] + cov["none"] == cov["n"]
+    assert isinstance(cov["missing"], list) and isinstance(cov["pct"], float)
+    # ③ pipeline 接线（源码级断言）+ 披露文案 + board_view 边界文案更新
+    pl = _read("board/pipeline.py")
+    assert "chassis_coverage" in pl and "CF.coverage" in pl
+    assert "底盘事实覆盖" in pl
+    bv = _read("board/board_view.py")
+    assert "chassis_fetch 多源链采集" in bv, "board_view 边界文案未更新"
+    return "台账自洽+覆盖率哨兵+pipeline披露接线+边界文案修正"
+
+
+def t145():
+    """BUG-145：可选依赖 requests 顶层 import 打死缓存复用路径（v10.51.1）。
+
+    根因（2026-11-24 v54 首跑暴露）：fetch_dcd_sales 顶层 import requests →
+    缺 requests 的环境整个模块无法 import → sales_backfill.fetch_snapshot 的
+    **快照缓存复用路径**（缓存命中时零网络）在 import 阶段就被打死 → 销量回填
+    静默降级到手填值，「月销仅为车系上界」标签与名次区间随quality/销量漂移。
+    同病：auto_trims 顶层 import requests（回归 t075 在缺依赖环境恒红、
+    chassis_fetch 的 S1 汽车之家通道被连带降级）。
+    修法：两模块 requests 改函数内懒导入（import 隔离）——缓存命中路径零依赖，
+    缺依赖只影响真抓取，如实降级不静默压分。
+    """
+    import importlib
+    import sys
+    # 模拟环境缺 requests：sys.modules["requests"]=None 使 import requests 抛 ImportError
+    had = sys.modules.get("requests", "___absent___")
+    sys.modules["requests"] = None
+    try:
+        for mod_name in ("modules.research.fetch_dcd_sales", "modules.research.auto_trims"):
+            sys.modules.pop(mod_name, None)
+            importlib.import_module(mod_name)   # 顶层 import requests 会在这里炸
+        # 缓存复用路径不断依赖：snapshot_path 可调用（不断言网络）
+        from modules.board import sales_backfill as SB
+        assert SB.snapshot_path("202610").endswith("dcd_sales_snapshot_202610.json")
+    finally:
+        if had == "___absent___":
+            sys.modules.pop("requests", None)
+        else:
+            sys.modules["requests"] = had
+    # 源码断言（反向注入可检出）：懒导入在函数内
+    assert re.search(r"def fetch_page[\s\S]{0,400}import requests",
+                     _read("research/fetch_dcd_sales.py")), "fetch_dcd_sales requests 未懒导入"
+    assert re.search(r"def _fetch_config_json[\s\S]{0,600}import requests",
+                     _read("research/auto_trims.py")), "auto_trims requests 未懒导入"
+    return "requests 懒导入隔离 + 缓存复用路径不断依赖"
+
+
+def t146():
+    """BUG-146：底盘采集通用化（v10.51.2）。
+
+    用户纠正（2026-11-24）：手动研究 21 台再 apply JSON 只是榜单回填，不是根治。
+    根治 = 采集链通用化，任何车走同一条链：
+    ① S2a 自动发现（researcher 搜索 → URL 质量过滤 → 抓取 → 提取）+ 多源共识/冲突披露；
+    ② --fill-all 全库缺口迭代（含部分缺口）+ 逐车型留痕 runs/chassis_fill_report；
+    ③ auto_trims --apply 新车入库后自动对接底盘链（失败只披露不阻断入库）；
+    ④ --models 非库车型跑链写 facts JSON（混合榜燃油/混动车），不写库；
+    ⑤ 只填空不覆盖 + 冲突留 null 不猜（与 t143 同纪律）。
+    """
+    src = _read("research/chassis_fetch.py")
+    for k in ("def fill_all", "def fill_models", "def gap_models", "def discover_article_urls",
+              "def _merge_article_parts", "def _url_quality"):
+        assert k in src, f"通用化缺函数 {k}"
+    assert "conflicts" in src, "多源冲突披露缺失"
+    assert "--fill-all" in src and "--out-json" in src, "CLI 缺通用化入口"
+    at = _read("research/auto_trims.py")
+    assert "chassis_fetch" in at and "fill_models" in at, "auto_trims 入库流未接底盘链"
+    assert "apply_facts(facts, dry_run=not apply)" in src
+    # 冲突合并纯函数：两源悬后冲突 → null + 披露（不猜）
+    from modules.research import chassis_fetch as CF
+    mg = CF._merge_article_parts([
+        {"susp_front": "双叉臂", "susp_rear": "五连杆", "drive_forms": ["后置后驱"]},
+        {"susp_front": "双叉臂", "susp_rear": "多连杆", "drive_forms": ["后置后驱"]}])
+    assert mg["susp_front"] == "双叉臂" and mg["susp_rear"] is None and mg["conflicts"]
+    # gap 迭代走 trims_store 合流视图（人工+自动都查），离线可跑
+    gaps = CF.gap_models()
+    assert isinstance(gaps, list)
+    return "底盘链通用化：fill-all/gap迭代/自动发现/共识冲突/入库接线/非库facts"
+
+
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120, t121, t122, t123, t124, t125, t126, t127, t128, t129, t130, t131, t132, t133, t134, t135, t136, t137, t138, t139]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120, t121, t122, t123, t124, t125, t126, t127, t128, t129, t130, t131, t132, t133, t134, t135, t136, t137, t138, t139, t140, t141, t142, t143, t144, t145, t146]
 
 
 def run():

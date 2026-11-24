@@ -91,6 +91,18 @@ details.adj summary{cursor:pointer;outline:none;text-decoration:underline dotted
 .tier-badge.t1{background:#e7f4ea;color:#1a7f37}
 .tier-badge.t2{background:#fbf3e6;color:#9a6700}
 .tier-badge.t3{background:#fbe9e7;color:#b42318}
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-top:10px}
+.form-card{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:#fcfbf8}
+.form-card.top{border-color:#1f6f8b;background:#eef7fa;box-shadow:0 0 0 1px #1f6f8b inset}
+.form-card .fc-head{display:flex;align-items:center;gap:6px;font-weight:700;font-size:13.5px}
+.form-card .fc-avg{font-size:22px;font-weight:700;color:var(--accent2);margin:4px 0 2px}
+.form-card .fc-sub{font-size:11px;color:var(--sub);line-height:1.5}
+.form-card .fc-badge{font-size:10px;padding:1px 6px;border-radius:4px;background:#e7f4ea;color:#1a7f37}
+.form-card .fc-badge.mid{background:#fbf3e6;color:#9a6700}
+.form-card .fc-badge.bad{background:#fbe9e7;color:#b42318}
+.diag{margin-top:12px;font-size:12px;line-height:1.7}
+.diag .d-item{padding:3px 0;border-bottom:1px dashed var(--line)}
+.diag .warn{color:#b42318}.diag .info{color:#5b6470}
 @media(max-width:1000px){.layout{grid-template-columns:1fr}.cond-panel{position:static}.two{grid-template-columns:1fr}.mform{grid-template-columns:1fr 1fr}}
 </style>
 </head>
@@ -100,7 +112,7 @@ details.adj summary{cursor:pointer;outline:none;text-decoration:underline dotted
 <header>
   <h1>选车适配<em>调节器</em> · 产品力主榜 + 用车条件修正</h1>
   <div class="sub">车好不好，主要看 8 维产品力分（<b>统一维度：电车评三电、油车评三大件，同一把尺子</b>）；你的用车条件只做加减分修正。例如"单次要开 500km、这车有效续航仅 400km"，就在续航不足项扣分。改动条件即时重排车型。</div>
-  <div class="note"><b>核心公式：</b>车型综合分 = 产品力主分（统一 8 维加权，75–90 分）+ 场景调节（软调节封顶±10）+ <b>硬条件惩罚（全额计入、降档、标注）</b>。第 1 维"动力总成"对电车=三电、油车=三大件、混动=两者，共用 18% 权重。<b>有效续航用物理模型</b>：基准电耗（真实数据优先，缺失用 4.48×车重+5.88×CdA 回归估算）× 工况倍率（风阻大的车高速更费）× 温度 × 驾驶风格 × 空调 × 电压平台，电量÷场景电耗×100。物理参数（整备质量/风阻/电压/换电）采集自汽车之家参数页。<b>换电车型</b>在无桩/极寒/短持有场景有优势。点续航或调节分数可看完整算式。所有数据内嵌本页，离线可用。</div>
+  <div class="note"><b>核心公式：</b>车型综合分 = 产品力主分（统一 8 维加权，75–90 分）+ 场景调节（软调节封顶±10）+ <b>硬条件惩罚（全额计入、降档、标注）</b>。第 1 维"动力总成"对电车=三电、油车=三大件、混动=两者，共用 18% 权重。<b>有效续航用物理模型</b>：基准电耗（真实数据优先，缺失用 4.48×车重+5.88×CdA 回归估算）× 工况倍率（风阻大的车高速更费）× 温度 × 暖风 × 电压平台，电量÷场景电耗×100。物理参数（整备质量/风阻/电压/换电）采集自汽车之家参数页。<b>换电车型</b>在无桩/极寒/短持有场景有优势。点续航或调节分数可看完整算式。<b>前置条件</b>：跨能源混合比较必须先选定 11 项用车条件画像（缺省=人群默认画像，页面顶部画像卡明示），定稿榜=该画像下的快照；页面顶部「前置条件 → 能源形式适配结论」先给出「你这种条件适合哪种能源形式」，并做画像自检（矛盾组合会提示）。所有数据内嵌本页，离线可用。</div>
   <div class="note warn" id="dataNote"></div>
 </header>
 
@@ -119,7 +131,7 @@ details.adj summary{cursor:pointer;outline:none;text-decoration:underline dotted
     </div>
     <div class="fg">
       <label>车身类型</label>
-      <select id="bodyFilter"><option value="轿车" selected>轿车</option><option value="SUV">SUV</option><option value="ALL">全部</option></select>
+      <select id="bodyFilter"><option value="SUV">SUV</option><option value="轿车" selected>轿车</option><option value="ALL">全部</option></select>
     </div>
     <div class="fg">
       <label>场景调节力度 <span id="wLabel">100%</span></label>
@@ -131,6 +143,13 @@ details.adj summary{cursor:pointer;outline:none;text-decoration:underline dotted
   </div>
 
   <div>
+    <div class="panel" style="margin-bottom:20px">
+      <div class="section-title"><span class="bar"></span>前置条件 → 能源形式适配结论</div>
+      <div class="summary-box" id="formNarr"></div>
+      <div class="form-grid" id="formGrid"></div>
+      <div class="diag" id="profileDiag"></div>
+    </div>
+
     <div class="panel">
       <div class="section-title"><span class="bar"></span>车型综合榜 <span style="font-size:11px;color:var(--sub);font-weight:400" id="carCount"></span></div>
       <div class="summary-box" id="summary"></div>
@@ -142,6 +161,7 @@ details.adj summary{cursor:pointer;outline:none;text-decoration:underline dotted
             <th data-k="power">能源</th><th data-k="price" class="num">价格(万)</th>
             <th data-k="cltc" class="num">CLTC(km)</th><th data-k="cons" class="num">电耗</th><th data-k="eff" class="num">有效续航▾</th>
             <th data-k="product" class="num">产品力</th><th data-k="adj" class="num">场景调节</th>
+            <th data-k="tco" class="num">持有成本8年▾</th>
             <th data-k="composite" class="num sorted">综合分</th>
           </tr></thead>
           <tbody id="carBody"></tbody>
@@ -160,13 +180,18 @@ details.adj summary{cursor:pointer;outline:none;text-decoration:underline dotted
       <h2>方法、默认值与数据边界</h2>
       <div class="two">
         <div>
-          <p><b>打分逻辑：</b>综合分 = 产品力主分 + 软调节（封顶±10）+ 硬条件惩罚（全额、不封顶）。产品力用统一 8 维框架（动力总成18%/安全16.2%/智驾13.5%/空间12.6%/性价比11.7%/质量品控10%/操控9%/车机座舱9%）×10。硬条件触发时扣大分并<b>降一档</b>（T1→T2→T3）、车型旁标红警示：无桩纯电(−15)、极寒+低价纯电(−12)、短持有纯电(−8)、长途续航不足(−10)、限牌油车(−8)、营运油车(−10)。<b>换电车型</b>相反：无桩/极寒/短持有/长途场景给正分（据网搜共识：3分钟补能、电池恒温、车电分离保值）。</p>
-          <p><b>物理续航模型（透明可核）：</b>基准电耗 = 事实库真实电耗（51款），缺失用回归 <code>4.48×车重(t) + 5.88×Cd×迎风面积 + 0.61</code> 估算（39款拟合、MAE 0.69）。迎风面积≈宽×高×0.84。<code>场景电耗 = 基准 × 工况倍率 × 温度 × 驾驶 × 空调 × 电压</code>，<code>有效续航 = 电量 ÷ 场景电耗 ×100</code>。工况倍率：市区1.04、高速基准1.70并按每车 <b>CdA/吨</b> 偏离中位数(0.314)差异化（风阻大高速更费，解释方盒子效应）；温度&gt;0℃1.0/−10℃1.08/−20℃1.28/极寒1.6；驾驶温和0.92/暴力1.15；空调0.97–1.10；电压800V·SiC约0.975（影响小，主要影响充电速度）。经验值：轿车市区12/高速19.5、SUV市区13/高速21.5、方盒子高速24 kWh/100km，实测校验高速达成率约51–63%（懂车帝实测55%吻合）。</p>
+          <p><b>打分逻辑：</b>综合分 = 产品力主分 + 软调节（封顶±10）+ 硬条件惩罚（全额、不封顶）。产品力用统一 8 维框架（动力总成18%/安全16.2%/智驾13.5%/空间12.6%/性价比11.7%/质量品控10%/操控9%/车机座舱9%）×10。硬条件触发时扣大分并<b>降一档</b>（T1→T2→T3）、车型旁标红警示：无桩纯电(−15)、极寒+低价纯电(−12)、短持有纯电(−8)、长途续航不足(−10)、限牌油车(−8)、营运油车(−10)、<b>限牌京沪·插混增程无绿牌优势(−8，v10.52.0 新增：北京插混增程按油车管理需燃油指标、上海插混无免费绿牌)</b>。<b>纯电优先原则（v10.52.0）</b>：无硬条件冲突的纯电车型 +0.5——「纯电尽量纯电，条件不符再扣分」的代码化。<b>换电车型</b>相反：无桩/极寒/短持有/长途场景给正分（据网搜共识：3分钟补能、电池恒温、车电分离保值）。</p>
+          <p><b>物理续航模型（透明可核）：</b>基准电耗 = 事实库真实电耗，缺失用回归 <code>4.48×车重(t) + 5.88×Cd×迎风面积 + 0.61</code> 估算（39款拟合、MAE 0.69）。迎风面积≈宽×高×0.84。<code>场景电耗 = 基准 × 工况倍率 × 温度(仅电池) × 暖风基础 × 电压</code>，<code>有效续航 = 电量 ÷ 场景电耗 ×100</code>。工况倍率：市区/高速按高速占比加权，高速基准按每车 <b>CdA/吨</b> 偏离中位数差异化——<b>车身形状的影响由车型自身风阻承担</b>（方盒子车 Cd 高、自然更费），不再需要用户勾选"我买的是方盒子"。温度&gt;0℃1.00/−10℃1.05/−20℃1.12/极寒1.20；电压800V·SiC约0.975（影响小，主要影响充电速度）。实测校验高速达成率约51–63%（懂车帝实测55%吻合）。<b>山区/高原不在模型内</b>：路线级爬坡差异（丘陵 +10~20%、高山 +25~40%，每爬升 100m 约 0.5kWh）请自行上浮预期，页面不假装能算准。</p>
         </div>
         <div>
-          <p><b>其余调节项：</b>长途频率高→纯电减分、油/混动加分；无家充→纯电大幅减分、插混/增程减分、油车加分；营运→纯电加分；限牌→新能源加分；常年高速→增程明显减分、纯电续航打折；方盒子叠加高频高速→增程/纯电/插混减分；短持有→纯电减分；高里程→纯电加分。插混/增程因有油箱兜底，不扣"里程不足"分，但增程高速油耗高会体现为减分。</p>
-          <p><b>默认值依据：</b>年里程 1.5–2.5 万（超过成本平衡点 0.83–1.5 万）；冬季 −10~0℃；单次 300–500km、一年 1–5 次；有家充；不限牌；持有 5–8 年；高速 20–40%；非营运。为人群常见画像，可按实际修改。</p>
-          <p><b>数据边界：</b>候选池 67 款车（其中 67 款有续航数据、47 款有完整物理参数），当前仅收录纯电(BEV)与插混(PHEV)的<b>官方核验</b>逐配置数据；燃油/油混/增程无数据入池——这是数据现状而非"更差"，不编造车型。物理参数（整备质量/风阻Cd/长宽高/电压/换电）由汽车之家参数页采集，来源逐车可查（见 vehicle_physics.json），采集不到的字段留空、用回归估算并在算式里标注。无电量数据的车不估算续航。</p>
+          <p><b>其余调节项：</b>长途频率高→纯电减分、油/混动加分；无家充→纯电大幅减分、插混/增程减分、油车加分（<b>单位/公司可充电</b>单独一档：白天补能、成本接近家充，不按「无固定充电」处罚）；营运→纯电加分；限牌→新能源加分（京沪细分：插混/增程同罚）；常年高速→增程明显减分、纯电续航打折；短持有→纯电减分；年里程：2.5万以上纯电加分，<b>5000km 以下纯电 −2.0</b>（低于盈亏平衡点约 4800km/年）、5000~1万 −1.0；<b>补能耐心不足+长途→纯电明显减分、可油可电加分</b>；<b>低里程无桩纯电→追加减分（TCO 固定成本摊薄慢）</b>。插混/增程因有油箱兜底，不扣"里程不足"分，但增程高速油耗高会体现为减分。</p>
+          <p><b>条件表 11 项（v10.56.0，删清"问得多、结论不变"的项）：</b>
+          核心 9 项——营运 / 充电条件 / <b>冬季气候带</b>（按常驻城市选：南方·江淮·华北·东北，括号内温度只用于续航）/ 年里程（含 5000km 以下档）/ 单次最长里程 / 长途频率 / 限牌城市 / 持有年限 / 高速占比；
+          进阶 2 项——<b>家庭车辆结构</b>（增购第二辆且已有油车：纯电 +2.0，第二辆再买燃油 −1.0，J.D. Power 2025 增购占新能源购买 28.1%）、<b>补能耐心</b>。
+          已删 9 项与理由（逐项扰动实测，见 references/用车条件因素库.md）：夏季气温 / 驾驶风格 / 空调强度 / 停放环境 / 驻车用电 / 露营外放电 / 电价档（单项最大影响 ≤2 分或只改 TCO 展示）；<b>地形</b>（无硬条件、路线级平均算不准，改为上文"自行上浮预期"）；<b>方盒子造型</b>（改成车型自身风阻 + 车身形式筛选，不再让用户替车型回答风阻问题）。</p>
+          <p><b>持有成本 TCO（披露，不入分）：</b>8 年合计 = 能源（逐车电耗/油耗事实优先 × 画像年里程 × 充电条件，油价8.36元/L·家充按谷电0.35元/度·公充1.5元/度·单位0.75元/度）+ 保费（新能源5500 vs 燃油3500元/年）+ 保养（中位口径）+ 购置税（2026-2027 新能源减半5%、燃油/油混10%）+ 残值损失（3年保值率近似：纯电45.1%/插混42.2%/增程42%/油混50%/燃油46.07%）+ 电池风险金（纯电2500元/年·插混增程800元/年，中保研电池零整比49.6%口径）。摘要区给出<b>家充纯电 vs 池内最优燃油/油混的盈亏平衡里程</b>（约 4800km/年，谷电口径）。</p>
+          <p><b>默认值依据：</b>年里程 1.5–2.5 万（成本平衡点约 4800km/年，谷电口径）；冬季气候带默认江淮（长江流域）；单次 300–500km、一年 1–5 次；有家充；不限牌；持有 5–8 年；高速 20–40%；非营运；可接受补能等待；家庭唯一用车。为人群常见画像，可按实际修改。</p>
+          <p><b>数据边界：</b>候选池 67 款车（其中 67 款有续航数据、47 款有完整物理参数）。能源形式覆盖 BEV/PHEV/EREV/HEV/ICE 五种——纯电/插混为<b>官方核验</b>逐配置数据；燃油/油混/增程的 8 维分与逐配置来自<b>人工补采</b>（每维附信源 URL，见 runs/ 下 scores batch）与汽车之家结构化提取；<b>无电量数据的车</b>不编造续航、不参与续航调节（纯电显示「数据待核」），缺物理参数的车用回归估算电耗并标注来源。物理参数（整备质量/风阻Cd/长宽高/电压/换电）由汽车之家参数页采集，来源逐车可查（见 vehicle_physics.json）。TCO 为披露测算非定价承诺，实际花费因驾驶习惯/地区电价/保险折扣而异。</p>
         </div>
       </div>
     </div>
@@ -176,11 +201,11 @@ details.adj summary{cursor:pointer;outline:none;text-decoration:underline dotted
 
 <script>
 const CARS=[{"model":"小鹏MONA L05","brand":"小鹏","cls":"中型SUV","body":"SUV","power":"BEV","price":15.98,"priceLow":13.98,"priceHigh":17.18,"product":87.2,"cltc":635,"kwh":71.1,"cons":11.7,"consSrc":"事实库","weight":1930,"cd":null,"area":2.65,"voltage":null,"swap":null,"cdaPerTon":null,"cell":"中创新航","sales":0},{"model":"深蓝L06","brand":"深蓝","cls":"中型车","body":"轿车","power":"BEV","price":12.99,"priceLow":11.79,"priceHigh":16.49,"product":86.4,"cltc":560,"kwh":56.1,"cons":11.5,"consSrc":"事实库","weight":1785,"cd":0.23,"area":2.37,"voltage":null,"swap":null,"cdaPerTon":0.305,"cell":"宁德时代","sales":5758},{"model":"极氪7X","brand":"极氪","cls":"中型SUV","body":"SUV","power":"BEV","price":24.98,"priceLow":22.98,"priceHigh":26.98,"product":86.4,"cltc":802,"kwh":103.0,"cons":13.9,"consSrc":"事实库","weight":2280,"cd":0.247,"area":2.7,"voltage":800,"swap":false,"cdaPerTon":0.293,"cell":"弗迪","sales":8500},{"model":"大众ID.AURA T6","brand":"大众","cls":"中型SUV","body":"SUV","power":"BEV","price":14.99,"priceLow":12.99,"priceHigh":16.69,"product":84.3,"cltc":660,"kwh":77.5,"cons":13.1,"consSrc":"事实库","weight":2126,"cd":0.245,"area":2.6,"voltage":400,"swap":null,"cdaPerTon":0.3,"cell":"宁德时代(时代一汽)","sales":12032},{"model":"MG 07 纯电","brand":"","cls":"中型车","body":"轿车","power":"BEV","price":12.69,"priceLow":10.89,"priceHigh":15.99,"product":84.0,"cltc":610,"kwh":67.0,"cons":12.3,"consSrc":"事实库","weight":1810,"cd":null,"area":2.36,"voltage":400,"swap":null,"cdaPerTon":null,"cell":"清陶（半固态）/宁德（800V版）","sales":12236},{"model":"海狮06EV","brand":"","cls":"中型SUV","body":"SUV","power":"BEV","price":15.99,"priceLow":15.99,"priceHigh":17.99,"product":83.5,"cltc":710,"kwh":69.1,"cons":13.3,"consSrc":"事实库","weight":1970,"cd":0.26,"area":2.7,"voltage":800,"swap":null,"cdaPerTon":0.356,"cell":"弗迪（刀片）","sales":10514},{"model":"阿维塔07 纯电版","brand":"阿维塔","cls":"中型SUV","body":"SUV","power":"BEV","price":22.99,"priceLow":22.99,"priceHigh":27.99,"product":83.3,"cltc":650,"kwh":82.2,"cons":14.5,"consSrc":"事实库","weight":2315,"cd":0.259,"area":2.69,"voltage":null,"swap":false,"cdaPerTon":0.301,"cell":"宁德时代","sales":7000},{"model":"零跑C10","brand":"零跑","cls":"中型SUV","body":"SUV","power":"BEV","price":14.28,"priceLow":12.28,"priceHigh":14.28,"product":82.2,"cltc":660,"kwh":81.9,"cons":13.8,"consSrc":"事实库","weight":1995,"cd":null,"area":2.68,"voltage":800,"swap":null,"cdaPerTon":null,"cell":"国轩高科/亿纬动力/中创新航","sales":10152},{"model":"长安启源Q06","brand":"长安启源","cls":"中型SUV","body":"SUV","power":"BEV","price":14.99,"priceLow":13.99,"priceHigh":16.99,"product":82.2,"cltc":700,"kwh":66.0,"cons":12.8,"consSrc":"事实库","weight":1925,"cd":0.27,"area":2.76,"voltage":800,"swap":null,"cdaPerTon":0.387,"cell":"中创新航","sales":6414},{"model":"零跑C16","brand":"零跑","cls":"中大型SUV","body":"SUV","power":"BEV","price":16.68,"priceLow":15.28,"priceHigh":16.98,"product":82.2,"cltc":630,"kwh":81.9,"cons":14.6,"consSrc":"事实库","weight":2120,"cd":null,"area":2.83,"voltage":800,"swap":null,"cdaPerTon":null,"cell":"中创新航/国轩高科","sales":6117},{"model":"马自达EZ-6","brand":"马自达","cls":"中型车","body":"轿车","power":"BEV","price":13.98,"priceLow":13.98,"priceHigh":17.98,"product":82.1,"cltc":600,"kwh":56.1,"cons":13.4,"consSrc":"事实库","weight":1778,"cd":null,"area":2.36,"voltage":null,"swap":null,"cdaPerTon":null,"cell":"宁德时代(时代长安)","sales":2144},{"model":"银河TT","brand":"","cls":"中大型车","body":"轿车","power":"BEV","price":13.99,"priceLow":13.99,"priceHigh":19.59,"product":81.8,"cltc":640,"kwh":63.8,"cons":11.0,"consSrc":"事实库","weight":1790,"cd":0.22,"area":2.38,"voltage":800,"swap":null,"cdaPerTon":0.293,"cell":"神盾短刀（吉利自研）","sales":6894},{"model":"极狐阿尔法T7","brand":"极狐","cls":"中大型SUV","body":"SUV","power":"BEV","price":16.88,"priceLow":13.98,"priceHigh":17.28,"product":81.8,"cltc":715,"kwh":84.8,"cons":12.7,"consSrc":"事实库","weight":2050,"cd":0.251,"area":2.83,"voltage":800,"swap":null,"cdaPerTon":0.347,"cell":"宁德时代","sales":8131},{"model":"秦MAX EV","brand":"","cls":"中型车","body":"轿车","power":"BEV","price":13.29,"priceLow":10.99,"priceHigh":14.69,"product":81.6,"cltc":630,"kwh":64.3,"cons":11.4,"consSrc":"事实库","weight":1670,"cd":0.212,"area":2.36,"voltage":null,"swap":null,"cdaPerTon":0.3,"cell":"弗迪(第二代刀片)","sales":3635},{"model":"深蓝L07","brand":"深蓝","cls":"中型车","body":"轿车","power":"BEV","price":14.59,"priceLow":14.59,"priceHigh":16.59,"product":81.5,"cltc":660,"kwh":56.1,"cons":12.0,"consSrc":"事实库","weight":1835,"cd":0.215,"area":2.35,"voltage":null,"swap":null,"cdaPerTon":0.275,"cell":"宁德时代(时代长安)","sales":697},{"model":"马自达EZ-60","brand":"马自达","cls":"中型SUV","body":"SUV","power":"BEV","price":16.09,"priceLow":14.59,"priceHigh":17.29,"product":81.5,"cltc":600,"kwh":77.9,"cons":14.4,"consSrc":"物理估算","weight":2180,"cd":0.26,"area":2.63,"voltage":null,"swap":null,"cdaPerTon":0.314,"cell":"中创新航","sales":3730},{"model":"大众ID.ERA 5S","brand":"大众","cls":"中型车","body":"轿车","power":"PHEV","price":12.99,"priceLow":11.99,"priceHigh":14.99,"product":81.3,"cltc":160,"kwh":19.1,"cons":11.5,"consSrc":"物理估算","weight":1655,"cd":0.247,"area":2.38,"voltage":null,"swap":null,"cdaPerTon":0.355,"cell":null,"sales":7010},{"model":"极狐阿尔法T5","brand":"极狐","cls":"中型SUV","body":"SUV","power":"BEV","price":13.5,"priceLow":11.38,"priceHigh":15.88,"product":81.3,"cltc":705,"kwh":64.8,"cons":13.1,"consSrc":"事实库","weight":1970,"cd":0.268,"area":2.68,"voltage":800,"swap":null,"cdaPerTon":0.365,"cell":"宁德时代","sales":1302},{"model":"红旗天工05","brand":"红旗","cls":"中型车","body":"轿车","power":"BEV","price":15.98,"priceLow":15.98,"priceHigh":15.98,"product":80.8,"cltc":850,"kwh":62.0,"cons":12.1,"consSrc":"事实库","weight":1890,"cd":0.213,"area":2.38,"voltage":null,"swap":null,"cdaPerTon":0.268,"cell":"宁德时代(时代一汽)","sales":294},{"model":"宋Ultra EV","brand":"","cls":"中型SUV","body":"SUV","power":"BEV","price":15.19,"priceLow":15.19,"priceHigh":17.99,"product":80.3,"cltc":710,"kwh":82.7,"cons":13.9,"consSrc":"物理估算","weight":1990,"cd":0.28,"area":2.68,"voltage":null,"swap":null,"cdaPerTon":0.377,"cell":"弗迪","sales":8324},{"model":"腾势N7","brand":"腾势","cls":"中型SUV","body":"SUV","power":"BEV","price":27.48,"priceLow":25.98,"priceHigh":28.98,"product":80.3,"cltc":702,"kwh":91.3,"cons":13.0,"consSrc":"车身经验","weight":2440,"cd":null,"area":2.6,"voltage":800,"swap":false,"cdaPerTon":null,"cell":"弗迪","sales":1500},{"model":"深蓝S07","brand":"深蓝","cls":"中型SUV","body":"SUV","power":"BEV","price":15.59,"priceLow":15.59,"priceHigh":17.69,"product":80.1,"cltc":725,"kwh":66.0,"cons":12.6,"consSrc":"事实库","weight":1970,"cd":null,"area":2.63,"voltage":800,"swap":null,"cdaPerTon":null,"cell":"宁德时代/中创新航","sales":3912},{"model":"乐道L60","brand":"乐道","cls":"中型SUV","body":"SUV","power":"BEV","price":20.69,"priceLow":19.28,"priceHigh":25.18,"product":80.0,"cltc":740,"kwh":85.0,"cons":12.6,"consSrc":"物理估算","weight":1885,"cd":0.229,"area":2.62,"voltage":900,"swap":true,"cdaPerTon":0.318,"cell":null,"sales":6000},{"model":"风云A9","brand":"","cls":"中型车","body":"轿车","power":"BEV","price":12.99,"priceLow":10.99,"priceHigh":12.99,"product":79.7,"cltc":655,"kwh":70.1,"cons":12.3,"consSrc":"事实库","weight":1850,"cd":0.223,"area":2.37,"voltage":null,"swap":null,"cdaPerTon":0.286,"cell":"得壹能源(奇瑞犀牛自研)","sales":5859},{"model":"丰田bZ5","brand":"丰田","cls":"中型SUV","body":"SUV","power":"BEV","price":13.98,"priceLow":12.98,"priceHigh":19.98,"product":79.5,"cltc":550,"kwh":65.3,"cons":13.5,"consSrc":"事实库","weight":1950,"cd":0.24,"area":2.37,"voltage":null,"swap":null,"cdaPerTon":0.292,"cell":"弗迪(刀片)","sales":929},{"model":"小鹏G6","brand":"小鹏","cls":"中型SUV","body":"SUV","power":"BEV","price":18.68,"priceLow":17.68,"priceHigh":18.68,"product":79.4,"cltc":625,"kwh":68.5,"cons":13.6,"consSrc":"物理估算","weight":2030,"cd":0.248,"area":2.66,"voltage":800,"swap":false,"cdaPerTon":0.325,"cell":null,"sales":5000},{"model":"海豹06EV","brand":"","cls":"中型车","body":"轿车","power":"BEV","price":12.98,"priceLow":10.98,"priceHigh":13.98,"product":79.3,"cltc":630,"kwh":56.6,"cons":11.4,"consSrc":"事实库","weight":1795,"cd":null,"area":2.37,"voltage":null,"swap":null,"cdaPerTon":null,"cell":"弗迪(刀片)","sales":4564},{"model":"大众与众09","brand":"大众","cls":"中大型车","body":"轿车","power":"BEV","price":17.99,"priceLow":17.99,"priceHigh":24.99,"product":79.3,"cltc":755,"kwh":92.0,"cons":13.7,"consSrc":"事实库","weight":null,"cd":0.21,"area":2.51,"voltage":800,"swap":null,"cdaPerTon":null,"cell":"宁德时代","sales":69},{"model":"零跑C11","brand":"零跑","cls":"中型SUV","body":"SUV","power":"BEV","price":15.58,"priceLow":14.38,"priceHigh":16.58,"product":79.2,"cltc":640,"kwh":81.9,"cons":14.4,"consSrc":"事实库","weight":2110,"cd":null,"area":2.65,"voltage":800,"swap":null,"cdaPerTon":null,"cell":"蜂巢能源/国轩高科","sales":6130},{"model":"丰田bZ3","brand":"丰田","cls":"中型车","body":"轿车","power":"BEV","price":13.98,"priceLow":12.98,"priceHigh":15.98,"product":79.1,"cltc":616,"kwh":65.3,"cons":11.0,"consSrc":"事实库","weight":1740,"cd":0.23,"area":2.28,"voltage":null,"swap":null,"cdaPerTon":0.301,"cell":"弗迪(刀片)","sales":1592},{"model":"极狐阿尔法S5","brand":"极狐","cls":"中型车","body":"轿车","power":"BEV","price":12.88,"priceLow":12.88,"priceHigh":14.48,"product":78.9,"cltc":560,"kwh":64.8,"cons":13.6,"consSrc":"事实库","weight":1920,"cd":0.1925,"area":2.4,"voltage":null,"swap":null,"cdaPerTon":0.241,"cell":"宁德时代","sales":4390},{"model":"问界M5纯电版","brand":"问界","cls":"中型SUV","body":"SUV","power":"BEV","price":23.98,"priceLow":null,"priceHigh":null,"product":78.7,"cltc":602,"kwh":83.0,"cons":14.7,"consSrc":"物理估算","weight":2235,"cd":0.266,"area":2.63,"voltage":null,"swap":false,"cdaPerTon":0.313,"cell":null,"sales":83},{"model":"东风奕派M8","brand":"东风奕派","cls":"中大型SUV","body":"SUV","power":"BEV","price":17.98,"priceLow":17.98,"priceHigh":21.98,"product":78.4,"cltc":600,"kwh":77.4,"cons":14.6,"consSrc":"事实库","weight":2218,"cd":null,"area":2.88,"voltage":800,"swap":null,"cdaPerTon":null,"cell":"中创新航","sales":1087},{"model":"银河A7 EV","brand":"","cls":"中型车","body":"轿车","power":"BEV","price":11.98,"priceLow":11.98,"priceHigh":14.58,"product":78.1,"cltc":550,"kwh":58.0,"cons":11.4,"consSrc":"事实库","weight":1605,"cd":0.229,"area":2.4,"voltage":null,"swap":null,"cdaPerTon":0.342,"cell":"神盾金砖(吉利自研/耀宁)","sales":2147},{"model":"丰田铂智7","brand":"丰田","cls":"中大型车","body":"轿车","power":"BEV","price":16.98,"priceLow":16.98,"priceHigh":22.98,"product":77.9,"cltc":710,"kwh":71.3,"cons":12.7,"consSrc":"事实库","weight":2105,"cd":0.19,"area":2.49,"voltage":null,"swap":null,"cdaPerTon":0.225,"cell":"弗迪/宁德时代","sales":2054},{"model":"长安启源A06","brand":"长安启源","cls":"中大型车","body":"轿车","power":"BEV","price":13.99,"priceLow":10.99,"priceHigh":15.99,"product":77.8,"cltc":800,"kwh":61.7,"cons":11.0,"consSrc":"事实库","weight":1860,"cd":0.205,"area":2.41,"voltage":800,"swap":null,"cdaPerTon":0.266,"cell":"宁德时代","sales":5152},{"model":"蔚来ES6","brand":"蔚来","cls":"中型SUV","body":"SUV","power":"BEV","price":33.8,"priceLow":33.8,"priceHigh":35.0,"product":77.5,"cltc":650,"kwh":100.0,"cons":15.3,"consSrc":"物理估算","weight":2336,"cd":0.25,"area":2.85,"voltage":null,"swap":true,"cdaPerTon":0.305,"cell":null,"sales":4000},{"model":"埃安Ray7","brand":"","cls":"中大型车","body":"轿车","power":"BEV","price":14.38,"priceLow":12.38,"priceHigh":15.38,"product":77.3,"cltc":702,"kwh":63.0,"cons":9.8,"consSrc":"事实库","weight":1720,"cd":0.22,"area":2.32,"voltage":null,"swap":null,"cdaPerTon":0.297,"cell":"中创新航/因湃","sales":null},{"model":"日产NX8","brand":"日产","cls":"中大型SUV","body":"SUV","power":"BEV","price":17.99,"priceLow":15.99,"priceHigh":20.99,"product":76.8,"cltc":650,"kwh":73.0,"cons":14.4,"consSrc":"事实库","weight":2162,"cd":0.26,"area":2.71,"voltage":null,"swap":null,"cdaPerTon":0.326,"cell":"欣旺达/宁德时代","sales":2974},{"model":"特斯拉 Model Y","brand":"特斯拉","cls":"中型SUV","body":"SUV","power":"BEV","price":26.35,"priceLow":26.35,"priceHigh":36.9,"product":76.8,"cltc":821,"kwh":78.4,"cons":12.6,"consSrc":"物理估算","weight":1921,"cd":0.22,"area":2.62,"voltage":null,"swap":false,"cdaPerTon":0.3,"cell":null,"sales":48000},{"model":"大众与众07","brand":"大众","cls":"中型车","body":"轿车","power":"BEV","price":10.99,"priceLow":10.99,"priceHigh":14.99,"product":76.2,"cltc":670,"kwh":59.9,"cons":12.1,"consSrc":"事实库","weight":2036,"cd":null,"area":2.44,"voltage":null,"swap":null,"cdaPerTon":null,"cell":"国轩高科","sales":696},{"model":"比亚迪宋L EV","brand":"比亚迪","cls":"中型SUV","body":"SUV","power":"BEV","price":18.98,"priceLow":18.98,"priceHigh":24.98,"product":76.2,"cltc":662,"kwh":87.0,"cons":14.6,"consSrc":"物理估算","weight":2265,"cd":0.255,"area":2.56,"voltage":null,"swap":false,"cdaPerTon":0.288,"cell":"弗迪","sales":3500},{"model":"极狐贝塔S3","brand":"极狐","cls":"中型车","body":"轿车","power":"BEV","price":8.48,"priceLow":8.48,"priceHigh":12.58,"product":75.9,"cltc":660,"kwh":54.0,"cons":10.9,"consSrc":"物理估算","weight":1620,"cd":0.22,"area":2.36,"voltage":400,"swap":true,"cdaPerTon":0.32,"cell":"宁德时代(巧克力换电)","sales":6963},{"model":"秦L EV","brand":"","cls":"中型车","body":"轿车","power":"BEV","price":12.98,"priceLow":11.98,"priceHigh":15.58,"product":75.7,"cltc":545,"kwh":56.6,"cons":11.7,"consSrc":"物理估算","weight":1670,"cd":0.26,"area":2.36,"voltage":null,"swap":null,"cdaPerTon":0.367,"cell":"弗迪(刀片)","sales":1968},{"model":"长安启源A07","brand":"长安启源","cls":"中大型车","body":"轿车","power":"BEV","price":14.99,"priceLow":14.99,"priceHigh":16.59,"product":75.6,"cltc":730,"kwh":77.9,"cons":12.5,"consSrc":"事实库","weight":1805,"cd":0.22,"area":2.37,"voltage":null,"swap":null,"cdaPerTon":0.289,"cell":"宁德时代","sales":1979},{"model":"比亚迪海狮07EV","brand":"比亚迪","cls":"中型SUV","body":"SUV","power":"BEV","price":18.98,"priceLow":18.98,"priceHigh":23.98,"product":75.3,"cltc":610,"kwh":80.6,"cons":13.0,"consSrc":"车身经验","weight":2210,"cd":null,"area":2.62,"voltage":null,"swap":false,"cdaPerTon":null,"cell":"弗迪","sales":3000},{"model":"比亚迪海狮06 EV","brand":"比亚迪","cls":"中型SUV","body":"SUV","power":"BEV","price":15.99,"priceLow":14.38,"priceHigh":19.98,"product":74.7,"cltc":710,"kwh":82.7,"cons":13.6,"consSrc":"物理估算","weight":1970,"cd":0.26,"area":2.7,"voltage":800,"swap":false,"cdaPerTon":0.356,"cell":null,"sales":2500},{"model":"别克E5","brand":"别克","cls":"中大型SUV","body":"SUV","power":"BEV","price":16.99,"priceLow":16.99,"priceHigh":21.19,"product":74.2,"cltc":620,"kwh":65.0,"cons":13.4,"consSrc":"事实库","weight":2075,"cd":0.297,"area":2.69,"voltage":null,"swap":null,"cdaPerTon":0.385,"cell":"上汽时代","sales":202},{"model":"日产N7","brand":"日产","cls":"中大型车","body":"轿车","power":"BEV","price":14.99,"priceLow":11.99,"priceHigh":15.69,"product":74.0,"cltc":625,"kwh":73.0,"cons":13.0,"consSrc":"事实库","weight":1875,"cd":0.208,"area":2.37,"voltage":null,"swap":null,"cdaPerTon":0.263,"cell":"欣旺达/宁德时代","sales":1354},{"model":"零跑B01","brand":"零跑","cls":"紧凑型车","body":"轿车","power":"BEV","price":11.98,"priceLow":9.58,"priceHigh":14.97,"product":73.1,"cltc":670,"kwh":69.7,"cons":11.5,"consSrc":"事实库","weight":1645,"cd":0.197,"area":2.35,"voltage":null,"swap":null,"cdaPerTon":0.281,"cell":null,"sales":4399},{"model":"小鹏MONA L03","brand":"小鹏","cls":"紧凑型SUV","body":"SUV","power":"BEV","price":13.38,"priceLow":12.38,"priceHigh":15.68,"product":71.2,"cltc":550,"kwh":69.0,"cons":11.5,"consSrc":"事实库","weight":null,"cd":null,"area":null,"voltage":null,"swap":null,"cdaPerTon":null,"cell":null,"sales":14885},{"model":"东风风行星海V6","brand":"","cls":"中大型SUV","body":"SUV","power":"BEV","price":11.49,"priceLow":8.99,"priceHigh":12.49,"product":69.5,"cltc":510,"kwh":60.5,"cons":13.5,"consSrc":"事实库","weight":1670,"cd":0.269,"area":2.82,"voltage":null,"swap":null,"cdaPerTon":0.454,"cell":"未披露","sales":538},{"model":"AION RT","brand":"","cls":"紧凑型车","body":"轿车","power":"BEV","price":11.98,"priceLow":9.98,"priceHigh":12.88,"product":66.3,"cltc":710,"kwh":70.1,"cons":10.5,"consSrc":"事实库","weight":null,"cd":0.208,"area":2.39,"voltage":400,"swap":true,"cdaPerTon":null,"cell":null,"sales":5914},{"model":"小鹏MONA M03","brand":"小鹏","cls":"紧凑型车","body":"轿车","power":"BEV","price":13.98,"priceLow":11.98,"priceHigh":15.18,"product":65.9,"cltc":540,"kwh":61.6,"cons":10.8,"consSrc":"事实库","weight":1675,"cd":0.194,"area":2.3,"voltage":null,"swap":null,"cdaPerTon":0.266,"cell":"弗迪","sales":7160},{"model":"AION i60","brand":"","cls":"紧凑型SUV","body":"SUV","power":"BEV","price":12.98,"priceLow":10.28,"priceHigh":14.28,"product":65.8,"cltc":520,"kwh":77.7,"cons":12.3,"consSrc":"事实库","weight":null,"cd":0.27,"area":2.59,"voltage":null,"swap":null,"cdaPerTon":null,"cell":null,"sales":12296},{"model":"元PLUS","brand":"","cls":"紧凑型SUV","body":"SUV","power":"BEV","price":12.99,"priceLow":11.99,"priceHigh":14.99,"product":65.0,"cltc":540,"kwh":57.5,"cons":11.8,"consSrc":"事实库","weight":1840,"cd":null,"area":2.67,"voltage":null,"swap":null,"cdaPerTon":null,"cell":"弗迪","sales":11954},{"model":"零跑Lafa5","brand":"零跑","cls":"紧凑型车","body":"轿车","power":"BEV","price":11.18,"priceLow":9.78,"priceHigh":12.98,"product":64.5,"cltc":605,"kwh":67.1,"cons":12.4,"consSrc":"事实库","weight":1665,"cd":0.256,"area":2.4,"voltage":800,"swap":null,"cdaPerTon":0.369,"cell":null,"sales":4356},{"model":"深蓝S05","brand":"深蓝","cls":"紧凑型SUV","body":"SUV","power":"BEV","price":12.99,"priceLow":11.99,"priceHigh":15.19,"product":64.5,"cltc":520,"kwh":56.1,"cons":12.3,"consSrc":"事实库","weight":1720,"cd":0.25,"area":2.55,"voltage":null,"swap":false,"cdaPerTon":0.371,"cell":"中创新航","sales":11411},{"model":"海狮05EV","brand":"","cls":"紧凑型SUV","body":"SUV","power":"BEV","price":12.99,"priceLow":11.99,"priceHigh":14.59,"product":64.4,"cltc":540,"kwh":57.5,"cons":11.8,"consSrc":"事实库","weight":1670,"cd":0.28,"area":2.55,"voltage":null,"swap":false,"cdaPerTon":0.428,"cell":"弗迪","sales":9033},{"model":"零跑B10","brand":"零跑","cls":"紧凑型SUV","body":"SUV","power":"BEV","price":11.58,"priceLow":9.98,"priceHigh":12.58,"product":64.4,"cltc":610,"kwh":69.7,"cons":12.6,"consSrc":"事实库","weight":1745,"cd":null,"area":2.62,"voltage":800,"swap":false,"cdaPerTon":null,"cell":null,"sales":7719},{"model":"银河E5","brand":"","cls":"紧凑型SUV","body":"SUV","power":"BEV","price":11.78,"priceLow":10.78,"priceHigh":14.78,"product":64.3,"cltc":530,"kwh":61.5,"cons":12.1,"consSrc":"事实库","weight":1655,"cd":0.269,"area":2.67,"voltage":null,"swap":false,"cdaPerTon":0.434,"cell":"弗迪","sales":6214},{"model":"MG4","brand":"","cls":"紧凑型车","body":"轿车","power":"BEV","price":9.68,"priceLow":6.88,"priceHigh":10.28,"product":63.3,"cltc":530,"kwh":53.9,"cons":11.9,"consSrc":"事实库","weight":1415,"cd":0.27,"area":2.4,"voltage":null,"swap":null,"cdaPerTon":0.458,"cell":null,"sales":15503},{"model":"铂智3X","brand":"","cls":"紧凑型SUV","body":"SUV","power":"BEV","price":12.98,"priceLow":10.98,"priceHigh":15.98,"product":62.9,"cltc":430,"kwh":58.4,"cons":12.6,"consSrc":"事实库","weight":1690,"cd":0.27,"area":2.58,"voltage":null,"swap":false,"cdaPerTon":0.412,"cell":null,"sales":9101},{"model":"AION UT","brand":"","cls":"紧凑型车","body":"轿车","power":"BEV","price":8.68,"priceLow":6.98,"priceHigh":10.18,"product":61.9,"cltc":530,"kwh":56.7,"cons":11.7,"consSrc":"事实库","weight":null,"cd":null,"area":2.45,"voltage":null,"swap":null,"cdaPerTon":null,"cell":null,"sales":1858},{"model":"长安启源Q05","brand":"长安启源","cls":"紧凑型SUV","body":"SUV","power":"BEV","price":10.19,"priceLow":7.99,"priceHigh":11.49,"product":61.7,"cltc":405,"kwh":51.9,"cons":11.3,"consSrc":"事实库","weight":1435,"cd":0.265,"area":2.49,"voltage":null,"swap":null,"cdaPerTon":0.46,"cell":"中创新航","sales":20022},{"model":"荣威D6","brand":"荣威","cls":"紧凑型车","body":"轿车","power":"BEV","price":11.48,"priceLow":9.98,"priceHigh":13.98,"product":61.3,"cltc":520,"kwh":54.0,"cons":11.7,"consSrc":"事实库","weight":1380,"cd":0.27,"area":2.3,"voltage":null,"swap":null,"cdaPerTon":0.45,"cell":null,"sales":1867},{"model":"秦PLUS EV","brand":"","cls":"紧凑型车","body":"轿车","power":"BEV","price":11.98,"priceLow":7.98,"priceHigh":17.98,"product":60.2,"cltc":510,"kwh":57.6,"cons":11.9,"consSrc":"事实库","weight":1657,"cd":null,"area":2.34,"voltage":null,"swap":false,"cdaPerTon":null,"cell":"弗迪","sales":2744}];
-const FACTORS={"operation":{"label":"是否营运","default":"no","desc":"营运车辆（网约/出租）以纯电为主，运营成本是核心","options":[{"v":"no","label":"非营运（家用为主）","hint":"按家用场景综合权衡"},{"v":"yes","label":"营运（网约/出租）","hint":"高频行驶+成本敏感，纯电车型加分、燃油/油混减分"}]},"winter_temp":{"label":"冬季最低气温","default":"m10to0","desc":"用于计算纯电有效续航：−10℃约衰减20–45%，−20℃可达40–60%","options":[{"v":"above0","label":"0℃以上（华南）","hint":"温度系数0.95，纯电几乎无冬季衰减"},{"v":"m10to0","label":"-10~0℃（江淮/长三角）","hint":"温度系数0.85（默认）"},{"v":"m20tom10","label":"-20~-10℃（华北/山东）","hint":"温度系数0.68，纯电衰减明显"},{"v":"underm20","label":"-20℃以下（东北/内蒙）","hint":"温度系数0.50，纯电续航可能腰斩"}]},"annual_km":{"label":"年行驶里程","default":"15to25","desc":"成本平衡点约0.83–1.5万公里：低于此油车省心，高于此电车省钱","options":[{"v":"under10","label":"1万公里以下","hint":"跑得少，纯电小幅减分、油车加分"},{"v":"10to15","label":"1万~1.5万公里","hint":"接近平衡点，不调节"},{"v":"15to25","label":"1.5万~2.5万公里","hint":"超过平衡点（默认）"},{"v":"over25","label":"2.5万公里以上","hint":"高里程，纯电省钱优势加分"}]},"single_trip":{"label":"单次最长连续里程","default":"300to500","desc":"核心调节项：需求里程超过纯电有效续航时，按缺口扣分","options":[{"v":"under150","label":"150km 以下","hint":"需求约100km，纯电普遍胜任"},{"v":"150to300","label":"150~300km","hint":"需求约220km"},{"v":"300to500","label":"300~500km","hint":"需求约400km（默认）"},{"v":"over500","label":"500km 以上","hint":"需求约600km，纯电续航不足将明显扣分"}]},"long_trip_freq":{"label":"长途频率（该里程一年几次）","default":"few","desc":"长途次数多时，纯电补能时间成本高，可油可电更灵活","options":[{"v":"rare","label":"几乎没有","hint":"纯电小幅加分"},{"v":"few","label":"一年 1~5 次","hint":"偶发长途（默认）"},{"v":"monthly","label":"一年 6~20 次","hint":"较频繁，纯电减分、油/混动加分"},{"v":"weekly","label":"每月都有/更频繁","hint":"高频长途，纯电明显减分"}]},"home_charger":{"label":"充电条件","default":"home","desc":"家充是电车经济性的前提；无稳定充电时插混长期亏电油耗会恶化","options":[{"v":"home","label":"有家用充电桩","hint":"纯电/插混/增程加分（默认）"},{"v":"public","label":"无家充但有稳定公充","hint":"不额外调节"},{"v":"none","label":"完全没有固定充电","hint":"纯电大幅减分，插混/增程减分，油车/油混加分"}]},"plate_limit":{"label":"是否限牌城市","default":"no","desc":"限牌城市新能源可直接上牌，燃油/油混需摇号或拍牌","options":[{"v":"no","label":"不限牌","hint":"不调节（默认）"},{"v":"yes","label":"限牌城市","hint":"新能源加分、燃油/油混减分"}]},"hold_years":{"label":"计划持有年限","default":"5to8","desc":"持有越久，残值影响越摊薄，电车的能源节省越明显","options":[{"v":"under3","label":"3 年内换车","hint":"纯电折旧快，减分；油车加分"},{"v":"3to5","label":"3~5 年","hint":"不调节"},{"v":"5to8","label":"5~8 年","hint":"默认"},{"v":"over8","label":"8 年以上","hint":"纯电加分"}]},"highway_ratio":{"label":"高速工况占比","default":"20to40","desc":"增程高速油耗最高（油→电→轮二次损耗）；插混直驱高速效率更优。高速还会降低纯电有效续航","options":[{"v":"under20","label":"20% 以下（市区为主）","hint":"高速系数1.0，纯电小幅加分"},{"v":"20to40","label":"20%~40%","hint":"高速系数0.92（默认）"},{"v":"40to60","label":"40%~60%","hint":"高速系数0.82，增程减分"},{"v":"over60","label":"60% 以上（常年高速）","hint":"高速系数0.72，增程明显减分、纯电续航打折"}]},"boxy":{"label":"方盒子造型","default":"no","desc":"方盒子车型车重风阻大，高速能耗显著上升（如钛7这类承载式方盒子）","options":[{"v":"no","label":"普通造型","hint":"按实际风阻参数计算（默认）"},{"v":"yes","label":"看重方盒子/风味越野","hint":"按方盒子修正能耗，叠加高频高速时混动意义打折"}]},"drive_style":{"label":"驾驶风格","default":"normal","desc":"暴力驾驶（急加速/高速）显著增加能耗，CLTC理想工况未计入","options":[{"v":"mild","label":"温和（省电驾驶）","hint":"能耗 ×0.92"},{"v":"normal","label":"正常","hint":"能耗 ×1.0（默认）"},{"v":"aggressive","label":"暴力（经常急加速）","hint":"能耗 ×1.15"}]},"ac_usage":{"label":"空调使用","default":"normal","desc":"CLTC理想工况空调负载低；实际开空调（尤其冬夏）会增加能耗","options":[{"v":"off","label":"很少开空调","hint":"能耗 ×0.97"},{"v":"normal","label":"正常开空调","hint":"能耗 ×1.0（默认）"},{"v":"heavy","label":"空调常开/开大风","hint":"能耗 ×1.10"}]}};
-const FACTOR_GROUPS=[["核心能源决策",["home_charger","winter_temp","annual_km","single_trip","long_trip_freq","plate_limit","hold_years","highway_ratio"],"以下 8 项直接决定燃油/混动/纯电谁更合适（依据：家充是油电分水岭、−10℃纯电平均衰减32.7%、绿牌通行红利等）"],["能耗微调",["boxy","drive_style","ac_usage"],"以下 3 项主要影响电耗与有效续航，不改变能源形式的大方向"],["特殊场景",["operation"],"营运/网约等高频场景，家用用户可忽略"]];
+const FACTORS={"operation":{"label":"是否营运","default":"no","desc":"营运车辆（网约/出租）以纯电为主，运营成本是核心","options":[{"v":"no","label":"非营运（家用为主）","hint":"按家用场景综合权衡"},{"v":"yes","label":"营运（网约/出租）","hint":"高频行驶+成本敏感，纯电加分、燃油/油混减分"}]},"winter_temp":{"label":"冬季气候带（常驻城市）","default":"m10to0","desc":"先按你常驻城市的气候带选，括号里的温度只用于续航计算：−10℃约衰减20–45%，−20℃可达40–60%","options":[{"v":"above0","label":"南方（冬季极少≤0℃）","hint":"系数1.00，纯电几乎无冬季衰减 · 代表城市：广州/深圳/福州/南宁/厦门/海口（含滇南、桂南）"},{"v":"m10to0","label":"江淮/长江流域（0~-10℃）","hint":"系数1.05（默认）· 代表城市：上海/杭州/南京/武汉/成都/重庆/长沙；你所在城市极端最低温 -5℃ 左右选这档"},{"v":"m20tom10","label":"华北/黄淮（-10~-20℃）","hint":"系数1.12，纯电衰减明显 · 代表城市：北京/天津/石家庄/济南/郑州/西安/太原（极端 -12℃ 左右）"},{"v":"underm20","label":"东北/内蒙/新疆北部（≤-20℃）","hint":"系数1.20，纯电续航可能腰斩 · 代表城市：哈尔滨/长春/沈阳/呼和浩特/乌鲁木齐/拉萨；辽东半岛沿海（大连约-15℃）按华北档更接近"}]},"annual_km":{"label":"年行驶里程","default":"15to25","desc":"成本平衡点约 4800km/年（2026 油价+家充谷电口径，见 TCO 区块）：低于此纯电连能源差额都补不回保险溢价与残值差","options":[{"v":"under5","label":"5000 公里以下（仅周末代步）","hint":"低于盈亏平衡点（约4800km/年）：纯电省不回保险/残值差，油车或油混更划算"},{"v":"under10","label":"5000~1万公里","hint":"跑得少，纯电固定成本摊薄慢、油车/油混加分"},{"v":"10to15","label":"1万~1.5万公里","hint":"刚过平衡点，不调节"},{"v":"15to25","label":"1.5万~2.5万公里","hint":"明显超过平衡点（默认）"},{"v":"over25","label":"2.5万公里以上","hint":"高里程，纯电省钱优势加分"}]},"single_trip":{"label":"单次最长连续里程","default":"300to500","desc":"核心调节项：需求里程超过纯电有效续航时，按缺口扣分","options":[{"v":"under150","label":"150km 以下","hint":"需求约100km，纯电普遍胜任"},{"v":"150to300","label":"150~300km","hint":"需求约220km"},{"v":"300to500","label":"300~500km","hint":"需求约400km（默认）"},{"v":"over500","label":"500km 以上","hint":"需求约600km，纯电续航不足将明显扣分"}]},"long_trip_freq":{"label":"长途频率（该里程一年几次）","default":"few","desc":"长途次数多时，纯电补能时间成本高，可油可电更灵活","options":[{"v":"rare","label":"几乎没有","hint":"纯电小幅加分"},{"v":"few","label":"一年 1~5 次","hint":"偶发长途（默认）"},{"v":"monthly","label":"一年 6~20 次","hint":"较频繁，纯电减分、油/混动加分"},{"v":"weekly","label":"每月都有/更频繁","hint":"高频长途，纯电明显减分"}]},"home_charger":{"label":"充电条件","default":"home","desc":"家充是电车经济性的前提；但「单位能充」与「无固定充电」是两回事，不能一视同仁","options":[{"v":"home","label":"有家用充电桩","hint":"纯电/插混/增程加分（默认）"},{"v":"work","label":"无家充·单位/公司可充","hint":"白天补能、成本接近家充：纯电仍可行，不触发无桩硬条件"},{"v":"public","label":"无家充但有稳定公充","hint":"纯电谨慎：不额外硬扣分，但成本约家充3-5倍"},{"v":"none","label":"完全没有固定充电","hint":"纯电大幅减分，插混/增程减分，油车/油混加分"}]},"plate_limit":{"label":"限牌城市","default":"no","desc":"限牌城市新能源可直接上牌；北京插混/增程按油车管理、上海插混无免费绿牌（2026 政策）","options":[{"v":"no","label":"不限牌","hint":"不调节（默认）"},{"v":"yes","label":"限牌（广深杭蓉等·插混可绿牌）","hint":"新能源加分、燃油/油混减分"},{"v":"beijing","label":"北京（插混/增程按油车管理）","hint":"仅纯电绿牌；插混/增程/燃油/油混均扣分"},{"v":"shanghai","label":"上海（插混无免费绿牌）","hint":"纯电免费绿牌；插混/增程/燃油/油混均扣分"}]},"hold_years":{"label":"计划持有年限","default":"5to8","desc":"持有越久，残值影响越摊薄，电车的能源节省越明显","options":[{"v":"under3","label":"3 年内换车","hint":"纯电折旧快，减分；油车/油混加分"},{"v":"3to5","label":"3~5 年","hint":"不调节"},{"v":"5to8","label":"5~8 年","hint":"默认"},{"v":"over8","label":"8 年以上","hint":"纯电加分（能源节省累积）"}]},"highway_ratio":{"label":"高速工况占比","default":"20to40","desc":"增程高速油耗最高（油→电→轮二次损耗）；插混直驱高速效率更优。高速还会降低纯电有效续航","options":[{"v":"under20","label":"20% 以下（市区为主）","hint":"高速系数1.0，纯电小幅加分"},{"v":"20to40","label":"20%~40%","hint":"高速系数0.92（默认）"},{"v":"40to60","label":"40%~60%","hint":"高速系数0.82，增程减分"},{"v":"over60","label":"60% 以上（常年高速）","hint":"高速系数0.72，增程明显减分、纯电续航打折"}]},"charge_patience":{"label":"途中补能耐心","default":"tolerate","desc":"纯电长途需中途充电（800V约10-20分钟、400V约30-40分钟，节假日排队另计）","options":[{"v":"tolerate","label":"可接受充电等待","hint":"纯电长途补能时间成本可接受（默认）"},{"v":"reluctant","label":"不愿等待（补能时间敏感）","hint":"纯电长途明显减分、可油可电加分"}]},"fleet":{"label":"家庭车辆结构","default":"only","desc":"「唯一用车」要扛全部场景；「家里已有油车再增购」则长途由油车兜底，纯电只负责日常——同一价位、同一环境分，结论可能完全不同","options":[{"v":"only","label":"家里唯一用车（主力）","hint":"所有场景都要它扛（默认）"},{"v":"second","label":"增购第二辆（已有油车）","hint":"纯电加分：长途/返乡交给油车，纯电管通勤接娃与周末近郊"}]}};
+const FACTOR_GROUPS=[["核心能源决策",["operation","home_charger","winter_temp","annual_km","single_trip","long_trip_freq","plate_limit","hold_years","highway_ratio"],"以下 9 项直接决定燃油/混动/纯电谁更合适：营运与高频长途是纯电的硬门槛、家充/单位充电是油电分水岭、−10℃纯电平均衰减32.7%、年里程决定成本反超点、绿牌通行红利、短持有折旧差"],["进阶条件",["fleet","charge_patience"],"以下 2 项在特定人群才翻转结论：增购第二辆（长途交给已有油车）、不愿在服务区等充电——没这些情况就保持默认，不影响结论"]];
 const DIMS=[{"key":"powertrain","label":"动力总成","weight":0.18,"by_power":{"BEV":"三电：电池/电机/电控","PHEV":"三电+发动机直驱","EREV":"电机驱动+增程器发电","HEV":"三大件：发动机+变速箱+底盘","ICE":"三大件：发动机+变速箱+底盘"}},{"key":"safety","label":"安全","weight":0.162,"by_power":{"BEV":"碰撞+主动安全","PHEV":"碰撞+主动安全","EREV":"碰撞+主动安全","HEV":"碰撞+主动安全","ICE":"碰撞+主动安全"}},{"key":"adas","label":"智驾","weight":0.135,"by_power":{"BEV":"辅助驾驶硬件与功能","PHEV":"辅助驾驶硬件与功能","EREV":"辅助驾驶硬件与功能","HEV":"辅助驾驶硬件与功能","ICE":"辅助驾驶硬件与功能"}},{"key":"space","label":"空间","weight":0.126,"by_power":{"BEV":"乘坐+储物","PHEV":"乘坐+储物","EREV":"乘坐+储物","HEV":"乘坐+储物","ICE":"乘坐+储物"}},{"key":"value","label":"性价比","weight":0.117,"by_power":{"BEV":"配置/价格","PHEV":"配置/价格","EREV":"配置/价格","HEV":"配置/价格","ICE":"配置/价格"}},{"key":"quality","label":"质量品控","weight":0.1,"by_power":{"BEV":"品控/投诉","PHEV":"品控/投诉","EREV":"品控/投诉","HEV":"可靠性/投诉","ICE":"可靠性/投诉"}},{"key":"control","label":"操控","weight":0.09,"by_power":{"BEV":"底盘+转向","PHEV":"底盘+转向","EREV":"底盘+转向","HEV":"底盘+转向","ICE":"三大件之底盘调校"}},{"key":"cabin","label":"车机座舱","weight":0.09,"by_power":{"BEV":"车机+座舱","PHEV":"车机+座舱","EREV":"车机+座舱","HEV":"座舱","ICE":"座舱"}}];
 const WM={"powertrain":0.18,"safety":0.162,"adas":0.135,"space":0.126,"value":0.117,"quality":0.1,"control":0.09,"cabin":0.09};
-const PHYS={"a":4.48,"b":5.88,"c":0.61,"areaFactor":0.84,"medRatio":0.314,"hwyBase":1.65,"cityBase":1.1,"temp":{"above0":1.0,"m10to0":1.05,"m20tom10":1.12,"underm20":1.2},"drive":{"mild":0.9,"normal":1.0,"aggressive":1.18},"ac":{"off":0.9,"normal":1.0,"heavy":1.12},"acSeason":{"above0":1.08,"m10to0":1.12,"m20tom10":1.18,"underm20":1.22},"volt":{"400":1.0,"600":0.99,"800":0.975,"900":0.97},"swapAdv":{"no_charger":{"gain":2.5,"reason":"换电3分钟补能、接近加油，无家充痛点大幅缓解"},"short_hold":{"gain":1.5,"reason":"车电分离、无电池衰减与残值焦虑，二手更保值"},"cold":{"gain":1.5,"reason":"换电站电池恒温15-30℃，冬季补能不挨冻、不受低温影响"},"longtrip":{"gain":1.0,"reason":"高速换电网络补能快（依赖站点覆盖）"}}};
+const PHYS={"a":4.48,"b":5.88,"c":0.61,"areaFactor":0.84,"medRatio":0.314,"hwyBase":1.65,"cityBase":1.1,"temp":{"above0":1.0,"m10to0":1.05,"m20tom10":1.12,"underm20":1.2},"drive":{"mild":0.9,"normal":1.0,"aggressive":1.18},"ac":{"off":0.9,"normal":1.0,"heavy":1.12},"acSeason":{"above0":1.08,"m10to0":1.12,"m20tom10":1.18,"underm20":1.22},"volt":{"400":1.0,"600":0.99,"800":0.975,"900":0.97},"swapAdv":{"no_charger":{"gain":2.5,"reason":"换电3分钟补能、接近加油，无家充痛点大幅缓解"},"short_hold":{"gain":1.5,"reason":"车电分离、无电池衰减与残值焦虑，二手更保值"},"cold":{"gain":1.5,"reason":"换电站电池恒温15-30℃，冬季补能不挨冻、不受低温影响"},"longtrip":{"gain":1.0,"reason":"高速换电网络补能快（依赖站点覆盖）"}},"tco":{"oilPrice":8.36,"elecHome":0.35,"elecPublic":1.5,"elecWork":0.75,"elecHomeBy":{"valley":0.35,"flat":0.55,"commercial":0.9},"bevKwhPer100km":16.0,"iceFuelL":8.0,"hevFuelL":4.5,"phevFuelL":5.0,"erevFuelL":7.5,"insNev":5500,"insIce":3500,"maint":{"BEV":500,"PHEV":1200,"EREV":1200,"HEV":1000,"ICE":2000},"residual3":{"BEV":0.451,"PHEV":0.422,"EREV":0.42,"HEV":0.5,"ICE":0.4607},"batteryRisk":{"BEV":2500,"PHEV":800,"EREV":800,"HEV":0,"ICE":0},"idleHours":150,"idleLPerH":{"ICE":2.0,"HEV":0.3},"idleKwhPerH":1.5,"taxNevRate":0.05,"taxIceRate":0.1,"years":8},"annualKmMid":{"under5":4000,"under10":8000,"10to15":12500,"15to25":20000,"over25":30000},"tcoBasis":"8年持有；能源按画像年里程、充电条件与电价档（谷电0.35/居民0.55/物业商用0.90元/度，逐车电耗/油耗事实优先）；保费新能源5500 vs 燃油3500元/年（精算师协会2026-03口径）；保养中位；残值用3年保值率近似（BEV45.1%/PHEV42.2%/EREV42%/HEV50%/ICE46.07%，流通协会+精真估2026）；购置税2026-2027新能源减半5%、燃油/油混10%；以旧换新补贴因资格各异未计入"};
 const POWERS=["ICE","HEV","PHEV","EREV","BEV"];
 const PM={"ICE":{"name":"燃油车","short":"燃油","color":"#8a6d3b","desc":"纯汽油/柴油发动机，补能最快"},"HEV":{"name":"油电混动","short":"油混","color":"#5a8a6a","desc":"不插电，发动机为主、电机省油"},"PHEV":{"name":"插电混动","short":"插混","color":"#c8442e","desc":"可插电、发动机可直驱，油电双修"},"EREV":{"name":"增程式","short":"增程","color":"#b07d10","desc":"电机驱动、发动机只发电，高速油耗高"},"BEV":{"name":"纯电动","short":"纯电","color":"#1f6f8b","desc":"只用电，家充成本最低，冬季/高速续航打折"}};
 const POOL_POWERS=[...new Set(CARS.map(c=>c.power))];
@@ -253,39 +278,92 @@ function makeCond(fid,f){
   return d;
 }
 function readCond(){const c={};for(const fid of Object.keys(FACTORS))c[fid]=document.getElementById('c_'+fid).value;return c;}
+// TCO 明细格式化（与 engine.py tco() 同口径）
+function tcoHtml(t){
+  if(!t) return '无价格数据，不测算';
+  const wan=x=>(x/10000).toFixed(2)+'万';
+  return '能源×8年 '+wan(t.energy8y)+'（'+t.unitEnergy.toFixed(3)+'元/km × '+t.annualKm+'km × 8）<br>'+
+    '保费×8年 '+wan(t.ins8y)+'（新能源5500 vs 燃油3500元/年口径）<br>'+
+    '保养×8年 '+wan(t.maint8y)+'<br>购置税 '+wan(t.purchaseTax)+'（2026-2027新能源减半5%/燃油油混10%）<br>'+
+    '残值损失(3年口径近似) '+wan(t.residualLoss)+'（'+({BEV:'纯电45.1%',PHEV:'插混42.2%',EREV:'增程42%',HEV:'油混50%',ICE:'燃油46.07%'})[t.power]+'）<br>'+
+    '电池风险金×8年 '+wan(t.batteryRisk8y)+'<br>'+
+    '<b>8年合计 '+wan(t.tco8y)+' ≈ '+(t.tcoPerKm*8).toFixed(2)+'元/km（含购车残值口径）</b><br>'+
+    '<span style="color:#8a929b">'+t.basis+'</span>';
+}
+// 逐条件判定徽章：非"适配"的判定上钻（最多3枚）
+function verdictChips(v){
+  const LV={适配:['#e7f4ea','#1a7f37'],谨慎:['#fbf3e6','#9a6700'],不建议:['#fbe9e7','#b42318']};
+  const out=[];
+  for(const [fid,val] of Object.entries(v||{})){
+    if(!val||val[0]==='适配') continue;
+    const lc=LV[val[0]]||LV['谨慎'];
+    out.push('<span title="'+fid+'：'+(val[1]||'')+'" style="display:inline-block;background:'+lc[0]+';color:'+lc[1]+';border-radius:4px;font-size:9.5px;padding:0 5px;margin-left:5px">'+val[0]+'·'+({operation:'营运',winter_temp:'气候带',annual_km:'年里程',single_trip:'单次里程',long_trip_freq:'长途频率',home_charger:'充电',plate_limit:'限牌',hold_years:'持有',highway_ratio:'高速',charge_patience:'补能耐心',fleet:'车队'})[fid]+'</span>');
+    if(out.length>=3) break;
+  }
+  return out.join('');
+}
+
+// 前置条件 → 能源形式适配结论（v10.53.0）：形式均分 + 画像自检，回答「我这种条件适合哪种能源」
+function renderForm(rows,cond){
+  const forms=recommendForm(rows,cond);
+  const narr=document.getElementById('formNarr');
+  if(narr) narr.innerHTML='<b>结论：</b>'+formNarrative(forms,cond)+
+    '<div class="formula">形式均分 = 池内该能源车型综合分均值（产品力 + 场景调节）；仅作形式层面参考，逐车结论仍以下方主榜为准</div>';
+  const grid=document.getElementById('formGrid');
+  if(grid){
+    grid.innerHTML=forms.map(function(f){
+      const cardCls=f.label==='最适配'?'form-card top':'form-card';
+      const bCls=f.label==='不建议'?'fc-badge bad':(f.label==='最适配'?'fc-badge':'fc-badge mid');
+      const col=PM[f.power]?PM[f.power].color:'#888';
+      return '<div class="'+cardCls+'"><div class="fc-head"><span class="pill" style="background:'+col+'">'+
+        (PM[f.power]?PM[f.power].short:f.power)+'</span><span class="'+bCls+'">'+f.label+'</span>'+
+        '<span style="margin-left:auto;font-size:10.5px;color:#5b6470">均分</span></div>'+
+        '<div class="fc-avg">'+f.avg.toFixed(1)+'</div>'+
+        '<div class="fc-sub">池内 '+f.n+' 款 · 场景调节均值 '+(f.avg_adj>0?'+':'')+f.avg_adj.toFixed(2)+
+        (f.hard?' · <span style="color:#b42318">'+f.hard+' 款硬条件</span>':' · 无硬条件')+
+        '<br>最强一款：'+f.best+'</div></div>';
+    }).join('');
+  }
+  const diag=document.getElementById('profileDiag');
+  if(diag){
+    const ws=checkProfile(cond);
+    diag.innerHTML=ws.length
+      ? '<b>画像自检（'+ws.length+' 条）：</b>'+ws.map(function(w){
+          return '<div class="d-item '+(w.level==='warn'?'warn':'info')+'">'+(w.level==='warn'?'⚠ ':'· ')+w.text+'</div>';}).join('')
+      : '<b>画像自检：</b><span style="color:#1a7f37">条件自洽，未发现矛盾组合</span>';
+  }
+}
 
 /* ============================================================================
- * engine.js —— 跨能源「环境分 + 实际续航」引擎（唯一事实源）
+ * engine.js —— 跨能源「环境分 + 实际续航 + 持有成本」引擎（浏览器交互镜像）
  *
- * 这是 modules/envscore 的核心：给一台车 + 一套用车条件，算出
- *   1) rangeCalc / effRange：真实续航（用 PHYS 物理常数，服务端与浏览器同源）
- *   2) adjust：环境分（12 项用车条件的软加减分 + 硬闸门 hard 标记）
- *   3) compositeTier：按综合分划 T1/T2/T3
+ * v10.52.0 架构变更（2026-11-24 跨能源比较优化）：
+ *   规则单一事实源 = modules/envscore/engine.py（Python，服务端定稿渲染 + 可回归）；
+ *   本文件是浏览器交互镜像（场景推演器实时重算必须跑在页面里）。
+ *   两套实现由 modules/regress/env_equivalence_regress.py 守护：同一批 fixtures ×
+ *   画像，node 实跑本文件 vs Python engine，调整分/硬条件/续航/TCO 必须一致——
+ *   防两套口径漂移（项目"禁止两处系数"纪律）。
  *
- * 依赖注入（构建时由 build_compare.py 写入，不要在本文件里写死）：
- *   PHYS  —— 物理常数对象，来自 modules/physics/ev_range_model.py
+ * 这是 modules/envscore 的交互侧核心：给一台车 + 一套用车条件（15 项），算出
+ *   1) rangeCalc / effRange：真实续航（PHYS 物理常数，服务端与浏览器同源）
+ *   2) adjust：环境分（15 项用车条件的软加减分 + 硬闸门 hard 标记 + 逐条件判定）
+ *   3) tco：8 年持有成本测算（仅披露不入分）
+ *   4) compositeTier：按综合分划 T1/T2/T3
+ *
+ * 依赖注入（构建时由 build_energy_compare.py 写入，不要在本文件里写死）：
+ *   PHYS  —— 物理常数 + TCO 常量对象，来自 modules/physics/ev_range_model.py 与 envscore/engine.py
  *   （车列表 CARS、条件表 FACTORS 由页面注入，本文件只消费）
  *
  * 纪律：本文件不放任何 DOM 操作。页面渲染（render/resetAll）留在
  * build_energy_compare.py 的模板里；node 回归只跑本文件的纯函数。
  * ========================================================================== */
 
-// ===== 物理续航模型 v5 =====
-// 基准电耗：真实电耗优先，缺失用物理回归(重量+CdA)估算 —— 已在 load_cars 算好 car.cons
-// 工况倍率：高速按每车 CdA/吨 差异化（风阻大的高速更费电，解释方盒子效应）
-// 再加入：温度、驾驶风格、空调、电压平台/碳化硅修正
+// ===== 物理续航模型（与 engine.py 同源）=====
 const DEMAND={under150:100,'150to300':220,'300to500':400,over500:600};
-// 档位：按当前榜内综合分相对位置分 T1/T2/T3（硬条件触发时在 render 里再降一档）
 function compositeTier(score){ return score>=82?'T1':(score>=72?'T2':'T3'); }
 
 function hwyMult(car,cond){
-  // 高速倍率基准1.70，按 CdA/吨 偏离中位数修正；方盒子额外加成
   let r=car.cdaPerTon;
-  if(cond.boxy==='yes'){
-    // 方盒子：风阻按同级典型方盒子 Cd≈0.32、迎风面积偏大约20% 修正
-    if(car.cd!=null) r=(car.cd*1.15*(car.area||2.6)*1.0)/((car.weight||1800)/1000);
-    else r=PHYS.medRatio*1.5;
-  }
   if(r==null) r=PHYS.medRatio;
   let m=PHYS.hwyBase*(1+0.45*(r/PHYS.medRatio-1));
   return Math.max(1.35,Math.min(2.35,m));
@@ -295,20 +373,17 @@ function rangeCalc(car,cond){
   if(car.power!=='BEV') return null;
   const hwWeight={under20:0.0,'20to40':0.25,'40to60':0.7,over60:1.0}[cond.highway_ratio];
   const hwM=hwyMult(car,cond);
-  // 市区/高速倍率按高速占比加权
   const sceneM=PHYS.cityBase*(1-hwWeight)+hwM*hwWeight;
-  const tempM=PHYS.temp[cond.winter_temp];  // 仅电池活性，不含暖风
-  const driveM=PHYS.drive[cond.drive_style]||1.0;
-  // 空调=季节基线×用户档位（温度与暖风拆分，避免旧版双重计算）
-  const acM=(PHYS.acSeason[cond.winter_temp]||1.0)*(PHYS.ac[cond.ac_usage]||1.0);
-  // 电压平台修正：800V+SiC 转换效率略高(影响小，主要影响充电速度)
+  const tempM=PHYS.temp[cond.winter_temp];
+  const acM=(PHYS.acSeason[cond.winter_temp]||1.0);   // 冬季暖风基线（空调强度条件已移除）
   let voltM=1.0;
   if(car.voltage){
     const vs=Object.keys(PHYS.volt).map(Number).sort((a,b)=>a-b);
     let best=vs[0]; for(const v of vs) if(Math.abs(v-car.voltage)<Math.abs(best-car.voltage)) best=v;
     voltM=PHYS.volt[best];
   }
-  const sceneCons=car.cons*sceneM*tempM*driveM*acM*voltM;
+  // 地形条件已移除（v10.56.0）：场景电耗不再乘地形系数
+  const sceneCons=car.cons*sceneM*tempM*acM*voltM;
   if(!car.kwh){
     return {range:null, method:'无电量数据', cls:car.body,
       steps:['该车型无电池电量数据，无法估算续航（不编造）']};
@@ -322,26 +397,100 @@ function rangeCalc(car,cond){
     steps.push('  车重 '+(car.weight||'—')+'kg · Cd '+(car.cd||'—')+' · 迎风面积 '+(car.area||'—')+'m²');
   }
   steps.push('× 工况倍率 '+sceneM.toFixed(2)+(hwWeight>=0.5?'（偏高速，CdA/吨 '+(car.cdaPerTon||'—')+'）':'（偏市区）'));
-  steps.push('× 温度(仅电池) '+tempM+' × 驾驶 '+driveM+' × 空调 '+acM.toFixed(2)+'（季节基线'+PHYS.acSeason[cond.winter_temp]+'×档位'+(PHYS.ac[cond.ac_usage]||1)+'） × 电压系数 '+voltM+(car.voltage?'（'+car.voltage+'V平台）':''));
+  steps.push('× 温度(仅电池) '+tempM+' × 暖风 '+acM.toFixed(2)+' × 电压系数 '+voltM+(car.voltage?'（'+car.voltage+'V平台）':''));
   steps.push('= 场景电耗 '+sceneCons.toFixed(1)+' kWh/100km');
   steps.push('电量 '+car.kwh+' kWh ÷ 场景电耗 ×100 = 有效续航 '+rng+' km');
   return {range:rng, method:car.consSrc==='事实库'?'物理模型(真实电耗基准)':'物理模型(估算电耗基准)',
-          cls:car.boxy==='yes'?'方盒子':car.body, sceneCons:Math.round(sceneCons*10)/10, steps};
+          cls:car.body, sceneCons:Math.round(sceneCons*10)/10, steps};
 }
 function effRange(car,cond){ const r=rangeCalc(car,cond); return r?r.range:null; }
 
-// 场景调节：对具体车型计算，返回各项明细与合计（未缩放）
+// ===== 持有成本测算 TCO（与 engine.py 同源；仅披露不入分）=====
+function homeElecPrice(cond){
+  const T=PHYS.tco;
+  return T.elecHome;   // 固定谷电口径（电价档条件已移除）
+}
+function unitEnergyCost(car,cond){
+  const T=PHYS.tco;
+  const charger=cond.home_charger;
+  const homePrice=homeElecPrice(cond);
+  const P=car.power;
+  const cons=car.cons;
+  if(P==='BEV'){
+    const per100=cons||T.bevKwhPer100km;
+    const home=per100*homePrice/100, pub=per100*T.elecPublic/100;
+    const work=per100*(0.8*T.elecWork+0.2*T.elecPublic)/100;
+    if(charger==='work') return +work.toFixed(3);
+    return charger==='home'?home:(charger==='public'?+(home*0.3+pub*0.7).toFixed(3):pub);
+  }
+  function fuelL(){
+    if(car.fuelDeprivedL100) return car.fuelDeprivedL100;
+    if(car.fuelL100) return car.fuelL100;
+    return ({PHEV:T.phevFuelL,EREV:T.erevFuelL,HEV:T.hevFuelL})[P]||T.iceFuelL;
+  }
+  const evPrice=charger==='work'?T.elecWork:homePrice;
+  const per100=cons||T.bevKwhPer100km;
+  if(P==='PHEV'){
+    const evShare=charger==='home'?0.8:(charger==='work'?0.7:(charger==='public'?0.5:0.3));
+    return +(evShare*evPrice/100*per100+(1-evShare)*fuelL()*T.oilPrice/100).toFixed(3);
+  }
+  if(P==='EREV'){
+    const evShare=charger==='home'?0.7:(charger==='work'?0.6:(charger==='public'?0.5:0.3));
+    return +(evShare*evPrice/100*per100+(1-evShare)*fuelL()*T.oilPrice/100).toFixed(3);
+  }
+  return +(fuelL()*T.oilPrice/100).toFixed(3);
+}
+function idleCost(car,cond){
+  return 0;   // 驻车用电条件已移除（保留函数为兼容旧调用）
+}
+function tco(car,cond){
+  const T=PHYS.tco;
+  const P=car.power;
+  const price=car.price||car.priceLow||0;
+  const km=PHYS.annualKmMid[cond.annual_km];
+  const unit=unitEnergyCost(car,cond);
+  const energy8=unit*km*T.years;
+  const ins8=(P==='BEV'||P==='PHEV'||P==='EREV'?T.insNev:T.insIce)*T.years;
+  const maint8=(T.maint[P]||T.maint.ICE)*T.years;
+  const isNev=(P==='BEV'||P==='PHEV'||P==='EREV');
+  const tax=price/1.13*(isNev?T.taxNevRate:T.taxIceRate);
+  const residualLoss=price*(1-T.residual3[P]);
+  const batteryRisk8=(T.batteryRisk[P]||0)*T.years;
+  const idle8=idleCost(car,cond);
+  const total=energy8+ins8+maint8+tax+residualLoss+batteryRisk8+idle8;
+  return {power:P,price:price,annualKm:km,unitEnergy:+unit.toFixed(3),
+    energy8y:Math.round(energy8),ins8y:Math.round(ins8),maint8y:Math.round(maint8),
+    purchaseTax:Math.round(tax),residualLoss:Math.round(residualLoss),
+    batteryRisk8y:Math.round(batteryRisk8),idle8y:idle8,elecPrice:homeElecPrice(cond),
+    tco8y:Math.round(total),
+    tcoPerKm:+(total/(km*T.years)).toFixed(3),basis:PHYS.tcoBasis};
+}
+function breakevenKm(cars,cond){
+  const bev=cars.filter(c=>c.power==='BEV');
+  const ice=cars.filter(c=>c.power==='ICE'||c.power==='HEV');
+  if(!bev.length||!ice.length) return null;
+  const b=tco(bev[0],Object.assign({},cond,{annual_km:'15to25',home_charger:'home'}));
+  let bestIce=null;
+  for(const c of ice){ const t=tco(c,cond); if(!bestIce||t.tco8y<bestIce.tco8y) bestIce=t; }
+  const fixedB=b.tco8y-b.unitEnergy*PHYS.annualKmMid['15to25']*PHYS.tco.years;
+  const fixedI=bestIce.tco8y-bestIce.unitEnergy*PHYS.annualKmMid['15to25']*PHYS.tco.years;
+  const unitDiff=bestIce.unitEnergy-b.unitEnergy;
+  if(unitDiff<=0) return null;
+  return Math.round((fixedB-fixedI)/(PHYS.tco.years*unitDiff));
+}
+
+// ===== 场景调节（与 engine.py adjust 同源）=====
 function adjust(car,cond){
   const items=[]; let total=0;
-  const hard=[]; // 硬条件：{label,pt,reason,downgrade}
+  const hard=[];
   const add=(label,pt)=>{ if(pt){items.push({label,pt}); total+=pt;} };
   const addHard=(label,pt,reason,downgrade)=>{ if(pt){hard.push({label,pt,reason,downgrade:!!downgrade}); total+=pt;} };
   const P=car.power;
-  const isNew=(P==='BEV'||P==='PHEV'||P==='EREV');
   const isSwap=car.swap===true;
+  const price=car.price;
 
   // ===== 硬条件（大扣分 + 降档 + 标注）=====
-  // H1: 无固定充电 + 纯电（非换电）→ 大扣分，换电车型缓解
+  // H1 无固定充电 + 纯电（非换电）
   if(cond.home_charger==='none' && P==='BEV'){
     if(isSwap){
       addHard('无家充·换电缓解', PHYS.swapAdv.no_charger.gain, PHYS.swapAdv.no_charger.reason, false);
@@ -349,17 +498,17 @@ function adjust(car,cond){
       addHard('无充电桩·纯电不推荐', -15, '无固定充电，纯电日常补能困难、体验大幅打折；换电车型不受此限', true);
     }
   }
-  // H2: 东北极寒 + 低价纯电（≤15万）→ 续航低+充电慢，谨慎；换电/大电池缓解
-  if(cond.winter_temp==='underm20' && P==='BEV' && car.price!=null && car.price<=15){
+  // H2 极寒 + 低价纯电（≤15万）
+  if(cond.winter_temp==='underm20' && P==='BEV'){
     if(isSwap){
       addHard('极寒·换电缓解', PHYS.swapAdv.cold.gain, PHYS.swapAdv.cold.reason, false);
-    }else{
+    }else if(price!=null && price<=15){
       addHard('极寒+低价纯电·谨慎', -12, '-20℃以下低价纯电续航常腰斩、充电变慢，北方选购需谨慎；换电或大电池车型更稳', true);
+    }else{
+      addHard('极寒·换电优势', PHYS.swapAdv.cold.gain, PHYS.swapAdv.cold.reason, false);
     }
-  }else if(cond.winter_temp==='underm20' && P==='BEV' && isSwap){
-    addHard('极寒·换电优势', PHYS.swapAdv.cold.gain, PHYS.swapAdv.cold.reason, false);
   }
-  // H3: 短持有(2-3年) + 纯电 → 折旧快；换电车型(车电分离)合适
+  // H3 短持有(2-3年) + 纯电
   if(cond.hold_years==='under3' && P==='BEV'){
     if(isSwap){
       addHard('短持有·换电合适', PHYS.swapAdv.short_hold.gain, PHYS.swapAdv.short_hold.reason, false);
@@ -367,7 +516,7 @@ function adjust(car,cond){
       addHard('短持有·纯电折旧快', -8, '2-3年换车，纯电折旧快、残值损失大；换电车型车电分离更合适', true);
     }
   }
-  // H4: 长途高频 + 纯电续航明显不足 → 大扣分
+  // H4 长途高频 + 纯电续航明显不足
   if((cond.long_trip_freq==='weekly'||cond.long_trip_freq==='monthly') && P==='BEV'){
     const eff=effRange(car,cond), d=DEMAND[cond.single_trip];
     if(eff!=null && eff < d*0.75){
@@ -375,17 +524,21 @@ function adjust(car,cond){
       else addHard('长途续航不足·不推荐', -10, '长途频繁且单次里程远超有效续航，纯电补能时间成本高', true);
     }
   }
-  // H5: 限牌 + 燃油/油混 → 上牌困难
-  if(cond.plate_limit==='yes' && (P==='ICE'||P==='HEV')){
+  // H5 限牌 + 燃油/油混
+  if((cond.plate_limit==='yes'||cond.plate_limit==='beijing'||cond.plate_limit==='shanghai') && (P==='ICE'||P==='HEV')){
     addHard('限牌城市·上牌难', -8, '限牌城市燃油/油混需摇号拍牌，新能源可直接上牌', true);
   }
-  // H6: 营运 + 燃油/油混 → 成本劣势
+  // H6 营运 + 燃油/油混
   if(cond.operation==='yes' && (P==='ICE'||P==='HEV')){
     addHard('营运·能耗成本高', -10, '营运高频，燃油/油混能耗成本远高于纯电', true);
   }
+  // H7（v10.52.0）限牌京沪 + 插混/增程：北京插混增程按油车管理、上海插混无免费绿牌
+  if((cond.plate_limit==='beijing'||cond.plate_limit==='shanghai') && (P==='PHEV'||P==='EREV')){
+    const city=cond.plate_limit==='beijing'?'北京':'上海';
+    addHard('限牌'+city+'·插混增程无绿牌优势', -8, city+'插混/增程不享新能源绿牌（北京按油车管理需燃油指标/上海无免费绿牌），上牌成本与燃油车同', true);
+  }
 
   // ===== 常规软调节 =====
-  // 1) 续航匹配（仅纯电）
   const eff=effRange(car,cond), d=DEMAND[cond.single_trip];
   if(P==='BEV'){
     if(eff!=null){
@@ -397,30 +550,203 @@ function adjust(car,cond){
       items.push({label:'续航匹配：无续航数据，不参与',pt:0,na:true});
     }
   }
-  // 2) 长途频率（软）
   if(cond.long_trip_freq==='monthly'||cond.long_trip_freq==='weekly'){
-    add('长途频率高', P==='BEV'?-1.5 : (P==='ICE'||P==='HEV')?1.5 : 0);
+    add('长途频率高', P==='BEV'?-1.5 : ((P==='ICE'||P==='HEV')?1.5 : 0));
   }else if(cond.long_trip_freq==='rare'){ add('几乎无长途', P==='BEV'?1:0); }
-  // 3) 充电条件（软，硬条件H1已覆盖纯电无桩）
-  if(cond.home_charger==='home') add('有家充', P==='BEV'?1.5 : (P==='PHEV'||P==='EREV')?1 : 0);
+  if(cond.home_charger==='home') add('有家充', P==='BEV'?1.5 : ((P==='PHEV'||P==='EREV')?1:0));
+  else if(cond.home_charger==='work') add('单位可充电', P==='BEV'?1.0 : ((P==='PHEV'||P==='EREV')?0.8:0));
   if(cond.home_charger==='none' && P!=='BEV') add('无固定充电', (P==='PHEV'||P==='EREV')?-1.5 : 1);
-  // 4) 营运（软）
-  if(cond.operation==='yes') add('营运', P==='BEV'?2 : 0);
-  // 5) 高速占比（软）
-  if(cond.highway_ratio==='over60') add('常年高速', P==='EREV'?-2 : P==='BEV'?-1 : 1);
+  if(cond.operation==='yes') add('营运', P==='BEV'?2:0);
+  if(cond.highway_ratio==='over60') add('常年高速', P==='EREV'?-2 : (P==='BEV'?-1 : 1));
   else if(cond.highway_ratio==='40to60') add('高速较多', P==='EREV'?-1:0);
   else if(cond.highway_ratio==='under20') add('市区为主', P==='BEV'?1:0);
-  // 6) 方盒子 + 高频高速
-  if(cond.boxy==='yes'&&cond.highway_ratio==='over60') add('方盒子+高频高速', P==='EREV'?-1.5 : P==='BEV'?-1.5 : P==='PHEV'?-1:0);
-  // 7) 年里程
-  if(cond.annual_km==='over25') add('高里程', P==='BEV'?1.5 : P==='ICE'?-1:0);
+  if(cond.annual_km==='over25') add('高里程', P==='BEV'?1.5 : (P==='ICE'?-1:0));
+  else if(cond.annual_km==='under5') add('超低里程', P==='BEV'?-2.0 : ((P==='ICE'||P==='HEV')?2.0:0));
   else if(cond.annual_km==='under10') add('低里程', P==='BEV'?-1 : ((P==='ICE'||P==='HEV')?1:0));
-  // 8) 持有年限（长期持有：电车能源节省累积、残值摊薄 → 纯电加分；与 under3 硬条件方向对称）
-  //    over8 的 hint 明确写"纯电加分"，此前引擎漏实现导致该选项完全无效（回归探测抓出）。
-  if(cond.hold_years==='over8') add('长期持有·电车收益累积', P==='BEV'?1.0 : (P==='PHEV'||P==='EREV')?0.3 : ((P==='ICE'||P==='HEV')?-0.3:0));
+  if(cond.hold_years==='over8') add('长期持有·电车收益累积', P==='BEV'?1.0 : ((P==='PHEV'||P==='EREV')?0.3 : ((P==='ICE'||P==='HEV')?-0.3:0)));
+  // v10.52.0 新增软调节（与 engine.py 逐一对应）
+  if(P==='BEV' && hard.length===0) add('纯电优先（无硬条件冲突）', 0.5);
+  if(cond.charge_patience==='reluctant'){
+    const longNeed=cond.long_trip_freq==='monthly'||cond.long_trip_freq==='weekly'||cond.single_trip==='over500';
+    if(P==='BEV') add('补能耐心不足+长途需求', longNeed?-2:-1);
+    else add('补能时间不敏感', 0.5);
+  }
+  if((cond.annual_km==='under5'||cond.annual_km==='under10') && P==='BEV' && cond.home_charger==='none') add('低里程无桩纯电·固定成本摊薄慢', cond.annual_km==='under5'?-1.5:-1);
+  // ===== v10.53.0 新增软调节（与 engine.py 逐一对应）=====
+  if(cond.fleet==='second'){
+    add('家庭增购·已有油车兜底', P==='BEV'?2.0 : (P==='PHEV'?0.6 : (P==='EREV'?0.4 : (P==='ICE'?-1.0:0))));
+  }
+  // 地形/方盒子条件已移除（v10.56.0），对应规则同步删除
+  // 停放环境/驻车用电/露营/电价档条件已移除（v10.54.0），对应规则同步删除
 
-  return {items,total,hard};
+  return {items:items, total:+total.toFixed(2), hard:hard, verdicts:verdicts(car,cond,eff,d)};
 }
+
+// ===== 逐条件适配判定（与 engine.py verdicts 同源）=====
+function verdicts(car,cond,eff,d){
+  const P=car.power, price=car.price;
+  const v={};
+  if(cond.operation==='yes'){
+    if(P==='BEV'||P==='PHEV'||P==='EREV') v.operation=['适配','营运高频：纯电/插混/增程能耗成本碾压燃油（网约车新能源渗透率76%）'];
+    else v.operation=['不建议','营运高频：燃油/油混能耗成本远高于纯电（硬条件H6 −10）'];
+  }
+  const wt=cond.winter_temp;
+  if(wt==='underm20'){
+    if(P==='BEV'){
+      if(price!=null && price<=15) v.winter_temp=['不建议','极寒+低价纯电：续航常腰斩、充电慢（硬条件H2 −12）'];
+      else v.winter_temp=['谨慎','极寒纯电续航大幅打折，优先换电/大电池/热泵车型'];
+    }else if(P==='PHEV'||P==='EREV') v.winter_temp=['适配','发动机余热兜底+加油补能；冬季纯电续航按×0.5~0.7规划'];
+    else v.winter_temp=['适配','燃油/油混低温稳定，油耗升高约20-30%'];
+  }else if(wt==='m20tom10'){
+    v.winter_temp=(P==='BEV')?['谨慎','纯电：-10℃续航达成约68%（硬条件不触发但需规划）']:['适配','有油箱/发动机兜底，影响小'];
+  }
+  const ak=cond.annual_km;
+  if(ak==='under5'){
+    if(P==='BEV') v.annual_km=['不建议','超低里程（<5000km/年）：低于盈亏平衡点（约4800km/年），纯电省回的能源差额抵不过保险溢价与残值差'];
+    else v.annual_km=['适配','超低里程：能源成本占比极小，油车/油混总花费更低'];
+  }else if(ak==='under10'){
+    if(P==='BEV') v.annual_km=[(cond.home_charger!=='none'?'谨慎':'不建议'),'低里程：纯电能源节省无法覆盖保险溢价与残值差（TCO 测算见持有成本区块）'];
+    else v.annual_km=['适配','低里程油车/油混省心，能源成本占比低'];
+  }else if(ak==='over25'){
+    v.annual_km=(P!=='ICE')?['适配','高里程：纯电/混动能源成本优势累积']:['谨慎','高里程油费占比高，慎选纯燃油'];
+  }
+  if(eff!=null && P==='BEV'){
+    if((cond.long_trip_freq==='monthly'||cond.long_trip_freq==='weekly') && eff<d*0.75) v.single_trip=['不建议','长途高频且有效续航'+eff+'km < 需求'+d+'km×0.75（硬条件H4 −10）'];
+    else if(eff<d) v.single_trip=['谨慎','有效续航'+eff+'km 低于单次需求'+d+'km，需途中补能'];
+    else v.single_trip=['适配','有效续航'+eff+'km 覆盖单次需求'+d+'km'];
+  }else if(P==='BEV'){
+    v.single_trip=['谨慎','无续航数据不估算，长途需求请人工核实'];
+  }else{
+    const note=(P==='EREV'&&(cond.highway_ratio==='over60'||cond.highway_ratio==='40to60'))?'；增程高速亏电油耗7-9L高于插混直驱5-6L':'油箱兜底';
+    v.single_trip=['适配','非纯电'+note];
+  }
+  const hc=cond.home_charger;
+  if(hc==='none'){
+    if(P==='BEV') v.home_charger=['不建议','无固定充电，纯电日常补能困难（硬条件H1 −15）'];
+    else if(P==='PHEV'||P==='EREV') v.home_charger=['谨慎','无家充插混/增程长期亏电运行，油耗经济性恶化'];
+    else v.home_charger=['适配','加油即走，无充电依赖'];
+  }else if(hc==='public'){
+    v.home_charger=(P==='BEV')?['谨慎','纯电依赖公充：成本约为家充3-5倍、高峰排队']:['适配','不依赖家充'];
+  }else if(hc==='work'){
+    if(P==='BEV'||P==='PHEV'||P==='EREV') v.home_charger=['适配','单位/公司可充电：白天补能、成本接近家充，不按「无固定充电」处罚'];
+    else v.home_charger=['适配','加油即走，不依赖充电'];
+  }
+  const pl=cond.plate_limit;
+  if(pl==='beijing'||pl==='shanghai'){
+    const city=pl==='beijing'?'北京':'上海';
+    if(P==='BEV') v.plate_limit=['适配',city+'纯电享免费绿牌'];
+    else if(P==='PHEV'||P==='EREV') v.plate_limit=['不建议',city+'插混/增程不享绿牌（北京按油车管理/上海无免费绿牌）（硬条件H7 −8）'];
+    else v.plate_limit=['不建议',city+'燃油/油混需摇号或拍牌（硬条件H5 −8）'];
+  }else if(pl==='yes'){
+    if(P==='ICE'||P==='HEV') v.plate_limit=['不建议','限牌城市燃油/油混需摇号拍牌（硬条件H5 −8）'];
+    else v.plate_limit=['适配','新能源直接上牌'];
+  }
+  const hy=cond.hold_years;
+  if(hy==='under3'){
+    if(P==='BEV') v.hold_years=['不建议','短持有纯电折旧快（硬条件H3 −8）；换电车型车电分离除外'];
+    else if(P==='PHEV'||P==='EREV') v.hold_years=['谨慎','短持有插混/增程残值中等受压'];
+    else v.hold_years=['适配','短持有燃油/油混残值相对稳'];
+  }else if(hy==='over8' && P==='BEV'){
+    v.hold_years=['适配','长期持有：能源节省累积、残值影响摊薄'];
+  }
+  const hr=cond.highway_ratio;
+  if(hr==='over60'){
+    if(P==='EREV') v.highway_ratio=['谨慎','常年高速：增程亏电油耗7-9L（油→电→轮二次转换），高于插混直驱5-6L'];
+    else if(P==='BEV') v.highway_ratio=['谨慎','常年高速：纯电高速续航达成56-75%，补能时间成本高'];
+    else if(P==='PHEV') v.highway_ratio=['适配','插混高速发动机直驱效率高（亏电3.3-5.5L）'];
+    else v.highway_ratio=['适配','燃油/油混高速工况稳定'];
+  }
+  // 方盒子条件已移除（v10.56.0）：车身形状由车型风阻承担，判定同步删除
+  if((cond.charge_patience||'tolerate')==='reluctant' && P==='BEV'){
+    const longNeed=cond.long_trip_freq==='monthly'||cond.long_trip_freq==='weekly'||cond.single_trip==='over500';
+    v.charge_patience=[longNeed?'不建议':'谨慎','补能时间敏感+纯电途中充电等待（800V约10-20分钟/400V约30-40分钟，节假日排队另计）'];
+  }
+  // 露营/停放/驻车/电价档条件已移除（v10.54.0），对应判定同步删除
+  // ===== v10.53.0 新增判定（与 engine.py 同源）=====
+  if(cond.fleet==='second'){
+    if(P==='BEV') v.fleet=['适配','增购第二辆：长途/返乡由已有油车承担，纯电只管日常，分工最省钱'];
+    else if(P==='ICE') v.fleet=['谨慎','第二辆车再买燃油车：日常能源成本无优势，与已有油车功能重叠'];
+    else if(P==='PHEV'||P==='EREV') v.fleet=['适配','第二辆可油可电：与油车功能部分重叠，胜在无补能焦虑'];
+  }
+  // 地形条件已移除（v10.56.0）：路线级平均不够准，改为方法区提示自行上浮电耗
+  return v;
+}
+
+// ===== 能源形式聚合结论 + 画像自检（v10.53.0，与 engine.py 同源）=====
+const FORM_CN={ICE:'燃油',HEV:'油混',PHEV:'插混',EREV:'增程',BEV:'纯电'};
+const FORM_MIN_N=3;   // 形式均分最小样本量：<3 款标「样本不足」，不参与形式推荐
+function recommendForm(rows,cond){
+  const agg={};
+  for(const r of rows){
+    const p=r.power;
+    if(!agg[p]) agg[p]={power:p,n:0,sum:0,adjSum:0,hard:0,bad:0,best:null,bestScore:-1e9};
+    const a=agg[p];
+    a.n+=1; a.sum+=(r.composite||0); a.adjSum+=(r.adj||0);
+    if(r.hard&&r.hard.length) a.hard+=1;
+    const vs=r.verdicts||{};
+    for(const k of Object.keys(vs)){ if(vs[k]&&vs[k][0]==='不建议') a.bad+=1; }
+    if((r.composite||0)>a.bestScore){ a.best=r.model; a.bestScore=r.composite||0; }
+  }
+  const out=Object.keys(agg).map(p=>{
+    const a=agg[p];
+    return {power:p,n:a.n,avg:Math.round((a.sum/a.n)*10)/10,
+            avg_adj:Math.round((a.adjSum/a.n)*100)/100,
+            hard:a.hard,bad:a.bad,best:a.best};
+  });
+  out.sort((x,y)=> (y.avg-x.avg) || (x.hard-y.hard) || (y.n-x.n));
+  const eligible=out.filter(x=>x.n>=FORM_MIN_N);
+  const base=eligible.length?eligible[0]:out[0];
+  out.forEach(x=>{
+    if(x.n<FORM_MIN_N){ x.label='样本不足'; x.rank=null; return; }
+    x.rank=eligible.indexOf(x)+1;
+    if(x.power===base.power) x.label='最适配';
+    else if(x.avg>=base.avg-1.5 && x.hard<=base.hard) x.label='可考虑';
+    else if(x.avg>=base.avg-4) x.label='次选';
+    else x.label='不建议';
+  });
+  // 展示顺序：有样本的先按名次，样本不足的排后（避免 n=2 的形式霸占第一名造成误读）
+  out.sort((x,y)=>((x.rank?0:1)-(y.rank?0:1)) || ((x.rank||0)-(y.rank||0)) || (y.avg-x.avg));
+  return out;
+}
+function formNarrative(forms,cond){
+  if(!forms||!forms.length) return '池内无车，无法给出形式结论';
+  if(forms.length===1){const f0=forms[0];
+    return '池内只有'+(FORM_CN[f0.power]||f0.power)+'一种能源形式（'+f0.n+' 款），不存在跨形式取舍，形式适配结论不适用。';}
+  const eligible=forms.filter(f=>f.n>=FORM_MIN_N);
+  const pool=eligible.length?eligible:forms;
+  const top=pool[0], second=pool[1];
+  let txt='本画像下'+(FORM_CN[top.power]||top.power)+'形式最合适（均分 '+top.avg.toFixed(1)+'，池内 '+top.n+' 款，最强一款 '+top.best+'）';
+  if(second){
+    const gap=Math.round((top.avg-second.avg)*10)/10;
+    if(gap>=2) txt+='，比'+(FORM_CN[second.power]||second.power)+'（'+second.avg.toFixed(1)+'）明显领先 '+gap.toFixed(1)+' 分';
+    else if(gap>0) txt+='，与'+(FORM_CN[second.power]||second.power)+'（'+second.avg.toFixed(1)+'）只差 '+gap.toFixed(1)+' 分，按具体车型选更靠谱';
+    else txt+='，与'+(FORM_CN[second.power]||second.power)+'基本同级';
+  }
+  const thin=forms.filter(f=>f.n<FORM_MIN_N);
+  if(thin.length) txt+='；'+thin.map(f=>(FORM_CN[f.power]||f.power)+f.n+'款').join('、')+'样本不足，不作形式结论';
+  if(top.hard) txt+='；但该形式有 '+top.hard+' 款触发硬条件（无固定充电/极寒/长途续航等），需逐车核';
+  return txt+'。';
+}
+function checkProfile(cond){
+  const w=[];
+  const noFixed=cond.home_charger==='none';
+  const cold=(cond.winter_temp==='m20tom10'||cond.winter_temp==='underm20');
+  const longNeed=(cond.long_trip_freq==='weekly'||cond.long_trip_freq==='monthly'||cond.single_trip==='over500');
+  if(cond.operation==='yes'){
+    if(longNeed) w.push({level:'warn',text:'营运车（网约/出租）极少单程 500km 以上的高频长途：确认是营运用途还是私家长途'});
+    if(cond.hold_years==='over8') w.push({level:'warn',text:'营运车年里程常在 5 万公里以上，多数城市网约车 8 年强制退出：『8 年以上持有』与营运不匹配'});
+    if(cond.fleet==='second') w.push({level:'warn',text:'营运车是生产工具，通常不是家庭第二辆车：两项条件相互矛盾'});
+  }
+  if(noFixed&&cold&&longNeed) w.push({level:'warn',text:'无固定充电 + 低温 + 高频长途：纯电在本画像下基本无解（H1/H2/H4 会连续触发），建议直接看插混/油混/燃油'});
+  else if(noFixed&&cold) w.push({level:'info',text:'无固定充电 + 低温：纯电要靠公充与热泵/电池预热车型硬扛，先确认单位或住处能否装桩'});
+  else if(noFixed&&longNeed) w.push({level:'info',text:'无固定充电 + 高频长途：纯电补能时间成本高，可油可电更稳'});
+  if((cond.annual_km==='under5'||cond.annual_km==='under10')&&noFixed) w.push({level:'info',text:'年里程 1 万以下（尤其 5000km 以下）又无固定充电：纯电的能源节省很难覆盖保费溢价与残值差，油车/油混通常更省'});
+  if(cond.fleet==='second'&&longNeed) w.push({level:'info',text:'增购第二辆 + 长途高频：长途交给已有油车即可，纯电按日常通勤里程选电池大小就行'});
+  if(cond.hold_years==='under3'&&noFixed) w.push({level:'info',text:'3 年内换车 + 无固定充电：纯电折旧与补能双重不利，短期持有优先油车/油混'});
+  if(cond.annual_km==='over25'&&cond.single_trip==='under150'&&cond.long_trip_freq==='rare') w.push({level:'info',text:'年里程 2.5 万以上但几乎全是短途：典型城配/网约特征，纯电最合适'});
+  return w;
+}
+
 
 
 let carSort={k:'composite',dir:-1};
@@ -448,11 +774,12 @@ function render(){
     const capped=Math.abs(soft*scale)>10;
     const hardDown=a.hard.some(h=>h.downgrade);
     const rc=rangeCalc(c,cond);
+    const tc=tco(c,cond);
     // 档位：基础按综合分，触发硬条件降一档
     let tier=compositeTier(c.product+adj);
     if(hardDown) tier=tier==='T1'?'T2':(tier==='T2'?'T3':'T3');
     return {...c, eff:rc?rc.range:null, rc, adjTotal:a.total, adj, capped, adjItems:a.items,
-            hard:a.hard, tier, composite:c.product+adj};
+            hard:a.hard, tier, composite:c.product+adj, tco:tc, verdicts:a.verdicts};
   });
 
   const k=carSort.k;
@@ -463,6 +790,8 @@ function render(){
     return carSort.dir*(a-b);
   });
   rows.forEach((r,i)=>r.rank=i+1);
+  // v10.53.0：形式聚合结论 + 画像自检（随条件实时更新，属推演态）
+  renderForm(rows,cond);
   // 可选扩展钩子：外部注入的正式榜区块可订阅重排结果，随条件实时重绘。默认无订阅，行为不变。
   if(typeof window!=='undefined' && typeof window.onBoardRerender==='function'){
     try{ window.onBoardRerender(rows, cond, scale); }catch(e){ console.error('onBoardRerender',e); }
@@ -475,13 +804,15 @@ function render(){
       '当前条件下，<b>'+t.model+'</b> 综合分居首（'+t.composite.toFixed(1)+'）= 产品力 '+t.product.toFixed(1)+
       ' + 场景调节 '+(t.adj>=0?'+':'')+t.adj.toFixed(1)+'。'+
       '<div class="formula">综合分 = 产品力主分 + 软调节(封顶±10，力度'+Math.round(scale*100)+'%) + 硬条件惩罚(全额·降档)</div>';
+    const be=breakevenKm(CARS,cond);
+    if(be!=null) document.getElementById('summary').innerHTML+='<div class="formula">家充纯电 vs 池内最优燃油/油混：8年TCO盈亏平衡约 <b>'+be+' km/年</b>（低于此里程油车/油混更省，以上纯电更省）</div>';
   }else{
     document.getElementById('summary').innerHTML='当前过滤条件下无匹配车型，请放宽预算区间或车身类型。';
   }
 
   document.getElementById('carCount').textContent='（'+rows.length+' 款符合条件）';
   const tb=document.getElementById('carBody'); tb.innerHTML='';
-  if(!rows.length) tb.innerHTML='<tr><td colspan="12" style="text-align:center;color:#888;padding:24px">无匹配车型</td></tr>';
+  if(!rows.length) tb.innerHTML='<tr><td colspan="14" style="text-align:center;color:#888;padding:24px">无匹配车型</td></tr>';
   rows.forEach(r=>{
     const tr=document.createElement('tr');
     const adjCls=r.adj>0?'adj-pos':(r.adj<0?'adj-neg':'adj-zero');
@@ -493,9 +824,10 @@ function render(){
     const cap=r.capped?'<div class="cap">注：软调节已封顶至 ±10</div>':'';
     const hardHtml=r.hard.length?('<div class="cap" style="color:#b42318"><b>硬条件：</b>'+
       r.hard.map(h=>'· '+h.label+' ('+(h.pt>0?'+':'')+h.pt+')：'+h.reason+(h.downgrade?' [已降档]':'')).join('<br>')+'</div>'):'';
-    // 车型名旁的警示/换电徽章
+    // 车型名旁的警示/换电徽章 + 逐条件判定徽章（非适配项，最多3枚）
     const badges=(r.swap?'<span style="display:inline-block;background:#e7f4ea;color:#1a7f37;border-radius:4px;font-size:9.5px;padding:0 5px;margin-left:5px">换电</span>':'')+
-      (r.hard.some(h=>h.downgrade)?'<span style="display:inline-block;background:#fbe9e7;color:#b42318;border-radius:4px;font-size:9.5px;padding:0 5px;margin-left:5px">⚠硬条件不符</span>':'');
+      (r.hard.some(h=>h.downgrade)?'<span style="display:inline-block;background:#fbe9e7;color:#b42318;border-radius:4px;font-size:9.5px;padding:0 5px;margin-left:5px">⚠硬条件不符</span>':'')+
+      verdictChips(r.verdicts);
     const tierCls=r.tier==='T1'?'t1':(r.tier==='T2'?'t2':'t3');
     tr.innerHTML=
       '<td>'+r.rank+'</td><td><b>'+r.model+'</b>'+badges+'</td>'+
@@ -511,6 +843,8 @@ function render(){
       '<td class="num">'+r.product.toFixed(1)+'</td>'+
       '<td class="num"><details class="adj"><summary class="'+adjCls+'">'+adjTxt+'</summary>'+
         '<div class="adjbox">调节明细（软 '+(r.adjTotal>0?'+':'')+r.adjTotal.toFixed(1)+'；硬条件不缩放）<br>'+detail+cap+hardHtml+'</div></details></td>'+
+      '<td class="num"><details class="adj"><summary>'+(r.tco?(r.tco.tco8y/10000).toFixed(1)+'万':'—')+'</summary>'+
+        '<div class="adjbox"><b>8年持有成本测算（仅披露不入分）</b><br>'+tcoHtml(r.tco)+'</div></details></td>'+
       '<td class="num"><b>'+r.composite.toFixed(1)+'</b></td>';
     tb.appendChild(tr);
   });

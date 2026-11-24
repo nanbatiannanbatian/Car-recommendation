@@ -363,6 +363,27 @@ def main():
     except Exception as _ex:                               # 自检失败不影响出榜
         _vf_consistency = {"ok": False, "error": f"{type(_ex).__name__}: {_ex}"}
 
+    # 底盘事实覆盖率（v10.51.0）：操控维规则的结构化数据源（悬架形式/驱动形式）
+    # 此前从未有任何结构化采集通道（汽车之家底盘组对所有能源类型整组为空、
+    # 易车/懂车帝参数表反爬、官网 SPA 无 SSR），只靠人工取证文本正则提取。
+    # 现在 chassis_fetch 多源链落地（文章正文提取带引文 + 人工核验），这里出榜前
+    # 披露覆盖率——告警不阻断（同 v10.10.0 事实一致性门禁纪律：缺口车缺数据
+    # ≠ 差，不插补不改分，但缺口必须显式可见，不许静默伪装成「数据源没有」）。
+    try:
+        from modules.research import chassis_fetch as CF
+        _chassis_cov = CF.coverage([c.get("model") for c in cands])
+        _chassis_sum = {"n": _chassis_cov["n"], "full": _chassis_cov["full"],
+                        "partial": _chassis_cov["partial"], "none": _chassis_cov["none"],
+                        "pct": _chassis_cov["pct"],
+                        "missing": _chassis_cov.get("missing") or [],
+                        "partial_models": _chassis_cov.get("partial_models") or []}
+        if _chassis_cov["none"]:
+            print(f"[底盘覆盖] ⚠ {_chassis_cov['none']}/{_chassis_cov['n']} 款底盘三字段"
+                  f"（前悬/后悬/驱动）全缺：{'、'.join(_chassis_cov['missing'][:8])}"
+                  + ("…" if len(_chassis_cov['missing']) > 8 else ""))
+    except Exception as _ex:                               # 自检失败不影响出榜
+        _chassis_sum = {"error": f"{type(_ex).__name__}: {_ex}"}
+
     # 多测评融合（v10.4.0，2026-11-21）：用户要求「有评测就要纳入，按业内原则重新设计」。
     # 同体系多维度按木桶取最低（Euro NCAP/C-NCAP 官方口径）；跨体系按严格度选主分、
     # 其余列示不叠加（各国 NCAP 无对应关系）。一手来源含 C-IASI 官网新闻稿纯文字等级
@@ -880,6 +901,22 @@ def main():
                      "密度=投诉/万台，仅参考不改档。")
         parts.append("")
 
+    # v10.51.0：底盘事实覆盖率披露（操控维规则的结构化数据源；告警不阻断）
+    if isinstance(_chassis_sum, dict) and "n" in _chassis_sum:
+        _miss = _chassis_sum.get("missing") or []
+        _miss_txt = ""
+        if _miss:
+            _miss_txt = ("（全缺：" + "、".join(_miss[:10])
+                         + ("…" if len(_miss) > 10 else "") + "）")
+        parts.append(
+            f"> **底盘事实覆盖（v10.51.0 起结构化采集）：**"
+            f"{_chassis_sum['full']}/{_chassis_sum['n']} 款三字段（前悬/后悬/驱动）"
+            f"齐全，{_chassis_sum['partial']} 款部分覆盖，"
+            f"{_chassis_sum['none']} 款全缺{_miss_txt}。"
+            "全缺车的操控维规则增量不参与（缺数据≠差，不插补）；"
+            "事实来源与引文见 trims 条目 chassis_sources / 人工核验条目。")
+        parts.append("")
+
     # 1 逐榜：分榜 → 闸门 → 三档 → 审查 → 稳健性 → 权重审计 → 三榜并列
     #    顺序是「先分榜再闸门」，因为四个榜的价格带上限不同（16 万 / 18 万），
     #    gates 必须按榜取，不能全局一刀切。
@@ -947,6 +984,8 @@ def main():
         "crash_auto_verify": _crash_verify,
         # v10.10.0：车辆事实单一数据源审计（权威源 94 台 / 派生副本漂移）
         "vehicle_facts_consistency": _vf_consistency,
+        # v10.51.0：底盘事实覆盖率（操控维结构化数据源；告警不阻断）
+        "chassis_coverage": _chassis_sum,
         "crash_display_audit": {"leaks": _display_leaks},
         # 多成绩审计：全部成绩留痕 + 主成绩选择口径（取证据最强，不取最高/不叠加）
         "crash_multi_scores": [

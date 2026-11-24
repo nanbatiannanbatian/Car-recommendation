@@ -202,21 +202,23 @@ def t015():
 
 
 def t016():
-    """v5 坑：驾驶风格+空调两个新条件必须在规则表且能被动态渲染。"""
+    """v5 坑：新增条件（现为 v10.53.0 的家庭车队/地形）必须在规则表且能被动态渲染；v10.54.0 精简后仍守住。"""
     from modules.envscore import build_energy_compare as B
-    assert "drive_style" in B.FACTORS and "ac_usage" in B.FACTORS, "新条件未进规则表"
+    assert "fleet" in B.FACTORS and "charge_patience" in B.FACTORS, "新条件未进规则表"
+    assert "terrain" not in B.FACTORS and "boxy" not in B.FACTORS, "已删条件仍在规则表"
+    assert "drive_style" not in B.FACTORS and "ac_usage" not in B.FACTORS, "已删条件仍在规则表"
     # 下拉框由 buildConds() 动态生成（id='c_'+fid），验证产物里注入了 FACTORS 且渲染函数在
     html = _html()
     fac = _js_const(html, "FACTORS")
-    assert "drive_style" in fac and "ac_usage" in fac, "产物 FACTORS 缺新条件"
+    assert "fleet" in fac and "charge_patience" in fac, "产物 FACTORS 缺新条件"
     assert "d.innerHTML='<label>'+f.label" in html and "'c_'+fid" in html, "buildConds 动态渲染逻辑丢失"
-    return "驾驶风格/空调在规则表+动态渲染双落地"
+    return "家庭车队/补能耐心在规则表+动态渲染双落地，已删条件不回流"
 
 
 def t017():
-    """v4/v5 坑：续航算式必须展示温度/驾驶/空调/电压四因子，且无'0.975V'文案 bug。"""
+    """v4/v5 坑：续航算式必须展示温度/暖风/电压三因子（v10.55.0 起驾驶/空调条件已删），且无'0.975V'文案 bug。"""
     html = _html()
-    for kw in ("温度 ", "驾驶 ", "空调 ", "电压系数"):
+    for kw in ("温度(仅电池)", "暖风 ", "电压系数"):
         assert kw in html, f"续航算式缺因子 {kw}"
     assert "电压 '+voltM+'V(" not in html, "电压文案 bug 复现（0.975V）"
     assert "物理回归估算电耗" in html, "物理回归估算说明丢失"
@@ -227,7 +229,7 @@ def t018():
     """v4 坑：有效续航不得用 CLTC 裸乘达成率主算法（会被风阻车型误导）。"""
     src = _read("build_energy_compare.py")
     assert "PHYS_A*(weight/1000.0)" in src, "物理回归估算未用于缺电耗车"
-    assert "cdaPerTon" in src, "CdA/吨差异化倍率丢失（方盒子效应无法体现）"
+    assert "cdaPerTon" in src, "CdA/吨差异化倍率丢失（车身风阻差异无法体现）"
     assert "4.48" in src and "5.88" in src, "回归系数丢失"
     return "物理模型为续航主算法（非 CLTC 打折）"
 
@@ -263,6 +265,20 @@ def t022():
     assert "不编造车型" in html, "数据边界声明丢失"
     assert "无电量数据的车" in html, "缺电量不估算声明丢失"
     return "数据边界声明完整（不编造）"
+
+
+
+def t033():
+    """v10.56.0：车身形式归一——官方 body 直映射，越野车/方盒子SUV 只在有客观字段时升级（不猜外形）。"""
+    from modules.envscore.build_energy_compare import body_label
+    assert body_label({"body": "MPV"}, {}) == "MPV", "MPV 未识别"
+    assert body_label({"body": "三厢车"}, {}) == "轿车", "三厢应归一为轿车"
+    assert body_label({"body": "两厢车"}, {}) == "轿车", "两厢应归一为轿车"
+    assert body_label({"body": "SUV"}, {}) == "SUV", "普通 SUV 不得被猜成越野/方盒子"
+    assert body_label({"body": "SUV"}, {"offroad": True}) == "越野车", "越野标记未生效"
+    assert body_label({"body": "SUV"}, {"boxy": True}) == "方盒子SUV", "方盒子标记未生效"
+    assert body_label({"body": "SUV", "body_form": "MPV"}, {}) == "MPV", "显式 body_form 应优先"
+    return "车身形式 轿车/SUV/MPV/越野车/方盒子SUV 归一正确，缺字段不猜"
 
 
 def t030():
@@ -308,6 +324,7 @@ CASES = [
     ("t030", "物理模型 vs 真实数据对照（±12pp）", t030),
     ("t031", "温度/空调拆分+胎压轮胎建模", t031),
     ("t032", "缺数据可估算+无电量不编造", t032),
+    ("t033", "车身形式归一（含MPV/越野/方盒子SUV）", t033),
     ("t001", "规则表/占位符在生成脚本（单一事实源）", t001),
     ("t002", "重新生成后车型数据 = 源数据（防重跑退化）", t002),
     ("t003", "物理模型常量源 = 产物", t003),
