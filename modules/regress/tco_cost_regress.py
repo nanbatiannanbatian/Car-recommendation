@@ -84,6 +84,45 @@ def main():
     ck(E.breakeven_km(pool, COND, non_energy_scale=1.3) > be > E.breakeven_km(pool, COND, non_energy_scale=0.7),
        "C 固定项变大 → 平衡点上移（方向不反）", be)
 
+    # D. v10.60.0 参数带：保费按车价、轮胎按尺寸档、残值按车身级别
+    ins_bev14 = E.car_rates(car("BEV", 14.0, cons=14.0))["ins_annual"]
+    ins_ice14 = E.car_rates(car("ICE", 14.0, fuel=6.5))["ins_annual"]
+    ck(1200 <= ins_bev14 - ins_ice14 <= 2000,
+       "D 同级 14 万：纯电年保费贵 1200~2000 元（精算协会口径）", round(ins_bev14 - ins_ice14))
+    ins_bev30 = E.car_rates(car("BEV", 30.0, cons=16.0))["ins_annual"]
+    ins_ice30 = E.car_rates(car("ICE", 30.0, fuel=8.0))["ins_annual"]
+    ck(ins_bev30 - ins_ice30 >= 2500, "D 30 万级：纯电保费差价 ≥2500/年", round(ins_bev30 - ins_ice30))
+    ck(E.car_rates(car("BEV", 10.0))["tire_size"] == "17"
+       and E.car_rates(car("BEV", 12.0))["tire_size"] == "18"
+       and E.car_rates(car("ICE", 7.0))["tire_size"] == "16"
+       and E.car_rates(car("BEV", 40.0))["tire_size"] == "20",
+       "D 轮胎尺寸档按车价映射（7万16寸/10万17/12万18/40万20）")
+    suv = {"model": "测试SUV", "power": "BEV", "price": 14.0, "cons": 16.0, "body": "SUV"}
+    sedan = {"model": "测试轿车", "power": "BEV", "price": 14.0, "cons": 16.0, "body": "轿车"}
+    r_suv, r_sed = E.car_rates(suv), E.car_rates(sedan)
+    ck(r_suv["residual_rate"] > r_sed["residual_rate"],
+       "D 残值按车身级别：SUV 基准高于轿车", (r_suv["residual_rate"], r_sed["residual_rate"]))
+    ck(abs((r_suv["residual_rate"] - r_sed["residual_rate"]) - 0.0195) <= 0.002,
+       "D 级别差 = 50.25% - 48.30%", round(r_suv["residual_rate"] - r_sed["residual_rate"], 4))
+
+    # D2. 敏感性：能源/电价是主导项，且区间单调
+    sens = E.breakeven_sensitivity(pool, COND)
+    ck(len(sens) >= 4, "D2 敏感性覆盖 ≥4 个参数", len(sens))
+    ck(sens and sens[0]["id"] == "energy", "D2 首位主导项是油价/电价", sens and sens[0]["id"])
+    ck(all(s["low"] <= s["high"] and s["delta"] > 0 for s in sens), "D2 每项区间有序且位移为正",
+       [(s["id"], s["low"], s["high"]) for s in sens])
+
+    # D3. 发布版常量与开发期计算器一致（防漂移；发布包里没有 price_model，自动跳过）
+    try:
+        from modules.envscore import price_model as PM
+        import difflib
+        gen = PM.render_python()
+        on_disk = open("modules/envscore/cost_params.py", encoding="utf-8").read()
+        ck(gen == on_disk, "D3 cost_params.py 与 price_model 生成结果一致（要改就重跑 --emit）",
+           "".join(list(difflib.unified_diff(on_disk.splitlines(True), gen.splitlines(True)))[:6]))
+    except ImportError:
+        print("  SKIP  D3 发布包内无 price_model（正常）")
+
     print("\n[tco_cost_regress] %s · %d 项失败" % ("FAIL" if FAIL else "PASS", len(FAIL)))
     return 1 if FAIL else 0
 

@@ -107,28 +107,50 @@ function unitEnergyCost(car,cond){
 function idleCost(car,cond){
   return 0;   // 驻车用电条件已移除（保留函数为兼容旧调用）
 }
+function tireSizeOf(priceWan){
+  const T=PHYS.tco, rows=T.tireSizeByPrice||[];
+  const p=+(priceWan||0);
+  if(!(p>0)) return '17';
+  for(const [cap,size] of rows){ if(p<=cap) return size; }
+  return '20';
+}
+function carRates(car){
+  // v10.60.0：保费=车价×费率×能源系数×续保均值；轮胎价按轮毂尺寸档；残值=级别基准+能源修正
+  const T=PHYS.tco, P=car.power;
+  const priceWan=+(car.price||car.priceLow||0);
+  const base=T.resBase||{}, delta=T.resDelta||{};
+  const body=car.body;
+  const key=(body in base)?body:((String(body||'').indexOf('SUV')>=0)?'SUV':'轿车');
+  const size=tireSizeOf(priceWan);
+  const resRate=Math.min(0.80,Math.max(0.20,+(base[key]+(delta[P]||0)).toFixed(4)));
+  return {insAnnual:((T.insFixed||0)+priceWan*10000*(T.insRate||0))*((T.insMult||{})[P]||1)*(T.insRenew||1),
+    maintAnnual:(T.maint||{})[P]||0, wearAnnual:(T.wear||{})[P]||0,
+    tirePrice4:(T.tireSet||{})[size]||0, tireSize:size,
+    tireLifeKm:(T.tireLife||{})[P]||60000, resRate:resRate, batteryRisk:(T.batteryRisk||{})[P]||0};
+}
 function tco(car,cond){
   const T=PHYS.tco;
   const P=car.power;
   // 车价链路单位是万元（H2「≤15万」/页面报价都按万元），进 TCO 先换成元（v10.59.0 修正单位错配）
   const price=(car.price||car.priceLow||0)*10000;
   const km=PHYS.annualKmMid[cond.annual_km];
+  const r=carRates(car);
   const unit=unitEnergyCost(car,cond);
   const energy8=unit*km*T.years;
-  const ins8=(P==='BEV'||P==='PHEV'||P==='EREV'?T.insNev:T.insIce)*T.years;
-  const maint8=(T.maint[P]||T.maint.ICE)*T.years;
+  const ins8=r.insAnnual*T.years;
+  const maint8=r.maintAnnual*T.years;
   const isNev=(P==='BEV'||P==='PHEV'||P==='EREV');
   let tax=price/1.13*(isNev?T.taxNevRate:T.taxIceRate);
   if(isNev&&T.taxNevCap!=null) tax=Math.min(tax,T.taxNevCap);
-  const residualLoss=price*(1-T.residual3[P]);
-  const batteryRisk8=(T.batteryRisk[P]||0)*T.years;
+  const residualLoss=price*(1-r.resRate);
+  const batteryRisk8=r.batteryRisk*T.years;
   const idle8=idleCost(car,cond);
-  // v10.59.0：轮胎按里程折损 + 非事故易损/电子件年预算（与 engine.py 同口径）
-  const tireLife=(T.tireLifeKm&&T.tireLifeKm[P])||60000;
-  const tirePrice=(T.tirePrice4&&T.tirePrice4[P])||2400;
+  // 轮胎按里程折损 + 非事故易损/电子件年预算（与 engine.py 同口径）
+  const tireLife=r.tireLifeKm||60000;
+  const tirePrice=r.tirePrice4||0;
   const tireUnit=tirePrice/tireLife;
   const tire8=tireUnit*km*T.years;
-  const wear8=((T.wear&&T.wear[P])||0)*T.years;
+  const wear8=r.wearAnnual*T.years;
   const total=energy8+ins8+maint8+tax+residualLoss+batteryRisk8+idle8+tire8+wear8;
   return {power:P,price:price,annualKm:km,unitEnergy:+unit.toFixed(3),unitTire:+tireUnit.toFixed(4),
     energy8y:Math.round(energy8),ins8y:Math.round(ins8),maint8y:Math.round(maint8),
@@ -138,6 +160,7 @@ function tco(car,cond){
     tco8y:Math.round(total),
     variablePerKm:+(unit+tireUnit).toFixed(3),
     fixed8y:Math.round(total-energy8-tire8),
+    tireSize:r.tireSize,tirePrice4:Math.round(r.tirePrice4),residualRate:r.resRate,insAnnual:Math.round(r.insAnnual),
     tcoPerKm:+(total/(km*T.years)).toFixed(3),basis:PHYS.tcoBasis};
 }
 function breakevenKm(cars,cond){

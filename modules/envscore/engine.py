@@ -54,7 +54,7 @@ v10.56.0（2026-11-24 第四轮，用户逐项提审：
        等于把客观参数变成主观勾选。改为：高速倍率只按车型自身 cdaPerTon/cd 算（Cd 高的车自然更费），
        并在 build_energy_compare 的「车身形式」筛选里按数据区分 轿车 / SUV / MPV / 越野车 / 方盒子SUV
        （枚举从池内实际取值派生，池里没有就不显示，避免空选项）。
-  ⑮ 年里程新增 under5（5000km/年以下）档：本引擎算出的盈亏平衡点约 2 万 km/年（区间 1.4~2.7 万；谷电、池内最优
+  ⑮ 年里程新增 under5（5000km/年以下）档：本引擎算出的盈亏平衡点约 1.5 万 km/年（区间 1.1~2.0 万；家充谷电、池内最优
      燃油/油混口径），5000km 以下远在平衡点左侧——纯电的保险溢价与残值落在 8 年里摊不回来，
      是真实分界而非人为细分。规则：纯电 −2.0、燃油/油混 +2.0，且"低里程+无桩"追加减分由 −1 升到 −1.5。
      注：v10.58.0 修正款型油耗口径前该值为 4839km/年（同车系油混与燃油共用一批款型所致），已更正。
@@ -68,7 +68,8 @@ v10.56.0（2026-11-24 第四轮，用户逐项提审：
   BEV 冬季续航达成率 -10℃约×0.68 / -20℃约×0.50（中汽研 67 款均值衰减 32.7%、
   汽车之家冬测）；PHEV 高速亏电 3.3-5.5L vs EREV 7-9L（媒体实测）；HEV 市区 4.2-5.2L；
   营运车 BEV 渗透率 76%（2026-03，全国网约车）；NEV 保费高 15-20%（精算师协会 2026-03）；
-  3 年保值率 BEV 45.1%/PHEV 42.2%/HEV 约 50/ICE 46.07%（流通协会+精真估 2026）；
+  3 年保值率按「级别基准 + 能源修正」：轿车 48.3%/SUV 50.25%/MPV 55.45%，纯电 −2.4pt、插混·增程 −3.0pt、油混 +1.0pt
+（流通协会+精真估 2026-05：纯电 45.9%、插混 45.3%）；
   购置税 2026-2027 NEV 减半 5%（减税额≤1.5 万封顶）vs ICE/HEV 10%（购置税法）；
   以旧换新 NEV 报废 12%封顶2万/置换 8%封顶1.5万 vs ICE 10%/6%（商务部 2026 细则）；
   山区每爬升 100m 约耗 0.5kWh（1.7t 电车口径）、丘陵路线电耗 +10~20%、高山 +25~40%；
@@ -105,9 +106,9 @@ FACTORS = {
     },
     "annual_km": {
         "label": "年行驶里程", "default": "15to25",
-        "desc": "成本平衡点约 2 万km/年（区间 1.4~2.7 万，2026 油价+家充谷电口径，见 TCO 区块）：低于此纯电补不回保险溢价与残值差",
+        "desc": "成本平衡点约 1.5 万km/年（区间 1.1~2.0 万，2026 油价+家充谷电口径，见 TCO 区块）：低于此纯电补不回保险溢价与残值差",
         "options": [
-            {"v": "under5",  "label": "5000 公里以下（仅周末代步）", "hint": "远低于盈亏平衡点（约2万km/年）：纯电省不回保险/残值差，油车或油混更划算"},
+            {"v": "under5",  "label": "5000 公里以下（仅周末代步）", "hint": "远低于盈亏平衡点（约1.5万km/年）：纯电省不回保险/残值差，油车或油混更划算"},
             {"v": "under10", "label": "5000~1万公里",     "hint": "低于平衡点，纯电固定成本摊薄慢、油车/油混加分"},
             {"v": "10to15",  "label": "1万~1.5万公里",   "hint": "接近平衡点，不调节"},
             {"v": "15to25",  "label": "1.5万~2.5万公里", "hint": "明显超过平衡点（默认）"},
@@ -237,43 +238,46 @@ SWAP_ADVANTAGE = {
 }
 
 # ============ 3. 持有成本测算（TCO）常量——仅披露不入分 ============
-# 信源见模块 docstring；口径：8 年持有，能源按画像年里程，残值用 3 年保值率近似（披露）
+# v10.60.0 起，成本参数的**唯一事实源**是 cost_params.py（开发期由 price_model.py 查资料后
+# 生成并随包发布；price_model.py 本身不进发布包）。这里只做「视图」：把参数摊成引擎四处
+# 用得到的形状，避免同一个数字抄两遍。
+from .cost_params import (PARAMS as CP, INS_MULT, TIRE_SIZE_BY_PRICE,
+                          SOURCES as COST_SOURCES, BASIS as COST_BASIS,
+                          AS_OF as COST_AS_OF, YEARS as _TCO_YEARS,
+                          TAX_NEV_RATE as _TAX_NEV, TAX_NEV_CAP as _TAX_NEV_CAP,
+                          TAX_ICE_RATE as _TAX_ICE)
+
 TCO = {
-    "oil_price": 8.36,          # 元/L，92# 2026-11 发改委调价口径
-    "elec_home": 0.35,          # 元/kWh，家充谷电（默认档；画像可选 flat/commercial 覆盖）
-    "elec_public": 1.50,        # 元/kWh，公共快充均值
-    "elec_work": 0.75,          # 元/kWh，单位/园区充电（工商业峰谷价+服务费，部分企业免费）
-    # v10.53.0：家充电价档（「低里程油车更省」的结论随电价变化，必须可调）
-    "elec_home_by": {"valley": 0.35, "flat": 0.55, "commercial": 0.90},
+    "oil_price": CP["oil"]["mid"],          # 元/L，92# 各省发改委 2026-11-12 调价（8.26~8.39）
+    "elec_home": CP["elec_home"]["mid"],    # 元/kWh，家充谷电（浙江居民充电设施谷段 0.308）
+    "elec_public": CP["elec_public"]["mid"],
+    "elec_work": CP["elec_work"]["mid"],
+    # 家充电价档（「低里程油车更省」的结论随电价变化，必须可调）
+    "elec_home_by": {"valley": CP["elec_home"]["mid"], "flat": 0.55, "commercial": 0.90},
     "bev_kwh_per_100km": 16.0,  # 轿车电耗中位（事实库口径）
     "ice_fuel_l": 8.0,          # 燃油 WLTC 综合油耗中位（L/100km）
     "hev_fuel_l": 4.5,          # 油混 WLTC
     "phev_fuel_l": 5.0,         # 插混亏电油耗（直驱架构优秀值）
     "erev_fuel_l": 7.5,         # 增程亏电油耗（高速偏高口径）
-    "ins_nev": 5500,            # 新能源车年均保费（家用口径，含电池险）
-    "ins_ice": 3500,            # 燃油/油混年均保费
-    "maint": {"BEV": 500, "PHEV": 1200, "EREV": 1200, "HEV": 1000, "ICE": 2000},
-    "residual3": {"BEV": 0.451, "PHEV": 0.422, "EREV": 0.42, "HEV": 0.50, "ICE": 0.4607},
-    # 电池风险准备金（元/年）：中保研第20期纯电电池单件零整比均值49.59%（部分>90%）、
-    # 换电池4-15万、规范用车年均衰减1.8-2.3%；8年持有摊薄预期风险。披露项，可质疑可替换。
-    "battery_risk": {"BEV": 2500, "PHEV": 800, "EREV": 800, "HEV": 0, "ICE": 0},
-    # v10.53.0 驻车用电成本（披露）：每周多次车内开空调等人≈150h/年
+    # 保费按「车价 × 费率 × 能源系数 × 续保均值」算（tco() 里做），这里保留 14 万级参考值供文档引用
+    "ins_nev": round((CP["ins_fixed"]["mid"] + 140000 * CP["ins_rate"]["mid"]) * INS_MULT["mid"]["BEV"] * CP["ins_renew"]["mid"]),
+    "ins_ice": round((CP["ins_fixed"]["mid"] + 140000 * CP["ins_rate"]["mid"]) * INS_MULT["mid"]["ICE"] * CP["ins_renew"]["mid"]),
+    "maint": CP["maint"]["mid"],
+    "wear": CP["wear"]["mid"],
+    # 残值：级别基准 + 能源修正（这里给「轿车」基准的参考值；tco() 按 car["body"] 取级别）
+    "residual3": {P: round(CP["residual_base"]["mid"]["轿车"] + CP["residual_delta"]["mid"][P], 4)
+                  for P in ("BEV", "PHEV", "EREV", "HEV", "ICE")},
+    "battery_risk": CP["battery_risk"]["mid"],
     "idle_hours": 150,
-    "idle_l_per_h": {"ICE": 2.0, "HEV": 0.3},   # 怠速开空调油耗 L/h（1.5-2.0L 排量实测区间）
-    "idle_kwh_per_h": 1.5,                      # 纯电驻车空调电耗 kWh/h
-    # v10.59.0 非能源持有成本（披露项，估算口径，可质疑可替换；不是官方精算）
-    # ①轮胎：电车更重 + 瞬时扭矩大 → 磨得快；低滚阻/静音专用胎单价更高。
-    "tire": {
-        "life_km": {"BEV": 40000, "PHEV": 50000, "EREV": 50000, "HEV": 60000, "ICE": 60000},
-        "price4": {"BEV": 3200, "PHEV": 2800, "EREV": 2800, "HEV": 2400, "ICE": 2400},
-    },
-    # ②非事故易损与电子件年预算（不含保养——保养在 maint 里；不含事故——事故由保费吸收）：
-    #   电车大灯总成/毫米波雷达/一体压铸件单件价高，且电子件更多；油车刹车片/三滤频率高已在 maint 里。
-    "wear": {"BEV": 1200, "PHEV": 1000, "EREV": 1000, "HEV": 900, "ICE": 900},
-    "tax_nev_rate": 0.05,       # 2026-2027 购置税减半 5%
-    "tax_nev_cap": 15000,       # 新能源减税额上限 1.5 万元（2026-2027 政策）
-    "tax_ice_rate": 0.10,       # 购置税法 10%（HEV 不在新能源目录，同油车口径）
-    "years": 8,
+    "idle_l_per_h": {"ICE": 2.0, "HEV": 0.3},
+    "idle_kwh_per_h": 1.5,
+    # 轮胎：寿命按动力、整套价按轮毂尺寸档（tco() 按车价映射尺寸）
+    "tire": {"life_km": CP["tire_life"]["mid"],
+             "price4": {P: CP["tire_set"]["mid"]["18"] for P in ("BEV", "PHEV", "EREV", "HEV", "ICE")}},
+    "tax_nev_rate": _TAX_NEV,
+    "tax_nev_cap": _TAX_NEV_CAP,
+    "tax_ice_rate": _TAX_ICE,
+    "years": _TCO_YEARS,
 }
 ANNUAL_KM_MID = {"under5": 4000, "under10": 8000, "10to15": 12500, "15to25": 20000, "over25": 30000}
 
@@ -509,7 +513,7 @@ def verdicts(car, cond, eff=None, d=None):
     ak = cond["annual_km"]
     if ak == "under5":
         if P == "BEV":
-            v["annual_km"] = ("不建议", "超低里程（<5000km/年）：远低于盈亏平衡点（约2万km/年），纯电省回的能源差额抵不过保险溢价与残值差")
+            v["annual_km"] = ("不建议", "超低里程（<5000km/年）：远低于盈亏平衡点（约1.5万km/年），纯电省回的能源差额抵不过保险溢价与残值差")
         else:
             v["annual_km"] = ("适配", "超低里程：能源成本占比极小，油车/油混总花费更低")
     elif ak == "under10":
@@ -657,33 +661,80 @@ def idle_cost(car, cond):
     return 0
 
 
-def tco(car, cond):
+def tire_size_of(price_wan):
+    """车价（万元）→ 轮毂尺寸档（16~20 寸）。取不到车价按 17 寸（最常见家用规格）。"""
+    try:
+        p = float(price_wan or 0)
+    except (TypeError, ValueError):
+        p = 0.0
+    if p <= 0:
+        return "17"
+    for cap, size in TIRE_SIZE_BY_PRICE:
+        if p <= cap:
+            return size
+    return "20"
+
+
+def car_rates(car, scales=None, level="mid"):
+    """单车的成本参数（元/年、元/套、比例）——tco() 的唯一取数口。
+
+    与 v10.59.0 的差别：保费不再是一个固定数，而是「车价 × 费率 × 能源系数 × 续保均值」；
+    轮胎整套价按车价映射轮毂尺寸档；残值按车身级别基准 + 能源修正。
+    scales 供敏感性分析按键缩放（比例项用 residual_shift 平移）。
+    """
+    P = car.get("power")
+    price_wan = car.get("price") or car.get("priceLow") or 0
+    sc = scales or {}
+    size = tire_size_of(price_wan)
+    base = CP["residual_base"][level]
+    body = car.get("body")
+    body_key = body if body in base else ("SUV" if "SUV" in str(body or "") else "轿车")
+    r = {
+        "ins_annual": (CP["ins_fixed"][level] + float(price_wan) * 10000 * CP["ins_rate"][level]) * INS_MULT[level].get(P, 1.0) * CP["ins_renew"][level],
+        "maint_annual": CP["maint"][level].get(P, CP["maint"][level]["ICE"]),
+        "wear_annual": CP["wear"][level].get(P, CP["wear"][level]["ICE"]),
+        "tire_price4": CP["tire_set"][level][size],
+        "tire_size": size,
+        "tire_life_km": CP["tire_life"][level].get(P, CP["tire_life"][level]["ICE"]),
+        "residual_rate": round(base.get(body_key, base["轿车"]) + CP["residual_delta"][level].get(P, 0.0), 4),
+        "battery_risk_annual": CP["battery_risk"][level].get(P, 0),
+    }
+    for k, f in sc.items():
+        if k == "residual_shift":
+            r["residual_rate"] = max(0.20, min(0.80, round(r["residual_rate"] + f, 4)))
+        elif k in r and isinstance(r[k], (int, float)) and not isinstance(f, bool):
+            r[k] = r[k] * f
+    return r
+
+
+def tco(car, cond, scales=None, energy_scale=1.0):
     """8 年持有成本测算（ disclosed, not scored）。返回明细+合计+口径说明。
 
     单位约定（v10.59.0 修正）：车价在整条链路里是**万元**（H2 「≤15万」、H7「京沪」、页面报价都用万元），
     所以进 TCO 时先 ×10000 换成元。此前直接用万元当元算，购置税只有 1 元、残值损失只有 5 元，
     等于把两项最大的固定成本算没了——盈亏平衡点因此严重偏小。
+    scales / energy_scale 只给敏感性分析用，正常出榜不传（默认中性口径）。
     """
     P = car.get("power")
-    price_wan = car.get("price") or 0.0
+    price_wan = car.get("price") or car.get("priceLow") or 0.0
     price = price_wan * 10000.0
     km = ANNUAL_KM_MID[cond["annual_km"]]
-    charger = cond["home_charger"]
-    unit = unit_energy_cost(car, cond)
+    r = car_rates(car, scales)
+    unit = unit_energy_cost(car, cond) * energy_scale
     energy_8 = unit * km * TCO["years"]
-    ins_8 = (TCO["ins_nev"] if P in ("BEV", "PHEV", "EREV") else TCO["ins_ice"]) * TCO["years"]
-    maint_8 = TCO["maint"][P] * TCO["years"]
+    ins_8 = r["ins_annual"] * TCO["years"]
+    maint_8 = r["maint_annual"] * TCO["years"]
     is_nev = P in ("BEV", "PHEV", "EREV")
     tax = price / 1.13 * (TCO["tax_nev_rate"] if is_nev else TCO["tax_ice_rate"])
     if is_nev:
         tax = min(tax, TCO["tax_nev_cap"])   # 2026-2027 新能源减税额上限 1.5 万元
-    residual_loss = price * (1 - TCO["residual3"][P])
-    battery_risk_8 = TCO["battery_risk"][P] * TCO["years"]
+    residual_loss = price * (1 - r["residual_rate"])
+    battery_risk_8 = r["battery_risk_annual"] * TCO["years"]
     idle_8 = idle_cost(car, cond)
-    # v10.59.0：轮胎按里程折损（电车更重+扭矩大→寿命更短、专用胎更贵）、非事故易损与电子件年预算
-    tire_unit = TCO["tire"]["price4"][P] / TCO["tire"]["life_km"][P]   # 元/km
+    # 轮胎按里程折损（电车更重+扭矩大→寿命更短、专用胎更贵）、非事故易损与电子件年预算
+    tire_unit = r["tire_price4"] / r["tire_life_km"]   # 元/km
     tire_8 = tire_unit * km * TCO["years"]
-    wear_8 = TCO["wear"][P] * TCO["years"]
+    wear_8 = r["wear_annual"] * TCO["years"]
     total = energy_8 + ins_8 + maint_8 + tax + residual_loss + battery_risk_8 + idle_8 + tire_8 + wear_8
     return {
         "power": P, "price": price, "annual_km": km,
@@ -697,12 +748,15 @@ def tco(car, cond):
         # 拆成「可变（按公里）」与「固定」两部分，供盈亏平衡与区间计算复用
         "variable_per_km": round(unit + tire_unit, 3),
         "fixed_8y": round(total - energy_8 - tire_8),
-        "basis": "8年持有；能源按画像年里程与充电条件、家充按谷电0.35元/度统一口径（电价档条件已移除，避免同一套车不同电价得出两套结论）；"
+        # 参数留痕：页面与报告可以直接说明「这车用的是哪档轮胎、哪档残值」
+        "tire_size": r["tire_size"], "tire_price4": round(r["tire_price4"]),
+        "residual_rate": r["residual_rate"], "ins_annual": round(r["ins_annual"]),
+        "basis": "8年持有；车价万元→元换算后计税与残值（购置税新能源按5%减半、减税额上限1.5万；燃油/油混10%）；"
+                 "能源按画像年里程与充电条件（家充用谷电，电价档条件已移除以免同车双结论）；"
                  "油耗取该车**该动力形式自己的款型**中位（v10.58.0 起按能源类型/款型名拆动力，油混不再与燃油共用一批款型）；"
-                 "轮胎按里程折损（纯电 4万km/套·3200 元、插混5万·2800、油混/燃油6万·2400，电车更重+扭矩大+专用胎）；"
-                 "易损与电子件年预算（纯电1200/插混1000/油混900/燃油900，不含保养也不含事故——保养在保养项、事故由保费吸收，不重复计）；"
-                 "保费/保养为同级中位口径；残值用3年保值率近似（BEV45.1%/PHEV42.2%/EREV42%/HEV50%/ICE46.07%，"
-                 "流通协会+精真估2026）；购置税2026-2027新能源减半5%、燃油/油混10%；以旧换新补贴因资格各异未计入",
+                 + COST_BASIS +
+                 "；易损与电子件不含保养、不含事故（保养在保养项，事故由保费吸收，不重复计）；"
+                 "残值用3年保值率近似8年（两侧同向，不制造单边优势）；TCO 只披露、不入分",
     }
 
 
@@ -716,6 +770,11 @@ def tco_js():
         "hevFuelL": TCO["hev_fuel_l"], "phevFuelL": TCO["phev_fuel_l"], "erevFuelL": TCO["erev_fuel_l"],
         "insNev": TCO["ins_nev"], "insIce": TCO["ins_ice"], "maint": TCO["maint"],
         "residual3": TCO["residual3"], "batteryRisk": TCO["battery_risk"],
+        # v10.60.0：保费/轮胎/残值改成「按车价与车身级别算」，这些是公式需要的参数
+        "insRate": CP["ins_rate"]["mid"], "insFixed": CP["ins_fixed"]["mid"], "insMult": INS_MULT["mid"], "insRenew": CP["ins_renew"]["mid"],
+        "tireSet": CP["tire_set"]["mid"], "tireLife": CP["tire_life"]["mid"],
+        "tireSizeByPrice": TIRE_SIZE_BY_PRICE,
+        "resBase": CP["residual_base"]["mid"], "resDelta": CP["residual_delta"]["mid"],
         "idleHours": TCO["idle_hours"], "idleLPerH": TCO["idle_l_per_h"],
         "idleKwhPerH": TCO["idle_kwh_per_h"],
         "tireLifeKm": TCO["tire"]["life_km"], "tirePrice4": TCO["tire"]["price4"],
@@ -725,21 +784,22 @@ def tco_js():
     }
 
 
-def breakeven_km(cars, cond, bev_price=None, non_energy_scale=1.0):
+def breakeven_km(cars, cond, bev_price=None, non_energy_scale=1.0, scales=None, energy_scale=1.0):
     """盈亏平衡年里程（km/年）：家充纯电 vs 池内最优燃油/油混的 8 年 TCO 相等点。
 
     v10.59.0 起把「油耗/电耗 + 轮胎折损」都算作按公里变化的可变成本，其余（保费/保养/购置税/
     残值/电池准备/易损电子件）算固定项：
         TCO(km/年) = 固定项(8年) + 可变单价 × km × 8
         → km = (固定差) / (8 × 可变单价差)
-    non_energy_scale 用来做区间（对固定项整体缩放），不改变中性口径。
+    non_energy_scale 缩放固定项出区间；scales / energy_scale 供参数敏感性分析，不改变中性口径。
     """
     bev = [c for c in cars if c.get("power") == "BEV"]
     ice = [c for c in cars if c.get("power") in ("ICE", "HEV")]
     if not bev or not ice:
         return None
-    b = tco(bev[0], {**cond, "annual_km": "15to25", "home_charger": "home"})
-    best_ice = min((tco(c, {**cond, "annual_km": "15to25"}) for c in ice), key=lambda t: t["tco_8y"])
+    kw = {"scales": scales, "energy_scale": energy_scale}
+    b = tco(bev[0], {**cond, "annual_km": "15to25", "home_charger": "home"}, **kw)
+    best_ice = min((tco(c, {**cond, "annual_km": "15to25"}, **kw) for c in ice), key=lambda t: t["tco_8y"])
     fixed_b = b["fixed_8y"] * non_energy_scale
     fixed_i = best_ice["fixed_8y"] * non_energy_scale
     unit_diff = best_ice["variable_per_km"] - b["variable_per_km"]
@@ -760,6 +820,42 @@ def breakeven_km_range(cars, cond, spread=0.3):
     if lo is None or hi is None:
         return {"km": mid, "low": None, "high": None, "spread": spread}
     return {"km": mid, "low": round(min(lo, hi), 1), "high": round(max(lo, hi), 1), "spread": spread}
+
+
+def breakeven_sensitivity(cars, cond, band=0.2, residual_shift=0.03):
+    """平衡点对哪个假设最敏感（开发期与页面共用，纯计算）。
+
+    对每个非能源参数按各自口径上下扰动，重算平衡里程，按 |Δ| 排序：
+      残值率（±3 个百分点，权威口径的三年保值率年际波动量级）
+      保费（±20%）、轮胎全套价（±20%）、保养（±20%）、能源单价（±20%）
+    返回 [{"id","cn","low","high","delta","dir"}]，delta = high-low（km/年）。
+    用途：告诉用户「这个平衡点主要由什么决定」，而不是给一个孤零零的点值。
+    """
+    base = breakeven_km(cars, cond)
+    if base is None:
+        return []
+    items = [
+        ("residual", "残值率", {"residual_shift": -residual_shift}, {"residual_shift": residual_shift}),
+        ("insurance", "保费", {"ins_annual": 1 - band}, {"ins_annual": 1 + band}),
+        ("tire", "轮胎整套价", {"tire_price4": 1 - band}, {"tire_price4": 1 + band}),
+        ("maint", "保养", {"maint_annual": 1 - band}, {"maint_annual": 1 + band}),
+    ]
+    out = []
+    for pid, cn, lo_sc, hi_sc in items:
+        lo = breakeven_km(cars, cond, scales=lo_sc)
+        hi = breakeven_km(cars, cond, scales=hi_sc)
+        if lo is None or hi is None:
+            continue
+        out.append({"id": pid, "cn": cn, "low": min(lo, hi), "high": max(lo, hi),
+                    "delta": round(abs(hi - lo), 1), "base": base})
+    # 能源单价：油价/电价一起动 ±band（两者对平衡点方向相反，单看一个会低估）
+    e_lo = breakeven_km(cars, cond, energy_scale=1 - band)
+    e_hi = breakeven_km(cars, cond, energy_scale=1 + band)
+    if e_lo is not None and e_hi is not None:
+        out.append({"id": "energy", "cn": "油价/电价", "low": min(e_lo, e_hi), "high": max(e_lo, e_hi),
+                    "delta": round(abs(e_hi - e_lo), 1), "base": base})
+    out.sort(key=lambda x: -x["delta"])
+    return out
 
 
 # ============ 7b. 能源形式聚合结论 + 画像自检（v10.53.0 / 形式合并 v10.57.0）============

@@ -67,6 +67,10 @@ EXCLUDE_FILES = {                                     # 文件名精确排除
     "build_release.py",       # 打包脚本自身
     "sync_to_repo.py",        # 作者私用同步脚本，含本机仓库路径
     "install_hooks.py",       # v10.40.0：作者私用钩子安装器，含本机仓库路径
+    # v10.60.0：price_model.py 是**开发期参数估算器**（查资料、取实价、定费率带），运行时用不到，
+    # 只把它的产物 cost_params.py（参数结果 + 口径解释）随包；原始抓取资料另存 runs/_price_sources。
+    # 这样以后参数换更准的来源，重跑 --emit 再打包即可，发布物始终只有「数值 + 口径」。
+    "price_model.py",
 }
 EXCLUDE_GLOBS = ["*.bak", "*.bak-*", "*.tmp", "*.pyc", "*.orig",
                  # v6.0/v6.1 配置快照遗留，无任何代码/文档引用（已核实）；解压后共 223KB
@@ -376,13 +380,16 @@ def strip_changelog(text: str, arc: str) -> str:
 
 def rewrite_for_flat(text: str, arc: str) -> str:
     """把源码里的分层 import 改写为扁平包可用的 import（仅作用于 zip 内字节）。"""
-    # 1) runpy 薄壳与显式三级 import：modules.<pkg>.<mod> -> modules.<mod>
-    for pkg in FLAT_PKGS:
-        text = re.sub(rf"modules\.{pkg}\.([A-Za-z_][\w]*)", r"modules.\1", text)
+    # v10.60.0 修顺序：必须先做「二级包导入」再做「三级 import」。
+    # 否则三级重写得到的 `modules.engine` 会被二级规则（pkg="engine"）再吃一层 → `from modules import …`，
+    # 于是 `from modules.envscore.engine import FACTORS` 变成 `from modules import FACTORS`（解包冷跑必炸）。
     # 2) 二级包导入：from modules.<pkg> import X -> from modules import X
     for pkg in FLAT_PKGS:
         text = re.sub(rf"from modules\.{pkg} import", "from modules import", text)
         text = re.sub(rf"import modules\.{pkg}(?!\.)", "import modules", text)
+    # 1) runpy 薄壳与显式三级 import：modules.<pkg>.<mod> -> modules.<mod>
+    for pkg in FLAT_PKGS:
+        text = re.sub(rf"modules\.{pkg}\.([A-Za-z_][\w]*)", r"modules.\1", text)
     # 3) paths.py：src() 的 glob 不再有子包目录；module() 的 pkg 轮询改直查 modules
     if arc == "paths.py":
         text = text.replace('MODULES.glob(f"*/{p.stem}.py")', 'MODULES.glob(f"{p.stem}.py")')
