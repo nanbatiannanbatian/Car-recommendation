@@ -140,6 +140,8 @@ def main():
     ap.add_argument("--as-of", default=None, help="HTML 页面销量数据月标注(YYYYMM)，默认自动取上个月；出榜须让用户看到基于哪月销量")
     ap.add_argument("--universe", help="候选池完整性盘点的同级权威车型清单JSON(默认 categories/universe_<category>.json)")
     ap.add_argument("--skip-universe-gate", action="store_true", help="跳过完整性门禁(须在报告说明为何同级漏收车无需处理)")
+    ap.add_argument("--allow-discontinued", action="store_true", help="允许已停产停售车参与(默认硬拦;须在报告说明原因)")
+    ap.add_argument("--skip-discovery-gate", action="store_true", help="跳过候选发现门禁(须在报告说明为何池外高销量车无需判定)")
     ap.add_argument("--skip-consistency-gate", action="store_true", help="跳过条目内一致性门禁(须在报告说明为何note与结构字段矛盾不是错误)")
     ap.add_argument("--skip-sibling-gate", action="store_true", help="跳过同源车评分一致性门禁(须在报告说明为何无据差异合理)")
     ap.add_argument("--skip-safety-gate", action="store_true", help="跳过安全分严谨性门禁(须在报告说明为何成绩映射分可偏离)")
@@ -575,6 +577,46 @@ def main():
 
     # v9.7.43：候选池完整性门禁——出榜前必须联网盘点同级全量在售车型，与候选池比对。
     # 漏收的车必须逐个判定：能入池的补入候选池+trims.json，不能入池的写进 pool_excluded[] 并写明事实原因。
+    # v10.68 根因修复：候选发现门禁——池外高销量车必须逐车判定。
+    # 2026-11-24 事故：极狐阿尔法T7（中大型纯电SUV、月销8131）漏收，
+    # discover.py 早已抓到它（其文档开头就写着这个案例），但从未接进出榜链路。
+    # 现在检查候选池 discovery_reviewed：每条池外高销量车必须有明确判定
+    # （已入池 / 级别不符写明具体级别），出现"未判定/待核实"即硬拦。
+    _drv = data.get("discovery_reviewed") or {}
+    if _drv and not getattr(a, "skip_discovery_gate", False):
+        _undecided = [r for r in (_drv.get("reviewed") or [])
+                      if not r.get("verdict") or r["verdict"] in ("未判定", "待核实")
+                      or str(r["verdict"]).startswith("待核实")]
+        if _undecided:
+            sys.exit("候选发现门禁：以下池外高销量车未判定级别，不得出榜：\n"
+                     + "\n".join(f"  {r.get('name')}（月销{r.get('sales')}）" for r in _undecided)
+                     + "\n→ 逐个查官方二级分类：符合本榜口径的补入候选池；不符合的写明具体级别。"
+                     "\n→ 确需带未判定项出榜用 --skip-discovery-gate（须在报告说明）。")
+        print(f"[候选发现门禁] 池外高销量 {len(_drv.get('reviewed') or [])} 款已逐车判定，未判定 0")
+
+    # v10.68 根因修复：生命周期确证门禁——停产/停售车不得进主榜。
+    # 2026-11-24 事故：唐L EV 2026-06 已停产，却仍排中大型榜第1。
+    # lifecycle_confirm.py 模块与 lifecycle_status.json 权威库都在，但 pipeline
+    # 从未调用它做硬拦（只有"状态值中文化"门禁，不判断停产）——工具存在没接线。
+    # 现在出榜前逐候选查确证库，discontinued/stopped 的車一律硬拦。
+    from modules.engine import lifecycle_confirm as _LC
+    _lc_db = _LC.load_db()
+    _dead = []
+    for _c in cands:
+        _st = _LC.resolve(_c, _lc_db)
+        if str(_st.get("status") or "").lower() in ("discontinued", "stopped"):
+            _dead.append((_c.get("model"), _st.get("date") or "?",
+                          _st.get("successor") or "", str(_st.get("note") or "")[:60]))
+    if _dead and not getattr(a, "allow_discontinued", False):
+        sys.exit("生命周期门禁：以下候选已停产停售，不得进主榜（lifecycle_status.json 确证）：\n"
+                 + "\n".join(f"  {m}（{d}停产；继任{s}）：{n}" for m, d, s, n in _dead)
+                 + "\n→ 从候选池移出+写进 pool_excluded，或确认已复产并更新 lifecycle_status.json。"
+                 "\n→ 确需带着停产车出榜用 --allow-discontinued（须在报告说明）。")
+    if _dead:
+        print(f"[生命周期门禁] ⚠ 允许 {len(_dead)} 款停产车参与（--allow-discontinued）")
+    else:
+        print(f"[生命周期门禁] {len(cands)} 款候选均非停产停售")
+
     # 这是对"Model 3 漏收"事故的根因修复（此前只靠人记得盘点，没接进出榜链路）。
     from modules.engine import trim_coverage as TC
     # v10.62 根因修复：优先用品类配置显式指定的唯一权威清单（cfg["universe"]），

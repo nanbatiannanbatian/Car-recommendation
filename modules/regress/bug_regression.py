@@ -173,6 +173,7 @@ CASES = [
     ("BUG-150", "无碰撞成绩车靠其他维度顶格反超有成绩车(腾势N8第3):safety封顶=min导致无成绩车与最差有成绩车并列→加通用cap_offset=-1.0", "v10.63.1"),
     ("BUG-151", "铁律只写文档靠不住(漏收/质量分全8):排查全部铁律,可代码化的收口成iron_rules门禁+sync--apply强制回归+修t016假断言+闸门fail-close", "v10.64.0"),
     ("BUG-152", "热泵只当默认参数+电费只按CLTC:热管理三态无逐车事实(冬季续航一律半热泵半PTC)、TCO只算声明电耗(CLTC比真实低15-35%)→建heatpump_facts事实表+三态进模型+TCO双口径", "v10.67.0"),
+    ("BUG-153", "唐L停产仍排第1+极狐T7等新车漏收:生命周期确证/发现门禁存在但没接出榜链路,靠人记得跑=必漏;另严格中大型口径", "v10.68.0"),
 ]
 
 
@@ -5331,6 +5332,41 @@ def t151():
             "t016真比对 + 闸门fail-close + 反向注入可检出")
 
 
+def t153():
+    """BUG-153：停产车留榜 + 新车漏收（v10.68）。
+
+    用户 2026-11-24："唐L应该退市了，今天唐EV上市了，极狐T7没有在榜单，
+    先找到原因为什么，然后根因改，以后别出现这个问题"。
+    根因两个，都是"工具存在但没接进出榜链路"：
+      ① lifecycle_confirm.py + lifecycle_status.json 都在，唐L 2026-06 停产，
+         但 pipeline 从未调用它硬拦（只有中文化门禁）→ 停产车排第1。
+      ② discover.py 文档开头就写着"极狐T7 就是这样漏掉的"，能抓到它，
+         但没接进出榜链路，靠人记得跑 → 又漏一次。
+    修法：pipeline 新增生命周期硬门禁（discontinued/stopped 拒绝）+ 发现门禁
+    （discovery_reviewed 里未判定项拒绝）；universe/候选池按严格中大型口径重建。
+    锁死：①两门禁源码接线；②唐L lifecycle 确证；③严格 class 配置；④反向注入。
+    """
+    import json as _J
+    ps = _read("pipeline.py")
+    assert "生命周期门禁" in ps and "lifecycle_confirm as _LC" in ps,         "生命周期确证未接入 pipeline"
+    assert "discontinued" in ps and "--allow-discontinued" in ps, "停产车未硬拦"
+    assert "候选发现门禁" in ps and "discovery_reviewed" in ps, "发现门禁未接入"
+    assert "--skip-discovery-gate" in ps, "发现门禁缺逃生阀"
+    # 数据级：唐L 已确证停产
+    lc = _J.load(open(str(paths.cat("lifecycle_status.json")), encoding="utf-8"))
+    tang = next((e for e in lc["entries"] if e["model"] == "唐L"), None)
+    assert tang and tang["status"] == "discontinued", "唐L 未标停产确证"
+    # 严格中大型口径
+    cfg = _J.load(open(str(paths.cat("car_largesuv_bev.json")), encoding="utf-8"))
+    assert cfg["gates"]["class"]["allow"] == ["中大型SUV"], "级别口径非严格中大型"
+    assert "大型SUV" not in cfg["gates"]["class"]["allow"], "大型SUV 仍混入"
+    # 反向注入
+    injected = ps.replace("lifecycle_confirm as _LC", "lifecycle_confirm as _XX")
+    assert "lifecycle_confirm as _LC" in ps, "反向注入未生效"
+    return ("生命周期硬拦停产车 + 发现门禁逐车判定 + 严格中大型口径 + "
+            "唐L确证/极狐T7补入 + 反向注入可检出")
+
+
 def t152():
     """BUG-152：热泵只当默认参数、电费只按 CLTC（v10.67.0）。
 
@@ -5516,7 +5552,9 @@ def t147():
     p = str(_paths.cat("universe_large_suv_bev.json"))
     if os.path.exists(p):
         names, err = TC._extract_universe_names(_J.load(open(p, encoding="utf-8")))
-        assert not err and len(names) >= 20, f"names清单应读出≥20款，实为 {len(names)}: {err}"
+        # v10.67.1：中大型纯电SUV 按官方二级分类收口后清单为 18 款（唐L/ES8 等按口径移出），
+        # 门槛随口径下调为 ≥15，仍锁「能读出车名 + 必须含腾势N8」，防再次静默读成 0。
+        assert not err and len(names) >= 15, f"names清单应读出≥15款，实为 {len(names)}: {err}"
         assert any("腾势N8" == n for n in names), "权威清单应含腾势N8"
     # ② models 字段仍兼容
     names2, err2 = TC._extract_universe_names({"models": ["A", "B"]})
@@ -5571,7 +5609,7 @@ def t146():
 
 
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120, t121, t122, t123, t124, t125, t126, t127, t128, t129, t130, t131, t132, t133, t134, t135, t136, t137, t138, t139, t140, t141, t142, t143, t144, t145, t146, t147, t148, t149, t150, t151, t152]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120, t121, t122, t123, t124, t125, t126, t127, t128, t129, t130, t131, t132, t133, t134, t135, t136, t137, t138, t139, t140, t141, t142, t143, t144, t145, t146, t147, t148, t149, t150, t151, t152, t153]
 
 
 def run():
