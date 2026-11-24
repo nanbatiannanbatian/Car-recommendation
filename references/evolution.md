@@ -1762,3 +1762,14 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
 - **③ 雪地路面按用户决定不进页面条件**（仍只在 selftest/validate 用；页面固定干燥路面，方法区保留「雪地再低 5–8 点」提示）。
 - 新增回归 **BUG-152**（150/150）：事实表覆盖≥60 且「有结论必带 URL」；三态→冬季续航严格单调（455/417/384km）；物理电耗必须高于声明电耗；物理口径平衡点必须晚于声明口径；builder 必须统一走 `heatpump_of()`；前端必须有双行与 JS 镜像；去掉 `heatpump` 字段必须退回 mixed（反向注入）。
 - 验收：bug 150/150、iron_rules 10/10、energy_compare 21/21、tco_cost 28 项、midsuv 52/52、layout 16/16、env_options 85/85、env_equivalence 126、energy_router 32/32、negative 116/116、build_release 92/92；五张页面重建（各 20 区块）。
+
+## v10.68.0 生命周期+发现门禁（2026-11-24 唐L退市/极狐T7漏收）
+- 用户："唐L应该退市了，今天唐EV上市了，极狐T7没有在榜单，先找到原因为什么，然后根因改，以后别出现这个问题，最后再出一版排行榜"。
+- **三个根因**（都是"工具存在但没接进出榜链路"）：
+  ① 唐L EV 2026-06 已停产（王朝L系列集体停产、官网改主推第三代唐EV），却仍排中大型榜第1——`lifecycle_confirm.py` + `lifecycle_status.json` 权威库都在，pipeline 只做"状态中文化"从不查停产状态。
+  ② 极狐阿尔法T7（中大型纯电、月销8131）漏收——`discover.py` 文档开头就写着这个案例、能抓到它，但没接出榜链路，靠人记得跑。
+  ③ universe 是人工清单，本身会漏（唐EV/极狐T7/钛7EV/追光S 都不在），完整性门禁只比对清单内=清单漏就看不见。
+- 修法：pipeline 新增生命周期硬门禁（resolve 查确证库，discontinued/stopped 拒绝，--allow-discontinued 逃生）+ 候选发现门禁（discovery_reviewed.reviewed[] 未判定项拒绝，--skip-discovery-gate 逃生）；universe/候选池按严格中大型口径重建（用户拍板不收大型SUV，ES8/M8/L90/N8L/大唐EV全移出）；lifecycle_status.json 补唐L停产+唐EV/T7新上市。
+- 发现门禁逐车判定 21 款池外高销量车时，又抓出 2 个真漏：方程豹钛7 EV（中大型/1000V闪充/月销1.2万）、岚图追光S（中大型/800V/华为ADS5）——印证门禁价值。
+- 最终：22 款严格官方中大型在售纯电SUV重出榜，唐L与大型SUV全移出，唐EV/T7/钛7EV/追光S补入；完整性22/22/0、生命周期22款非停产、发现21款全判定、bug151/151全绿。
+- 教训：工具存在≠接线——lifecycle_confirm/discover 早就在，没接 pipeline 就连续漏收。凡防漏工具必须接进出榜链路。

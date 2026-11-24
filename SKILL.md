@@ -13,7 +13,7 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 10.67.1
+version: 10.68.0
 author: "nanbatiannanbatian"
 ---
 
@@ -263,6 +263,19 @@ HTML/报告用 `--as-of <YYYYMM>` 标注事实列数据月，禁止停在"—"�
 - 已核验的领域快照（如 `runs/midsedan_bev_1218_202610/candidates_allprice.json` 25款）可作候选，**分数一律复用其中已核验的 `scores`**，不许用 Agent 补采分顶替。
 - "销量榜 Top" ≠ 候选全集：只能做候选发现器，绝不直接当入池名单（会系统性漏车）。
 - 用 `runs/` 下无指纹快照必须 `--force-stale`，并在报告显著标注"过期/强制出榜"。
+
+**①a 生命周期+候选发现硬门禁（v10.68，用户"唐L退市/极狐T7漏收，根因改"）**
+出榜前 pipeline 自动过两道门禁（默认硬拦，各有显式逃生阀须在报告说明）：
+- **生命周期确证门禁**：`lifecycle_confirm.resolve()` 查 `lifecycle_status.json`，
+  `discontinued/stopped` 的车不得进主榜（唐L 2026-06 停产却排第1就是此门禁此前没接线）；
+  逃：`--allow-discontinued`。
+- **候选发现门禁**：候选池 `discovery_reviewed.reviewed[]` 逐车登记池外高销量车判定
+  （已入池 / 级别不符写明具体级别），出现"未判定/待核实"即拦（极狐T7/钛7EV/岚图追光S
+  这类 discover.py 能抓到却没接线的漏收）；逃：`--skip-discovery-gate`。
+- **严格级别口径**：中大型纯电SUV榜只认官方二级分类"中大型SUV"，大型SUV
+  （ES8/M8/L90/N8L/大唐EV等）明确不进主榜，可另出大型SUV榜。
+- 版本教训：工具存在≠接线——lifecycle_confirm/discover 两个模块早就在，只因没接进
+  pipeline 就连续漏收两次。凡"防漏工具"必须接进出榜链路，否则等于没有。
 
 **①b 铁律代码化（v10.64 起步 / v10.65 补齐）**
 用户铁律不再只靠文档纪律——可代码化的全部收口到 `modules/regress/iron_rules.py`（单一真相源）：
