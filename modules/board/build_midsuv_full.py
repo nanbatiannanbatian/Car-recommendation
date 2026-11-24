@@ -161,6 +161,7 @@ def main():
         extra_tail=secs + "\n" + CES.dynamic_script(),  # 注入区块 + 定稿/推演分离脚本
         title="2026年10月 12-18万 中型SUV 跨能源正式榜（产品力+环境分）",
         def_low=12, def_high=18, def_body="SUV",  # 本榜口径：12–18万中型SUV（避免默认轿车12-14万导致空表）
+        sales_month="202610",
     )
     # 校验
     html = open(OUT, encoding="utf-8").read()

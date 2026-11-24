@@ -268,7 +268,8 @@ def main(argv=None):
     EC.build(cars_override=cars, out=OUT, extra_head=nav,
              extra_tail=banner + secs + "\n" + CES.dynamic_script(),
              title="2026年11月 中大型纯电SUV榜（产品力+环境分+TCO，参数驱动）",
-             def_low=int(LOW), def_high=int(HIGH), def_body=BODY)
+             def_low=int(LOW), def_high=int(HIGH), def_body=BODY,
+             sales_month="202611")
     html = open(OUT, encoding="utf-8").read()
     assert "boardNav" in html and f"{len(CES.BLOCKS)} 区块" in html, "导航缺失"
     for bid, _ in CES.BLOCKS:

@@ -13,7 +13,7 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 10.64.0
+version: 10.65.0
 author: "nanbatiannanbatian"
 ---
 
@@ -264,13 +264,19 @@ HTML/报告用 `--as-of <YYYYMM>` 标注事实列数据月，禁止停在"—"�
 - "销量榜 Top" ≠ 候选全集：只能做候选发现器，绝不直接当入池名单（会系统性漏车）。
 - 用 `runs/` 下无指纹快照必须 `--force-stale`，并在报告显著标注"过期/强制出榜"。
 
-**①b 铁律代码化（v10.64）**
+**①b 铁律代码化（v10.64 起步 / v10.65 补齐）**
 用户铁律不再只靠文档纪律——可代码化的全部收口到 `modules/regress/iron_rules.py`（单一真相源）：
-- **README/SKILL 版本一致**：`iron_rules.check_version_sync` 真比对（修 t016 假断言）；
+- **README/SKILL 版本一致**：`check_version_sync` 真比对（修 t016 假断言）；
 - **证据 URL 可核验**：扫 trims.json 占位根域；**路径走 paths.cat**：禁硬编码 categories 拼接；
 - **契约自带 selftest**：trims_schema/candidate_schema/quality_score/trim_coverage 自检；
+- **页面不写死版本号**（v10.65）：正文（去 script/style 后）零 `vX.Y.Z`——方法区曾写「v10.52.0 新增」，两个版本后就成过期标签；版本迁移由文档承担；
+- **综合分=TCO 不入分**（v10.65）：产物 CARS 跑 `engine.analyze` 断言 `composite==product+adj`，并**把油价/电价翻倍再算一遍**，分数名次必须零漂移——有人把成本塞进排序会立刻 FAIL；
+- **缺维不加权**（v10.65）：有 `coverage` 的车，`scores` 的键必须全部落在 coverage 内（不填假分）；
+- **车价单位万元**（v10.65）：车价 1–300、购置税 ≤3 万、残值损失 ≥ 车价 20%——把万元当元算（v10.59 的历史坑）会三处同时越界；
+- **销量口径声明**（v10.65）：页面必须同时写清「6 个月逐月中位（判档）」与「单月车系口径（事实列）+ 数据月」；数据月由 `EC.build(sales_month=...)` 注入，缺则退回「见逐车标注」；
+- **bug 回归不许减案**（v10.65）：`bug_regression.py` 用例名不许重名、数量不得低于 `BUG_CASE_FLOOR`（149，只增不减）；
 - **改完必回归**：固化在 `sync_to_repo.py --apply`——skill→仓库是唯一上线通道，同步前强制跑
-  iron_rules + bug_regression(34s) + layout_regress + package_audit，任一失败拒绝同步（紧急 `--skip-gates` 事后补跑）；
+  iron_rules + bug_regression + layout_regress + package_audit，任一失败拒绝同步（紧急 `--skip-gates` 事后补跑）；
 - **闸门 fail-close**：gate_report 异常不再静默放行，按"无法判定"落榜并写明原因；
 - 不可代码化的铁律（页面渲染改动先确认 / 不许打补丁 / 不许编造 / 尽量收全的程度 / 口径变更先拍板）
   在 `iron_rules.NON_CODABLE` 如实列明，不假装覆盖。

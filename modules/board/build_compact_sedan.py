@@ -360,6 +360,7 @@ def main(argv=None):
         extra_head=nav, extra_tail=banner + secs + "\n" + CES.dynamic_script(),
         title="2026年11月 6-16万 紧凑型轿车榜（纯电+燃油+油混+插混，产品力+环境分+形式结论）",
         def_low=int(LOW), def_high=int(HIGH), def_body="轿车",
+        sales_month="202611",
     )
     html = open(OUT, encoding="utf-8").read()
     assert "boardNav" in html and f"{len(CES.BLOCKS)} 区块" in html, "导航缺失"

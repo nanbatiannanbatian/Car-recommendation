@@ -96,6 +96,7 @@ def main():
         extra_tail=secs + "\n" + CES.dynamic_script(),
         title="12-14万 轿车 跨能源演示榜（产品力+环境分+形式结论）",
         def_low=LOW, def_high=HIGH, def_body="轿车",
+        sales_month="202610",
     )
     html = open(OUT, encoding="utf-8").read()
     assert "boardNav" in html and f"{len(CES.BLOCKS)} 区块" in html, "导航缺失"
