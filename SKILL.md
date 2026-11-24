@@ -13,7 +13,7 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 10.66.0
+version: 10.67.0
 author: "nanbatiannanbatian"
 ---
 
@@ -368,6 +368,8 @@ python3 pipeline.py --category <categories/下的配置ID> \
 
 ### 七、实际续航物理估算能力
 - **【能力】`ev_range_model.py`（v2.0 功率式）单一事实源**：`P(v)=m·g·Crr·v + ½ρ·CdA·v³`，`场景电耗=(P/η+附件kW×1000)/(10·v)`，`有效续航=电量×可用SOC(0.94)÷电耗×100`。每车用自己的整备质量与 CdA（Cd×迎风面积），风阻按 v³ 展开；**空调以 kW 进入**（PTC 3–5kW、热泵按温度档 0.55/0.70/0.86 折算），因此低速吃亏、高速影响小——旧版「暖风乘数」正是冬季市区低估、冬季高速高估的根因。冬季两层拆分：电池活性（−10℃ +4%、−20℃ +9%、极寒 +16%）与暖风功率，互不重复计。全局标定 `CAL_G=1.14`（39 款「声明电耗+整备质量+Cd」车取 median(声明/物理@30km/h)），吸收工况开销而非逐车拟合。缺整备质量时按自家电耗回归反解（口径可查）、缺风阻按 CdA/吨中位，均在 steps 里标注。**engine.py 不再自抄一份系数**（旧版两套靠人肉对齐＝漂移温床），engine.js 是同源镜像、由 126 组等价回归守。校准锚点：市区 0.85–0.90 / 100km/h 0.70 / 120km/h 定速 0.55–0.60 / −10℃ 0.70（PTC 0.5–0.6、热泵 0.75）/ −20℃ 0.45（雪地再 −5~8pp），selftest 六场景对共识 ≤±8pp。胎压已建模（按原厂推荐不臆测），轮胎类型谨慎（unknown=1.0 不编造）；算不出标"无数据不估算"。不改主榜打分。
+- **【能力】热泵是「三态逐车事实」，不是默认参数**：事实表 `categories/heatpump_facts.json`（汽车之家参数页「空调/冰箱 → 热泵空调」config id=8417，纯电列过滤，●=有 / ○=选装→null / -=无，逐条 `source_url` 可核；参数页没有该条目就记 null，**不推断为无**）。所有榜的 builder 统一走 `EC.heatpump_of(model)`，不许各榜自己读 JSON 或各写默认。None → 「半热泵半 PTC」参与冬季续航并在页面披露。三态对续航是阶梯而不是开关：−10℃ 市区分档实测 热泵≈0.75 / 混合≈0.68 / PTC≈0.55–0.60。
+- **【口径】TCO 能源成本双口径并排**：`declared`＝声明电耗（CLTC/台架），`phys`＝物理年均电耗（与「有效续航」同源，含风阻 v³、暖风 kW、温度档、逐车热管理）。两套都进 TCO（`unit_energy` / `unit_energy_phys`、`energy_8y` / `energy_8y_phys`），页面两行展示并标明**下行才是实际电费**；盈亏平衡同时给两个点（`breakeven_km(..., basis="phys")` 会晚 10% 左右）。CLTC 普遍比真实低 15%–35%，只看上行会把纯电用车成本算便宜、把反超点算早。燃油/油混不做电耗物理化（显示「—」，油耗按 WLTC/工信部口径）。
 
 ### 当前明确不做/已废止（手册边界）
 - 已删除：从零逐配置算分排名、标准差锚定排名、经销商体验表/官方优惠双口径表、`band_subboards`/`segmented_summary` 区块（数据保留不渲染）。

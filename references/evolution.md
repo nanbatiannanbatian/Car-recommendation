@@ -1739,3 +1739,18 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
 - 校准锚点（selftest 六场景，均 ≤±8pp）：市区 0.90、100km/h 0.70、120km/h 0.57、−10℃ PTC 0.55 / 热泵 0.73、−20℃ 0.45（雪地再 −5~8pp）；over60 桶按中国高速实际均速 105km/h，120 定速在该结果上再低约 10%。
 - 顺带：条件表温度档文案与 `FACTOR_GROUPS` 里「−10℃平均衰减32.7%」的旧口径全部改成达成率说法；页面方法区整段重写为功率式；regress t017/t030/t031/t003 跟着新契约更新（t030 从「±12pp 容差」收紧到 ±8pp）。
 - 验收：physics selftest OK；env_equivalence 126；energy_compare 21/21；midsuv 52/52；layout 16/16；env_options 85/85；bug 149/149；energy_router 32/32；param_score 7 项；tco_cost 28 项；negative 116/116；build_release 92/92；五张页面重建 20 区块齐全；iron_rules 10/10。
+## v10.67.0 热泵变逐车事实 + TCO 能源成本双口径（2026-11-24）
+- 用户拍板：「1 要（热泵做逐车事实字段）、2 不要（雪地路面不进页面条件）、3 都展示但说明物理口径才是我们算的真实续航」。
+- **① 热泵：从「默认参数」变成「三态逐车事实」**
+  - 此前 67 车维表里「热泵」出现 0 次，全部落到 `mixed`（半热泵半 PTC）。但 −10℃ 三态是阶梯不是开关：热泵≈0.75、混合≈0.68、PTC≈0.55–0.60，热泵车被系统性低估 10 个点左右，而 −10℃ 档正好驱动「东北能不能买纯电」的硬条件 H2。
+  - 新建 `categories/heatpump_facts.json`：数据源＝汽车之家参数页「空调/冰箱 → 热泵空调」（config item id=8417）。解析要绕两坑：①该字段不在 `var config` 的 `paramtypeitems` 里，而在 `var option` 的 `result.configtypeitems`；②一车多动力车系（海狮06、秦PLUS、启源A06、极氪7X 等）必须按「能源类型」列过滤到纯电款型，否则 DM-i 的「无」会盖掉纯电的「有」。
+  - 结果：77 款中 **64 款有据（全部「标配」）、0 款明确无、13 款未采到记 null**（参数页没有该条目时不推断为无）。逐条带 `source_url`，`evidence` 记「标配n/选装m/无k」。
+  - 代码：`build_energy_compare` 提供 `load_heatpump_facts()/heatpump_of()` 单一入口，四个榜单 builder 全部改为 `EC.heatpump_of(model)`（此前「大 SUV 榜读不到、其它榜读维表」正是双源漂移的苗头，已收口）；`engine.py/js` 三态翻译不变（True→heatpump / False→ptc / None→mixed），但 steps 里必须写明「参数页核验」或「未采到→半热泵半PTC 默认」。
+  - 数值效果（默认画像含 −10℃）：红旗天工08 408→442km、腾势N8 541→580km、小米YU7 492→533km、智己LS7 475→514km；中大型纯电 TOP10 十款全部有热泵事实，不再靠默认值。
+- **② TCO：声明口径与物理口径并排，盈亏平衡给两点**
+  - 旧版能源成本只按声明电耗（CLTC/台架）算钱，比真实用车低 15%–35% —— 纯电电费被算便宜、油电反超点被算早。
+  - `engine.py` 新增 `phys_per100()`（与「有效续航」完全同源：同一画像的温度档/路况/驾驶风格 + 逐车热管理）与 `unit_energy_cost_phys()`；`tco()` 增 `unit_energy_phys` / `energy_8y_phys` / `phys_cons` / `variable_per_km_phys` / `fixed_8y_phys`，总账口径不变（仍以声明口径为主，避免所有历史数字整体漂移）。
+  - 页面 TCO 表把「能源元/km」「能源8年」改成两行电平：上行声明、下行物理，并写明「**CLTC 通常比真实低 15%–35%，看实际电费请看下行**」；盈亏平衡并列 `23195 km/年（声明）→ 25691 km/年（物理）`（示例池）。JS（动态推演器）镜像 `physPer100/unitEnergyCostPhys`，TCO 明细同步渲染物理行。
+- **③ 雪地路面按用户决定不进页面条件**（仍只在 selftest/validate 用；页面固定干燥路面，方法区保留「雪地再低 5–8 点」提示）。
+- 新增回归 **BUG-152**（150/150）：事实表覆盖≥60 且「有结论必带 URL」；三态→冬季续航严格单调（455/417/384km）；物理电耗必须高于声明电耗；物理口径平衡点必须晚于声明口径；builder 必须统一走 `heatpump_of()`；前端必须有双行与 JS 镜像；去掉 `heatpump` 字段必须退回 mixed（反向注入）。
+- 验收：bug 150/150、iron_rules 10/10、energy_compare 21/21、tco_cost 28 项、midsuv 52/52、layout 16/16、env_options 85/85、env_equivalence 126、energy_router 32/32、negative 116/116、build_release 92/92；五张页面重建（各 20 区块）。

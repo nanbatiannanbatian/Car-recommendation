@@ -97,6 +97,10 @@ function rangeCalc(car,cond){
   if(car.consSrc==='物理估算'){
     steps.unshift('该车无声明电耗，展示用回归估算 '+car.cons+' kWh/100km（4.48×车重t + 5.88×CdA + 0.61，仅用于成本展示）；续航按质量/风阻物理算');
   }
+  // v10.67.0：热管理形式是逐车核验事实（true=热泵 / false=PTC / 未采到=mixed 默认），写进步骤披露
+  steps.push(mode==='heatpump'?'热管理：热泵（参数页核验）':
+             (mode==='ptc'?'热管理：PTC 无热泵（参数页核验）':
+              '热管理未采到 → 按「半热泵半 PTC」默认（已披露，不猜）'));
   return {range:rng, method:(car.weight?'物理模型(质量+风阻+空调kW)':'物理模型(质量按电耗回归反解)'),
           cls:car.body, sceneCons:Math.round(cons*10)/10, steps};
 }
@@ -137,6 +141,51 @@ function unitEnergyCost(car,cond){
   }
   return +(fuelL()*T.oilPrice/100).toFixed(3);
 }
+// v10.67.0：TCO 双口径——物理年均电耗（与有效续航同源），口径同 unitEnergyCost
+function physPer100(car,cond){
+  const M=PHYS.phys, T=PHYS.tco;
+  const P=car.power;
+  if(P!=='BEV'&&P!=='PHEV'&&P!=='EREV') return null;
+  const hw=cond.highway_ratio||'20to40';
+  const v=(M.speed[hw]==null)?55:M.speed[hw];
+  const wm=massOf(car), w=wm[0], cda=cdaOf(car,w);
+  if(!w||!cda) return null;
+  const season=cond.winter_temp||'m10to0';
+  const mode=(car.heatpump===true)?'heatpump':((car.heatpump===false)?'ptc':'mixed');
+  const aux=M.aux+hvacKw(season,mode,cond.ac_usage);
+  const crr=M.crr*((M.road&&M.road.dry!=null)?M.road.dry:1);
+  const drive=driveCons(v,w,cda,aux,crr);
+  const stop=(M.stopgo[hw]==null)?1:M.stopgo[hw];
+  const temp=(M.battery[season]==null)?1:M.battery[season];
+  let cons=drive*M.calG*stop*temp;
+  if(car.voltage){
+    const vs=Object.keys(M.volt).map(Number).sort((a,b)=>a-b);
+    let best=vs[0]; for(const vv of vs) if(Math.abs(vv-car.voltage)<Math.abs(best-car.voltage)) best=vv;
+    cons*=M.volt[best];
+  }
+  return cons;
+}
+function unitEnergyCostPhys(car,cond){
+  const T=PHYS.tco;
+  const per100=physPer100(car,cond);
+  if(!per100) return null;
+  const charger=cond.home_charger, homePrice=homeElecPrice(cond), P=car.power;
+  if(P==='BEV'){
+    const home=per100*homePrice/100, pub=per100*T.elecPublic/100;
+    const work=per100*(0.8*T.elecWork+0.2*T.elecPublic)/100;
+    if(charger==='work') return +work.toFixed(3);
+    return charger==='home'?home:(charger==='public'?+(home*0.3+pub*0.7).toFixed(3):pub);
+  }
+  function fuelL(){
+    if(car.fuelDeprivedL100) return car.fuelDeprivedL100;
+    if(car.fuelL100) return car.fuelL100;
+    return ({PHEV:T.phevFuelL,EREV:T.erevFuelL})[P]||T.phevFuelL;
+  }
+  const evPrice=charger==='work'?T.elecWork:homePrice;
+  const evShare=(P==='PHEV')?(charger==='home'?0.8:(charger==='work'?0.7:(charger==='public'?0.5:0.3)))
+                            :(charger==='home'?0.7:(charger==='work'?0.6:(charger==='public'?0.5:0.3)));
+  return +(evShare*evPrice/100*per100+(1-evShare)*fuelL()*T.oilPrice/100).toFixed(3);
+}
 function idleCost(car,cond){
   return 0;   // 驻车用电条件已移除（保留函数为兼容旧调用）
 }
@@ -170,6 +219,9 @@ function tco(car,cond){
   const r=carRates(car);
   const unit=unitEnergyCost(car,cond);
   const energy8=unit*km*T.years;
+  // v10.67.0：物理口径（真实续航）能源成本，与声明口径并排披露
+  const unitP=unitEnergyCostPhys(car,cond);
+  const energy8P=(unitP==null)?null:unitP*km*T.years;
   const ins8=r.insAnnual*T.years;
   const maint8=r.maintAnnual*T.years;
   const isNev=(P==='BEV'||P==='PHEV'||P==='EREV');
@@ -186,13 +238,17 @@ function tco(car,cond){
   const wear8=r.wearAnnual*T.years;
   const total=energy8+ins8+maint8+tax+residualLoss+batteryRisk8+idle8+tire8+wear8;
   return {power:P,price:price,annualKm:km,unitEnergy:+unit.toFixed(3),unitTire:+tireUnit.toFixed(4),
-    energy8y:Math.round(energy8),ins8y:Math.round(ins8),maint8y:Math.round(maint8),
+    unitEnergyPhys:(unitP==null)?null:+unitP.toFixed(3),
+    energy8y:Math.round(energy8),energy8yPhys:(energy8P==null)?null:Math.round(energy8P),
+    physCons:(unitP==null)?null:Math.round(physPer100(car,cond)*10)/10,ins8y:Math.round(ins8),maint8y:Math.round(maint8),
     tire8y:Math.round(tire8),wear8y:Math.round(wear8),
     purchaseTax:Math.round(tax),residualLoss:Math.round(residualLoss),
     batteryRisk8y:Math.round(batteryRisk8),idle8y:idle8,elecPrice:homeElecPrice(cond),
     tco8y:Math.round(total),
     variablePerKm:+(unit+tireUnit).toFixed(3),
+    variablePerKmPhys:(unitP==null)?null:+(unitP+tireUnit).toFixed(3),
     fixed8y:Math.round(total-energy8-tire8),
+    fixed8yPhys:(unitP==null)?null:Math.round(total-energy8+(energy8P||0)-tire8),
     tireSize:r.tireSize,tirePrice4:Math.round(r.tirePrice4),residualRate:r.resRate,insAnnual:Math.round(r.insAnnual),
     tcoPerKm:+(total/(km*T.years)).toFixed(3),basis:PHYS.tcoBasis};
 }

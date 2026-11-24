@@ -308,6 +308,11 @@ def range_calc(car, cond):
     if r["range_km"] is None:
         return {"range": None, "method": r["method"], "steps": r["steps"]}
     steps = list(r["steps"])
+    # v10.67.0：热管理形式是逐车核验事实（True=热泵 / False=PTC / None=未采到），必须写进步骤里
+    steps.append({"heatpump": "热管理：热泵（参数页核验）",
+                  "ptc": "热管理：PTC 无热泵（参数页核验）"}.get(
+                     "heatpump" if hp is True else ("ptc" if hp is False else "mixed"),
+                     "热管理未采到 → 按「半热泵半 PTC」默认（已披露，不猜）"))
     if car.get("consSrc") == "物理估算":
         steps.insert(0, "该车无声明电耗，展示用回归估算 %s kWh/100km"
                         "（4.48×车重t + 5.88×CdA + 0.61，仅用于成本展示）；续航按质量/风阻物理算"
@@ -647,6 +652,58 @@ def unit_energy_cost(car, cond):
     return round(fuel_l() * TCO["oil_price"] / 100, 3)
 
 
+def phys_per100(car, cond):
+    """物理口径年均电耗（kWh/100km）——与「有效续航」完全同源（同一画像的温度档/路况/驾驶风格 +
+    逐车热管理事实）。BEV/PHEV/EREV 可算；燃油/油混不硬套电耗模型，返回 None。
+
+    v10.67.0：TCO 双口径展示用。声明电耗（CLTC）是台架口径，比真实用车低 15%–35%；
+    物理口径才是「我们算的真实续航」对应的用电量，两者并排披露，不让用户拿 CLTC 价签当电费。"""
+    if car.get("power") not in ("BEV", "PHEV", "EREV"):
+        return None
+    hp = car.get("heatpump")
+    scen = {
+        "highway_ratio": cond.get("highway_ratio", "20to40"),
+        "winter_temp": cond.get("winter_temp", "m10to0"),
+        "thermal": "heatpump" if hp is True else ("ptc" if hp is False else "mixed"),
+        "drive_style": "normal", "load": "normal",
+    }
+    veh = {"kwh": car.get("kwh"), "cons": car.get("cons"), "cltc": car.get("cltc"),
+           "weight": car.get("weight"), "cd": car.get("cd"), "area": car.get("area"),
+           "cda": car.get("cda"), "cdaPerTon": car.get("cdaPerTon"),
+           "voltage": car.get("voltage"), "body": car.get("body")}
+    cons, _v, _d = ERM.scene_consumption(veh, scen)
+    return cons
+
+
+def unit_energy_cost_phys(car, cond):
+    """物理口径每公里能源成本（元/km）——口径同 unit_energy_cost，只是把 per100 换成物理年均电耗。"""
+    per100 = phys_per100(car, cond)
+    if not per100:
+        return None
+    charger = cond["home_charger"]
+    home_price = home_elec_price(cond)
+    P = car.get("power")
+    if P == "BEV":
+        home = per100 * home_price / 100
+        pub = per100 * TCO["elec_public"] / 100
+        work = per100 * (0.8 * TCO["elec_work"] + 0.2 * TCO["elec_public"]) / 100
+        return {"home": home, "work": round(work, 3),
+                "public": round(home * 0.3 + pub * 0.7, 3), "none": pub}[charger]
+    def fuel_l():
+        for k in ("fuelDeprivedL100", "fuelL100"):
+            v = car.get(k)
+            if v:
+                return float(v)
+        return {"PHEV": TCO["phev_fuel_l"], "EREV": TCO["erev_fuel_l"]}.get(P, TCO["phev_fuel_l"])
+    ev_price = TCO["elec_work"] if charger == "work" else home_price
+    if P == "PHEV":
+        ev_share = 0.8 if charger == "home" else (0.7 if charger == "work" else (0.5 if charger == "public" else 0.3))
+    else:
+        ev_share = 0.7 if charger == "home" else (0.6 if charger == "work" else (0.5 if charger == "public" else 0.3))
+    return round(ev_share * ev_price / 100 * per100
+                 + (1 - ev_share) * fuel_l() * TCO["oil_price"] / 100, 3)
+
+
 def idle_cost(car, cond):
     """驻车用电成本（8 年，元）——驻车用电条件已移除，保留函数为兼容旧调用（恒 0）。"""
     return 0
@@ -713,6 +770,10 @@ def tco(car, cond, scales=None, energy_scale=1.0):
     r = car_rates(car, scales)
     unit = unit_energy_cost(car, cond) * energy_scale
     energy_8 = unit * km * TCO["years"]
+    # v10.67.0：物理口径（真实续航）能源成本，与声明口径并排披露；尚不可物理建模的车留 None
+    unit_p = unit_energy_cost_phys(car, cond)
+    unit_p = unit_p * energy_scale if unit_p is not None else None
+    energy_8_p = unit_p * km * TCO["years"] if unit_p is not None else None
     ins_8 = r["ins_annual"] * TCO["years"]
     maint_8 = r["maint_annual"] * TCO["years"]
     is_nev = P in ("BEV", "PHEV", "EREV")
@@ -731,6 +792,10 @@ def tco(car, cond, scales=None, energy_scale=1.0):
         "power": P, "price": price, "annual_km": km,
         "unit_energy": round(unit, 3), "unit_tire": round(tire_unit, 4),
         "energy_8y": round(energy_8), "ins_8y": round(ins_8), "maint_8y": round(maint_8),
+        # 双口径：declared=声明/CLTC 电耗；phys=物理模型（真实续航）电耗。同一画像、同一电价口径
+        "unit_energy_phys": round(unit_p, 3) if unit_p is not None else None,
+        "energy_8y_phys": round(energy_8_p) if energy_8_p is not None else None,
+        "phys_cons": phys_per100(car, cond),
         "tire_8y": round(tire_8), "wear_8y": round(wear_8),
         "purchase_tax": round(tax), "residual_loss": round(residual_loss),
         "battery_risk_8y": round(battery_risk_8), "idle_8y": round(idle_8),
@@ -739,6 +804,9 @@ def tco(car, cond, scales=None, energy_scale=1.0):
         # 拆成「可变（按公里）」与「固定」两部分，供盈亏平衡与区间计算复用
         "variable_per_km": round(unit + tire_unit, 3),
         "fixed_8y": round(total - energy_8 - tire_8),
+        # 物理口径下的同一组拆分（能源换成物理电耗，其余不变）——供双口径盈亏平衡复用
+        "variable_per_km_phys": (round(unit_p + tire_unit, 3) if unit_p is not None else None),
+        "fixed_8y_phys": (round(total - energy_8 + energy_8_p - tire_8) if unit_p is not None else None),
         # 参数留痕：页面与报告可以直接说明「这车用的是哪档轮胎、哪档残值」
         "tire_size": r["tire_size"], "tire_price4": round(r["tire_price4"]),
         "residual_rate": r["residual_rate"], "ins_annual": round(r["ins_annual"]),
@@ -747,7 +815,9 @@ def tco(car, cond, scales=None, energy_scale=1.0):
                  "油耗取该车**该动力形式自己的款型**中位（v10.58.0 起按能源类型/款型名拆动力，油混不再与燃油共用一批款型）；"
                  + COST_BASIS +
                  "；易损与电子件不含保养、不含事故（保养在保养项，事故由保费吸收，不重复计）；"
-                 "残值用3年保值率近似8年（两侧同向，不制造单边优势）；TCO 只披露、不入分",
+                 "残值用3年保值率近似8年（两侧同向，不制造单边优势）；TCO 只披露、不入分；"
+                 "能源成本并列两套口径：**声明电耗（CLTC/台架）**与**物理年均电耗（真实续航口径，含风阻v³/暖风kW/车速/温度）**，"
+                 "后者才对应实际用电量——CLTC 通常比真实低 15%–35%，看电费别看错那一列",
     }
 
 
@@ -775,7 +845,8 @@ def tco_js():
     }
 
 
-def breakeven_km(cars, cond, bev_price=None, non_energy_scale=1.0, scales=None, energy_scale=1.0):
+def breakeven_km(cars, cond, bev_price=None, non_energy_scale=1.0, scales=None, energy_scale=1.0,
+                 basis="declared"):
     """盈亏平衡年里程（km/年）：家充纯电 vs 池内最优燃油/油混的 8 年 TCO 相等点。
 
     v10.59.0 起把「油耗/电耗 + 轮胎折损」都算作按公里变化的可变成本，其余（保费/保养/购置税/
@@ -783,6 +854,8 @@ def breakeven_km(cars, cond, bev_price=None, non_energy_scale=1.0, scales=None, 
         TCO(km/年) = 固定项(8年) + 可变单价 × km × 8
         → km = (固定差) / (8 × 可变单价差)
     non_energy_scale 缩放固定项出区间；scales / energy_scale 供参数敏感性分析，不改变中性口径。
+    v10.67.0：basis="phys" 时纯电的可变单价换成「物理年均电耗」（真实续航口径），
+    平衡点会上移——CLTC 口径会把电费算便宜、把纯电的反超点算得偏早。
     """
     bev = [c for c in cars if c.get("power") == "BEV"]
     ice = [c for c in cars if c.get("power") in ("ICE", "HEV")]
@@ -791,9 +864,16 @@ def breakeven_km(cars, cond, bev_price=None, non_energy_scale=1.0, scales=None, 
     kw = {"scales": scales, "energy_scale": energy_scale}
     b = tco(bev[0], {**cond, "annual_km": "15to25", "home_charger": "home"}, **kw)
     best_ice = min((tco(c, {**cond, "annual_km": "15to25"}, **kw) for c in ice), key=lambda t: t["tco_8y"])
-    fixed_b = b["fixed_8y"] * non_energy_scale
+    if basis == "phys":
+        vb, fb = b.get("variable_per_km_phys"), b.get("fixed_8y_phys")
+        if vb is None or fb is None:
+            return None
+        fixed_b = fb * non_energy_scale
+        unit_diff = best_ice["variable_per_km"] - vb
+    else:
+        fixed_b = b["fixed_8y"] * non_energy_scale
+        unit_diff = best_ice["variable_per_km"] - b["variable_per_km"]
     fixed_i = best_ice["fixed_8y"] * non_energy_scale
-    unit_diff = best_ice["variable_per_km"] - b["variable_per_km"]
     if unit_diff <= 0:
         return None
     return round((fixed_b - fixed_i) / (TCO["years"] * unit_diff), 1)  # km/年

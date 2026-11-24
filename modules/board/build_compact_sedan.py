@@ -226,6 +226,8 @@ def to_car(c, weights, trims, vp, fl_by, sales):
         "cons": round(cons, 1) if cons else None, "consSrc": cons_src,
         "weight": weight, "cd": cd, "area": area, "voltage": pv.get("voltage_v"),
         "swap": bool(pv.get("swap")), "cdaPerTon": cda, "boxy": False,
+        # v10.67.0：热泵是逐车事实（categories/heatpump_facts.json，来源参数页；None 按半热泵半PTC 默认并披露）
+        "heatpump": EC.heatpump_of(c["model"]),
         "sales": sales.get(k) or c.get("sales"),
         "evidence": c.get("evidence_status"),
     }

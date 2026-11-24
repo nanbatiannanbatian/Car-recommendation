@@ -75,6 +75,10 @@ def main():
     by = {norm(c["model"]): c for c in supp}
     for c in pool:
         by.setdefault(norm(c["model"]), c)
+    # v10.67.0：热泵逐车事实来自 categories/heatpump_facts.json（参数页「热泵空调」逐车核验）；
+    # 本页补采车若不在事实表里 → None，冬季续航按「半热泵半PTC」默认并在页面披露
+    for c in by.values():
+        c["heatpump"] = EC.heatpump_of(c["model"])
     cars = sorted(by.values(), key=lambda x: -(x.get("product") or 0))
     print(f"入池 {len(cars)} 款：", {p: sum(1 for c in cars if c['power'] == p) for p in ('BEV','PHEV','EREV','HEV','ICE')})
 

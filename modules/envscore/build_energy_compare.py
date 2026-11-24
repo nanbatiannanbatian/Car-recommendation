@@ -38,6 +38,36 @@ MP = str(paths.cat("master_pool.json"))
 TR = str(paths.cat("trims.json"))
 FL = str(paths.cat("fact_library.json"))  # 真实电耗/电量
 VP = str(paths.cat("vehicle_physics.json"))  # 物理参数库(采集)
+HP = str(paths.cat("heatpump_facts.json"))  # 热泵逐车事实(v10.67.0)
+
+
+def norm_model(s):
+    return "".join(ch for ch in str(s or "").lower() if ch.isalnum())
+
+
+def load_heatpump_facts():
+    """热泵逐车事实表：{规范化车名: True/False}（null=未采到不进表）。
+
+    单一事实源 = categories/heatpump_facts.json（来源汽车之家参数页「热泵空调」id=8417，逐车 source_url 可核）。
+    所有榜的 builder 都调它，杜绝「这个榜有热泵、那个榜当默认」的口径漂移。
+    """
+    try:
+        d = json.load(open(HP, encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}, {}
+    m = {}
+    for c in d.get("cars") or []:
+        if c.get("heatpump") is not None:
+            m[norm_model(c.get("model"))] = bool(c["heatpump"])
+    return m, (d.get("coverage") or {})
+
+
+_HEATPUMP_MAP, HEATPUMP_COVERAGE = load_heatpump_facts()
+
+
+def heatpump_of(model):
+    """该车有没有热泵：True/False；表里没有→None（未知，消费端按 mixed 默认并披露）。"""
+    return _HEATPUMP_MAP.get(norm_model(model))
 OUT = os.path.join(HERE, "energy_compare.html")
 
 # ===== 物理续航模型：全部从 ev_range_model 单一事实源 import =====
@@ -243,6 +273,8 @@ def load_cars():
             "consSrc": cons_src,
             "weight": weight, "cd": cd, "area": area,
             "voltage": voltage, "swap": swap, "cdaPerTon": cda_per_ton,
+            # v10.67.0：热泵逐车事实（heatpump_facts.json；None=未采到，按 mixed 默认并披露）
+            "heatpump": heatpump_of(c["model"]),
             "cell": (c.get("facts") or {}).get("cell_brand") or (cells[0] if cells else None),
             "sales": (c.get("facts") or {}).get("trend_sales"),
         })
@@ -355,11 +387,20 @@ def build(cars_override=None, out=None, extra_head="", extra_tail="", title=None
                               # v10.52.0：TCO 常量注入（JS tco() 与 engine.py 同源；键名 camelCase 由 engine.tco_js 派生）
                               "tco": tco_js(), "annualKmMid": ANNUAL_KM_MID,
                              "tcoBasis":COST_BASIS + "；购置税2026-2027新能源减半5%（减税额上限1.5万）、燃油/油混10%；"
-                                        "以旧换新补贴因资格各异未计入；TCO 只披露不入分"}),
+                                        "以旧换新补贴因资格各异未计入；能源成本并列「声明电耗(CLTC)」与「物理年均电耗(真实续航，含风阻v³/暖风kW/温度)」两套口径——后者才对应实际电费，CLTC 通常偏低 15%–35%；TCO 只披露不入分"}),
         "__N_CARS__": str(len(cars)),
         "__SALES_MONTH__": str(sales_month or "见逐车销量标注"),
         "__N_CLTC__": str(sum(1 for c in cars if c["cltc"])),
         "__N_PHYS__": str(sum(1 for c in cars if c.get("weight") and c.get("cd"))),
+        # v10.67.0：热泵逐车核验覆盖（True/False 都算已核；None 未采到 → 半热泵半PTC 默认）
+        "__N_HP__": str(sum(1 for c in cars if c.get("heatpump") is not None)),
+        "__N_HP_NO__": str(sum(1 for c in cars if c.get("heatpump") is False)),
+        "__N_HP_TXT__": (
+            "本页 %d 款已核（其中 %d 款明确无热泵）" % (
+                sum(1 for c in cars if c.get("heatpump") is not None),
+                sum(1 for c in cars if c.get("heatpump") is False))
+            if _HEATPUMP_MAP else
+            "热泵事实库未随包（发布包零 JSON 纪律），重建榜单需在完整开发树运行；此处一律按半热泵半 PTC 默认"),
         "__BE_KM__": _be_txt(ber, "km"),
         "__BE_LOW__": _be_txt(ber, "low"),
         "__BE_HIGH__": _be_txt(ber, "high"),
@@ -573,7 +614,7 @@ __EXTRA_HEAD__
           <p><b>平衡里程怎么读：</b>摘要区给的是「家充纯电 vs 池内最优燃油/油混」8 年 TCO 相等的年里程——本池约 <b>__BE_KM__ km/年</b>，非能源成本 ±30% 得区间 <b>__BE_LOW__~__BE_HIGH__ km/年</b>。低于它纯电省不回固定成本差（车价差、购置税、保费、残值），高于它才越开越省，灰区内取决于你自己那台车的报价。<b>对平衡点影响最大的参数依次是 __SENS__</b>——说明它不是被轮胎、残值那些小项决定的，主要由能源价差与保费差决定。参数取值、来源机构与日期属<b>开发期估算结果，随包发布</b>；原始抓取资料不入包，改口径只需改参数重新打包，公式自动跟着走。</p>
           <p><b>默认值依据：</b>年里程 1.5–2.5 万（成本平衡点约 1.5 万km/年、区间 1.1~2.0 万，家充谷电口径，按参数带重算）；冬季气候带默认江淮（长江流域）；单次 300–500km、一年 1–5 次；有家充；不限牌；持有 5–8 年；高速 20–40%；非营运；可接受补能等待；家庭唯一用车。为人群常见画像，可按实际修改。</p>
           <p><b>销量口径（事实列，不进分）：</b>判档用<b>最近 6 个月逐月中位数</b>（中位抗清库/换代跳水，新车爬坡取「中位 vs 最新月」较大值）；页面逐车显示的是<b>单月车系口径</b>（含该车系所有能源形式），数据月 <b>__SALES_MONTH__</b>（月初未出数时回退到上上月）。两个口径不同，不可混读——单月高≠稳态强，单月中位低也不代表清库。</p>
-          <p><b>数据边界：</b>候选池 __N_CARS__ 款车（其中 __N_CLTC__ 款有续航数据、__N_PHYS__ 款有完整物理参数）。能源形式覆盖 BEV/PHEV/EREV/HEV/ICE 五种——纯电/插混为<b>官方核验</b>逐配置数据；燃油/油混/增程的 8 维分与逐配置来自<b>人工补采</b>（每维附信源 URL，见 runs/ 下 scores batch）与汽车之家结构化提取；<b>无电量数据的车</b>不编造续航、不参与续航调节（纯电显示「数据待核」），缺物理参数的车用回归估算电耗并标注来源。物理参数（整备质量/风阻Cd/长宽高/电压/换电）由汽车之家参数页采集，来源逐车可查（见 vehicle_physics.json）。TCO 为披露测算非定价承诺，实际花费因驾驶习惯/地区电价/保险折扣而异。</p>
+          <p><b>数据边界：</b>候选池 __N_CARS__ 款车（其中 __N_CLTC__ 款有续航数据、__N_PHYS__ 款有完整物理参数）。能源形式覆盖 BEV/PHEV/EREV/HEV/ICE 五种——纯电/插混为<b>官方核验</b>逐配置数据；燃油/油混/增程的 8 维分与逐配置来自<b>人工补采</b>（每维附信源 URL，见 runs/ 下 scores batch）与汽车之家结构化提取；<b>无电量数据的车</b>不编造续航、不参与续航调节（纯电显示「数据待核」），缺物理参数的车用回归估算电耗并标注来源。物理参数（整备质量/风阻Cd/长宽高/电压/换电）由汽车之家参数页采集，来源逐车可查（见 vehicle_physics.json）；<b>热泵空调也是逐车核验字段</b>（参数页「空调/冰箱 → 热泵空调」，id=8417，逐车带 <code>heatpump_src</code>）——__N_HP_TXT__；未采到的按「半热泵半 PTC」默认参与冬季续航并在此披露，不猜。TCO 为披露测算非定价承诺，实际花费因驾驶习惯/地区电价/保险折扣而异。</p>
         </div>
       </div>
     </div>
@@ -664,7 +705,9 @@ function readCond(){const c={};for(const fid of Object.keys(FACTORS))c[fid]=docu
 function tcoHtml(t){
   if(!t) return '无价格数据，不测算';
   const wan=x=>(x/10000).toFixed(2)+'万';
-  return '能源×8年 '+wan(t.energy8y)+'（'+t.unitEnergy.toFixed(3)+'元/km × '+t.annualKm+'km × 8）<br>'+
+  const phys=(t.energy8yPhys==null)?'':('<br><span style="color:#6b7280;font-size:10.5px">物理口径（真实续航，含风阻v³/暖风kW）'+
+    t.physCons+'kWh/100km → '+wan(t.energy8yPhys)+'，'+t.unitEnergyPhys.toFixed(3)+'元/km：<b>CLTC 通常偏低 15%–35%</b></span>');
+  return '能源×8年 '+wan(t.energy8y)+'（'+t.unitEnergy.toFixed(3)+'元/km × '+t.annualKm+'km × 8，声明电耗口径）'+phys+'<br>'+
     '保费×8年 '+wan(t.ins8y)+'（车价×费率×能源系数：约 '+(t.insAnnual||0).toLocaleString()+' 元/年，含续保递减）<br>'+
     '保养×8年 '+wan(t.maint8y)+'<br>购置税 '+wan(t.purchaseTax)+'（2026-2027新能源减半5%/燃油油混10%，减税上限1.5万）<br>'+
     '轮胎×8年 '+wan(t.tire8y)+'（'+(t.tireSize||'')+'寸整套 '+(t.tirePrice4||0)+' 元，按里程折损；电车胎更贵、磨得更快）<br>'+

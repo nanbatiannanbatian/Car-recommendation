@@ -131,6 +131,8 @@ def build_cars(cands, scores, mp, trims, vp, fl_by):
             "product":product, "cltc":cltc, "kwh":round(kwh,1) if kwh else None,
             "cons":round(cons,1), "consSrc":cons_src, "weight":weight, "cd":cd,
             "area":area, "voltage":voltage, "swap":swap, "cdaPerTon":cda, "boxy":False,
+            # v10.67.0：热泵逐车事实（categories/heatpump_facts.json；None 按半热泵半PTC 默认并披露）
+            "heatpump":EC.heatpump_of(c["model"]),
             "sales":c.get("sales_202610"),
         })
     cars.sort(key=lambda x:-x["product"])

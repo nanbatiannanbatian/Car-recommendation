@@ -282,10 +282,15 @@ def sections_html(rows, meta=None):
     trows = []
     for r in top:
         t = r.get("tco") or {}
+        up, ep = t.get("unit_energy_phys"), t.get("energy_8y_phys")
+        phys_cell = (f"<span style='font-size:10.5px;color:#6b7280'>{up:.3f}</span>"
+                     if isinstance(up, (int, float)) else "<span style='color:#9ca3af'>—</span>")
+        phys8_cell = (f"<span style='font-size:10.5px;color:#6b7280'>{(ep or 0)/10000:.2f}</span>"
+                      if isinstance(ep, (int, float)) else "<span style='color:#9ca3af'>—</span>")
         trows.append(
             f"<tr><td><b>{_esc(r['model'])}</b></td><td>{POWER_CN.get(r['power'], '')}</td>"
-            f"<td class='num'>{t.get('unit_energy', 0):.3f}</td>"
-            f"<td class='num'>{(t.get('energy_8y') or 0)/10000:.2f}</td>"
+            f"<td class='num'>{t.get('unit_energy', 0):.3f}<br>{phys_cell}</td>"
+            f"<td class='num'>{(t.get('energy_8y') or 0)/10000:.2f}<br>{phys8_cell}</td>"
             f"<td class='num'>{(t.get('ins_8y') or 0)/10000:.2f}</td>"
             f"<td class='num'>{(t.get('maint_8y') or 0)/10000:.2f}</td>"
             f"<td class='num'>{(t.get('purchase_tax') or 0)/10000:.2f}</td>"
@@ -293,13 +298,26 @@ def sections_html(rows, meta=None):
             f"<td class='num'>{(t.get('battery_risk_8y') or 0)/10000:.2f}</td>"
             f"<td class='num'><b>{(t.get('tco_8y') or 0)/10000:.2f}</b></td></tr>")
     be = ENG.breakeven_km(meta.get("cars_raw") or [], cond)
-    be_txt = (f"家充纯电 vs 池内最优燃油/油混：8 年 TCO 盈亏平衡约 <b>{be} km/年</b>"
-              if be is not None else "池内能源形式不足，盈亏平衡不适用")
+    be_p = ENG.breakeven_km(meta.get("cars_raw") or [], cond, basis="phys")
+    if be is not None and be_p is not None and be > 0 and be_p > 0:
+        be_txt = (f"家充纯电 vs 池内最优燃油/油混：8 年 TCO 盈亏平衡约 <b>{be} km/年</b>"
+                  f"（按声明电耗口径）→ <b>{be_p} km/年</b>（按物理真实电耗口径，反超点更晚）")
+    elif be is not None:
+        be_txt = f"家充纯电 vs 池内最优燃油/油混：8 年 TCO 盈亏平衡约 <b>{be} km/年</b>"
+    else:
+        be_txt = "池内能源形式不足，盈亏平衡不适用"
+    # v10.67.0：TCO 双口径的小字样式（物理口径那行）
     sec("tco_block",
+        "<style>.tco .phys{font-size:10.5px;color:#6b7280}</style>"
         "<div class='note'>8 年持有成本测算（<b>仅披露不入分</b>，事实列不计分纪律）。单位能源成本按画像年里程与充电条件；"
         "逐车电耗/油耗事实优先、缺省用形式中位；残值用 3 年保值率近似；购置税 2026-2027 新能源减半 5%、燃油/油混 10%；"
-        "以旧换新补贴因资格各异未计入。实际花费因驾驶习惯/地区电价/保险折扣而异。</div>"
-        "<table><thead><tr><th>车型</th><th>能源</th><th>能源元/km</th><th>能源8年(万)</th><th>保费8年(万)</th>"
+        "以旧换新补贴因资格各异未计入。实际花费因驾驶习惯/地区电价/保险折扣而异。"
+        "<br><b>「能源元/km」「能源8年」两格各有两行电平：</b>上行＝<b>声明电耗（CLTC/台架）</b>，"
+        "下行＝<b>物理年均电耗（真实续航口径）</b>——按本画像的温度档/路况/驾驶风格和逐车热管理算出的场景电耗，"
+        "与上方「有效续航」同源、含风阻 v³ 与暖风 kW。<b>CLTC 通常比真实低 15%–35%，看实际电费请看下行那行</b>；"
+        "燃油/油混不做电耗物理化，下行显示「—」（油耗按 WLTC/工信部口径）。</div>"
+        "<table><thead><tr><th>车型</th><th>能源</th><th>能源元/km<br><span class='phys'>声明/物理</span></th>"
+        "<th>能源8年(万)<br><span class='phys'>声明/物理</span></th><th>保费8年(万)</th>"
         "<th>保养8年(万)</th><th>购置税(万)</th><th>残值损失(万)</th><th>电池风险金(万)</th><th>8年合计(万)</th></tr></thead><tbody>"
         + "".join(trows) + "</tbody></table>"
         f"<p style='margin-top:8px'>{be_txt}。</p>")

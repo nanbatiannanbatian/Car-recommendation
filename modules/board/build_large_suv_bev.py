@@ -141,6 +141,7 @@ def main(argv=None):
     uni = json.load(open(UNIVERSE, encoding="utf-8"))
     sales = load_sales()
     crash = load_crash()
+    # v10.67.0：热泵逐车事实由 EC.heatpump_of() 统一提供（categories/heatpump_facts.json，未采到=None）
     cars, gaps, excluded = [], [], []
     for name in uni["names"]:
         try:
@@ -219,6 +220,8 @@ def main(argv=None):
             "voltage": None, "swap": None,
             "cdaPerTon": round(cd * area / (weight / 1000.0), 3) if (cd and area and weight) else None,
             "boxy": False, "sales": sales_of(name, official, sales),
+            # v10.67.0：热泵逐车事实（heatpump_facts.json；None 时冬季按半热泵半PTC 默认并披露）
+            "heatpump": EC.heatpump_of(official),
             "evidence": sc["evidence"], "coverage": sc["coverage"],
             "trims": ts, "trims_n": len(bev_specs),
             "sources": {"series": AH.SERIES_URL.format(sid=rec.get("sid")),

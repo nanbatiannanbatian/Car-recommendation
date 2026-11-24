@@ -172,6 +172,7 @@ CASES = [
     ("BUG-149", "预处理写SKILL.md仍会漏做:质量维依赖人传--complaints+预先聚合→pipeline代码内自动聚合(内存cands已回填销量)", "v10.63.0"),
     ("BUG-150", "无碰撞成绩车靠其他维度顶格反超有成绩车(腾势N8第3):safety封顶=min导致无成绩车与最差有成绩车并列→加通用cap_offset=-1.0", "v10.63.1"),
     ("BUG-151", "铁律只写文档靠不住(漏收/质量分全8):排查全部铁律,可代码化的收口成iron_rules门禁+sync--apply强制回归+修t016假断言+闸门fail-close", "v10.64.0"),
+    ("BUG-152", "热泵只当默认参数+电费只按CLTC:热管理三态无逐车事实(冬季续航一律半热泵半PTC)、TCO只算声明电耗(CLTC比真实低15-35%)→建heatpump_facts事实表+三态进模型+TCO双口径", "v10.67.0"),
 ]
 
 
@@ -5330,6 +5331,69 @@ def t151():
             "t016真比对 + 闸门fail-close + 反向注入可检出")
 
 
+def t152():
+    """BUG-152：热泵只当默认参数、电费只按 CLTC（v10.67.0）。
+
+    用户（2026-11-24）："热泵是不是做成逐车事实字段"+"TCO 都展示，但说明物理口径才是真实续航"。
+    两个病灶：
+      ① 热管理三态（热泵/PTC/未知）此前没有任何逐车事实来源，67 车维表里「热泵」出现 0 次 →
+         全部落到 mixed 默认：热泵车冬季续航被系统性低估 15–20 个点（−10℃：热泵 0.75 vs 混合 0.68），
+         而这个档正好驱动「东北能不能买纯电」的硬条件 H2；
+      ② TCO 的能源成本只用声明电耗（CLTC 台架口径），比真实用车低 15%–35% →
+         纯电的用车成本被算便宜、盈亏平衡点被算得偏早。
+    修法：① 建 categories/heatpump_facts.json（汽车之家参数页「空调/冰箱→热泵空调」id=8417，
+    逐车 source_url + 三态，未采到记 null 不推断为无），builder 统一走 EC.heatpump_of()；
+    ② tco() 增物理口径（unit_energy_phys/energy_8y_phys，与有效续航同源）+ 页面双行展示 +
+    盈亏平衡双值（basis="phys" 会上移）。
+    锁死：①事实表覆盖≥60 且逐条有 source_url；②三态→续航单调（热泵>未知>PTC）；
+    ③物理电耗>声明电耗且 8 年能源费可算；④物理口径平衡点晚于声明口径；⑤清掉 heatpump 即退回 mixed（反向注入）。
+    """
+    import json as _json
+    hp = _json.loads(open(_read_path("categories/heatpump_facts.json"), encoding="utf-8").read())
+    cov = hp["coverage"]
+    assert cov["standardized"] >= 60, f"热泵事实覆盖不足: {cov}"
+    assert all(c.get("source_url") for c in hp["cars"] if c["heatpump"] is not None), \
+        "有结论（有/无）的热泵事实必须逐条带来源 URL；未采到的记 null"
+    assert all(c["heatpump"] in (True, False, None) for c in hp["cars"]), "热泵只允许三态"
+    # ② 三态 → 冬季续航单调（热泵 > 未知 > PTC）
+    from modules.envscore import engine as ENG
+    from modules.envscore import build_energy_compare as B
+    base = {"model": "标定车", "power": "BEV", "body": "SUV", "kwh": 80, "cltc": 600,
+            "cons": 13.5, "weight": 2200, "cd": 0.26, "area": 2.55}
+    cond = dict(ENG.DEFAULT_COND, winter_temp="m10to0")
+    r_t = ENG.range_calc(dict(base, heatpump=True), cond)["range"]
+    r_u = ENG.range_calc(dict(base, heatpump=None), cond)["range"]
+    r_f = ENG.range_calc(dict(base, heatpump=False), cond)["range"]
+    assert r_t > r_u > r_f, f"热泵三态未单调: {r_t}/{r_u}/{r_f}"
+    # ⑤ 反向注入：去掉 heatpump 必须退回 mixed
+    assert r_u == ENG.range_calc(dict(base), cond)["range"], "未声明热泵时未退回 mixed 默认"
+    # ③ 物理电耗 > 声明电耗；8 年能源费可算
+    t = ENG.tco(base, cond)
+    assert t["unit_energy_phys"] and t["unit_energy_phys"] > t["unit_energy"], \
+        f"物理口径未显著高于声明口径: {t['unit_energy_phys']} vs {t['unit_energy']}"
+    assert t["energy_8y_phys"] > t["energy_8y"], "物理口径 8 年能源费应更高"
+    # builder 统一取数（不许各榜自己读 JSON 或各写默认）
+    assert "heatpump_of" in _read("board/build_compact_sedan.py") + \
+        _read("board/build_midsuv_full.py") + _read("board/build_large_suv_bev.py"), \
+        "builder 未统一走 EC.heatpump_of()"
+    assert "load_heatpump_facts" in _read("envscore/build_energy_compare.py"), "缺热泵事实加载器"
+    # ④ 物理口径盈亏平衡更晚（电车购置价更高才有正的平衡点，正是真实场景）
+    pool = [dict(base, heatpump=True, price=20.0, priceLow=20.0, priceHigh=25.0),
+            {"model": "油车", "power": "ICE", "body": "轿车", "price": 10.0, "priceLow": 10.0,
+             "fuelL100": 7.0}]
+    be_d = ENG.breakeven_km(pool, cond)
+    be_p = ENG.breakeven_km(pool, cond, basis="phys")
+    assert be_d and be_p and be_d > 0 and be_p > be_d, f"物理口径平衡点未上移: {be_d} → {be_p}"
+    # 前端：TCO 表双行 + JS 同源函数
+    ces = _read("board/cross_energy_sections.py")
+    assert "物理年均电耗（真实续航口径）" in ces and "energy_8y_phys" in ces, "页面未展示物理口径"
+    js = open(_read_path("modules/envscore/engine.js"), encoding="utf-8").read()
+    assert "physPer100" in js and "energy8yPhys" in js, "JS 未镜像双口径"
+    return (f"热泵逐车三态({cov['standardized']}/{cov['total']} 有据) + 冬季续航单调 "
+            f"{r_t}/{r_u}/{r_f}km + TCO 双口径(物理 {t['unit_energy_phys']} vs 声明 {t['unit_energy']} 元/km)"
+            f" + 平衡点 {be_d}→{be_p} km/年 + 前端双行")
+
+
 def t150():
     """BUG-150：无碰撞成绩车靠其他维度顶格反超有成绩车（v10.63.1）。
 
@@ -5507,7 +5571,7 @@ def t146():
 
 
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120, t121, t122, t123, t124, t125, t126, t127, t128, t129, t130, t131, t132, t133, t134, t135, t136, t137, t138, t139, t140, t141, t142, t143, t144, t145, t146, t147, t148, t149, t150, t151]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120, t121, t122, t123, t124, t125, t126, t127, t128, t129, t130, t131, t132, t133, t134, t135, t136, t137, t138, t139, t140, t141, t142, t143, t144, t145, t146, t147, t148, t149, t150, t151, t152]
 
 
 def run():
