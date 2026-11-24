@@ -13,7 +13,7 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 10.62.1
+version: 10.63.1
 author: "nanbatiannanbatian"
 ---
 
@@ -266,15 +266,13 @@ HTML/报告用 `--as-of <YYYYMM>` 标注事实列数据月，禁止停在"—"�
 
 **② 出榜流程（唯一命令）**
 ```bash
-# 质量维必做三步预处理（v10.62 根因修复，缺一会让质量分全 8.0）：
-python3 modules/board/sales_backfill.py --candidates <候选池.json> --as-of <YYYYMM> \
-    --snapshot runs/dcd_sales_snapshot_<YYYYMM>.json --apply   # ①销量写回候选池文件(内存回填不够)
-python3 modules/research/fetch_complaints.py --skip-fetch \
-    --pool <候选池.json> --json runs/_complaints/agg_<category>.json  # ②投诉聚合(需销量算per_10k)
+# v10.63 起质量维预处理已固化进 pipeline 代码，无需手工三步：
 python3 pipeline.py --category <categories/下的配置ID> \
     --candidates <候选池.json> --out <输出目录> \
-    --as-of <YYYYMM销量月> --quality --complaints runs/_complaints/agg_<category>.json \
-    [--force-stale 仅在用无指纹快照时]                          # ③出榜必须传 --complaints
+    --as-of <YYYYMM销量月> --quality \
+    [--force-stale 仅在用无指纹快照时]
+# pipeline 自动：销量回填(内存) → 投诉缓存就地聚合(用已回填销量的 cands) → 喂给 quality_score。
+# 仅当要用外部聚合 JSON 时才传 --complaints（回测/复现场景）。
 ```
 **为什么不许省**：2026-11-24 中大型榜质量分全 8.0 的根因就是三步全没做——销量只在 pipeline 内存回填没写回文件→投诉聚合算不出 per_10k；出榜没传 `--complaints`→投诉数据没进 quality_score；网查到的车质网 PPH 比值无处放（已加 `complaint_pph` 字段通道）。有 PPH 数据的车（唐L 643.8/万、小鹏G9 153.3/万）应得 5.4~6.6，不该和真无数据的车同为 8.0。
 

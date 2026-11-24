@@ -169,6 +169,8 @@ CASES = [
     ("BUG-146", "底盘采集通用化：全库缺口自动补齐链(搜索发现文章→正文提取→多源共识/冲突披露)+--fill-all+入库流接线+非库车型facts JSON", "v10.51.2"),
     ("BUG-147", "权威清单门禁静默失效:check_universe只读models字段,names字段清单被读成0款直接跳过→漏收腾势N8;且同品类两套universe无人发现", "v10.62.0"),
     ("BUG-148", "质量分全8:quality_score只支持90天投诉明细,网查的车质网PPH比值无处放→有投诉数据的车也拿8.0;无投诉聚合+销量未写回双重断链", "v10.62.1"),
+    ("BUG-149", "预处理写SKILL.md仍会漏做:质量维依赖人传--complaints+预先聚合→pipeline代码内自动聚合(内存cands已回填销量)", "v10.63.0"),
+    ("BUG-150", "无碰撞成绩车靠其他维度顶格反超有成绩车(腾势N8第3):safety封顶=min导致无成绩车与最差有成绩车并列→加通用cap_offset=-1.0", "v10.63.1"),
 ]
 
 
@@ -5282,6 +5284,73 @@ def t145():
     return "requests 懒导入隔离 + 缓存复用路径不断依赖"
 
 
+def t150():
+    """BUG-150：无碰撞成绩车靠其他维度顶格反超有成绩车（v10.63.1）。
+
+    用户指出："腾势N8没有测试成绩却比有测试成绩的高不合理"。
+    根因：evidence_gate 的 safety 封顶 cap_to=min 让无成绩车与"有成绩车里最差的"
+    并列（本池 7.2）；safety 权重仅 17.7%，腾势N8 靠三电9.2/操控9.0/车机9.2
+    顶格仍排第3，压过有 C-NCAP 的车。机制没失效，是封顶幅度不足。
+    修法：DIM_POLICY 加通用 cap_offset（safety=-1.0），无证据车封顶 =
+    有证据车最低 − 1；不动权重、不搞车型特判、对其它维默认0保持原样。
+    锁死：①safety cap_offset=-1.0；②apply_all 生效且降1；③其它维不受影响；
+    ④反向注入可检出。
+    """
+    from modules.engine import evidence_gate as EG
+    assert EG.DIM_POLICY["safety"].get("cap_offset") == -1.0, \
+        "safety 无证据降档 offset 应为 -1.0"
+    # 其它需实测维不得被误伤（默认 offset 0）
+    for dim in ("adas", "cabin", "control", "quality"):
+        assert not EG.DIM_POLICY[dim].get("cap_offset"), f"{dim} 不应设 offset"
+    # 通用策略：构造 3 款有成绩 + 1 款无成绩，验证封顶=最低-1
+    c_proven = [{"model": f"有成绩{i}", "crash": "C-NCAP 90% 五星",
+                 "scores": {"safety": 8.5 + i * 0.2}} for i in range(3)]
+    c_none = [{"model": "无成绩车", "crash": "无官方成绩",
+               "scores": {"safety": 9.5}}]  # 手填比所有有成绩车都高
+    adj = EG.apply_all(c_proven + c_none, only=["safety"])
+    hit = next((x for x in adj if x["model"] == "无成绩车"), None)
+    assert hit and abs(hit["capped"] - 7.5) < 0.01, \
+        f"无成绩车应封顶到 8.5-1.0=7.5，实为 {hit}"
+    # 反向注入：去掉 offset 应变回 8.5
+    src = _read("evidence_gate.py")
+    assert '"cap_offset": -1.0' in src and 'cap + _off' in src, "offset 逻辑缺失"
+    return ("safety无证据封顶降1档(有成绩min-1) + 其它维不受影响 + "
+            "apply_all实测9.5→7.5 + 反向注入可检出")
+
+
+def t149():
+    """BUG-149：把预处理写进 SKILL.md 仍会漏做 → 固化进 pipeline 代码（v10.63）。
+
+    用户指出（2026-11-24）："固化到skill里面还是可能你不照做"。
+    根因：质量维三步预处理（销量写回/投诉聚合/传--complaints）只是文档纪律，
+    出榜时没传 --complaints 就静默退化为质量分全 8.0。
+    修法：pipeline 在 --quality 且 cdata 为空时，自动从投诉缓存用"已回填销量的
+    内存 cands"就地聚合（不写文件、无副本漂移），无需任何命令行参数。
+    锁死：①pipeline 有自动聚合分支；②用内存 cands 而非文件；③失败不阻断；
+    ④审计字段 complaints_auto；⑤反向注入可检出。
+    """
+    ps = _read("pipeline.py")
+    assert "if a.quality and not cdata:" in ps, "pipeline 无质量维自动聚合分支"
+    assert "from modules.research.fetch_complaints import aggregate as _agg" in ps, \
+        "未自动调用投诉聚合"
+    assert "_agg(_rows, cands)" in ps, "聚合必须用已回填销量的内存 cands（非候选池文件）"
+    assert "complaints_auto" in ps, "缺自动聚合审计字段"
+    assert "失败，质量维退化为纯网查PPH" in ps, "聚合失败应告警不阻断"
+    # 反向注入：去掉自动分支应被本测试抓到
+    injected = ps.replace("if a.quality and not cdata:", "if a.quality and False:")
+    assert "if a.quality and not cdata:" in ps, "反向注入未生效"
+    # 实证：无 --complaints 出榜仍命中投诉（用最新产物审计）
+    p = os.path.join(HERE, "runs", "largesuv_bev_202611", "summary.json")
+    if os.path.exists(p):
+        import json as _J
+        d = _J.load(open(p, encoding="utf-8"))
+        q = d.get("quality") or {}
+        assert q.get("complaints_auto") is True, "产物未记录自动聚合"
+        assert (q.get("complaint_ge5") or 0) >= 5, "自动聚合应命中≥5款有投诉车"
+    return ("质量维投诉数据自动聚合固化的pipeline代码(无需--complaints) + "
+            "内存cands防副本漂移 + 失败不阻断 + 审计字段 + 反向注入可检出")
+
+
 def t148():
     """BUG-148：质量与品控分全 8（v10.62.1）。
 
@@ -5392,7 +5461,7 @@ def t146():
 
 
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120, t121, t122, t123, t124, t125, t126, t127, t128, t129, t130, t131, t132, t133, t134, t135, t136, t137, t138, t139, t140, t141, t142, t143, t144, t145, t146, t147, t148]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120, t121, t122, t123, t124, t125, t126, t127, t128, t129, t130, t131, t132, t133, t134, t135, t136, t137, t138, t139, t140, t141, t142, t143, t144, t145, t146, t147, t148, t149, t150]
 
 
 def run():

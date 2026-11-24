@@ -37,7 +37,12 @@ import statistics
 #     33 款无样本车里 21 款填 8.0、12 款填 5.48~7.8，同一状态两种尺度，
 #     填低的车吃暗亏（T6 填 6.09，比填 8.0 被封到 6.74 的车还低）。
 DIM_POLICY = {
-    "safety":     {"need": "crash",      "cap_to": "min", "min_proven": 3,
+    # v10.63 根因修复（用户 2026-11-24：「腾势N8没有测试成绩却比有成绩的高不合理」）：
+    # 旧 cap_to=min 让无成绩车与"有成绩车里最差的"并列（本池 7.2），
+    # 而 safety 权重仅 17.7%，腾势N8 靠三电/操控/车机顶格仍能排第3压过 C-NCAP 车。
+    # 加通用 cap_offset：无证据车封顶 = 有证据车最低 + offset（-1.0 = 明确低一档）。
+    # 这是策略参数不是车型特判，对所有"需实测"维度开放，默认 0 保持其它维不变。
+    "safety":     {"need": "crash",      "cap_to": "min", "cap_offset": -1.0, "min_proven": 3,
                    "why": "官方碰撞成绩（C-NCAP 得分率 / C-IASI 等级）"},
     "adas":       {"need": "experience", "cap_to": "median", "min_proven": 3,
                    "why": "独立实测或车主样本（配置表看不出算法调校）"},
@@ -140,6 +145,11 @@ def apply_all(cands, experience_lib=None, policy=None, only=None, anchor=None) -
             else:                         # median
                 cap = round(statistics.median([v for _, v in proven]), 2)
                 anchor_label = f"有证据车中位（{len(proven)} 款）"
+            # v10.63：通用封顶偏移（如 safety -1.0 = 无成绩车必须比有成绩最低还低一档）
+            _off = float(rule.get("cap_offset") or 0.0)
+            if _off:
+                cap = round(cap + _off, 2)
+                anchor_label += f"{_off:+.1f}（无证据降档）"
 
         force = bool(rule.get("force"))
         for c in cands:

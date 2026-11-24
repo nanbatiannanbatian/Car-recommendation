@@ -1064,10 +1064,32 @@ def main():
               + (f"（跳过存疑 {len(_recall_report['skipped_uncertain'])} 款）"
                  if _recall_report["skipped_uncertain"] else ""))
 
+    # v10.63 根因固化：质量维的投诉数据不再依赖人记得传 --complaints + 预先聚合。
+    # 根因（2026-11-24）：流程写在 SKILL.md 里，执行时照样漏做 → 质量分全 8.0。
+    # 文档纪律靠不住，必须代码强制：--quality 时若 cdata 为空，自动从投诉缓存
+    # 按当前 cands（已回填销量）就地聚合，密度 per_10k 当场可算。
+    # 用内存 cands 而非候选池文件：销量回填只在内存发生，写文件会引入副本漂移。
+    _auto_cdata = None
+    if a.quality and not cdata:
+        try:
+            from modules.research.fetch_complaints import aggregate as _agg, load_cache as _loadc
+            _rows = _loadc()  # 默认 runs/_complaints/complaints.jsonl
+            _auto_cdata = _agg(_rows, cands)  # 用刚回填过销量的内存 cands
+            cdata = _auto_cdata
+            parts.append(f"> 投诉反馈（自动聚合）：车质网缓存窗口 "
+                         f"{cdata.get('window_days')} 天，命中 "
+                         f"{len(cdata.get('models') or {})} 款，密度=投诉/万台，仅参考不改档。")
+            parts.append("")
+            print(f"[投诉自动聚合] 缓存 {len(_rows)} 条 → 命中 {len(cdata.get('models') or {})} 款"
+                  "（无需 --complaints 参数）")
+        except Exception as _ex:  # 聚合失败不阻断，显式告警
+            print(f"[投诉自动聚合] 失败，质量维退化为纯网查PPH：{type(_ex).__name__}: {_ex}")
+
     if a.quality:
         cands, _ = QS.apply(cands, cdata)
         parts += ["---", "", QS.report(cands), ""]
         summary["quality"] = QS.coverage(cands)
+        summary["quality"]["complaints_auto"] = bool(_auto_cdata)
     summary["recall"] = {"status": _recall_report["status"],
                          "injected": _recall_report["injected"],
                          "detail": _recall_report["injected_detail"],
