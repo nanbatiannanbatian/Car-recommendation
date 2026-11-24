@@ -78,6 +78,26 @@ def _complaint_penalty(v: dict) -> tuple[float, str]:
                    f"密度扣分 {density:.2f}，问题性质扣分 {severe:.2f}（{tag_txt}）")
 
 
+def _complaint_pph_penalty(c: dict) -> tuple[float, str]:
+    """车质网投诉销量比（万分之）→ 质量扣分（v10.62 根因修复）。
+
+    背景：quality_score 文档写明数据源含"车质网投诉聚合"，但实现只支持
+    "90天投诉明细"形态（complaints.json 的 count/per_10k）。网查到的车质网
+    PPH 比值（13 款车有，如唐L 643.8/万、小米YU7 21.2/万）无处可放，导致
+    这些车全拿中性 8.0——用户质疑"质量分全 8 不合理"。
+    修复：与 _complaint_penalty 共用同一密度公式（log 压缩、封顶 2.2），
+    两种形态数据按"有明细用明细、无明细用 PPH 比值"优先级取，不双计。
+    PPH 是车系级（增程/纯电可能共用），故同样标注口径，保守处理。
+    """
+    pph = c.get("complaint_pph")
+    if not isinstance(pph, (int, float)) or pph <= 0:
+        return 0.0, "无车质网投诉销量比数据"
+    src = str(c.get("complaint_pph_source") or "车系级")
+    density = min(2.2, 2.0 * math.log1p(float(pph)) / math.log1p(50.0))
+    return density, (f"车质网投诉销量比 {float(pph):g}/万辆（{src}，按车系口径保守）；"
+                     f"密度扣分 {density:.2f}")
+
+
 def _pph_adjust(c: dict) -> tuple[float, str]:
     if not c.get("ah_pph_usable"):
         return 0.0, "PPH 样本不足，中性处理"
@@ -123,6 +143,10 @@ def _recall_penalty(c: dict) -> tuple[float, str]:
 
 def score_one(c: dict, complaint: dict | None) -> dict:
     comp_pen, comp_note = _complaint_penalty(complaint or {})
+    # v10.62：投诉明细优先；无明细时用网查车质网PPH比值（同一密度公式，不双计）
+    has_detail = int((complaint or {}).get("count") or 0) >= 5 and (complaint or {}).get("per_10k") is not None
+    if not has_detail and c.get("complaint_pph"):
+        comp_pen, comp_note = _complaint_pph_penalty(c)
     pph_adj, pph_note = _pph_adjust(c)
     rec_adj, rec_note = _recall_penalty(c)
     raw = BASE - comp_pen + pph_adj + rec_adj
@@ -130,9 +154,10 @@ def score_one(c: dict, complaint: dict | None) -> dict:
 
     has_complaint = int((complaint or {}).get("count") or 0) >= 5
     has_pph = bool(c.get("ah_pph_usable"))
+    has_web_pph = bool(c.get("complaint_pph"))  # v10.62：网查PPH也算有据，提置信
     if has_complaint and has_pph:
         conf = "high"
-    elif has_complaint or has_pph:
+    elif has_complaint or has_pph or has_web_pph:
         conf = "medium"
     else:
         conf = "low"
@@ -149,6 +174,8 @@ def score_one(c: dict, complaint: dict | None) -> dict:
         },
         "pph": c.get("ah_pph") if has_pph else None,
         "pph_usable": has_pph,
+        "complaint_pph": c.get("complaint_pph"),  # v10.62 车质网PPH(网查)
+        "complaint_pph_source": c.get("complaint_pph_source"),
         "recall_events": c.get("recall_events") or [],
         # v10.19.0：审计用——有几起纯软件OTA召回按口径不纳入（单一真相源判定）
         "recall_ota_excluded": sum(1 for e in (c.get("recall_events") or [])

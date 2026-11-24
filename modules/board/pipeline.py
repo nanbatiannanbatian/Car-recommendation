@@ -574,9 +574,19 @@ def main():
     # 漏收的车必须逐个判定：能入池的补入候选池+trims.json，不能入池的写进 pool_excluded[] 并写明事实原因。
     # 这是对"Model 3 漏收"事故的根因修复（此前只靠人记得盘点，没接进出榜链路）。
     from modules.engine import trim_coverage as TC
-    _univ = a.universe or str(paths.cat(f"universe_{a.category}.json"))
+    # v10.62 根因修复：优先用品类配置显式指定的唯一权威清单（cfg["universe"]），
+    # 其次命令行 --universe，最后才回退命名约定。防止同品类多副本清单各自为政。
+    _cfg_univ = (cfg.get("universe") or "").strip()
+    if _cfg_univ:
+        _cfg_univ = _cfg_univ if os.path.isabs(_cfg_univ) else str(paths.ROOT / _cfg_univ)
+    _univ = _cfg_univ or a.universe or str(paths.cat(f"universe_{a.category}.json"))
     if os.path.exists(_univ) and not a.skip_universe_gate:
         _ur = TC.check_universe(a.candidates, _univ, data.get("pool_excluded", []))
+        # v10.62 根因修复：清单格式读不到车名必须硬拦。
+        # 旧版只查 not_covered，names 字段清单被读成 0 款→静默跳过→漏收腾势N8 没被拦。
+        if _ur.get("error"):
+            sys.exit("完整性门禁：权威清单读取失败（拒绝静默跳过）：" + _ur["error"] +
+                     f"\n→ 清单路径 {_univ}；应含 names/models 车名数组。")
         if _ur.get("available") and _ur.get("not_covered"):
             sys.exit("完整性门禁：以下同级在售车漏收且未说明原因：" +
                      "、".join(_ur["not_covered"]) +

@@ -34,7 +34,8 @@ import sys
 import time
 
 import requests
-from lxml import html as LH
+# v10.62：lxml 只在联网抓取 parse_page 用，聚合(aggregate)不需要。
+# 顶层 import 会让"离线聚合缓存"因缺 lxml 直接崩——抓取依赖不该阻断纯本地分析。
 
 import paths
 
@@ -64,6 +65,7 @@ def _session() -> requests.Session:
 
 
 def parse_page(page: int) -> list[dict]:
+    from lxml import html as LH  # 仅联网抓取需要；离线聚合不触发
     s = _session()
     r = s.get(BASE.format(page=page), timeout=30)
     if r.status_code != 200:

@@ -98,7 +98,11 @@ def _uname(s):
     销量榜用「MG 07 EV/特斯拉Model 3/ZEEKR 007」，候选池用「MG 07 纯电/特斯拉Model 3/极氪007」——
     精确字符串会误报漏收，必须归一化。"""
     n = "".join(c for c in str(s).lower() if c.isalnum())
-    for suf in ("ev", "pureev", "bev", "phev", "dmi", "evphev", "纯电"):
+    # v10.62：补"纯电版/ev版/插混版/增程版"等后缀——
+    # 旧版只处理"纯电"，"问界M7 纯电版"归一化后仍是"问界m7纯电版"，
+    # 与权威清单"问界M7"匹配不上→误报漏收。
+    for suf in ("纯电版", "ev版", "插混版", "增程版", "pureev", "evphev",
+                "纯电", "bev", "phev", "dmi", "ev"):
         if n.endswith(suf) and len(n) > len(suf) + 2:
             n = n[:-len(suf)]
             break
@@ -110,14 +114,50 @@ def _uname(s):
     return n
 
 
+def _extract_universe_names(u) -> tuple[list, str | None]:
+    """从 universe JSON 提取车名列表——兼容多种历史格式（v10.62 根因修复）。
+
+    背景（2026-11-24 漏收腾势N8 根因之一）：项目里两份 universe 用了不同字段名：
+      · universe_car_midsuv_bev.json      → {"models": [...]}
+      · universe_large_suv_bev.json       → {"names": [...]}
+    旧版只读 models，读到 names 清单时 universe=0 → 门禁静默跳过、形同虚设。
+    这里统一收口所有已知格式；读不到任何车名时返回 error，由调用方硬拦，绝不静默。
+    """
+    if isinstance(u, list):
+        return u, None
+    if not isinstance(u, dict):
+        return [], f"universe 顶层类型非法：{type(u).__name__}"
+    # 车名字段：names 优先（现成权威清单），其次 models / candidates / universe
+    for key in ("names", "models", "candidates", "universe"):
+        v = u.get(key)
+        if isinstance(v, list) and v:
+            # 元素可以是字符串，也可以是 {"model"/"name": ...} 对象
+            out = []
+            for x in v:
+                if isinstance(x, str):
+                    out.append(x)
+                elif isinstance(x, dict):
+                    nm = x.get("model") or x.get("name")
+                    if nm:
+                        out.append(nm)
+            if out:
+                return out, None
+    return [], ("universe JSON 无任何车名（已试 names/models/candidates/universe 字段）——"
+                "门禁拒绝静默跳过，请修清单格式")
+
+
 def check_universe(cands_path: str, universe_path: str | None, excluded: list | None = None) -> dict:
     """候选池完整性盘点（v9.7.24）：对照权威车型清单，报出漏收的车型。
-    universe json 格式：{"models": ["车型A", ...]} 或纯 list。
-    v9.7.43：用归一化名称比对（去空格/EV后缀），避免别名误报漏收。"""
+    universe json 格式：{"names":[...]} / {"models":[...]} / 纯 list，v10.62 全部兼容。
+    v9.7.43：用归一化名称比对（去空格/EV后缀），避免别名误报漏收。
+    v10.62：读不到车名时返回 error（不再静默返回空清单放过）。"""
     if not universe_path or not os.path.exists(universe_path):
         return {"available": False}
     u = json.load(open(universe_path, encoding="utf-8"))
-    universe = set(u.get("models", []) if isinstance(u, dict) else u)
+    names, err = _extract_universe_names(u)
+    if err:
+        return {"available": True, "error": err, "universe": 0, "not_covered": []}
+    universe = set(names)
     pool = json.load(open(cands_path, encoding="utf-8"))
     cands = pool.get("candidates", []) if isinstance(pool, dict) else pool
     inpool = {c.get("model") for c in cands}

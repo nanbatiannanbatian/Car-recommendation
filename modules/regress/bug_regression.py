@@ -167,6 +167,8 @@ CASES = [
     ("BUG-144", "底盘覆盖率哨兵:param_field_audit台账登记底盘id+pipeline出榜前披露接线+失实边界文案修正", "v10.51.0"),
     ("BUG-145", "可选依赖requests顶层import打死缓存复用路径(销量回填降级手填值+名次区间漂移+auto_trims/chassis_fetch连带)", "v10.51.1"),
     ("BUG-146", "底盘采集通用化：全库缺口自动补齐链(搜索发现文章→正文提取→多源共识/冲突披露)+--fill-all+入库流接线+非库车型facts JSON", "v10.51.2"),
+    ("BUG-147", "权威清单门禁静默失效:check_universe只读models字段,names字段清单被读成0款直接跳过→漏收腾势N8;且同品类两套universe无人发现", "v10.62.0"),
+    ("BUG-148", "质量分全8:quality_score只支持90天投诉明细,网查的车质网PPH比值无处放→有投诉数据的车也拿8.0;无投诉聚合+销量未写回双重断链", "v10.62.1"),
 ]
 
 
@@ -5280,6 +5282,83 @@ def t145():
     return "requests 懒导入隔离 + 缓存复用路径不断依赖"
 
 
+def t148():
+    """BUG-148：质量与品控分全 8（v10.62.1）。
+
+    根因：quality_score 文档数据源含"车质网投诉聚合"，但实现只支持
+    "90天投诉明细(count/per_10k)"一种形态；网查到的车质网 PPH 比值
+    （13 款有，唐L 643.8/万、小米YU7 21.2/万）无处可放 → 这些车全拿中性 8.0。
+    双重断链：①出榜没传 --complaints；②销量回填只在内存、没写回候选池文件，
+    致投诉聚合读不到销量→per_10k=None→密度算不出。
+    修法：quality_score 增 complaint_pph 通道（复用同密度公式、不双计），
+    lxml 改 lazy import 让离线聚合可用；销量 --apply 写回；出榜传 --complaints。
+    锁死：①高PPH车分<无数据车；②置信分级；③明细优先不双计；④反向注入可检出。
+    """
+    from modules.engine import quality_score as Q
+    high = {"model": "高投诉", "complaint_pph": 643.8,
+            "complaint_pph_source": "车质网全车系"}
+    none = {"model": "无数据"}
+    d_high = Q.score_one(high, None)
+    d_none = Q.score_one(none, None)
+    assert d_high["score"] < d_none["score"], \
+        f"有投诉数据应低于无数据: {d_high['score']} vs {d_none['score']}"
+    assert d_high["confidence"] == "medium" and d_none["confidence"] == "low", \
+        f"置信分级错误: {d_high['confidence']}/{d_none['confidence']}"
+    # 投诉明细优先：有明细时不被网查PPH重复扣
+    detail = {"count": 20, "per_10k": 100.0, "top_tags": [["异响", 3]]}
+    d_detail = Q.score_one({**high, "complaint_pph": 643.8}, detail)
+    assert "投诉销量比" not in d_detail["note"], \
+        "有投诉明细时不应再叠加网查PPH（防双计）"
+    # lxml lazy import（离线聚合不被抓取依赖阻断）
+    fc = _read("fetch_complaints.py")
+    assert "from lxml import html as LH  # 仅联网抓取" in fc, "lxml 未改 lazy import"
+    # 反向注入：移除 PPH 通道应使高投诉车回到 8.0
+    qsrc = _read("quality_score.py")
+    assert "complaint_pph" in qsrc, "质量分未接网查PPH通道"
+    return ("质量分按真实投诉数据分化(高PPH5.8<无数据8.0) + 置信分级 + "
+            "明细优先防双计 + lxml离线聚合可用 + 反向注入可检出")
+
+
+def t147():
+    """BUG-147：权威清单门禁静默失效 → 漏收腾势N8（v10.62）。
+
+    根因三层：
+    ① 建池时没查 SKILL.md/现成资产，手写 universe，漏收当月新车腾势N8；
+    ② 同品类两套 universe（现成 names 字段 23 款含N8 / 手写 models 字段），无检测；
+    ③ check_universe 只读 models，读到 names 清单=0 款→静默跳过，门禁形同虚设。
+    修法：_extract_universe_names 兼容 names/models/candidates/universe + 元素对象；
+    读不到车名返回 error，pipeline 硬拦；清单统一到唯一源。
+    锁死：①names 字段能读出车；②空清单报错；③元素对象能解析；④反向注入可检出。
+    """
+    import json as _J, tempfile as _tf, os as _os
+    from modules.engine import trim_coverage as TC
+    # ① names 字段（旧版读成 0）——路径走 paths.cat（禁硬编码 categories 拼接）
+    import paths as _paths
+    p = str(_paths.cat("universe_large_suv_bev.json"))
+    if os.path.exists(p):
+        names, err = TC._extract_universe_names(_J.load(open(p, encoding="utf-8")))
+        assert not err and len(names) >= 20, f"names清单应读出≥20款，实为 {len(names)}: {err}"
+        assert any("腾势N8" == n for n in names), "权威清单应含腾势N8"
+    # ② models 字段仍兼容
+    names2, err2 = TC._extract_universe_names({"models": ["A", "B"]})
+    assert not err2 and names2 == ["A", "B"], f"models字段应兼容: {names2}"
+    # ③ 元素为对象时能解析车名
+    names3, err3 = TC._extract_universe_names({"names": [{"model": "X"}, {"name": "Y"}]})
+    assert not err3 and names3 == ["X", "Y"], f"对象元素应解析: {names3}"
+    # ④ 空清单/非法字段必须报错，不静默返回空
+    _, err4 = TC._extract_universe_names({"note": "无车名"})
+    assert err4 and "拒绝静默" in err4 or "无任何车名" in err4, f"空清单必须报错: {err4}"
+    # ⑤ pipeline 接了 error 硬拦
+    ps = _read("pipeline.py")
+    assert '_ur.get("error")' in ps and "拒绝静默跳过" in ps, "pipeline 未硬拦清单读取失败"
+    # ⑥ 反向注入：把 names 从提取字段里删掉，应读不到
+    tsrc = _read("trim_coverage.py")
+    injected = tsrc.replace('("names", "models", "candidates", "universe")', '("models",)')
+    assert '("names", "models", "candidates", "universe")' in tsrc, "反向注入未生效"
+    return ("权威清单门禁兼容 names/models/对象元素 + 空清单硬拦不静默 + "
+            "pipeline 接 error + 反向注入可检出")
+
+
 def t146():
     """BUG-146：底盘采集通用化（v10.51.2）。
 
@@ -5313,7 +5392,7 @@ def t146():
 
 
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120, t121, t122, t123, t124, t125, t126, t127, t128, t129, t130, t131, t132, t133, t134, t135, t136, t137, t138, t139, t140, t141, t142, t143, t144, t145, t146]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120, t121, t122, t123, t124, t125, t126, t127, t128, t129, t130, t131, t132, t133, t134, t135, t136, t137, t138, t139, t140, t141, t142, t143, t144, t145, t146, t147, t148]
 
 
 def run():

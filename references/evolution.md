@@ -1688,3 +1688,12 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
 - 产物：`runs/large_suv_bev_中大型纯电SUV_完整交互榜.html`（22 款 / 20 区块齐全 / 109KB）。默认画像下综合分前十：红旗天工08 94.8、智己LS7 94.6、腾势N8 94.1、小米YU7 92.7、理想i6 92.5、昊铂HT 92.3、唐L 92.2、长安启源E07 91.7、智己LS6 91.6、阿维塔11 90.2；形式结论单形式=纯电（均分 88.6）。
 - 诚实边界（写进页面与交付）：安全/智驾是「有判档才算」的维，22 款里只有 6 款有安全判档、8 款有品控（PPH），可用维中位 5/8；跨车比较是「在共同可判维度上」的名次，不等于整车结论。销量只作事实列（202611 单月、车系口径含所有能源），不进评价分。
 - 新增/改动文件：`modules/board/build_large_suv_bev.py`（新）、`build_large_suv_bev.py`（CLI 薄壳）、`categories/universe_large_suv_bev.json`（新，含 `excluded_verified` 与 `name_not_in_index` 台账）。零对既有打分/公式的改动，三张旧榜名次不受影响。SKILL 10.60.0→10.61.0，README 顶部版本行同步。
+
+## v10.62.1 权威清单门禁+质量分全8双根因修复（2026-11-24）
+- 用户追问"腾势N8呢"→发现漏收，用户要求"为什么会漏掉，根因改"；随后又指出"质量分全8不合理，根因修复"。
+- **漏收根因三层**：①建中大型榜时没查SKILL.md/现成资产(`build_large_suv_bev.py`+`universe_large_suv_bev.json`含腾势N8)，另起炉灶手写universe ②同品类两套universe(现成names字段23款/手写models字段20款)无检测 ③`check_universe`只读models字段，names清单被读成0款→门禁静默跳过。换唯一源检查后发现**10款在售纯电中大型SUV全漏**(蔚来EC7/理想i8/智己LS6/唐L/昊铂HT/红旗天工08/长安启源E07/飞凡R7/eπ008/零跑C16)，非仅腾势N8。
+- 修法：`_extract_universe_names`兼容names/models/candidates/universe+对象元素；读不到车名返回error、pipeline硬拦不静默；`_uname`补"纯电版/ev版"等后缀(问界M7不再误报)；品类cfg.universe指唯一源、手写清单归档；5款停售(ES7/ID.6X/ModelX/宝马iX/星纪元ET)附核验依据写pool_excluded。10款逐配置+8维证据网查补采(6个agent)，人工定分。BUG-147。
+- **质量分全8根因**：quality_score文档数据源含"车质网投诉聚合"但实现只支持"90天投诉明细(count/per_10k)"一种形态；网查到的13款车质网PPH比值(唐L643.8/万、小鹏G9 153.3/万等)无处放→全拿中性8.0。双重断链：销量回填只在pipeline内存没写回候选池文件→投诉聚合per_10k=None；出榜没传--complaints。
+- 修法：quality_score加`complaint_pph`通道(与明细共用log密度公式、明细优先防双计、置信medium)；lxml改lazy import让离线聚合可用；sales_backfill --apply写回候选池；SKILL.md固化"出榜质量维必做三步预处理"(销量apply→投诉聚合→pipeline传--complaints)+"新品类前先查现成资产铁律"。结果23款质量分5.4~6.62真实分化，仅7款真无数据为8.0(low)。BUG-148。
+- 回归bug146/146(可注入116条)、t147/t148全绿；23款全入榜、完整性门禁23/23/0漏收、一致性0冲突。
+- 教训：①门禁静默跳过比没门禁更危险；②同一事实多副本(两份universe)必有漏；③"无数据=中性8.0"本身没错，错在让有真实投诉数据的车也拿8.0——数据源没接进来。
