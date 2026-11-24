@@ -39,6 +39,9 @@ RUNS = os.path.join(HERE, "runs")
 UNIVERSE = str(paths.cat("universe_large_suv_bev.json"))
 SALES = os.path.join(RUNS, "dcd_sales_snapshot_202611.json")
 OUT = os.path.join(RUNS, "large_suv_bev_中大型纯电SUV_完整交互榜.html")
+# --top N 只出池内前 N（默认全池）。用于"前十/前二十"这类切片，池与口径不变，只改展示范围。
+TOP = None
+POOL_N = None
 
 CLS, BODY = "中大型SUV", "SUV"
 LOW, HIGH = 15.0, 90.0
@@ -124,6 +127,11 @@ def load_crash():
 
 
 def main(argv=None):
+    global TOP, POOL_N, OUT
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if "--top" in argv:
+        TOP = int(argv[argv.index("--top") + 1])
+        OUT = os.path.join(RUNS, "large_suv_bev_中大型纯电SUV_TOP%d_完整交互榜.html" % TOP)
     if not os.path.exists(UNIVERSE):
         print("缺少品类清单 %s。\n"
               "本榜与其它固定榜一样依赖开发树里的 JSON 事实库（categories/、data/gen/），"
@@ -221,7 +229,11 @@ def main(argv=None):
         cars.append(car)
 
     cars.sort(key=lambda x: -x["product"])
-    print("入池 %d 款；级别不符排除 %d 款；gap %d 条" % (len(cars), len(excluded), len(gaps)))
+    POOL_N = len(cars)
+    if TOP:
+        cars = cars[:TOP]
+    print("入池 %d 款%s；级别不符排除 %d 款；gap %d 条"
+          % (POOL_N, ("（按综合分取前 %d 展示）" % TOP) if TOP else "", len(excluded), len(gaps)))
     for e in excluded:
         print("  排除(级别=%s)：%s" % (e[1], e[0]))
     for g_ in gaps:
@@ -245,15 +257,19 @@ def main(argv=None):
                      + ("；三电软上限 %.2f→%.2f" % c["pt_cap"] if c["pt_cap"] else "")),
         } for c in cars},
         "coverage_note": ("口径：官方二级分类=中大型SUV · 车系页含纯电分组 · 指导价低配 %.0f–%.0f 万；"
-                          "共 %d 款入榜。8 维中安全/智驾无官方判档留空、不加权（缺维不加权、不插补）；"
-                          "分数为参数驱动（C 级，仅参考）；销量只作事实列。" % (LOW, HIGH, len(cars))),
+                          "共 %d 款入榜%s。8 维中安全/智驾无官方判档留空、不加权（缺维不加权、不插补）；"
+                          "分数为参数驱动（C 级，仅参考）；销量只作事实列。"
+                          % (LOW, HIGH, len(cars),
+                             ("（全池 %d 款中的前 %d，池与口径不变）" % (POOL_N, TOP)) if TOP else "")),
     }
     nav, secs = CES.sections_html(rows, meta)
     banner = (
         "<div style='margin:10px auto;max-width:1180px;padding:10px 14px;border-left:4px solid #b8860b;"
         "background:#fffaf0;color:#5a4300;font:13px/1.7 -apple-system,\"Microsoft YaHei\",sans-serif'>"
         "<b>本榜口径</b>：官方二级分类「中大型SUV」+ 车系页有纯电款 + 指导价低配 15–90 万；"
-        f"共 {len(cars)} 款入榜（纯电）。级别由汽车之家官方二级分类逐款核验，"
+        f"共 {len(cars)} 款入榜（纯电）"
+        + (f"（全池 {POOL_N} 款按综合分取前 {TOP}，池与口径不变，完整榜见 large_suv_bev_中大型纯电SUV_完整交互榜.html）" if TOP else "")
+        + "。级别由汽车之家官方二级分类逐款核验，"
         "大型SUV（ES8/M8/M9/N9/L90/HL/N8L/9X/S09/LS9）与中型SUV（ES6/L60/G7/7X/知音/宋L/海狮07）不入本口径。"
         "<br><b>分数是参数驱动（C 级）</b>：安全/智驾两维没有官方碰撞判档与实测，留空不加权；"
         "电耗优先按「车重+风阻+迎风面积」物理估算，缺风阻才退回电量÷CLTC（逐车标注）。"

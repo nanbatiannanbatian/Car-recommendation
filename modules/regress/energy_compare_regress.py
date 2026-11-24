@@ -68,7 +68,7 @@ def t001():
     """生成器必须存在且可执行——规则在脚本里，不在 HTML 手工补丁里。"""
     assert os.path.exists(BUILD), "生成脚本缺失"
     src = _read("build_energy_compare.py")
-    for key in ("FACTORS", "DIMS", "PHYS_A", "TEMP_CONS", "SWAP_ADVANTAGE", "CONS_MULT" if False else "HWY_BASE_MULT"):
+    for key in ("FACTORS", "DIMS", "PHYS_A", "PHYS_MODEL", "SWAP_ADVANTAGE"):
         assert key in src, f"生成脚本缺少规则常量 {key}（可能被手工补丁绕过）"
     assert "__CARS_JSON__" in src and "__PHYS_JSON__" in src, "数据注入占位符缺失"
     return "规则表/占位符都在生成脚本中（单一事实源）"
@@ -96,9 +96,9 @@ def t003():
     html = _html()
     p = _js_const(html, "PHYS")
     assert p["a"] == B.PHYS_A and p["b"] == B.PHYS_B and p["c"] == B.PHYS_C, "回归系数不一致"
-    assert p["hwyBase"] == B.HWY_BASE_MULT and p["cityBase"] == B.CITY_BASE_MULT, "工况倍率不一致"
+    assert p["phys"] == json.loads(json.dumps(B.PHYS_MODEL, ensure_ascii=False)), \
+        "物理模型常量不一致（页面注入 ≠ ERM）"
     assert p["medRatio"] == B.BASE_CDA_PER_TON, "CdA中位数不一致"
-    assert p["temp"] == B.TEMP_CONS and p["drive"] == B.DRIVE_MULT and p["ac"] == B.AC_MULT, "工况系数不一致"
     assert p["swapAdv"] == B.SWAP_ADVANTAGE, "换电优势规则不一致"
     return "物理模型全部常量：源 = 产物"
 
@@ -216,12 +216,12 @@ def t016():
 
 
 def t017():
-    """v4/v5 坑：续航算式必须展示温度/暖风/电压三因子（v10.55.0 起驾驶/空调条件已删），且无'0.975V'文案 bug。"""
+    """续航算式必须展示物理量（车速/CdA/整车/附件kW/标定/电池温度/电压），且无'0.975V'文案 bug。"""
     html = _html()
-    for kw in ("温度(仅电池)", "暖风 ", "电压系数"):
+    for kw in ("车速 ", "CdA ", "附件 ", "× 标定 ", "电池温度 "):
         assert kw in html, f"续航算式缺因子 {kw}"
     assert "电压 '+voltM+'V(" not in html, "电压文案 bug 复现（0.975V）"
-    assert "物理回归估算电耗" in html, "物理回归估算说明丢失"
+    assert "4.48×车重t" in html and "仅用于成本展示" in html, "回归估算口径说明丢失"
     return "续航算式透明且无电压文案 bug"
 
 
@@ -282,31 +282,37 @@ def t033():
 
 
 def t030():
-    """沉淀的物理模型模块必须存在且自检通过（真实达成率对照在容差内）。"""
+    """物理模型必须存在且与「行业共识/公开实测」对照在 ±8 个百分点内。"""
     from modules.physics import ev_range_model as ERM
     val = ERM.validate_real()
-    assert len(val) >= 3, "真实数据对照场景不足"
+    assert len(val) >= 5, "对照场景不足（至少要覆盖市区/100/120/冬-10/冬-20）"
     for row in val:
-        lo = row["real_min"] * 100 - 12
-        hi = row["real_max"] * 100 + 12
-        m = row["model_ach"] * 100
-        assert lo <= m <= hi, f"{row['scene']} 模型达成率{m}% 偏离实测[{lo:.0f},{hi:.0f}]"
-    return "物理模型 vs 实测三场景均在±12pp内: " + ", ".join(
+        assert abs(row["delta_pt"]) <= 8, (
+            f"{row['scene']} 模型{row['model_ach']*100:.0f}% vs 共识{row['target']*100:.0f}%"
+            f"（{row['delta_pt']:+.1f}pt）")
+    return "物理模型 vs 共识/实测六场景均在±8pp内: " + ", ".join(
         f"{r['scene']}={r['model_ach']*100:.0f}%" for r in val)
 
 
 def t031():
-    """温度/空调必须拆分（防旧版双重计算暖风）；胎压/轮胎必须已建模。"""
+    """温度/暖风必须拆分（防旧版双重计算）；暖风要按 kW 且区分热泵/PTC；胎压/轮胎已建模。"""
     from modules.physics import ev_range_model as ERM
-    # 温度只管电池活性，极寒系数应温和
-    assert ERM.TEMP_BATTERY["underm20"] <= 1.25, "温度系数又把暖风算进去了（双重计算）"
-    # 空调按季节递增，独立于温度
-    assert ERM.AC_BASE["above0"] < ERM.AC_BASE["underm20"], "空调未按季节区分冬季暖风"
-    # 胎压：每低0.1bar约+1.5%电耗
+    assert ERM.BATTERY_TEMP["underm20"] <= 1.25, "温度系数又把暖风算进去了（双重计算）"
+    # 暖风以 kW 进入：随季节递增；热泵省电且深冷收窄
+    assert ERM.HVAC_KW["above0"] < ERM.HVAC_KW["underm20"], "暖风功率未按季节区分"
+    for s in ("m10to0", "m20tom10", "underm20"):
+        assert ERM.hvac_kw(s, "heatpump") < ERM.hvac_kw(s, "ptc"), f"{s} 热泵未省电"
+    assert (ERM.HVAC_KW["underm20"] / ERM.hvac_kw("underm20", "heatpump")
+            < ERM.HVAC_KW["m10to0"] / ERM.hvac_kw("m10to0", "heatpump")), "深冷热泵优势应收窄"
+    # 低速更吃亏（空调是固定 kW，不是乘数）
+    d30 = ERM.drive_consumption(30, 2200, 0.66, ERM.AUX_12V_KW)
+    d30h = ERM.drive_consumption(30, 2200, 0.66, ERM.AUX_12V_KW + 4.0)
+    d120 = ERM.drive_consumption(120, 2200, 0.66, ERM.AUX_12V_KW)
+    d120h = ERM.drive_consumption(120, 2200, 0.66, ERM.AUX_12V_KW + 4.0)
+    assert d30h / d30 > 2 * (d120h / d120), "暖风未体现「低速更吃亏」"
     assert abs((ERM.TIRE_PRESSURE_MULT["low_01"] - 1) - 0.015) < 1e-6, "胎压系数不符网搜证据"
-    # 轮胎类型默认不编造
     assert ERM.TIRE_TYPE_MULT["unknown"] == 1.0, "未知轮胎不应臆测修正"
-    return "温度/空调拆分正确，胎压+轮胎已建模且默认中性"
+    return "温度/暖风拆分正确（kW 计），热泵分档且深冷收窄，胎压+轮胎已建模"
 
 
 def t032():

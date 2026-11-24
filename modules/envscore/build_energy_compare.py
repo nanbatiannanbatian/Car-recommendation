@@ -45,13 +45,18 @@ OUT = os.path.join(HERE, "energy_compare.html")
 PHYS_A, PHYS_B, PHYS_C = ERM.REG_A, ERM.REG_B, ERM.REG_C
 AREA_FACTOR = ERM.AREA_FACTOR
 BASE_CDA_PER_TON = ERM.MED_CDA_PER_TON
-HWY_BASE_MULT = ERM.HWY_BASE_MULT
-CITY_BASE_MULT = ERM.CITY_BASE_MULT
-# 兼容旧变量名（页面 JS 用 temp/drive/ac 键名）：温度只管电池，空调按季节另算
-TEMP_CONS = ERM.TEMP_BATTERY          # 仅电池活性，不含暖风（修正旧版双重计算）
 DRIVE_MULT = ERM.DRIVE_MULT
-AC_MULT = ERM.AC_LEVEL                # 用户档位；季节基线由 acSeason 注入页面
 VOLTAGE_MULT = ERM.VOLTAGE_MULT
+# v10.66.0：物理模型改为「功率式」，这组新常量整体注入页面（engine.js 同源消费）
+PHYS_MODEL = {
+    "crr": ERM.CRR, "eta": ERM.ETA_DRIVE, "aux": ERM.AUX_12V_KW,
+    "calG": ERM.CAL_G, "usable": ERM.USABLE_SOC, "medRatio": ERM.MED_CDA_PER_TON,
+    "speed": ERM.SPEED_BY_BUCKET, "stopgo": ERM.STOPGO_BY_BUCKET,
+    "battery": ERM.BATTERY_TEMP, "hvacKw": ERM.HVAC_KW, "hpRatio": ERM.HVAC_HP_RATIO,
+    "hvacMode": ERM.HVAC_MODE, "acLevel": ERM.AC_LEVEL, "drive": ERM.DRIVE_MULT,
+    "volt": ERM.VOLTAGE_MULT, "road": ERM.ROAD_CRR_MULT,
+    "tire": ERM.TIRE_PRESSURE_MULT, "tireType": ERM.TIRE_TYPE_MULT, "load": ERM.LOAD_MULT,
+}
 
 # 换电场景优势（据网搜共识）：无家充/北方极寒/短持有/长途
 SWAP_ADVANTAGE = {
@@ -343,10 +348,9 @@ def build(cars_override=None, out=None, extra_head="", extra_tail="", title=None
         "__POWERMETA_JSON__": js(POWER_META),
         "__ENGINE_JS__": engine_js(),
         "__PHYS_JSON__": js({"a":PHYS_A,"b":PHYS_B,"c":PHYS_C,"areaFactor":AREA_FACTOR,
-                             "medRatio":BASE_CDA_PER_TON,"hwyBase":HWY_BASE_MULT,"cityBase":CITY_BASE_MULT,
-                             "temp":TEMP_CONS,"drive":DRIVE_MULT,"ac":AC_MULT,
-                             "acSeason":ERM.AC_BASE,
-                             "volt":VOLTAGE_MULT,"swapAdv":SWAP_ADVANTAGE,
+                             "medRatio":BASE_CDA_PER_TON,
+                             "phys":PHYS_MODEL,          # v10.66.0 功率式物理模型（engine.js 同源）
+                             "drive":DRIVE_MULT,"volt":VOLTAGE_MULT,"swapAdv":SWAP_ADVANTAGE,
                               # v10.56.0：地形/露天冬季条件已删，对应乘子不再注入（JS 侧已无引用）
                               # v10.52.0：TCO 常量注入（JS tco() 与 engine.py 同源；键名 camelCase 由 engine.tco_js 派生）
                               "tco": tco_js(), "annualKmMid": ANNUAL_KM_MID,
@@ -557,7 +561,7 @@ __EXTRA_HEAD__
       <div class="two">
         <div>
           <p><b>打分逻辑：</b>综合分 = 产品力主分 + 软调节（封顶±10）+ 硬条件惩罚（全额、不封顶）。产品力用统一 8 维框架（动力总成18%/安全16.2%/智驾13.5%/空间12.6%/性价比11.7%/质量品控10%/操控9%/车机座舱9%）×10。硬条件触发时扣大分并<b>降一档</b>（T1→T2→T3）、车型旁标红警示：无桩纯电(−15)、极寒+低价纯电(−12)、短持有纯电(−8)、长途续航不足(−10)、限牌油车(−8)、营运油车(−10)、<b>限牌京沪·插混增程无绿牌优势(−8：北京插混增程按油车管理需燃油指标、上海插混无免费绿牌)</b>。<b>纯电优先原则</b>：无硬条件冲突的纯电车型 +0.5——「纯电尽量纯电，条件不符再扣分」的代码化。<b>换电车型</b>相反：无桩/极寒/短持有/长途场景给正分（据网搜共识：3分钟补能、电池恒温、车电分离保值）。</p>
-          <p><b>物理续航模型（透明可核）：</b>基准电耗 = 事实库真实电耗，缺失用回归 <code>4.48×车重(t) + 5.88×Cd×迎风面积 + 0.61</code> 估算（39款拟合、MAE 0.69）。迎风面积≈宽×高×0.84。<code>场景电耗 = 基准 × 工况倍率 × 温度(仅电池) × 暖风基础 × 电压</code>，<code>有效续航 = 电量 ÷ 场景电耗 ×100</code>。工况倍率：市区/高速按高速占比加权，高速基准按每车 <b>CdA/吨</b> 偏离中位数差异化——<b>车身形状的影响由车型自身风阻承担</b>（方盒子车 Cd 高、自然更费），不再需要用户勾选"我买的是方盒子"。温度&gt;0℃1.00/−10℃1.05/−20℃1.12/极寒1.20；电压800V·SiC约0.975（影响小，主要影响充电速度）。实测校验高速达成率约51–63%（懂车帝实测55%吻合）。<b>山区/高原不在模型内</b>：路线级爬坡差异（丘陵 +10~20%、高山 +25~40%，每爬升 100m 约 0.5kWh）请自行上浮预期，页面不假装能算准。</p>
+          <p><b>物理续航模型（透明可核，功率式）：</b><code>驱动功率 P(v)=m·g·Crr·v + ½ρ·CdA·v³</code>（滚阻 + 风阻，风阻按 v³ 走）；<code>场景电耗 =（P/η + 附件kW×1000）/(10·v)</code>；<code>有效续航 = 电量×可用SOC ÷ 场景电耗 ×100</code>。<b>每车只用它自己的整备质量与 CdA（Cd×迎风面积）</b>，所以大车/高风阻车高速自然更费，不再靠统一经验倍率；<b>空调以「千瓦」进入</b>（PTC 3–5kW、热泵按温度档 0.55/0.70/0.86 折算），因此暖风在低速吃亏、高速影响小——这才符合实测。冬季拆两层：电池活性（−10℃ +4%、−20℃ +9%、极寒 +16%）与暖风功率，互不重复计算。<b>可用电量按标称 94%</b>（BMS 上下保留 + 不跑空）。全局标定系数 <code>1.14</code> 来自 39 款「声明电耗 + 整备质量 + Cd」的车（median(声明/物理@30km/h)），吸收工况开销而不是逐车拟合。实测对照：市区约 0.85–0.90、100km/h 约 0.70、120km/h 约 0.55–0.60、−10℃ 综合约 0.70（PTC 0.5–0.6 / 热泵 0.75）、−20℃ 约 0.45（雪地再低 5–8 点）；缺风阻的车按 CdA/吨中位 0.314、缺整备质量的车按自家电耗回归反解质量并标注。<b>120km/h 定速</b>比本页 over60（按中国高速实际均速 105km/h）再低约 10%。<b>山区/高原不在模型内</b>：路线级爬坡差异请自行上浮预期。</p>
         </div>
         <div>
           <p><b>其余调节项：</b>长途频率高→纯电减分、油/混动加分；无家充→纯电大幅减分、插混/增程减分、油车加分（<b>单位/公司可充电</b>单独一档：白天补能、成本接近家充，不按「无固定充电」处罚）；营运→纯电加分；限牌→新能源加分（京沪细分：插混/增程同罚）；常年高速→增程明显减分、纯电续航打折；短持有→纯电减分；年里程：2.5万以上纯电加分，<b>5000km 以下纯电 −2.0</b>（低于盈亏平衡点约 1.5 万km/年）、5000~1万 −1.0；<b>补能耐心不足+长途→纯电明显减分、可油可电加分</b>；<b>低里程无桩纯电→追加减分（TCO 固定成本摊薄慢）</b>。插混/增程因有油箱兜底，不扣"里程不足"分，但增程高速油耗高会体现为减分。</p>

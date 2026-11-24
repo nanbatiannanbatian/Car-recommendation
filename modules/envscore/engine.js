@@ -22,50 +22,83 @@
  * build_energy_compare.py 的模板里；node 回归只跑本文件的纯函数。
  * ========================================================================== */
 
-// ===== 物理续航模型（与 engine.py 同源）=====
+// ===== 物理续航模型 v2.0（与 engine.py / ev_range_model.py 同源）=====
+// 功率式：P = m·g·Crr·v + ½·ρ·CdA·v³；电耗 = (P/η + 附件kW×1000)/(10·v)
+// 空调按 kW 进入（低速吃亏、高速还好），不再是与车速无关的乘数。
 const DEMAND={under150:100,'150to300':220,'300to500':400,over500:600};
 function compositeTier(score){ return score>=82?'T1':(score>=72?'T2':'T3'); }
 
-function hwyMult(car,cond){
-  let r=car.cdaPerTon;
-  if(r==null) r=PHYS.medRatio;
-  let m=PHYS.hwyBase*(1+0.45*(r/PHYS.medRatio-1));
-  return Math.max(1.35,Math.min(2.35,m));
+function massOf(car){
+  const M=PHYS.phys;
+  if(car.weight) return [car.weight,false];
+  if(!car.cons) return [null,false];
+  let m=(car.cons-0.61)/(4.48+5.88*M.medRatio)*1000;   // 与 ERM.mass_of 同一反解式
+  m=Math.min(3200,Math.max(1200,m));
+  return [Math.floor(m/50+0.5)*50,true];
 }
-
+function cdaOf(car,w){
+  const M=PHYS.phys;
+  if(car.cda) return car.cda;
+  if(car.cd&&car.area) return car.cd*car.area;
+  if(car.cdaPerTon&&w) return car.cdaPerTon*(w/1000);
+  if(w) return M.medRatio*(w/1000);
+  return null;
+}
+function hvacKw(season,mode,acUsage){
+  const M=PHYS.phys;
+  const ptc=(M.hvacKw[season]==null)?1:M.hvacKw[season];
+  const hp=(M.hpRatio[season]==null)?1:M.hpRatio[season];
+  const mm=(M.hvacMode[mode]==null)?0.5:M.hvacMode[mode];
+  const lv=(M.acLevel[acUsage||'normal']==null)?1:M.acLevel[acUsage||'normal'];
+  return ptc*(1-mm)+ptc*hp*mm*lv;
+}
+function driveCons(v,w,cda,aux,crr){
+  const P=w*9.81*crr*(v/3.6)+0.5*1.225*cda*Math.pow(v/3.6,3);
+  return (P/PHYS.phys.eta+aux*1000)/(10*v);
+}
 function rangeCalc(car,cond){
   if(car.power!=='BEV') return null;
-  const hwWeight={under20:0.0,'20to40':0.25,'40to60':0.7,over60:1.0}[cond.highway_ratio];
-  const hwM=hwyMult(car,cond);
-  const sceneM=PHYS.cityBase*(1-hwWeight)+hwM*hwWeight;
-  const tempM=PHYS.temp[cond.winter_temp];
-  const acM=(PHYS.acSeason[cond.winter_temp]||1.0);   // 冬季暖风基线（空调强度条件已移除）
+  const M=PHYS.phys;
+  const hw=cond.highway_ratio||'20to40';
+  const v=(M.speed[hw]==null)?55:M.speed[hw];
+  const wm=massOf(car);
+  const w=wm[0], cda=cdaOf(car,w);
+  if(!w||!cda){
+    return {range:null, method:'缺整备质量/风阻', cls:car.body,
+      steps:['缺整备质量或风阻（CdA）→ 无法物理估算，不编造']};
+  }
+  const season=cond.winter_temp||'m10to0';
+  const mode=(car.heatpump===true)?'heatpump':((car.heatpump===false)?'ptc':'mixed');
+  const aux=M.aux+hvacKw(season,mode,cond.ac_usage);
+  const crr=M.crr*(M.road.dry==null?1:M.road.dry);
+  const drive=driveCons(v,w,cda,aux,crr);
+  const stop=(M.stopgo[hw]==null)?1:M.stopgo[hw];
+  const temp=(M.battery[season]==null)?1:M.battery[season];
+  let cons=drive*M.calG*stop*temp;
   let voltM=1.0;
   if(car.voltage){
-    const vs=Object.keys(PHYS.volt).map(Number).sort((a,b)=>a-b);
-    let best=vs[0]; for(const v of vs) if(Math.abs(v-car.voltage)<Math.abs(best-car.voltage)) best=v;
-    voltM=PHYS.volt[best];
+    const vs=Object.keys(M.volt).map(Number).sort((num1,num2)=>num1-num2);
+    let best=vs[0]; for(const vv of vs) if(Math.abs(vv-car.voltage)<Math.abs(best-car.voltage)) best=vv;
+    voltM=M.volt[best]; cons*=voltM;
   }
-  // 地形条件已移除（v10.56.0）：场景电耗不再乘地形系数
-  const sceneCons=car.cons*sceneM*tempM*acM*voltM;
+  cons=Math.round(cons*100)/100;
   if(!car.kwh){
     return {range:null, method:'无电量数据', cls:car.body,
       steps:['该车型无电池电量数据，无法估算续航（不编造）']};
   }
-  const rng=Math.round(car.kwh/sceneCons*100);
+  const usable=car.kwh*M.usable;
+  const rng=Math.round(usable/cons*100);
   const steps=[
-    '基准电耗 '+car.cons+' kWh/100km（'+car.consSrc+'）',
+    '车速 '+v+'km/h · CdA '+cda.toFixed(2)+'㎡ · 整车 '+w+(wm[1]?'（按电耗回归反解）':'')+'kg · 附件 '+aux.toFixed(1)+'kW → 巡航 '+driveCons(v,w,cda,M.aux,crr).toFixed(1)+' kWh/100km',
+    '× 标定 '+M.calG+' × stop-go '+stop+' × 电池温度 '+temp+(car.voltage?' × 电压 '+voltM+'（'+car.voltage+'V）':''),
+    '= 场景电耗 '+cons.toFixed(1)+' kWh/100km',
+    '可用电量 '+car.kwh+'×'+M.usable+'='+usable.toFixed(1)+'kWh ÷ '+cons.toFixed(1)+' ×100 = 有效续航 '+rng+' km'
   ];
   if(car.consSrc==='物理估算'){
-    steps[0]='物理回归估算电耗 '+car.cons+'（4.48×车重t + 5.88×CdA + 0.61）';
-    steps.push('  车重 '+(car.weight||'—')+'kg · Cd '+(car.cd||'—')+' · 迎风面积 '+(car.area||'—')+'m²');
+    steps.unshift('该车无声明电耗，展示用回归估算 '+car.cons+' kWh/100km（4.48×车重t + 5.88×CdA + 0.61，仅用于成本展示）；续航按质量/风阻物理算');
   }
-  steps.push('× 工况倍率 '+sceneM.toFixed(2)+(hwWeight>=0.5?'（偏高速，CdA/吨 '+(car.cdaPerTon||'—')+'）':'（偏市区）'));
-  steps.push('× 温度(仅电池) '+tempM+' × 暖风 '+acM.toFixed(2)+' × 电压系数 '+voltM+(car.voltage?'（'+car.voltage+'V平台）':''));
-  steps.push('= 场景电耗 '+sceneCons.toFixed(1)+' kWh/100km');
-  steps.push('电量 '+car.kwh+' kWh ÷ 场景电耗 ×100 = 有效续航 '+rng+' km');
-  return {range:rng, method:car.consSrc==='事实库'?'物理模型(真实电耗基准)':'物理模型(估算电耗基准)',
-          cls:car.body, sceneCons:Math.round(sceneCons*10)/10, steps};
+  return {range:rng, method:(car.weight?'物理模型(质量+风阻+空调kW)':'物理模型(质量按电耗回归反解)'),
+          cls:car.body, sceneCons:Math.round(cons*10)/10, steps};
 }
 function effRange(car,cond){ const r=rangeCalc(car,cond); return r?r.range:null; }
 
@@ -313,7 +346,7 @@ function verdicts(car,cond,eff,d){
     }else if(P==='PHEV'||P==='EREV') v.winter_temp=['适配','发动机余热兜底+加油补能；冬季纯电续航按×0.5~0.7规划'];
     else v.winter_temp=['适配','燃油/油混低温稳定，油耗升高约20-30%'];
   }else if(wt==='m20tom10'){
-    v.winter_temp=(P==='BEV')?['谨慎','纯电：-10℃续航达成约68%（硬条件不触发但需规划）']:['适配','有油箱/发动机兜底，影响小'];
+    v.winter_temp=(P==='BEV')?['谨慎','纯电：-10℃ 约打 7 折（PTC 5–6 折 / 热泵 7–8 折，需按此规划）']:['适配','有油箱/发动机兜底，影响小'];
   }
   const ak=cond.annual_km;
   if(ak==='under5'){

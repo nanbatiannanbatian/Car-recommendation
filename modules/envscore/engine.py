@@ -82,6 +82,11 @@ v10.56.0（2026-11-24 第四轮，用户逐项提审：
 """
 from __future__ import annotations
 
+try:                                        # 包内导入（正常路径）
+    from ..physics import ev_range_model as ERM
+except ImportError:                         # 以脚本/扁平包方式运行时
+    from modules.physics import ev_range_model as ERM
+
 # ============ 1. 用车条件因素表（15 项，单一事实源）============
 # build_energy_compare.py 的 FACTORS 与 engine.js 的条件下拉都从本表注入/对齐，
 # 回归 env_options 等价测试守每一项。
@@ -96,12 +101,12 @@ FACTORS = {
     },
     "winter_temp": {
         "label": "冬季气候带（常驻城市）", "default": "m10to0",
-        "desc": "先按你常驻城市的气候带选，括号里的温度只用于续航计算：−10℃约衰减20–45%，−20℃可达40–60%",
+        "desc": "先按你常驻城市的气候带选，括号里的温度只用于续航计算：−10℃ 纯电约打 7 折（PTC 暖风 5–6 折、热泵 7–8 折），−20℃ 约 4.5 折（雪地再低 5–8 点）",
         "options": [
-            {"v": "above0",  "label": "南方（冬季极少≤0℃）", "hint": "系数1.00，纯电几乎无冬季衰减 · 代表城市：广州/深圳/福州/南宁/厦门/海口（含滇南、桂南）"},
-            {"v": "m10to0",  "label": "江淮/长江流域（0~-10℃）", "hint": "系数1.05（默认）· 代表城市：上海/杭州/南京/武汉/成都/重庆/长沙；你所在城市极端最低温 -5℃ 左右选这档"},
-            {"v": "m20tom10","label": "华北/黄淮（-10~-20℃）", "hint": "系数1.12，纯电衰减明显 · 代表城市：北京/天津/石家庄/济南/郑州/西安/太原（极端 -12℃ 左右）"},
-            {"v": "underm20","label": "东北/内蒙/新疆北部（≤-20℃）", "hint": "系数1.20，纯电续航可能腰斩 · 代表城市：哈尔滨/长春/沈阳/呼和浩特/乌鲁木齐/拉萨；辽东半岛沿海（大连约-15℃）按华北档更接近"},
+            {"v": "above0",  "label": "南方（冬季极少≤0℃）", "hint": "电池几乎无衰减，但冬天开暖风仍要多耗（市区约 +10%~15%）· 代表城市：广州/深圳/福州/南宁/厦门/海口（含滇南、桂南）"},
+            {"v": "m10to0",  "label": "江淮/长江流域（0~-10℃）", "hint": "默认档：纯电综合达成约 7 折（PTC 5–6 折 / 热泵 7–8 折）· 代表城市：上海/杭州/南京/武汉/成都/重庆/长沙"},
+            {"v": "m20tom10","label": "华北/黄淮（-10~-20℃）", "hint": "达成率约 5–6 折，暖风是主要耗电项 · 代表城市：北京/天津/石家庄/济南/郑州/西安/太原"},
+            {"v": "underm20","label": "东北/内蒙/新疆北部（≤-20℃）", "hint": "达成率约 35%~45%（雪地路面再低 5–8 点），热泵优势收窄、需电辅热 · 代表城市：哈尔滨/长春/沈阳/呼和浩特/乌鲁木齐/拉萨"},
         ],
     },
     "annual_km": {
@@ -198,7 +203,7 @@ FACTOR_GROUPS = [
     ("核心能源决策", ["operation", "home_charger", "winter_temp", "annual_km", "single_trip",
                    "long_trip_freq", "plate_limit", "hold_years", "highway_ratio"],
      "以下 9 项直接决定燃油/混动/纯电谁更合适：营运与高频长途是纯电的硬门槛、家充/单位充电是油电分水岭、"
-     "−10℃纯电平均衰减32.7%、年里程决定成本反超点、绿牌通行红利、短持有折旧差"),
+     "−10℃ 纯电约打 7 折（PTC 5–6 折 / 热泵 7–8 折）、年里程决定成本反超点、绿牌通行红利、短持有折旧差"),
     ("进阶条件", ["fleet", "charge_patience"],
      "以下 2 项在特定人群才翻转结论：增购第二辆（长途交给已有油车）、不愿在服务区等充电——"
      "没这些情况就保持默认，不影响结论"),
@@ -211,18 +216,15 @@ DEFAULT_COND = {k: v["default"] for k, v in FACTORS.items()}
 CORE_FACTORS = ["operation", "winter_temp", "annual_km", "single_trip", "long_trip_freq",
                 "home_charger", "plate_limit", "hold_years", "highway_ratio"]
 
-# ============ 2. 物理续航模型常量（与 modules/physics/ev_range_model.py 对齐）============
+# ============ 2. 物理续航模型（唯一事实源 = modules/physics/ev_range_model.py）============
+# v10.66.0：这里不再自己抄一份系数（旧版 engine 与 physics 各一套、靠人肉对齐，
+# 正是"两处漂移"的温床）。engine 只做「条件画像 → 场景」的翻译，公式与常量全部来自 ERM。
 DEMAND = {"under150": 100, "150to300": 220, "300to500": 400, "over500": 600}
-MED_CDA_PER_TON = 0.314
-HWY_BASE_MULT = 1.65
-CITY_BASE_MULT = 1.10
-HWY_CDA_WEIGHT = 0.45
-TEMP_BATTERY = {"above0": 1.00, "m10to0": 1.05, "m20tom10": 1.12, "underm20": 1.20}
-AC_BASE = {"above0": 1.08, "m10to0": 1.12, "m20tom10": 1.18, "underm20": 1.22}
-AC_LEVEL = {"off": 0.90, "normal": 1.00, "heavy": 1.12}
-DRIVE_MULT = {"mild": 0.90, "normal": 1.00, "aggressive": 1.18}
-VOLTAGE_MULT = {400: 1.00, 600: 0.99, 800: 0.975, 900: 0.97}
-HWY_MULT_CAP = (1.35, 2.35)
+MED_CDA_PER_TON = ERM.MED_CDA_PER_TON
+TEMP_BATTERY = ERM.BATTERY_TEMP          # 仅电池活性（暖风单独按 kW 计入物理式）
+USABLE_SOC = ERM.USABLE_SOC
+VOLTAGE_MULT = ERM.VOLTAGE_MULT
+DRIVE_MULT = ERM.DRIVE_MULT
 # v10.53.0：地形与停放环境对场景电耗的乘子（physical：爬坡重力做功 / 露天静置电池更冷）
 TERRAIN_MULT = {"flat": 1.00, "hilly": 1.10, "plateau": 1.06}
 # 露天停放按冬季档位加成的场景电耗乘子（地库维持基准；-10℃以下隔夜电池更冷）
@@ -284,47 +286,36 @@ ANNUAL_KM_MID = {"under5": 4000, "under10": 8000, "10to15": 12500, "15to25": 200
 POWERS = ["ICE", "HEV", "PHEV", "EREV", "BEV"]
 
 
-# ============ 4. 物理续航模型（与 engine.js rangeCalc 同源）============
-def hwy_mult(car, cond):
-    """高速倍率：基准1.65，按 CdA/吨 偏离中位数修正（车身形状由车型自身风阻承担，不再由「方盒子」条件修正）。"""
-    r = car.get("cdaPerTon")
-    if r is None:
-        r = MED_CDA_PER_TON
-    m = HWY_BASE_MULT * (1 + HWY_CDA_WEIGHT * (r / MED_CDA_PER_TON - 1))
-    return max(HWY_MULT_CAP[0], min(HWY_MULT_CAP[1], m))
-
-
+# ============ 4. 物理续航模型（v10.66.0 起完全由 ERM 计算）============
 def range_calc(car, cond):
-    """纯电有效续航（物理模型）。非纯电返回 None（有油箱兜底，不估算）。"""
+    """纯电有效续航：把「用车条件画像」翻译成 ERM 场景，再交给物理模型。
+    非纯电返回 None（有油箱兜底，不估算）。"""
     if car.get("power") != "BEV":
         return None
-    hw_w = {"under20": 0.0, "20to40": 0.25, "40to60": 0.7, "over60": 1.0}[cond["highway_ratio"]]
-    hw_m = hwy_mult(car, cond)
-    scene_m = CITY_BASE_MULT * (1 - hw_w) + hw_m * hw_w
-    temp_m = TEMP_BATTERY[cond["winter_temp"]]
-    ac_m = AC_BASE[cond["winter_temp"]]      # 冬季暖风基础负载（不再按「空调使用强度」调节）
-    volt_m = 1.0
-    if car.get("voltage"):
-        best = min(VOLTAGE_MULT, key=lambda v: abs(v - car["voltage"]))
-        volt_m = VOLTAGE_MULT[best]
-    terrain_m = 1.0                            # 地形已从条件表移除（见文件头 ⑭），乘子固定 1.0
-    scene_cons = car["cons"] * scene_m * temp_m * ac_m * volt_m
-    kwh = car.get("kwh")
-    if not kwh:
-        return {"range": None, "method": "无电量数据",
-                "steps": ["该车型无电池电量数据，无法估算续航（不编造）"]}
-    rng = round(kwh / scene_cons * 100)
-    steps = [
-        f"基准电耗 {car['cons']} kWh/100km（{car.get('consSrc','')}）",
-        f"× 工况倍率 {scene_m:.2f}" + ("（偏高速）" if hw_w >= 0.5 else "（偏市区）"),
-        f"× 温度(仅电池) {temp_m} × 暖风 {ac_m:.2f} × 电压系数 {volt_m}",
-    ]
-    steps += [
-        f"= 场景电耗 {scene_cons:.1f} kWh/100km",
-        f"电量 {kwh} kWh ÷ 场景电耗 ×100 = 有效续航 {rng} km",
-    ]
-    return {"range": rng, "method": car.get("consSrc") == "事实库" and "物理模型(真实电耗基准)" or "物理模型(估算电耗基准)",
-            "sceneCons": round(scene_cons, 1), "steps": steps}
+    hp = car.get("heatpump")
+    scen = {
+        "highway_ratio": cond.get("highway_ratio", "20to40"),
+        "winter_temp": cond.get("winter_temp", "m10to0"),
+        # 逐车若有热泵标记就按标记；没有则按「半热泵半PTC」的行业默认（页面必须披露）
+        "thermal": "heatpump" if hp is True else ("ptc" if hp is False else "mixed"),
+        "drive_style": "normal", "load": "normal",
+    }
+    veh = {"kwh": car.get("kwh"), "cons": car.get("cons"), "cltc": car.get("cltc"),
+           "weight": car.get("weight"), "cd": car.get("cd"), "area": car.get("area"),
+           "cda": car.get("cda"), "cdaPerTon": car.get("cdaPerTon"),
+           "voltage": car.get("voltage"), "body": car.get("body")}
+    r = ERM.estimate(veh, scen)
+    if r["range_km"] is None:
+        return {"range": None, "method": r["method"], "steps": r["steps"]}
+    steps = list(r["steps"])
+    if car.get("consSrc") == "物理估算":
+        steps.insert(0, "该车无声明电耗，展示用回归估算 %s kWh/100km"
+                        "（4.48×车重t + 5.88×CdA + 0.61，仅用于成本展示）；续航按质量/风阻物理算"
+                     % car.get("cons"))
+    return {"range": r["range_km"],
+            "method": ("物理模型(质量按电耗回归反解)" if not car.get("weight")
+                       else "物理模型(质量+风阻+空调kW)"),
+            "sceneCons": r["scene_cons"], "steps": steps}
 
 
 def eff_range(car, cond):
@@ -507,7 +498,7 @@ def verdicts(car, cond, eff=None, d=None):
             v["winter_temp"] = ("适配", "燃油/油混低温稳定，油耗升高约20-30%")
     elif wt == "m20tom10":
         v["winter_temp"] = ("谨慎" if P == "BEV" else "适配",
-                            "纯电：-10℃续航达成约68%（硬条件不触发但需规划）" if P == "BEV"
+                            "纯电：-10℃ 约打 7 折（PTC 5–6 折 / 热泵 7–8 折，需按此规划）" if P == "BEV"
                             else "有油箱/发动机兜底，影响小")
     # 年里程（TCO 视角）
     ak = cond["annual_km"]
