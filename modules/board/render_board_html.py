@@ -100,6 +100,9 @@ border-radius:50%;font-weight:700;background:var(--soft);color:var(--ink2)}
 .unv{display:inline-block;font-size:10.5px;font-weight:400;padding:0 5px;margin-left:5px;
 border-radius:4px;background:#f2f4f7;color:#475467;border:1px dashed #98a2b3;cursor:help;vertical-align:1px}
 .unv.heavy{background:#fdf0ee;color:#b42318;border-color:#f3c9c3}
+/* v10.74.5：维度单元格逐格标「插补」——虚线下划线 + ≈ 上标，区别于实测分 */
+.dim-imputed{text-decoration:underline dashed #98a2b3;text-underline-offset:3px}
+.dim-imputed .imp{font-size:9px;color:#667085;vertical-align:super;margin-left:1px}
 .score{font-size:17px;font-weight:700;color:var(--accent2)}
 .delta-up{color:#c8442e;font-weight:700}.delta-down{color:#1a7f37;font-weight:700}
 .tier{display:inline-block;padding:3px 9px;border-radius:20px;font-size:12px;font-weight:700;color:#fff;background:#5f6b78;white-space:nowrap}
@@ -747,7 +750,10 @@ def render(data, summary, title, as_of):
                  '<b>官方参数 + 客观差异规则推算</b>（来源：配置表/碰撞成绩/销量），'
                  '<b>不是实车实测分数</b>；配置间差异由「三电得分理由」逐条列明。'
                  '标注 <span class="flag flag-est">低置信</span> 表示基准配置匹配或证据不足，'
-                 '该行分数只作同车配置相对参考。实车实测数据（如冬测续航达成率）目前未纳入打分。</div>')
+                 '该行分数只作同车配置相对参考。实车实测数据（如冬测续航达成率）目前未纳入打分。'
+                 '带 <span class="dim-imputed">虚线下划线<span class="imp">≈</span></span> 的格子是'
+                 '<b>插补分</b>：该维没有一手证据，按「有证据车中位 −1σ」赋值，不等于该车差，'
+                 '也不能当成实测结论；悬停看锚点与样本数。</div>')
         H.append('<table id="scoreBoard"><thead><tr><th>#</th><th>车型</th><th>评分配置</th><th>指导价(万)</th>')
         for d in dims:
             H.append(f"<th>{e(d.get('label'))}<br><small>{float(d.get('weight',0))*100:.1f}%</small></th>")
@@ -770,9 +776,17 @@ def render(data, summary, title, as_of):
                 # v10.72.2：每个数字都带算式悬浮（用户：点上去要看得见为什么这么打分）
                 tip = BV.dim_formula_tip(r, d["key"], d.get("label") or d["key"],
                                         d.get("weight") or 0, v)
+                # v10.74.5：逐格标「插补」——文字仍是该维得分，但虚线下划线 + ≈，
+                # 点上去说明「这维没有一手证据，按有证据车中位−1σ 插补」，不冒充实测。
+                _ev = (r.get("dim_evidence") or {}).get(d["key"]) or {}
+                if _ev.get("kind") == "imputed":
+                    cls = (cls + " dim-imputed").strip()
+                    tip += (f"【插补分≠实测】该维无一手证据，插补至 {_ev.get('cap')}（{_ev.get('anchor')}）；"
+                            f"缺证据不等于该车差，但也不能当成测出来的分数。")
+                mark = '<span class="imp" title="插补分：无一手证据，非实测">≈</span>' if _ev.get("kind") == "imputed" else ""
                 H.append(f"<td class='{cls} dimcell' data-dim='{d['key']}' "
                          f'title="{e(tip)}">'
-                         f"{num(v) if isinstance(v,(int,float)) else '—'}</td>")
+                         f"{num(v) if isinstance(v,(int,float)) else '—'}{mark}</td>")
             ttip = BV.total_formula_tip(r, dims)
             H.append(f"<td class='totalcell' title=\"{e(ttip)}\">"
                      f"<span class='score'>{num(r.get('total'))}</span></td></tr>")

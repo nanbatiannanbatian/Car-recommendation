@@ -110,6 +110,9 @@ def apply_all(rows, cands, cfg, n_draws: int = N_DRAWS, seed: int = SEED) -> dic
         r["rank_band_p10p90"] = [lo, hi]
         r["rank_p50"] = p50
         r["imputed_weight"] = iw
+        # v10.74.5：把插补维明细带到行上，供「总分构成」逐格标虚线圈
+        r["imputed_dims"] = list(im)
+        r["dim_evidence"] = {d: dict(imps[m][d]) for d in im}
         r["rank_band_note"] = note
         out[m] = {"lo": q25, "hi": q75, "p10": lo, "p90": hi, "p50": p50,
                   "imputed_weight": iw, "imputed_dims": im, "note": note}
