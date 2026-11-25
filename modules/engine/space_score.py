@@ -95,7 +95,7 @@ def score(model: str, phys: dict | None = None) -> tuple[float | None, str]:
     dt = (tk - TRUNK_MEDIAN) / TRUNK_STEP
     raw = BASE + (dw + dt) * STEP_SCORE
     val = round(max(LOW, min(HIGH, raw)), 1)
-    tk_note = f"{tk:g}" if isinstance(tk_raw, (int, float)) else f"{tk:g}（{tk_raw} 取中位）"
+    tk_note = f"{tk:g}" if str(tk_raw).strip().replace('.', '', 1).isdigit() else f"{tk:g}（原值 {tk_raw} 取区间中位）"
     return val, (f"轴距{wb:g}mm({dw:+.1f}档) + 后备箱{tk_note}L({dt:+.1f}档) "
                  f"→ {raw:.2f} clamp[{LOW},{HIGH}] = {val}")
 

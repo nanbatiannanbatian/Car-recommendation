@@ -359,7 +359,11 @@ def annotate_all(cands: list[dict], cfg: dict) -> dict:
     """给每个车的所有配置生成人工口径分（base_scores + delta）。"""
     tdb = load_trims()
     # 权重随 --category 走，不再用模块级旧权重（页面/判档/主榜同一口径）。
-    Wc = {d["key"]: d["weight"] for d in (cfg.get("dimensions") or []) if d.get("key") in W}
+    # v10.74 根因修复：旧版 `if d["key"] in W` 用模块级 8 维常量做白名单，
+    # 新增的 reliability/holding_cost 被过滤掉 → 逐配置总分只按 8 维求和（权重和 0.80），
+    # 页面「加权分」凭空掉 15+ 分（Model Y 84.8 → 67.0）。权重唯一源是 cfg.dimensions。
+    Wc = {d["key"]: float(d["weight"]) for d in (cfg.get("dimensions") or [])
+          if d.get("key") and isinstance(d.get("weight"), (int, float))}
     if not Wc:
         Wc = dict(W)
     out = {}

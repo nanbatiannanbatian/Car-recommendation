@@ -21,6 +21,7 @@
 """
 from __future__ import annotations
 
+import math
 import statistics
 
 # 维度证据策略。need 决定"什么算有证据"，cap_to 决定封顶到哪。
@@ -37,28 +38,39 @@ import statistics
 #     33 款无样本车里 21 款填 8.0、12 款填 5.48~7.8，同一状态两种尺度，
 #     填低的车吃暗亏（T6 填 6.09，比填 8.0 被封到 6.74 的车还低）。
 DIM_POLICY = {
-    # v10.63 根因修复（用户 2026-11-24：「腾势N8没有测试成绩却比有成绩的高不合理」）：
-    # 旧 cap_to=min 让无成绩车与"有成绩车里最差的"并列（本池 7.2），
-    # 而 safety 权重仅 17.7%，腾势N8 靠三电/操控/车机顶格仍能排第3压过 C-NCAP 车。
-    # 加通用 cap_offset：无证据车封顶 = 有证据车最低 + offset（-1.0 = 明确低一档）。
-    # 这是策略参数不是车型特判，对所有"需实测"维度开放，默认 0 保持其它维不变。
-    "safety":     {"need": "crash",      "cap_to": "min", "cap_offset": -1.0, "min_proven": 3,
+    # v10.73 口径变更（用户 2026-11-25：「没有数据要比有数据的低，即使是差评，
+    # 是不是有点不合理」「按照你的建议来改」）：
+    #
+    # 旧口径（v10.63→v10.72）：无证据车封顶 = 有证据车最低 + offset（safety −1.0、
+    # quality −0.1）。语义等价于"你比全榜最有证据的差车还差"—— 把"不知道"当负无穷。
+    # 实测后果：安全 6 款并列 7.0、品控 7 款并列 5.0（全部无样本车被压在同一条线上，
+    # 且低于 PPH 233 的零跑C11 5.1），用户直接指出不合理。
+    #
+    # 新口径 cap_to="impute"（中位插补 + 不确定性折扣）：
+    #   ŝ = median(有证据车) − kappa × stdev(有证据车) / sqrt(n + 1)
+    # 语义：缺证据 = "未知"，落在有证据车的典型水平略偏保守一侧（因为不知道，
+    # 不敢给到中位），而不是"最差"。与 Consumer Reports 小样本向先验收缩同源，
+    # 与 J.D. Power 用 PP100 分层而非判差同源。
+    # 保留下来的硬约束：ŝ 一定低于有证据车中位（不得冒充更好），且门槛仍在
+    # ——无一级证据的车不得进入该维前 30%（由 ranking 层的 percentile 门槛执行）。
+    "safety":     {"need": "crash",      "cap_to": "impute", "impute_kappa": 1.0, "min_proven": 3,
                    "why": "官方碰撞成绩（C-NCAP 得分率 / C-IASI 等级）"},
-    "adas":       {"need": "experience", "cap_to": "median", "min_proven": 3,
+    "adas":       {"need": "experience", "cap_to": "impute", "impute_kappa": 1.0, "min_proven": 3,
                    "why": "独立实测或车主样本（配置表看不出算法调校）"},
-    "cabin":      {"need": "experience", "cap_to": "median", "min_proven": 3,
+    "cabin":      {"need": "experience", "cap_to": "impute", "impute_kappa": 1.0, "min_proven": 3,
                    "why": "车机实测/车主反馈（流畅度不是屏幕尺寸）"},
-    "control":    {"need": "experience", "cap_to": "median", "min_proven": 3,
+    "control":    {"need": "experience", "cap_to": "impute", "impute_kappa": 1.0, "min_proven": 3,
                    "why": "麋鹿/底盘实测（悬架形式说明不了调校）"},
-    # v10.72 根因修复（用户："不能没有数据的比有一些负面数据的打分还高"）：
-    # 旧 cap_to=median + force=True 把无数据车统一标定到"有证据车中位"，
-    # 而有真实负面数据的车（海狮06EV 6.56、零跑C11 5.61）低于中位 →
-    # 无数据车反而更高。严格用 min + offset=-0.1：无数据车 = 有数据车最低 -0.1，
-    # 满足硬不变量"无数据不得高于有负面数据"。这是"缺数据不冒充更好"的直接编码，
-    # 不是"缺数据判劣"——有负面数据的车本就该比无数据车低。
-    "quality":    {"need": "pph",        "cap_to": "min", "cap_offset": -0.1,
+    "quality":    {"need": "pph",        "cap_to": "impute", "impute_kappa": 1.0,
                    "min_proven": 3, "force": True,
                    "why": "PPH/投诉样本（故障率必须靠真实样本，没样本≠没问题）"},
+    # v10.74：拆维后的两个新维，同一套「无证据=中位插补」口径，不判劣
+    "reliability": {"need": "pph",       "cap_to": "impute", "impute_kappa": 1.0,
+                    "min_proven": 3,
+                    "why": "故障频度需真实投诉/PPH 样本（没有样本≠故障少）"},
+    "holding_cost": {"need": "resale",   "cap_to": "impute", "impute_kappa": 1.0,
+                     "min_proven": 3,
+                     "why": "三年保值率需流通协会/精真估等同口径数据（C级估值曲线不算）"},
     # ---- 以下为纸面可判定维度，明确不封顶 ----
     "space":      {"need": "params", "cap_to": None,
                    "why": "轴距/车长/容积是硬数据"},
@@ -141,6 +153,11 @@ def apply_all(cands, experience_lib=None, policy=None, only=None, anchor=None) -
                 return _dim in exp.get(canon(c.get("model") or ""), {})
             if _need == "pph":
                 return _has_pph(c)
+            if _need == "resale":
+                # v10.74：同口径三年保值率（A/B 级）才算证据，C 级估值曲线只展示
+                d = c.get("holding_cost_detail") or {}
+                return isinstance(d.get("resale"), (int, float)) and bool(d.get("tier")) \
+                    and str(d.get("tier")) in ("A", "B")
             return False
 
         # 固定锚点快照优先：全价位榜算好的 cap 直接用，不再从子池重算
@@ -165,6 +182,20 @@ def apply_all(cands, experience_lib=None, policy=None, only=None, anchor=None) -
             if cap_to == "min":
                 cap = min(v for _, v in proven)
                 anchor_label = min(proven, key=lambda x: x[1])[0]
+            elif cap_to == "impute":
+                # v10.73 中位插补 + 不确定性折扣：ŝ = median − kappa·σ
+                # σ 用总体标准差（有证据车就是全集）。
+                # 【为什么是 −1σ 而不是 −σ/√n】首版用 median−σ/√(n+1) 折扣过轻
+                # （quality 只降 0.35），无证据车被抬到近中位，全榜名次重排（Spearman≈0.5），
+                # 等于用"未知"换掉了"有投诉"的信息。−1σ 的语义是"未知落在有证据车
+                # 分布的保守一侧"：明显低于中位、明显高于最差（因为最差往往是极值不是典型）。
+                vals = [v for _, v in proven]
+                med = statistics.median(vals)
+                sd = statistics.pstdev(vals) if len(vals) > 1 else 0.0
+                k = float(rule.get("impute_kappa") or 1.0)
+                cap = round(med - k * sd, 2)
+                anchor_label = (f"中位插补 {med:g} − {k:g}×σ{sd:.2f}"
+                                f"（有证据 {len(vals)} 款，未知不判劣、不冒充更好）")
             elif cap_to == "q25":
                 # v10.72：下四分位——无数据车低于75%有数据车，但不等于最差
                 # （min 会把无数据车压到全池最低，违反"缺数据不判劣"；
@@ -185,23 +216,39 @@ def apply_all(cands, experience_lib=None, policy=None, only=None, anchor=None) -
                 anchor_label += f"{_off:+.1f}（无证据降档）"
 
         force = bool(rule.get("force"))
+        # v10.73：impute 模式的语义是"赋值"（插补到 ŝ），不是"封顶"——
+        # 手填过高要压下来、手填过低要抬上来，否则同一"无证据"状态仍两套尺度。
+        assign = force or cap_to == "impute"
         for c in cands:
             if has(c):
                 continue
             s = (c.get("scores") or {}).get(dim)
-            if not isinstance(s, (int, float)):
+            ok = isinstance(s, (int, float))
+            # v10.74 根因修复：旧版 `if not isinstance(s, ...) continue` 把「整维没有分」
+            # 的车直接跳过，等于"没有频度/保值率信号"的车该维永久缺失——
+            # 而 impute 的语义正是给未知车赋值。缺分车现按 ŝ 补上，否则页面该维留空、
+            # 权重和只剩 0.80、总分被压低十几分（启源Q06 84.0→67.7）。
+            if not ok and not assign:
                 continue
-            prev = float(s)
-            # force=True（quality）：无样本一律标定到中位，不管原值高低——
+            prev = float(s) if ok else None
+            # force/assign：无样本一律标定到 ŝ，不管原值高低——
             # 手填的 8.0 和 5.48 都是「没有依据」，不能因为填得低就吃亏。
-            if force:
-                if abs(prev - cap) <= 1e-9:
+            if assign:
+                if ok and abs(prev - cap) <= 1e-9:
                     continue
             elif prev <= cap + 1e-9:
                 continue
             c["scores"][dim] = cap
+            # v10.74.4：结构化记录「哪一维是无证据插补/封顶」，供名次带（rank_band）
+            # 做不确定性抽样、页面「未验证 x%」徽标披露。别从 score_cap_reasons 文本
+            # 里正则解析——文案一改就断，且发布包里的文案是可翻译的。
+            c.setdefault("dim_evidence", {})[dim] = {
+                "kind": "imputed" if cap_to == "impute" else "capped",
+                "cap": cap, "anchor": anchor_label, "why": rule["why"]}
             c.setdefault("score_cap_reasons", []).append(
-                f"{dim} 无{rule['why']}，封顶至 {cap:g}（锚点 {anchor_label}）")
+                (f"{dim} 无{rule['why']}，中位插补至 {cap:g}（{anchor_label}）"
+                 if cap_to == "impute" else
+                 f"{dim} 无{rule['why']}，封顶至 {cap:g}（锚点 {anchor_label}）"))
             out.append({"model": c["model"], "dim": dim, "prev": prev,
                         "capped": cap, "anchor": anchor_label, "rule": rule["why"],
                         "forced": force})

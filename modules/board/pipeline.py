@@ -494,15 +494,42 @@ def main():
     for _c in cands:
         _s = (_c.get("scores") or {}).get("powertrain")
         if isinstance(_s, (int, float)) and _s > _SS.MAIN_PT_KNEE:
-            _new = _SS.main_board_powertrain_cap(_s)
+            # v10.73 实测闸门：只有独立实测达成率（kind=independent）才允许越过 9.3
+            # 走到软上限 9.5；车主口碑/物理估算/无数据一律上界 9.0。
+            _measured = ((_c.get("range_achievement") or {}).get("kind") == "independent")
+            _new = _SS.main_board_powertrain_cap(_s, measured=_measured)
             if _new < _s:
                 _c["scores"]["powertrain"] = _new
                 _c.setdefault("score_cap_reasons", []).append(
-                    f"powertrain 主榜软上限 {_s:g}→{_new:g}（渐近 {_SS.MAIN_PT_CAP:g}，不硬顶满分）")
-                _pt_capped.append({"model": _c["model"], "prev": _s, "to": _new})
+                    (f"powertrain 主榜软上限 {_s:g}→{_new:g}（渐近 {_SS.MAIN_PT_CAP:g}，不硬顶满分）"
+                     if _measured else
+                     f"powertrain {_s:g}→{_new:g}（无一手实测达成率，上界 {_SS.MAIN_PT_UNVERIFIED_CAP:g}，"
+                     f"不声称第一梯队）"))
+                _pt_capped.append({"model": _c["model"], "prev": _s, "to": _new,
+                                   "measured": _measured})
     if _pt_capped:
         print(f"[主榜三电软上限] {len(_pt_capped)} 款满分/近满分收敛：" +
               "、".join(f"{x['model']} {x['prev']:g}→{x['to']:g}" for x in _pt_capped[:5]))
+
+    # v10.73 结构防线出榜：补能「单一账本」批量体检（800V 与快充不得双计）。
+    # 逐配置跑 spec_score.powertrain_parts；若谁把平台分/快充分改成同时为正，
+    # 这里直接抛 RuntimeError（宁可出榜失败，也不发布一个虚高的三电分）。
+    # 同时披露两项计数：platform_muted=有快充→平台被置 0 的配置数；
+    # platform_proxy=无快充数据→平台作补能代理计分的配置数。
+    from modules.engine import trim_board as _TB
+    from modules.data import trims_store as _TS
+    _pt_db = _TS.load_db()
+    _pt_specs = []
+    for _e in (_pt_db.get("entries") or []):
+        for _t in (_e.get("trims") or []):
+            _sp = _TB.spec_from_trim(_t)
+            if isinstance(_sp, dict) and _sp.get("charge_10_80_min") is not None:
+                _pt_specs.append(_sp)
+    _sc_aud = _SS.powertrain_single_credit_audit(_pt_specs)
+    print(f"[补能单一账本] 体检 {_sc_aud['checked']} 条配置：平台并入补能置 0 "
+          f"{_sc_aud['platform_muted']} 条 / 无快充作代理 {_sc_aud['platform_proxy']} 条 / "
+          f"双计违规 {len(_sc_aud['violations'])} 条")
+
 
     # v10.72 根因修复：space 从"纯手填"改为"硬数据规则算"（用户"特斯拉空间为什么差"）。
     # 旧版 evidence_gate 把 space 标"纸面可判定、不封顶"，却没有任何算分规则——
@@ -707,15 +734,16 @@ def main():
                  "\n→ 确认为口径差非错误时用 --skip-consistency-gate 并在报告说明。")
     print(f"[内部一致性门禁] {_ic['checked']} 款候选，note/结构字段矛盾 0")
 
-    # 质价比法（v10.47：全池统一，不分价位档）：
+    # 质价比法（v10.73：同价位段残差）：
     # 旧 value 是人工裁决分（名实不符=电池密度、不可复算）；v10.17 改价格残差（分档），
-    # v10.47 用户指出分档=不同车不同标准，且实测本池产品力与价格无关（Hedonic b≈0），
-    # 故去掉分档、用「每万元产品力」相对全池均值的距离复算 value——全池一把尺子。
-    # 产品力取其余七维归一加权（剔除 value 自身避免重复计分），保值率仍作有数据车微调。
+    # v10.47 曾改「全池统一锚」，但实测把「便宜」本身变成加分项（本池最低价 G6 的
+    # value 直接 9.0 排全榜第 2，而空间/品控/安全均中下游），用户判定不合理；
+    # v10.73 改回同价位段残差：锚点=本档每万元产品力的中位（档内<3款回退全池中位），
+    # 价低但产品力同样低的车不再占便宜，跨档不可比。保值率仍不进 value（v10.49）。
     # 必须在 sibling/安全门禁之前：新 value 要过同源车一致性校验；此时七维主体
     # （规则增量/体验/效率/达成率/软上限/证据封顶/空间校准）已定稿，仅差后续
     # airbags/ground_clearance 对 safety 的 ≤±0.3 微调（对 pf 影响<0.02）。
-    # 子榜从全价位固定快照读档均值（value_bins），保证同车跨榜同分。
+    # 子榜从全价位固定快照读档中位（value_bins），保证同车跨榜同分。
     from modules.engine import value_residual as _VR
     _wv = {x["key"]: x["weight"] for x in cfg.get("dimensions", [])}
     # v10.45 根因修复：ppw 分母必须用主榜评分配置价（与产品力同配置），
@@ -741,8 +769,8 @@ def main():
                                fixed_bins=(_anchor or {}).get("value_bins"),
                                price_map=_price_map)
         _n_trim = sum(1 for c in cands if c.get("model") in _price_map)
-        print(f"[质价比·全池统一] 覆盖 {_vr_report['covered']}/{_vr_report['n']} 款（"
-              f"每万元产品力对全池均值，不分价位档"
+        print(f"[质价比·同价位段] 覆盖 {_vr_report['covered']}/{_vr_report['n']} 款（"
+              f"每万元产品力对本档中位，档内<3款回退全池"
               + ("，读全榜锚点" if _anchor else "，本池拟合")
               + f"，评分配置价 {_n_trim}/{_vr_report['n']} 款）")
 
@@ -1187,13 +1215,39 @@ def main():
 
     if a.quality:
         cands, _ = QS.apply(cands, cdata)
+        # v10.74：把旧「质量与品控」一格拆成两个独立维度（用户 2026-11-25 指示）
+        #   reliability（可靠性）= 故障频度（投诉密度/PPH），召回不计（属处置不属频发）
+        #   quality（质量与品控）= 故障严重度（安全类标签/物理召回处置）
+        # 用同一次投诉聚合数据、不同分量，不重算不双计；quality_score.score_one 的
+        # 合成分保持不变（历史回归不受影响），这里只把分量分别落到两个维。
+        for _c in cands:
+            _qd = _c.get("quality_detail") or {}
+            _comp = _qd.get("components") or {}
+            _sev = 8.0 - float(_comp.get("severe") or 0.0) + float(_comp.get("recall_adj") or 0.0)
+            _c.setdefault("scores", {})["quality"] = round(max(3.0, min(9.5, _sev)), 2)
+        from modules.engine import reliability_score as _RS
+        cands, _r_audit = _RS.apply(cands, cdata)
+        _r_cov = _RS.coverage(cands)
+        print(f"[可靠性维] 覆盖 {_r_cov['covered']}/{_r_cov['total']} 款"
+              f"（故障频度：投诉密度 + PPH；召回不计入）")
+        summary["reliability"] = _r_cov
+        # 持有成本（三年保值率）：单一真相源 residual_values.json，C 级只展示不计分
+        from modules.engine import holding_cost as _HC
+        cands, _h_audit = _HC.apply(cands)
+        _h_cov = _HC.coverage(cands)
+        print(f"[持有成本维] 三年保值率覆盖 {_h_cov['covered']}/{_h_cov['total']} 款"
+              f"（C级/未覆盖交中位插补）")
+        summary["holding_cost"] = _h_cov
         # v10.72：quality 证据封顶放在 QS.apply 之后（此时 quality_detail 已生成，
         # _has_pph 能识别"有投诉明细但PPH样本不足"的车，不再一律 force）。
-        _q_adj = EG.apply_all(cands, only=["quality"])
+        _q_adj = EG.apply_all(cands, only=["quality", "reliability", "holding_cost"])
         if _q_adj:
-            print(f"[质量证据封顶] {len(_q_adj)} 款无质量证据车标定到 "
-                  f"{_q_adj[0]['capped']:g}（有证据车最低-0.1，"
-                  "确保无数据不高于有负面数据）")
+            # v10.74：三个维各自的封顶数分开打印（旧版只打总量，把可靠性/持有成本的
+            # 插补数误算成「质量证据封顶」，口径披露失真）
+            _by = EG.summarize(_q_adj)
+            _msg = " / ".join(f"{_d} {_v['count']} 款→{_v['cap']:g}"
+                              for _d, _v in _by.items())
+            print(f"[证据封顶·拆维] {_msg}（无证据=中位插补，不判劣、不冒充更好）")
         parts += ["---", "", QS.report(cands), ""]
         summary["quality"] = QS.coverage(cands)
         summary["quality"]["complaints_auto"] = bool(_auto_cdata)
@@ -1480,6 +1534,27 @@ def main():
                 data_v2 = BV.build(cands_for_html, cfg_v2, pol, facts_v2, tiers=_tiers_v2,
                                    rule_adjust_detail=_rule_detail,
                                    no_experience=True)  # 已在 pipeline 里调过，不重复累加
+                # v10.74.4：名次带（插补不确定性 → P10–P90 名次区间）+ 未验证权重。
+                # 只加区间/披露，不改任何分数与名次（页面排序仍以 total 为准）。
+                try:
+                    from modules.engine import rank_band as RB
+                    rb = RB.apply_all(data_v2.get("main_board") or [], cands_for_html, cfg_v2)
+                    summary["rank_band"] = rb
+                    # 名次带要进 summary.json（机读对比/回归用）——summary 文件在 HTML 段之前
+                    # 已写过一次，这里补写一次，避免"页面有带、JSON 没有"两套真相。
+                    try:
+                        json.dump(summary, open(sp, "w", encoding="utf-8"),
+                                  ensure_ascii=False, indent=2)
+                    except Exception:                  # noqa: BLE001
+                        pass
+                    _wide = [f"{m} {v['lo']}–{v['hi']}" for m, v in rb["models"].items()
+                             if v["hi"] - v["lo"] >= 3]
+                    print(f"[名次带] 覆盖 {len(rb['models'])} 款；带宽≥3 名 "
+                          f"{len(_wide)} 款" + ("：" + "、".join(_wide[:6]) if _wide else ""))
+                except Exception as _rbex:                 # 不阻断出榜
+                    import traceback as _tb2
+                    _tb2.print_exc(file=sys.stderr)
+                    print(f"[warn] 名次带跳过：{type(_rbex).__name__}: {_rbex}", file=sys.stderr)
                 _as_of = a.as_of
                 if not _as_of:
                     try:

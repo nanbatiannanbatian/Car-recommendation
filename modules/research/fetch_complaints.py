@@ -176,7 +176,10 @@ def aggregate(rows: list[dict], cands: list[dict]) -> dict:
                   "sales_basis": sales.get(m),
                   "first": min(b["dates"]) if b["dates"] else None,
                   "last": max(b["dates"]) if b["dates"] else None,
+                  # v10.74.1：top_tags 只留 4 条够展示，但严重度分级需要完整标签谱
+                  # （安全类/功能失效/耐久劣化/体验各有不同权重），故额外保留全量。
                   "top_tags": b["tags"].most_common(4),
+                  "tags_all": b["tags"].most_common(),
                   "samples": b["samples"]}
     dates = sorted(r["date"] for r in rows if r.get("date"))
     return {"window_days": WINDOW_DAYS, "rows_in_window":

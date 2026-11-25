@@ -94,6 +94,12 @@ border-radius:0 8px 8px 0;font-size:13px;color:#5c4518;margin:14px 0}
 border-radius:50%;font-weight:700;background:var(--soft);color:var(--ink2)}
 .rk.g1{background:#f6e3c0;color:#8a5a00}.rk.g2{background:#e7eaed;color:#495360}
 .rk.g3{background:#f3dfd6;color:#9b4a2f}
+/* v10.74.4：名次带（插补不确定性 → P10–P90 名次区间）与「未验证」徽标 */
+.rkband{display:block;margin-top:2px;font-size:10.5px;font-weight:400;color:#667085;cursor:help;white-space:nowrap}
+.rkband.wide{color:#8a5a1f}
+.unv{display:inline-block;font-size:10.5px;font-weight:400;padding:0 5px;margin-left:5px;
+border-radius:4px;background:#f2f4f7;color:#475467;border:1px dashed #98a2b3;cursor:help;vertical-align:1px}
+.unv.heavy{background:#fdf0ee;color:#b42318;border-color:#f3c9c3}
 .score{font-size:17px;font-weight:700;color:var(--accent2)}
 .delta-up{color:#c8442e;font-weight:700}.delta-down{color:#1a7f37;font-weight:700}
 .tier{display:inline-block;padding:3px 9px;border-radius:20px;font-size:12px;font-weight:700;color:#fff;background:#5f6b78;white-space:nowrap}
@@ -283,6 +289,39 @@ def rank_badge(rank):
     return f'<span class="rk {g}">{rank}</span>'
 
 
+def band_html(r):
+    """v10.74.4：名次带。带宽 ≥3 名标黄，提示「这个名次可以被插补值的运气改写」。"""
+    b = r.get("rank_band")
+    if not (isinstance(b, (list, tuple)) and len(b) == 2):
+        return ""
+    lo, hi = int(b[0]), int(b[1])
+    if lo == hi:
+        return ""                       # 全维度有证据：不显示冗余的 [6,6]
+    width = hi - lo
+    p10p90 = r.get("rank_band_p10p90") or []
+    tail = (f" 极端情形（P10–P90）为 {int(p10p90[0])}–{int(p10p90[1])}。"
+            if isinstance(p10p90, (list, tuple)) and len(p10p90) == 2 else "")
+    tip = (f"名次带 {lo}–{hi}（中间 50% 概率）：该车 {r.get('rank_band_note') or ''}，"
+           f"这些维按 ±σ 抽样 300 次重排。带宽 {width} 名，"
+           + ("证据偏薄，名次可能被插补值改写。" if width >= 3 else "证据较实，名次基本落在这个窄区间。")
+           + tail)
+    return f'<span class="rkband{" wide" if width >= 3 else ""}" title="{e(tip)}">{lo}–{hi}</span>'
+
+
+def unf_html(r):
+    """v10.74.4：「未验证 x%」徽标 —— 总分里有多少权重来自无证据插补。"""
+    w = r.get("imputed_weight")
+    if not isinstance(w, (int, float)) or w <= 0:
+        return ""
+    pct = int(round(float(w) * 100))
+    heavy = float(w) >= 0.20
+    tip = (f"未验证 {pct}%：{r.get('rank_band_note') or ''}。"
+            f"这部分权重没有一手数据，按「有证据车中位 −1σ」插补，"
+            f"不等于该车真的差，也不能当成实测结论。")
+    return (f'<span class="unv{" heavy" if heavy else ""}" title="{e(tip)}">'
+            f'未验证 {pct}%</span>')
+
+
 def tier_badge(t):
     """档位徽标：CSS 颜色类是英文 T1/T2/T3（见 .tier.T1/.T2/.T3），
     此前误用中文当 class（tier 第二档）导致 CSS 匹配不上→白字无背景看不清。
@@ -409,10 +448,13 @@ def render(data, summary, title, as_of):
                  '<div class="rule" style="background:#f0f6f8;border-left-color:#1f6f8b">'
                  '<b>质价比（性价比列）怎么算：</b>每万元买到的产品力 '
                  '= 七维产品力（剔除价格本身）÷ 该车评分配置指导价，'
-                 '<b>全池统一一把尺子、不分价位档</b>——高于全池平均加分、低于扣分（8.0 为中性，'
-                 '按偏离幅度平滑给分、极端才封顶 ±1.5，本池实测落在 6.6–8.9）。'
-                 '因为产品力分数基本不随价格增长，<b>同产品力下价格越低质价比越高</b>，'
-                 '这是公式的必然结果而非便宜车「更好」；买贵车请改看「纯产品力总榜」（不看价格比硬件）。'
+                 '<b>同价位段内比、不跨档比</b>——先按指导价分档（≤15/15-20/20-25/>25 万），'
+                 '与<b>本档每万元产品力的中位</b>比：高于档内中位加分、低于扣分（8.0 为中性，'
+                 '按偏离幅度平滑给分、极端才封顶 ±1.5）。'
+                 '这样<b>「便宜」本身不再是加分项</b>：价低但产品力也低的车，每万元产品力不会变高；'
+                 '也让 11 万级和 28 万级不再被同一把尺子强行比较。'
+                 '档内不足 3 款时回退全池中位（页面 basis 会写明「回退全池中位」）。'
+                 '想看跨价位绝对产品力请改看「纯产品力总榜」（不看价格比硬件）。'
                  '<b>保值率不在这格里</b>（它是持有成本不是产品力，只在「逐车取证依据」展示、不计分）。'
                  '分数由维度分与指导价复算，不用人工拍分。</div>')
 
@@ -437,6 +479,23 @@ def render(data, summary, title, as_of):
                  '证据 A=官方碰撞成绩 / B=口碑样本够 / C=新上市或样本不足。</div>')
         H.append('<div class="rule">配置下拉为<b>交互预览</b>：切换后主榜名次与分数实时重排，'
                  '但<b>档位、三榜并列、稳健性、审查边界按最高配置口径固定不变</b>（权威结论不随预览改变）。</div>')
+        # v10.74.4：名次带 + 未验证徽标的口径说明（有数据才显示，避免空标题）
+        _rbm = ((summary or {}).get("rank_band") or {}).get("models") or {}
+        if _rbm:
+            _n_band = sum(1 for v in _rbm.values() if (v.get("hi") or 0) - (v.get("lo") or 0) >= 1)
+            _n_unv = sum(1 for v in _rbm.values() if (v.get("imputed_weight") or 0) > 0)
+            _heavy = sorted((v for v in _rbm.values() if (v.get("imputed_weight") or 0) >= 0.20),
+                            key=lambda v: -(v["imputed_weight"]))
+            _heavy_txt = ("；未验证 ≥20% 的：" + "、".join(
+                e(f"{m} {int(round(v['imputed_weight']*100))}%")
+                for m, v in _rbm.items() if (v.get("imputed_weight") or 0) >= 0.20)) if _heavy else ""
+            H.append(f'<div class="rule"><b>名次带与未验证徽标（本版新增）：</b>名次右侧的小字'
+                     f'（如 <span class="rkband" style="display:inline-block;margin:0 2px">5–8</span>）是<b>名次带</b>——把该车「无证据插补」的维度'
+                     f'按 ±σ 抽样 300 次后重排，取中间 50%（P25–P75），悬停看极端区间 P10–P90；带宽 ≥3 名标黄。'
+                     f'车名后的 <span class="unv">未验证 20%</span> 表示总分里有多少权重来自插补'
+                     f'（不是实测）。本次 {_n_unv} 款含插补、其中 {_n_band} 款名次带跨 ≥1 名'
+                     f'{_heavy_txt}。带越窄，名次越硬；差 0.1 分的相邻两名，谁在前可能只是插补值的运气。'
+                     f'名次旁没有小字＝该车全部维度都有证据。</div>')
         _stab = (summary or {}).get("stability") or {}
         _tau = _stab.get("kendall_mean")
         _tau_txt = ''
@@ -535,12 +594,12 @@ def render(data, summary, title, as_of):
             for ci, k in enumerate(BV.MAIN_BOARD_COLUMNS):
                 val = BV.main_cell(k, r, cand, gmap.get("kWh/万元", ""))
                 if k == "rank":
-                    H.append(f"<td class='c-rank'>{rank_badge(r.get('rank'))}</td>")
+                    H.append(f"<td class='c-rank'>{rank_badge(r.get('rank'))}{band_html(r)}</td>")
                 elif k == "model":
                     sel = trim_selector(r["model"], td.get("trims") or [],
                                         r.get("best_trim"), width=160)
                     # v9.7.53：强推金标移到档位列（车名列不再重复显示）
-                    H.append(f"<td class='name'>{e(val)}{risk_flags(r)}{sel}</td>")
+                    H.append(f"<td class='name'>{e(val)}{unf_html(r)}{risk_flags(r)}{sel}</td>")
                 elif k == "total":
                     H.append(f"<td class='c-total'><span class='score'>{e(val)}</span></td>")
                 elif k == "crash":
@@ -683,7 +742,7 @@ def render(data, summary, title, as_of):
     # ---- 总分构成
     if "score_breakdown" in ids:
         dims = meta.get("dimensions") or []
-        H.append("<h2>总分构成 <span>8 维原始分 · 加权分＝Σ(维分×权重)×10 + adjust</span></h2>")
+        H.append(f"<h2>总分构成 <span>{len(dims)} 维原始分 · 加权分＝Σ(维分×权重)×10 + adjust</span></h2>")
         H.append(f'<div class="rule"><b>分数证据类型（v{_ver}）：</b>本榜所有维度分均为'
                  '<b>官方参数 + 客观差异规则推算</b>（来源：配置表/碰撞成绩/销量），'
                  '<b>不是实车实测分数</b>；配置间差异由「三电得分理由」逐条列明。'
@@ -708,9 +767,15 @@ def render(data, summary, title, as_of):
                 v = sc.get(d["key"])
                 cls = "delta-up" if isinstance(v, (int, float)) and v >= 9 else (
                     "delta-down" if isinstance(v, (int, float)) and v < 8 else "")
-                H.append(f"<td class='{cls} dimcell' data-dim='{d['key']}'>"
+                # v10.72.2：每个数字都带算式悬浮（用户：点上去要看得见为什么这么打分）
+                tip = BV.dim_formula_tip(r, d["key"], d.get("label") or d["key"],
+                                        d.get("weight") or 0, v)
+                H.append(f"<td class='{cls} dimcell' data-dim='{d['key']}' "
+                         f'title="{e(tip)}">'
                          f"{num(v) if isinstance(v,(int,float)) else '—'}</td>")
-            H.append(f"<td class='totalcell'><span class='score'>{num(r.get('total'))}</span></td></tr>")
+            ttip = BV.total_formula_tip(r, dims)
+            H.append(f"<td class='totalcell' title=\"{e(ttip)}\">"
+                     f"<span class='score'>{num(r.get('total'))}</span></td></tr>")
         H.append("</tbody></table>")
         # v9.7.19：维度子项依据（折叠，默认收起，不破坏主榜简洁）
         H.append('<div class="rule" style="margin-top:12px"><b>维度子项依据（点开看每维分怎么来的）：</b>'
@@ -779,7 +844,13 @@ function sortMain(){
     var av=ae?parseFloat(ae.textContent)||0:0,bv=be?parseFloat(be.textContent)||0:0;
     return bv-av;});
   rs.forEach(function(r,i){tb.appendChild(r);
-    var rc=r.querySelector('.c-rank');if(rc)rc.innerHTML='<span class="rank">'+(i+1)+'</span>';});
+    var rc=r.querySelector('.c-rank');if(rc){
+      // v10.74.4：只改名次数字，保留名次带元素；切换配置后带不再适用于新名次，置为「—」
+      var rk=rc.querySelector('.rk');
+      if(rk){rk.textContent=(i+1);}else{rc.innerHTML='<span class="rk">'+(i+1)+'</span>';}
+      var bd=rc.querySelector('.rkband');
+      if(bd){bd.textContent='带—';bd.className='rkband';bd.title='切换配置后名次带不适用（带基于车系基准分与插补维不确定性）';}
+    }});
 }
 function sortPower(){
   var tb=document.querySelector('#powerBoard tbody');if(!tb)return;
@@ -1324,7 +1395,7 @@ def selftest():
         ("视图包装无哨兵残留", "<!--VB:" not in doc),
         # v10.47 用户要求"把性价比描述写清楚给用户看到"——页面须明说质价比口径
         ("页面写明质价比口径", "质价比（性价比列）怎么算" in doc
-         and "全池统一一把尺子、不分价位档" in doc
+         and "同价位段内比、不跨档比" in doc
          and "每万元买到的产品力" in doc),
         # v10.49 保值率剥离：页面声明不计分
         ("页面声明保值率不计分", "保值率不在这格里" in doc

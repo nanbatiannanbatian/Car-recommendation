@@ -188,6 +188,72 @@ def _active_dims(cfg: dict) -> list[dict]:
     return [d for d in cfg["dimensions"] if d.get("key") not in excl]
 
 
+def _dim_notes(c: dict) -> dict:
+    """逐维「凭什么给这个分」的原文依据（渲染层 hover 用，不参与打分）。
+
+    只搬运候选池里已存在的字段，不在这里新造理由：
+      safety  ← 碰撞成绩/体系 + 封顶原因
+      space   ← space_score 的硬数据算式（轴距/尾箱）
+      quality ← quality_score 的投诉/PPH/召回明细
+      value   ← value_residual 的每万元产品力算式
+      adas/cabin/control ← 取证文本里的对应维度证据
+    """
+    def _cut(s, n=220):
+        s = " ".join(str(s or "").split())
+        return s if len(s) <= n else s[:n] + "…"
+
+    ev = c.get("evidence") or {}
+    qd = c.get("quality_detail") or {}
+    vr = c.get("value_residual") or {}
+    out = {}
+    crash = c.get("crash") or ""
+    safety_bits = []
+    if crash:
+        safety_bits.append(f"官方成绩：{crash}")
+    else:
+        safety_bits.append("无国内官方碰撞成绩")
+    if c.get("safety_basis"):
+        safety_bits.append(f"体系：{c['safety_basis']}")
+    for k in ("safety_cap_reason", "safety_note"):
+        if c.get(k):
+            safety_bits.append(_cut(c[k], 180))
+    out["safety"] = "；".join(safety_bits)
+    # 多成绩体系：主分可能来自 SSOT，但融合裁决里还有别家成绩，hover 里都要能看见
+    fu = c.get("crash_fusion") or {}
+    if isinstance(fu, dict) and fu.get("primary"):
+        alts = [x.get("display") for x in (fu.get("all_scores") or [])
+                if isinstance(x, dict) and x.get("display")]
+        others = [a for a in alts if a != fu["primary"]]
+        if fu["primary"] != crash or others:
+            out["safety"] = (out["safety"] + "；融合裁决：" + str(fu["primary"])
+                             + (f"（另有 {'、'.join(others[:3])}）" if others else ""))
+    out["space"] = _cut(c.get("space_note") or ev.get("space_evidence"))
+    out["value"] = _cut(vr.get("basis"))
+    qn = _cut(qd.get("note"))
+    if not qn:
+        bits = []
+        if c.get("complaint_pph"):
+            bits.append(f"车质网投诉 PPH {c['complaint_pph']:g}（每百车口径，越高越差）")
+        if c.get("ah_pph_usable") and c.get("ah_pph"):
+            bits.append(f"汽车之家 PPH {c['ah_pph']:g}（样本 {c.get('ah_review_users') or 0}）")
+        elif c.get("ah_pph_note"):
+            bits.append(str(c["ah_pph_note"]))
+        qn = "；".join(bits)
+    out["quality"] = qn
+    # v10.74 拆维：可靠性=频度分量、质量=严重度分量、持有成本=三年保值率
+    rd = c.get("reliability_detail") or {}
+    out["reliability"] = _cut(rd.get("note") or qn)
+    hd = c.get("holding_cost_detail") or {}
+    out["holding_cost"] = _cut(hd.get("note"))
+    if (c.get("quality_detail") or {}).get("sev_note"):
+        out["quality"] = _cut(c["quality_detail"]["sev_note"])
+    for d in ("adas", "cabin", "control"):
+        out[d] = _cut(ev.get(f"{d}_evidence") or c.get(f"{d}_note"))
+    out["powertrain"] = _cut(c.get("powertrain_note") or ev.get("powertrain_evidence")
+                             or c.get("powertrain_basis"))
+    return {k: v for k, v in out.items() if v}
+
+
 def score_rows(cands: list[dict], cfg: dict, weights: list[float] | None = None) -> list[dict]:
     """weights 为按 dimensions 顺序的权重向量；缺省用配置里的基准权重。
 
@@ -216,6 +282,7 @@ def score_rows(cands: list[dict], cfg: dict, weights: list[float] | None = None)
             "model": c.get("model"),
             "price": c.get("price"),
             "total": round(total, 1),
+            "adjust": float(c.get("adjust") or 0.0),
             "missing_dims": missing,
             "evidence": c.get("evidence_status") or c.get("grade") or "?",
             "note": c.get("note") or c.get("weak") or "",
@@ -239,6 +306,11 @@ def score_rows(cands: list[dict], cfg: dict, weights: list[float] | None = None)
             "trend_sales": c.get("trend_sales"),
             "sales_scope": c.get("sales_scope"),
             "sales_note": c.get("sales_note"),
+            # v10.72.2：逐维依据透传（只读，不进打分），供「总分构成」每个数字 hover
+            # 显示「这一维凭什么给这个分」。旧版这些说明都留在候选池里，
+            # 页面拿到的是 row → 用户只能看到一个裸分数，无法复核。
+            "dim_notes": _dim_notes(c),
+            "score_cap_reasons": c.get("score_cap_reasons") or [],
             "lifecycle_status": (c.get("lifecycle") or {}).get("status")
                                 if isinstance(c.get("lifecycle"), dict) else None,
         })

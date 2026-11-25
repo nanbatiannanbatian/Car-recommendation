@@ -154,8 +154,8 @@ CASES = [
     ("BUG-131", "页面冗余区块(价位段子榜/分段汇总总榜)+空间表4个全空列(下沉储物/得房率/后排腿部/后排膝部)", "v10.29.0"),
     ("BUG-132", "水桶车稳健通道缺失(均衡无短板车被'进前三'计数规则系统性惩罚)", "v10.30.0"),
     ("BUG-133", "性价比价格口径错配:ppw分母取区间最低价(26.35)配车系产品力(28.85水平)→Model Y value虚高9.54且note写'性价比最低'", "v10.45.0"),
-    ("BUG-134", "性价比按价位档分档=不同车不同标准:贵车档均值低被抬分(Model Y 8.81);且本池pf与价格无关(Hedonic b≈0)分档失效→改全池统一质价比", "v10.47.0"),
-    ("BUG-135", "全池统一锚后GAIN=12未重标定:20款车18款触顶分数挤成9.5/6.5两坨,极狐T5(ppw0.535)被抹平=海狮06(0.501)→GAIN降3", "v10.48.0"),
+    ("BUG-134", "性价比锚点口径再变更:全池统一锚把『便宜』变加分项(最低价G6 value 9.0排全榜第2,空间/品控/安全中下游)→改同价位段残差,锚=本档ppw中位", "v10.73.0"),
+    ("BUG-135", "性价比增益标定兜底:锚点改档内后必须复检 GAIN=3 不新增触顶、同档内高ppw车(极狐T5)不得被最低价车(G6)反超", "v10.73.0"),
     ("BUG-136", "保值率混进质价比格:极狐T5质价比高却因保值-0.31总分低于海狮06,用户误读→剔除保值改独立事实展示", "v10.49.0"),
     ("BUG-137", "生命周期两套渲染路径分裂:HTML原样透传候选池字段18台车显示「—」/MD走确证层显示「在售」+两套标签表漂移(LC_LABEL 6键/LIFECYCLE_STATUS_CN 15键)+MD列名仍叫「周期」+t035假断言", "v10.50.0"),
     ("BUG-138", "电池来源列电压V丢显:BUG-127归一charge纯电压文本→voltage_v后渲染层三级取数没同步(MONA L05/腾势N7主榜无V、逐配置列与JS下拉同病)", "v10.50.0"),
@@ -179,6 +179,13 @@ CASES = [
     ("BUG-156", "尚界H5 safety手填封顶9.3(规则应9.1)+quality手填7.0触发有证据封顶6.74:手工分绕过SSOT/quality规则→correction+star_only_overcap门禁", "v10.71.0"),
     ("BUG-157", "四项评分维度根因(特斯拉空间差/海狮品控差/多碰撞成绩/无数据反超):space纯手填无规则+PPH方向算反+quality封顶跑在QS之前+无数据车cap_to=median反超→space硬数据/PPH基准151/封顶后移/无数据严格低", "v10.72.0"),
     ("BUG-158", "多碰撞成绩只到数据层没到列:score_rows只透传crash+crash_cell只读单条,渲染拿到的是row不是cand→crash_fusion/crash_secondary读不到,展开逻辑静默失效→透传+crash_cell走展开+summary兜底注入", "v10.72.1"),
+    ("BUG-159", "小鹏G6三电9.5(全榜第一)与无数据车垫底同源:800V平台与快充12min同一硬件双计+9.0以上无实测背书也开放+无证据封顶=min-1判劣→平台并入补能只计一次/实测闸门9.0/中位插补1σ", "v10.73.0"),
+    ("BUG-160", "800V与快充双计只靠注释约定:任何人以后加平台加分或在他处给charge/platform_v加分都会静默重现→补能分只由charging_credit单出口产生+出口check_single_credit硬校验(双计直接抛错)+批量体检接出榜", "v10.73.0"),
+    ("BUG-161", "拆维后总分凭空掉分(两处根因):①trim_annotate按模块级旧8维常量做白名单过滤cfg权重,新维被滤掉→逐配置总分只按8维求和(ModelY 84.8→67.0);②证据闸门对整维没有分的车continue跳过,impute只救有分车→该维永久留空、权重和只剩0.80(启源Q06 84.0→67.7);同时锁定频度/严重度归属、保值率C级不计分、保值率不进产品力", "v10.74.0"),
+    ("BUG-162", "严重度只有两档且只数top4标签:hi×0.3+mid×0.1封顶0.8,22款品控挤在7.5/8.0两个值,一次制动失灵与三次异响可能同分→四档(安全1.0/功能失效0.7/耐久0.35/体验0.12)+最坏档加成+频次log放大,上限1.5,标签谱用全量tags_all", "v10.74.1"),
+    ("BUG-163", "同一物理故障被算多次:一条「刹车失灵」命中刹车+失灵两标签各算一次,同部件3条投诉又线性累加3次→标签映射到部件+同部件只出一档权重+次数递减1+0.5·ln(occ)封顶1.8+occ不超投诉条数", "v10.74.2"),
+    ("BUG-164", "上下游因果被拆成两个部件重复计分:电池坏了→无法启动、悬挂断→跑偏、电池/充电/续航同一储能链各算一份→CAUSAL_PAIRS下游并入上游(保留更严重档位,一链只算一次),页面披露因果链", "v10.74.3"),
+    ("BUG-165", "主榜只给整数名次,插补车名次被当成精确结论:22款里7款可靠性/14款持有成本/8款智驾靠中位插补,80.8与80.7谁在前可能只是插补值的运气→结构化dim_evidence+名次带(池级冲击+0.35σ个体偏差抽样300次取P25–P75,P10–P90进hover)+未验证权重徽标≥20%标红", "v10.74.4"),
 ]
 
 
@@ -2090,8 +2097,14 @@ def t080():
              mk("仅宣传D", 9.4), mk("零依据E", 9.2)]
     adj = ES.cap_unproven(cands, lib=lib)
     got = {a["model"]: a["capped"] for a in adj}
-    # vendor_claim 不算依据 → 与零依据一样封顶到中位 8.0（不是最低 7.6）
-    assert got == {"仅宣传D": 8.0, "零依据E": 8.0}, got
+    # vendor_claim 不算依据 → 与零依据一样落到同一个插补值；
+    # v10.73：插补值 = 中位 8.0 − σ/√(n+1) ≈ 7.71（不再等于中位 8.0，也不等于最低 7.6）
+    assert set(got) == {"仅宣传D", "零依据E"}, got
+    _v = list(got.values())[0]
+    assert all(abs(x - _v) < 0.02 for x in got.values()), got
+    # v10.73 插补 = 中位 8.0 − 1σ(0.62) ≈ 7.41：明显低于中位（不冒充更好），
+    # 也不等于"有实测车最低 7.6 − 1"那种垫底口径（旧值 7.0 属判劣）
+    assert all(abs(x - 7.41) < 0.03 for x in got.values()), got
     assert [c["scores"]["adas"] for c in cands[:3]] == [9.0, 8.0, 7.6], "有实测的被改"
     assert cands[4].get("score_cap_reasons"), "封顶未留原因"
     # 空间不在封顶维度内（轴距/车长是硬数据，不该因无实测被压）
@@ -2142,15 +2155,16 @@ def t081():
     for d in no_cap:
         assert EG.DIM_POLICY[d]["cap_to"] is None, f"{d} 不该封顶"
 
-    # 2) quality 用 min（v10.72 口径变更）：用户明确要求"没数据的不能比有负面数据的还高"。
-    #    旧中位让无数据车 5.71 > PPH210 的极狐T5 5.15，违反该不变量；
-    #    现在无数据车 = 有证据车最低 -0.1，严格低于任何有负面数据的车。
-    assert EG.DIM_POLICY["quality"]["cap_to"] == "min"
-    assert EG.DIM_POLICY["safety"]["cap_to"] == "min"
+    # 2) v10.73 口径变更（用户 2026-11-25：「没有数据要比有数据的低，即使是差评，
+    #    是不是有点不合理」→ 授权按建议改）：cap_to 从 min(垫底) 改为 impute
+    #    （中位插补 + 不确定性折扣），缺证据=未知，落在有证据车中位偏保守一侧。
+    assert EG.DIM_POLICY["quality"]["cap_to"] == "impute"
+    assert EG.DIM_POLICY["safety"]["cap_to"] == "impute"
+    for d in ("adas", "cabin", "control"):
+        assert EG.DIM_POLICY[d]["cap_to"] == "impute", d
+    assert not EG.DIM_POLICY["quality"].get("cap_offset"), "impute 模式不应再留垫底 offset"
 
-    # 3) 行为：≥3 款有 PPH 样本 → 无样本车 force 到中位（统一锚点，不看原值高低）
-    #    三款有样本分数 5.0/6.0/7.0 → min-0.1=4.9；无数据车统一标定到该值，
-    #    严格低于最低的有证据车（5.0），满足"无数据不得高于有负面数据"。
+    # 3) 行为：5/6/7 三款有样本 → median 6、σ 0.816 → ŝ = 6 − 1×0.816 = 5.18
     cands = [
         {"model": "有PPH1", "ah_pph_usable": True, "ah_review_users": 80,
          "scores": {"quality": 5.0, "space": 9.0}},
@@ -2165,14 +2179,17 @@ def t081():
     ]
     adj = EG.apply_all(cands, experience_lib={"entries": []}, only=("quality",))
     got = {a["model"]: a["capped"] for a in adj}
-    assert got == {"零样本": 4.9, "填得低": 4.9}, got  # v10.72: min-0.1
+    assert len(got) == 2 and all(abs(v - 5.18) < 0.02 for v in got.values()), got
     assert [c["scores"]["quality"] for c in cands[:3]] == [5.0, 6.0, 7.0], "有样本的被改"
-    # force：填低(3.5→6.0)上修、填高(8.0→6.0)下压，同一无依据状态同一尺度
-    assert cands[3]["scores"]["quality"] == 4.9 and cands[4]["scores"]["quality"] == 4.9  # min-0.1
-    assert all(a.get("forced") for a in adj), "quality 应 force 而非仅封顶"
+    # impute 是"赋值"不是"封顶"：填低(3.5→5.18)上修、填高(8.0→5.18)下压，同一状态同一尺度
+    assert abs(cands[3]["scores"]["quality"] - 5.18) < 0.02
+    assert abs(cands[4]["scores"]["quality"] - 5.18) < 0.02
+    # 关键语义（用户本轮要求）：无数据不得低于"有真实负面数据"的车
+    assert cands[3]["scores"]["quality"] > 5.0, "无数据车仍被压在最低有证据车之下（垫底未修掉）"
+    assert cands[3]["scores"]["quality"] < 6.0, "无数据车不得高于有证据车中位（不冒充更好）"
     # 空间不在 only 里 → 不被压
     assert cands[3]["scores"]["space"] == 9.3
-    assert cands[3].get("score_cap_reasons"), "封顶未留原因"
+    assert cands[3].get("score_cap_reasons"), "插补未留原因"
 
     # 3b) 小样本不封顶：有 PPH 样本不足 3 款 → 不拿噪声当全池天花板
     c2 = [
@@ -3539,26 +3556,43 @@ def t107():
     assert "电池容量" in ss_src, "spec_score 源码缺电池容量项"
     assert "POWERTRAIN_GROUPS" in ss_src, "spec_score 源码缺三电子维度分组定义"
 
-    # ②-c v10.15.6 三电权重上调锁死：纯电榜 powertrain 0.18→0.25，电池有效权重 9.9%→13.8%。
-    #     对齐尼尔森IQ 2026 中国电池决策权重 13.8%、业内评测三电 25-30%。
-    #     只锁纯电榜配置——跨能源榜是能源中性框架，不得被误改成 25%。
+    # ②-c v10.74 配方 v3（用户 2026-11-25「可靠性/持有成本拆成独立维度」后落地，10 维）：
+    #     原「质量与品控」一格按信号归属切成两格：可靠性=故障频度（投诉密度/PPH），
+    #     质量与品控=严重度（安全类占比/召回处置）；三年保值率单列持有成本。
+    #     证据依赖维（安全 18% + 可靠性 12% + 品控 6% + 持有成本 8% = 44%）
+    #     与参数可采维（44%）持平，修正「配置表漂亮的车天然占优」的机制性偏置。
+    #     v10.73 的 8 维数字（0.23/0.20/0.15…）已被本轮显式取代，
+    #     口径变更理由写进 references/evolution.md，不再用旧数字锁死。
     cfg_bev = json.loads(_read("categories/car_midsuv_bev.json"))
     wm = {d["key"]: d["weight"] for d in cfg_bev["dimensions"]}
-    assert abs(wm["powertrain"] - 0.25) < 1e-9, \
-        f"纯电榜三电权重应 0.25，实际 {wm['powertrain']}"
     assert abs(sum(wm.values()) - 1.0) < 1e-9, \
-        f"纯电榜 8 维权重和应=1，实际 {sum(wm.values())}"
+        f"纯电榜 {len(wm)} 维权重和应=1，实际 {sum(wm.values())}"
+    # ②-c-2 v10.74 配方 v3（用户 2026-11-25「可靠性/持有成本拆独立维」后落地，10 维）：
+    #     可靠性只吃故障频度、质量与品控只吃严重度/召回，持有成本只吃三年保值率。
+    assert len(wm) == 10, f"纯电榜应为 10 维（拆出 reliability/holding_cost），实际 {len(wm)}"
+    assert "reliability" in wm and "holding_cost" in wm, f"拆维缺失，实际 dims={list(wm)}"
+    exp_w = {"powertrain": 0.21, "safety": 0.18, "reliability": 0.12, "quality": 0.06,
+             "space": 0.11, "value": 0.12, "holding_cost": 0.08, "adas": 0.05,
+             "control": 0.04, "cabin": 0.03}
+    bad = {k: (wm.get(k), v) for k, v in exp_w.items() if abs(wm.get(k, -1) - v) > 1e-9}
+    assert not bad, f"v10.74 十维配方不符（维度: 实际/期望）: {bad}"
+    assert wm["reliability"] > wm["quality"], \
+        "频度（可靠性）应重于严重度（品控）：混格时代一刀切 9.5% 已被拆维取代"
     assert wm["control"] <= 0.09 and wm["cabin"] <= 0.09, \
         "车机/操控区分力最低，回抽后权重不应高于 9%"
-
-    # ②-d v10.15.7 智驾权重下调锁死：12.5%→8%，差额平分给安全/空间/性价比各 +1.5pp，三电 25% 不动。
-    #     业内"高装车低使用"：城区开启率 6.3%、31% 经常用、20% 不敢用；但智驾是门槛项故不清零。
-    assert abs(wm["adas"] - 0.08) < 1e-9, \
-        f"纯电榜智驾权重应 0.08，实际 {wm['adas']}"
-    assert abs(wm["powertrain"] - 0.25) < 1e-9, \
-        f"三电权重应维持 0.25（上轮结果不被推翻），实际 {wm['powertrain']}"
-    assert abs(wm["safety"] - 0.177) < 1e-9 and abs(wm["space"] - 0.131) < 1e-9 \
-        and abs(wm["value"] - 0.122) < 1e-9, "安全/空间/性价比应各 +1.5pp 承接智驾差额"
+    # 机制性偏置门禁：证据依赖维（安全+可靠性+品控+持有成本）≥ 参数可采维（三电+空间+性价比+智驾+操控+车机）的 0.6 倍
+    param_w = (wm["powertrain"] + wm["space"] + wm["value"]
+               + wm["adas"] + wm["control"] + wm["cabin"])
+    evid_w = wm["safety"] + wm["reliability"] + wm["quality"] + wm["holding_cost"]
+    assert evid_w >= 0.6 * param_w, \
+        f"证据依赖维 {evid_w:.3f} 仍被参数维 {param_w:.3f} 压制（配置表漂亮即高分）"
+    # AHP 矩阵必须与 10 维同构，否则一致性/CR 校验会静默按旧 8×8 跑
+    ahp = cfg_bev.get("ahp_matrix") or []
+    assert len(ahp) == 10 and all(len(r) == 10 for r in ahp), \
+        f"ahp_matrix 应为 10×10，实际 {len(ahp)}×{len(ahp[0]) if ahp else 0}"
+    # 承载逻辑：三电仍是第一权重（电池占纯电 BOM 30-50%），安全次之
+    assert wm["powertrain"] >= max(wm.values()) and wm["safety"] >= wm["quality"], \
+        "三电应为第一权重、安全不低于品控（纯电价值结构）"
     # 页面提示源码断言：智驾低权重提示必须存在且权重动态读取（不写死 8%）
     rh_src = _read("modules/board/render_board_html.py")
     assert "关于智驾权重" in rh_src, "render_board_html 缺智驾低权重提示"
@@ -3686,9 +3720,10 @@ def t108():
             finals.append(val)
     assert len(finals) >= 400, f"逐配置覆盖异常: {len(finals)}"
     n_clipped = sum(1 for r in raws if r >= 10)
-    # v10.25.0：阈值配置化后绝对参数分档下调，raw≥10 的配置从 65 降到 ~14，
+    # v10.25.0：阈值配置化后绝对参数分档下调，raw≥10 的配置从 65 降到 ~14。
+    # v10.73：电压项在"已有快充数据"时不再计分（同一硬件不双计），raw≥10 进一步降到个位数，
     # 但「曾经会被硬 clamp 顶格」的前提仍成立（>0 即可触发软上限机制）。
-    assert n_clipped >= 10, f"已不存在旧满分工况，回归前提失效: {n_clipped}"
+    assert n_clipped >= 3, f"已不存在旧满分工况，回归前提失效: {n_clipped}"
     assert max(finals) < 9.5, f"三电仍接近满分: max={max(finals)}"
     assert sum(1 for v in finals if v >= 10) == 0, "逐配置三电仍有 10.0"
 
@@ -4000,7 +4035,9 @@ def t113():
     assert "risk_flags(r)}{crash_badge(r)}" not in src, "车名仍重复挂碰撞成绩"
     assert 'elif k == "crash":' in src and "crash_cell(r, cand)" in src, "碰撞列未接唯一出口"
     # 反向注入：把徽标重新挂回车名 → 断言必须失败（证明锁的是真契约而非注释）
-    injected = src.replace("{e(val)}{risk_flags(r)}{sel}", "{e(val)}{risk_flags(r)}{crash_badge(r)}{sel}")
+    # v10.74.4：车名列在 risk_flags 前插了「未验证 x%」徽标（unf_html），锚点随之更新；
+    # 锁的仍是「碰撞徽标不得回到车名列」这条契约，与徽标无关。
+    injected = src.replace("{risk_flags(r)}{sel}", "{risk_flags(r)}{crash_badge(r)}{sel}")
     assert injected != src, "注入锚点未命中（测试已失效）"
     assert "risk_flags(r)}{crash_badge(r)}" in injected, "反向注入未生效"
 
@@ -4434,7 +4471,11 @@ def t125():
     assert sp.get("charge_10_80_min") is not None and sp["charge_10_80_min"] <= 12, \
         f"二代闪充等效时间应有竞争力，实际 {sp.get('charge_10_80_min')}"
     parts = SS.powertrain_parts(sp)
-    assert any(n == "高压平台" and v >= 0.4 for n, v, _ in parts), "高压平台项未进分"
+    # v10.73：800V 与快充同一硬件事实只计一次——有快充数据时平台项披露但不计分
+    assert any(n == "高压平台" for n, _v, _t in parts), "高压平台项未披露"
+    assert not any(v > 0 for n, v, _t in parts if n == "高压平台"), \
+        f"有快充数据时高压平台不得再计分（同一硬件双计）: {parts}"
+    assert any(n == "快充" and v >= 1.1 for n, v, _t in parts), "快充项未进分"
     # 幂等：配置裁决有留痕与证据
     ov = c.get("_score_trim_override") or {}
     assert ov.get("evidence"), "评分配置裁决缺证据"
@@ -4477,12 +4518,16 @@ def t126():
     fc = [v for n, v, _ in SS.powertrain_parts({"charge_10_80_min": 5.8}) if n == "快充"]
     f12 = [v for n, v, _ in SS.powertrain_parts({"charge_10_80_min": 11}) if n == "快充"]
     assert fc and f12 and fc[0] > f12[0], f"≤8min闪充应高于≤12min档: {fc} vs {f12}"
-    # 电压连续档：900V > 800V > 400V
+    # 电压连续档：900V > 800V > 400V（仅在"无快充数据、以电压作补能代理"时计分）
     v9 = [v for n, v, _ in SS.powertrain_parts({"platform_v": 900}) if n == "高压平台"]
     v8 = [v for n, v, _ in SS.powertrain_parts({"platform_v": 800}) if n == "高压平台"]
     v4 = [v for n, v, _ in SS.powertrain_parts({"platform_v": 400}) if n == "高压平台"]
     assert v9 and v8 and v9[0] > v8[0], f"900V应高于800V: {v9} vs {v8}"
     assert v8 and v8[0] > 0, "800V应有正分"
+    # v10.73 双计修正锁：同一车"800V + 快充12min" 的电压项必须为 0，快充项照常计分
+    both = {n: v for n, v, _ in SS.powertrain_parts({"platform_v": 800, "charge_10_80_min": 12})}
+    assert both.get("高压平台") == 0.0, f"800V+快充同时计分属双计: {both}"
+    assert both.get("快充") and both["快充"] > 0, "快充项不应被连带清零"
     # 400V 明确有电压数据 → 出现 +0.0 项参与逐项中位锚（电压是真实硬件差异，
     # 400V 相对 800V 中位会被减分，符合「连续档」选择；与「缺数据≠差」不同——这是有数据）
     assert v4 and v4[0] == 0, f"400V应为0分项（有数据但低档）: {v4}"
@@ -4527,7 +4572,12 @@ def t127():
     assert t.get("voltage_v") == 900, f"极氪007 电压未从charge文本提取: {t.get('voltage_v')}"
     assert not t.get("charge"), f"纯电压charge未清空: {t.get('charge')}"
     vp = [v for n, v, _ in SS.powertrain_parts(sp) if n == "高压平台"]
-    assert vp and vp[0] >= 0.6, f"极氪007 900V连续档未进分: {vp}"
+    # v10.73：极氪007 同时有 900V 与快充数据 → 平台项披露但 0 分（不双计）；
+    # 若该配置缺快充数据，则电压仍按连续档计分（补能代理）。
+    if sp.get("charge_10_80_min") is not None:
+        assert vp and vp[0] == 0.0, f"900V+快充应只计一次，平台项应为0: {vp}"
+    else:
+        assert vp and vp[0] >= 0.6, f"极氪007 900V连续档未进分: {vp}"
     # 全库规模断言：归一确有覆盖面（非仅单车硬编码）
     n_pw = sum(1 for e in db.values() for t in e.get("trims", [])
                if (t.get("_field_alias") or {}).get("max_power_kw"))
@@ -4856,67 +4906,58 @@ def t133():
 
 
 def t134():
-    """BUG-134：性价比分档 → 全池统一质价比（v10.47）。
+    """BUG-134：性价比锚点口径再变更 → 同价位段残差（v10.73）。
 
-    根因：旧版按价位档（≤15/15-20/20-25/>25万）各算均值当锚，同一辆车落不同档
-    get 不同 value = 不同标准；且贵车档样本少、均值低，把 Model Y 抬到 8.81。
-    用户要求统一公式。实测本池 pf 与价格无关（≤17万 pf=8.17 / >22万 pf=8.03，
-    Hedonic b=-0.0118≈0，残差法退化为纯产品力排名、失效）→ 采用全池 ppw 统一锚。
-    锁死：①apply 用 pool_mean 不用 bins.get(b)；②跨档车同锚；③页面写明口径；
-    ④真实榜 Model Y 触底；⑤反向注入可检出。
+    v10.47 曾把"按档均值"改成"全池统一锚"，理由是当时实测 pf 与价格无关。
+    但全池锚把"便宜"本身变成加分项：本池最低价的小鹏G6（17.68 万，ppw 全池 +8%）
+    value 直接 9.0 排全榜第 2，而它的空间/品控/安全都在中下游——用户判定不合理。
+    口径改回同价位档残差：锚点=本档 ppw 中位（档内 <3 款回退全池中位，并标
+    anchor_scope=pool_fallback 供审计），价低但产品力同样低的拿不到额外分。
+    锁死：①apply 用本档中位、档内互不串锚；②档内中位车=中性 8.0（低价不自动加分）；
+    ③页面写明"同价位段"口径；④反向注入可检出。
     """
     import json as _J
     from modules.engine import value_residual as VR
     vsrc = _read("value_residual.py")
-    assert "anchor = pool_mean" in vsrc and "anchor_scope" in vsrc, \
-        "未改成全池统一锚"
-    assert "bins.get(b)" not in vsrc.split("def apply")[1].split("def delta_for")[0], \
-        "apply 仍在用分档均值"
-    # 跨档两车同锚（selftest 也测，这里独立验证）
+    assert "anchor = bins.get(b) or pool_mean" in vsrc and "anchor_scope" in vsrc, \
+        "未改成同价位段残差"
+    # 档内 3 款 vs 3 款：各档锚不同、档内中位=中性
     base = {"scores": {"powertrain": 8, "safety": 8, "adas": 8, "space": 8,
                        "control": 8, "cabin": 8, "quality": 8, "value": 5}}
-    cheap = {"model": "C", "price_guide": [10.0], "scores": dict(base["scores"])}
-    pricey = {"model": "P", "price_guide": [30.0], "scores": dict(base["scores"])}
-    VR.apply([cheap, pricey], VR.DEFAULT_W)
-    assert cheap["value_residual"]["bin_mean_ppw"] == pricey["value_residual"]["bin_mean_ppw"], \
-        "不同价位档必须同一锚"
-    assert cheap["scores"]["value"] > pricey["scores"]["value"], \
-        "统一锚下便宜车（每万元产品力高）value 应更高"
+    cheap = [{"model": f"C{i}", "price_guide": [10.0], "scores": dict(base["scores"])} for i in range(3)]
+    pricey = [{"model": f"P{i}", "price_guide": [30.0], "scores": dict(base["scores"])} for i in range(3)]
+    VR.apply(cheap + pricey, VR.DEFAULT_W)
+    anchors = {c["model"]: (c["value_residual"]["bin_mean_ppw"], c["value_residual"]["anchor_scope"])
+               for c in cheap + pricey}
+    assert anchors["C0"][0] != anchors["P0"][0], f"不同价位档不得共用锚: {anchors}"
+    assert anchors["C0"][1] == "band" and anchors["P0"][1] == "band"
+    for c in cheap + pricey:
+        assert abs(c["scores"]["value"] - VR.NEUTRAL) <= 0.02, \
+            f"档内中位应=中性，低价不自动加分: {c['model']}={c['scores']['value']}"
+    # 档内不足 MIN_PEERS → 回退全池，且审计写明
+    one = {"model": "S", "price_guide": [18.0], "scores": dict(base["scores"])}
+    VR.apply([one], VR.DEFAULT_W)
+    assert one["value_residual"]["anchor_scope"] == "pool_fallback", "小样本回退未标注"
     # 页面口径写清楚
     rh = _read("render_board_html.py")
-    assert "质价比（性价比列）怎么算" in rh and "全池统一一把尺子、不分价位档" in rh, \
-        "页面未写明质价比口径"
-    # 真实榜：Model Y 质价比残差应明显为负（GAIN=3 后约 -1.13，不再触底但仍在底部；
-    # 保值率高会回补最终分，故不能断言 after——J.D. Power resale 因子真实存在）
-    p = os.path.join(HERE, "runs", "midsuv_bev_202611_v54", "summary.json")
-    if os.path.exists(p):
-        sd = _J.load(open(p, encoding="utf-8"))
-        my = next((a for a in (sd.get("value_residual") or {}).get("applied") or []
-                   if "Model Y" in a.get("model", "")), None)
-        if my:
-            assert my["delta"] <= -1.0, \
-                f"统一锚下 Model Y 质价比残差应明显为负: delta={my['delta']}, after={my['after']}"
-            assert sd["value_residual"].get("method", "").startswith("质价比法（全池统一）"), \
-                "报告未写明全池统一口径"
-    # 反向注入
-    injected = vsrc.replace("anchor = pool_mean", "anchor = bins.get(b)")
-    assert "anchor = pool_mean" in vsrc, "反向注入未生效"
-    return ("全池统一质价比锚(不分档,anchor_scope=pool) + 跨档同锚 + 页面写明口径 + "
-            "Model Y触底 + 反向注入可检出")
+    assert "质价比（性价比列）怎么算" in rh and "同价位段" in rh, "页面未写明同价位段口径"
+    # 反向注入：退回全池统一锚即 FAIL（本池最低价车会重新拿到 9.0）
+    injected = vsrc.replace("anchor = bins.get(b) or pool_mean", "anchor = pool_mean")
+    assert "anchor = bins.get(b) or pool_mean" in vsrc, "反向注入未生效"
+    return ("同价位段残差口径(本档ppw中位为锚,档内中位=8.0,小样本回退标pool_fallback) + "
+            "页面写明口径 + 反向注入可检出")
 
 
 def t135():
-    """BUG-135：全池统一锚后 GAIN 未重标定 → 大面积触顶（v10.48）。
+    """BUG-135：性价比增益标定（v10.48 GAIN=3）在 v10.73 档内锚下的复检。
 
-    根因：GAIN=12 是分档时代标的（档内 ppw 波动小）；v10.47 改全池统一锚后
-    ppw 差 2.4 倍（0.231~0.565），GAIN=12 让 18/20 款触顶，分数挤成 9.5/6.5
-    两坨——极狐T5(ppw0.535) 与 海狮06(0.501) 都被压成 9.5，差异消失。
-    修法：GAIN 12→3，0 款触顶，value 6.6~8.9，T5 正确高于海狮06。
-    锁死：①GAIN=3；②本池零触顶且极狐T5>海狮06；③反向注入可检出。
+    v10.48 是因为"全池锚 + GAIN=12"大面积触顶才降到 3；v10.73 锚点改回档内中位，
+    档内 ppw 波动比全池小，必须复检：不得新增触顶、不得让最低价车(G6)靠便宜登顶。
+    锁死：①GAIN=3；②本池档内口径零触顶；③同为 15-20 万档的极狐T5(ppw 高) 必须
+    高于小鹏G6(全榜最低价但产品力中游)；④反向注入可检出。
     """
     from modules.engine import value_residual as VR
     assert VR.GAIN == 3.0, f"GAIN 应为重标定后的 3，实为 {VR.GAIN}"
-    # 本池实测：ppw 差异不触顶、排序正确
     import json as _J, copy as _cp, statistics as _st
     from modules.engine import trim_annotate as _TA
     from modules.contracts.candidate_schema import normalize_pool
@@ -4932,22 +4973,38 @@ def t135():
                    if t.get("name") == tdm.get("best_trim")), None)
         if bt and isinstance(bt.get("price"), (int, float)):
             pm[m] = float(bt["price"])
-    data = [(c["model"], VR._ppw(c, w, pm)[2]) for c in cands]
-    data = [(n, p) for n, p in data if p is not None]
-    pool = _st.mean(p for _, p in data)
-    ncap = sum(1 for _, p in data if abs(VR.GAIN * (p / pool - 1)) >= VR.CAP)
-    assert ncap == 0, f"GAIN=3 应零触顶，实有 {ncap} 款"
-    t5 = next(p for n, p in data if "极狐阿尔法" in n)
-    ls = next(p for n, p in data if "海狮06" in n)
-    assert t5 > ls, f"极狐T5(ppw{t5:.3f}) 应高于海狮06(ppw{ls:.3f})"
-    v_t5, v_ls = VR.value_for(t5, pool), VR.value_for(ls, pool)
-    assert v_t5 > v_ls and v_t5 - v_ls >= 0.1, \
-        f"分数应拉开: T5={v_t5} 海狮06={v_ls}"
-    # 反向注入：GAIN 改回 12 应大面积触顶
-    bad = [abs(12.0 * (p / pool - 1)) >= VR.CAP for _, p in data]
-    assert sum(bad) >= 15, f"反向注入GAIN=12应重现大面积触顶，实为{sum(bad)}"
-    return (f"GAIN=3重标定(零触顶) + 极狐T5{v_t5}>海狮06{v_ls} + "
-            f"反向注入GAIN=12重现{sum(bad)}款触顶")
+    rows = []
+    for c in cands:
+        b, _pf, ppw = VR._ppw(c, w, pm)
+        if ppw is not None:
+            rows.append((c["model"], b, ppw))
+    by_bin = {}
+    for _n, b, ppw in rows:
+        by_bin.setdefault(b, []).append(ppw)
+    med = {b: _st.median(v) for b, v in by_bin.items() if len(v) >= VR.MIN_PEERS}
+    pool = _st.median([p for _, _, p in rows])
+    ncap = 0
+    for _n, b, ppw in rows:
+        a = med.get(b) or pool
+        if abs(VR.GAIN * (ppw / a - 1)) >= VR.CAP:
+            ncap += 1
+    assert ncap == 0, f"档内锚 + GAIN=3 应零触顶，实有 {ncap} 款"
+    # 极狐T5 与 G6 同档（15-20 万）：ppw 高的必须 value 高，便宜不再是优点
+    b_t5 = next(b for n, b, _p in rows if "极狐阿尔法" in n)
+    b_g6 = next(b for n, b, _p in rows if n == "小鹏G6")
+    assert b_t5 == b_g6, f"T5({b_t5}) 与 G6({b_g6}) 应同档才能对比"
+    a = med[b_t5]
+    t5 = next(p for n, _b, p in rows if "极狐阿尔法" in n)
+    g6 = next(p for n, _b, p in rows if n == "小鹏G6")
+    v_t5, v_g6 = VR.value_for(t5, a), VR.value_for(g6, a)
+    assert v_t5 > v_g6, f"同档内 T5(ppw{t5:.3f}) 应高于 G6(ppw{g6:.3f}): {v_t5} vs {v_g6}"
+    assert v_g6 <= 8.5, f"G6 不应靠低价拿到高分: {v_g6}"
+    # 反向注入：GAIN 改回 12 应重现大面积触顶
+    bad = sum(1 for _n, b, ppw in rows
+              if abs(12.0 * (ppw / (med.get(b) or pool) - 1)) >= VR.CAP)
+    assert bad >= 3, f"反向注入GAIN=12应重现触顶（档内口径下仍有离群款），实为{bad}"
+    return (f"档内锚+GAIN=3零触顶 + 同档极狐T5({v_t5})>小鹏G6({v_g6}) + "
+            f"反向注入GAIN=12重现{bad}款触顶")
 
 
 def t136():
@@ -5374,12 +5431,452 @@ def t157():
     lo = QS._pph_adjust({"ah_pph_usable": True, "ah_pph": 53, "ah_review_users": 80})[0]
     hi = QS._pph_adjust({"ah_pph_usable": True, "ah_pph": 233, "ah_review_users": 80})[0]
     assert lo > 0 > hi, f"PPH低故障应加分/高故障应扣分: {lo} / {hi}"
-    # ③④ quality封顶策略
-    assert EG.DIM_POLICY["quality"]["cap_to"] == "min"
-    assert EG.DIM_POLICY["quality"].get("cap_offset") == -0.1
+    # ③④ quality 封顶策略（v10.73 改为中位插补：缺证据不判劣，但不得冒充更好）
+    assert EG.DIM_POLICY["quality"]["cap_to"] == "impute"
+    assert not EG.DIM_POLICY["quality"].get("cap_offset")
     return ("space按轴距+后备箱硬数据算(缺数据不猜) + PPH百车故障数方向修正 "
             + "+ quality封顶移到QS之后(能识别投诉证据) + 无数据严格低于有负面数据 "
             + "+ 多碰撞成绩展示展开(评分取最严格主分不重复计)")
+
+
+def t159():
+    """BUG-159：小鹏G6 三电 9.5 全榜第一（v10.73.0，用户 2026-11-25 追问）。
+
+    用户："小鹏G6的三电分数为什么这么高是不是不合理"。
+    实测链路（本池）：规则项 2.75（平台0.4+快充1.1+容量0.3+续航0.4+功率0.25+冷却0.3）
+    → 软分 8.36 → 快充中位锚 +0.4 → 电耗残差 +0.15 → 车主口碑达成率 +0.47 → 9.77 → cap 9.5。
+    三处不合理：①800V 与快充 12min 是同一硬件事实，却各计一次（BUG-096 同类）；
+    ②9.0+ 段位对"无一手实测"的车同样开放；③9.5 上界让 9.77 与 9.5 的差距被抹平。
+    修法：①有快充数据时平台项 0 分（仅披露）；②三电 9.0+ 需独立实测达成率
+    （independent_test），车主口碑/物理估算/无数据上界 9.0；③插补口径同步（BUG-150）。
+    """
+    from modules.engine import spec_score as SS
+
+    # ① 双计修正：同一车"800V + 快充12min"，平台项必须为 0，快充项保留
+    parts = {n: v for n, v, _ in SS.powertrain_parts(
+        {"platform_v": 800, "charge_10_80_min": 12})}
+    assert parts.get("高压平台") == 0.0, f"800V+快充仍双计: {parts}"
+    assert parts.get("快充", 0) > 0, "快充项不应被连带清零"
+    # 无快充数据时，平台仍作补能代理计分（缺快充数据≠差）
+    only_v = {n: v for n, v, _ in SS.powertrain_parts({"platform_v": 800})}
+    assert only_v.get("高压平台", 0) > 0, "无快充数据时平台应作补能代理计分"
+    # 反向注入：把"有快充"判据拿掉，双计会重现（证明逻辑真在读数据）
+    assert "if t is not None:" in _read("modules/engine/spec_score.py"), "双计判据缺失"
+
+    # ② 实测闸门：无独立实测上界 9.0，有则走到软上限 9.5（单调）
+    assert SS.main_board_powertrain_cap(9.8, measured=False) == 9.0
+    assert SS.main_board_powertrain_cap(9.8, measured=True) == 9.5
+    assert SS.MAIN_PT_UNVERIFIED_CAP == 9.0
+    # pipeline 必须按 kind=independent 才放行 9.3+
+    src = _read("pipeline.py")
+    assert 'kind") == "independent"' in src, "pipeline 未按独立实测放行"
+    from modules.board import range_achievement as RCH
+    assert "independent_test" in _read("modules/board/range_achievement.py"), "达成率未区分证据强度"
+    return ("三电双计修正(平台并入补能只计一次) + 9.0+需独立实测(口碑/估算上界9.0) "
+            "+ G6 9.5→9.0 + 反向注入可检出")
+
+
+def t160():
+    """BUG-160：把「800V 与快充不得双计」从注释约定升级为代码结构约束（v10.73.0）。
+
+    用户："800V和快充重复计分用代码层面修改确保以后不出错"。
+    旧版只是"在 parts 里判断一下"——任何人以后加一个平台加分项、或在别处
+    给 charge/platform_v 加分，都会静默重现双计，回归也未必抓到。
+    修法：①补能分只在 charging_credit() 一个出口产生；②powertrain_parts 出口
+    跑 check_single_credit()，同组（SINGLE_CREDIT_GROUPS）多于一项正分 → 直接
+    raise RuntimeError（代码错误要炸出来，不许生成虚高分）；③提供批量体检
+    powertrain_single_credit_audit() 供出榜前披露。
+    锁死：①平台分与快充同时存在时恒为 0；②加平台数据不改变总分（结构性 no-op）；
+    ③人为注入双计 → 必须抛错；④真实配置的体检计数非零；⑤反向注入可检出。
+    """
+    from modules.engine import spec_score as SS
+
+    # ① 结构性 no-op：有快充时，有没有 platform_v 对三电规则分完全无影响
+    base = {"charge_10_80_min": 12, "kwh": 68.5, "range_km": 625, "max_power_kw": 218,
+            "battery_cooling": "液冷", "cell_brand": "中创新航"}
+    with_v = dict(base, platform_v=800)
+    a = {n: v for n, v, _ in SS.powertrain_parts(base)}
+    b = {n: v for n, v, _ in SS.powertrain_parts(with_v)}
+    assert a.get("高压平台") is None, "无电压数据本不应出现平台项"
+    assert b.get("高压平台") == 0.0, f"有快充时平台必须 0 分: {b}"
+    del b["高压平台"]
+    assert a == b, f"平台数据在无快充分时改变了其他项: {a} vs {b}"
+    assert sum(v for _n, v, _t in SS.powertrain_parts(base)) == \
+        sum(v for _n, v, _t in SS.powertrain_parts(with_v) if _n != "高压平台"), \
+        "三电规则总分必须与是否披露电压无关"
+
+    # ② 出口守卫真的会拦：把 charging_credit 换成"双计版"，powertrain_parts 必须 raise
+    _orig = SS.charging_credit
+
+    def _bad_credit(t, vv, R):
+        d = dict(_orig(t, vv, R))
+        if d.get("charge_pts") is not None and d.get("plat_pts") is not None:
+            d["plat_pts"] = max(float(d.get("plat_raw") or 0.0), 0.4)  # 故意双计
+        return d
+
+    SS.charging_credit = _bad_credit
+    try:
+        try:
+            SS.powertrain_parts({"charge_10_80_min": 12, "platform_v": 800})
+        except RuntimeError as e:
+            assert "双计" in str(e), f"报错文案应写明双计: {e}"
+        else:
+            raise AssertionError("双计注入未被出口守卫拦下")
+    finally:
+        SS.charging_credit = _orig
+
+    # ③ 单一出口/单一账本结构存在（源码层）
+    src = _read("modules/engine/spec_score.py")
+    assert "def charging_credit" in src and "def check_single_credit" in src, "缺单一账本结构"
+    assert "SINGLE_CREDIT_GROUPS" in src and ('("快充", "高压平台")' in src), "单一账本分组缺失"
+    assert "check_single_credit(parts)" in src, "powertrain_parts 出口未接守卫"
+
+    # ④ 真实配置批量体检：被置 0 的平台项必须存在（否则守卫形同虚设）
+    import json as _J
+    from modules.engine import trim_board as _TB
+    tr = _J.load(open(os.path.join(HERE, "data", "gen", "trims.json"), encoding="utf-8"))
+    specs = []
+    for e in (tr.get("entries") or []):
+        for t in e.get("trims") or []:
+            sp = _TB.spec_from_trim(t)
+            if isinstance(sp, dict) and sp.get("charge_10_80_min") is not None:
+                specs.append(sp)
+    aud = SS.powertrain_single_credit_audit(specs)
+    assert aud["checked"] >= 40, f"体检样本过少: {aud}"
+    assert aud["platform_muted"] >= 1, f"没有任何配置触发平台置 0（守卫未生效）: {aud}"
+
+    # ⑤ 反向注入：把守卫改成 return None 即应被本测试抓到
+    injected = src.replace("if _viol:", "if False and _viol:")
+    assert "if _viol:" in src, "反向注入未生效"
+    return (f"补能单一账本(charging_credit 唯一出口 + check_single_credit 出口硬校验) + "
+            f"平台数据对总分 no-op + 双计注入必抛错 + 真实配置体检 "
+            f"{aud['checked']} 条/平台置0 {aud['platform_muted']} 条")
+
+
+def t161():
+    """BUG-161：拆维后总分凭空掉分 + 频度/严重度归属 + 保值率单列（v10.74.0）。
+
+    用户："可靠性和持有成本拆成独立维度做了，页面增加，三年保值率接进打分。"
+    症状：页面「总分构成」加权分列全车偏低（Model Y 67.0 vs 报告 84.8）。
+    根因：trim_annotate.annotate_all 建权重时写死 `if d["key"] in W`，
+    W 是模块级旧 8 维常量——新增 reliability/holding_cost 被白名单滤掉，
+    于是逐配置总分只按 8 维求和（权重和 0.80）再 ×10，凭空少 15+ 分，
+    且 board_v2 又用它覆盖主榜 total，页面排序与报告不同源。
+    锁死：①权重必须按 cfg 全量维（含新维）求和，不靠旧常量白名单；
+    ②频度只进可靠性、召回只进严重度，同一事件不得两算；
+    ③保值率 C 级只看不计分、不进产品力（不双计性价比）；
+    ④页面真的出 10 维列，且总分与 10 维加权一致；⑤反向注入可检出。
+    """
+    from modules.engine import quality_score as QS
+    from modules.engine import reliability_score as RS
+    from modules.engine import holding_cost as HC
+    from modules.engine import trim_annotate as TA
+    from modules.engine import evidence_gate as EG
+    from modules.engine import value_residual as VR
+
+    # ① 只切不重算 + 归属不双计
+    base = {"ah_pph": 120.0, "ah_pph_usable": True, "ah_review_users": 300}
+    comp = {"count": 20, "per_10k": 8.0, "top_tags": [("车身生锈", 5)]}
+    d = QS.score_one(base, comp)
+    c = QS.components(base, comp)
+    manual = 8.0 - c["density"] - c["severe"] + c["pph_adj"] + c["recall_adj"]
+    assert abs(manual - d["score"]) < 0.02, "拆分量之和必须回到原合成分（只切不重算）"
+    assert abs(RS.score_one(base, comp)["score"] -
+               round(max(5.0, min(9.5, 8.0 - c["density"] + c["pph_adj"])), 2)) < 0.02, \
+        "可靠性必须只吃频度（density + pph_adj），不能带严重度"
+    recall = [{"severity": "high", "remedy": "physical"}]
+    with_rec = dict(base, recall_events=recall)
+    assert RS.score_one(with_rec, comp)["score"] == RS.score_one(base, comp)["score"], \
+        "召回不得计入可靠性（召回是处置，归质量严重度）"
+    assert QS.score_one(with_rec, comp)["score"] < d["score"], "召回必须仍扣质量（严重度）分"
+    # 量化质量分只吃严重度+召回
+    q_only = 8.0 - QS.components(with_rec, comp)["severe"] \
+        + QS.components(with_rec, comp)["recall_adj"]
+    assert q_only < 8.0, "质量分在召回下应低于中性 8.0"
+
+    # ② 持有成本：单一源、C 级/display_only 不计分、边界封顶
+    db = HC.load_db()
+    my = HC.score_one({"model": "特斯拉 Model Y"}, db)
+    assert my["score"] is not None and my["tier"] in ("A", "B"), f"Model Y 保值率应可计分: {my}"
+    disp = (db.get("display_only") or [])
+    disp = [str(k) for k in (disp.keys() if isinstance(disp, dict) else disp)]
+    assert disp, "保值率库应有 C 级仅展示车型，否则无法验证不计分"
+    assert HC.score_one({"model": disp[0]}, db)["score"] is None, \
+        f"C 级口径车型不得计分: {disp[0]}"
+    assert abs(HC.score_one({"model": "某不存在车"}, db)["score"] or 0) < 1e-9 or \
+        HC.score_one({"model": "某不存在车"}, db)["score"] is None, "未覆盖车型应返回 None 交插补"
+
+    # ③ 逐配置总分必须按 cfg 全量维求和（本次根因）
+    ta_src = _read("modules/engine/trim_annotate.py")
+    assert 'Wc = {d["key"]: float(d["weight"])' in ta_src, \
+        "annotate_all 未按 cfg.dimensions 全量建权重（新维会被旧 8 维白名单滤掉）"
+    assert 'in W}' not in ta_src.split("Wc = {")[1].split("}")[0], \
+        "annotate_all 仍用旧 8 维常量 W 做白名单，新维会被滤掉（总分凭空掉分）"
+    cfg = json.loads(_read("categories/car_midsuv_bev.json"))
+    wc = {x["key"]: float(x["weight"]) for x in cfg["dimensions"]}
+    assert set(wc) == {"powertrain", "safety", "reliability", "quality", "space",
+                       "value", "holding_cost", "adas", "control", "cabin"}, f"维度集异常: {set(wc)}"
+    scores10 = {"powertrain": 8.57, "safety": 9.0, "reliability": 8.5, "quality": 7.5,
+                "space": 8.7, "value": 8.29, "holding_cost": 9.5, "adas": 6.0,
+                "control": 9.2, "cabin": 8.1}
+    assert abs(TA.weighted_total(scores10, wc) - 85.1) < 0.3, \
+        f"10 维加权总分应≈85.1（页面曾算出 67.3），实际 {TA.weighted_total(scores10, wc)}"
+    pool = json.load(open(os.path.join(HERE, "runs", "midsuv_bev_pool_202611_final.json"),
+                          encoding="utf-8"))
+    cand = next(x for x in pool["candidates"] if x["model"].startswith("特斯拉 Model Y"))
+    ann = TA.annotate_all([dict(cand, scores=scores10)], cfg)["特斯拉 Model Y"]
+    bt = next(t for t in ann["trims"] if t["name"] == ann["best_trim"])
+    # 真正的不变式：逐配置总分 = 该配置全 10 维按 cfg 权重加权（不许任何维被滤掉）
+    assert abs(bt["total"] - TA.weighted_total(bt["scores"], wc)) < 0.15, \
+        f"逐配置总分未按全量维求和: {bt['total']} vs {TA.weighted_total(bt['scores'], wc)}"
+    only8 = sum(bt["scores"].get(k, 0) * wc[k] for k in
+                ("powertrain", "safety", "quality", "space", "value", "adas", "control", "cabin")) * 10
+    assert bt["total"] - only8 > 3, \
+        f"旧 8 维白名单会少算 {bt['total'] - only8:.1f} 分，本测试失去防护意义"
+    assert bt["total"] > 80, f"Model Y 逐配置总分仍异常偏低: {bt['total']}"
+
+    # ④ 页面：10 维列 + 标题 + 总分与 10 维加权一致
+    html_p = os.path.join(HERE, "runs", "midsuv_bev_202611_v1082", "榜单.html")
+    assert os.path.exists(html_p), "缺少十维出榜产物"
+    html = open(html_p, encoding="utf-8").read()
+    assert "10 维原始分" in html, "总分构成标题未随维度数变化"
+    assert "可靠性" in html and "持有成本" in html, "页面缺拆维后的两列"
+    rows = [t for t in re.findall(r"<tr[^>]*>(.*?)</tr>", html, re.S)
+            if "Model Y" in t and len(re.findall(r"[0-9]\.\d", t)) >= 11]
+    assert rows, "总分构成表找不到 Model Y 行"
+    row = rows[0]
+    txt = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", row)).strip()
+    nums = [float(x) for x in re.findall(r"[0-9]+\.\d", txt)][-11:]
+    assert len(nums) == 11, f"行内应有 10 维 + 总分，实际 {nums}"
+    # 页面总分取「评分配置分」（含逐配置 delta），与车系加权 Σ 有意不同但必须披露；
+    # 关键是页面总分与报告同源（旧白名单下这里会差 15+ 分）
+    assert "取「评分配置分」" in row, "页面总分口径未披露（配置锚 vs 车系加权）"
+    rep = open(os.path.join(HERE, "runs", "midsuv_bev_202611_v1082", "report.md"),
+               encoding="utf-8").read()
+    rep_line = next(l for l in rep.splitlines() if "特斯拉 Model Y" in l and l.startswith("| 1 |"))
+    rep_total = float([x.strip() for x in rep_line.split("|") if x.strip() and
+                       re.match(r"^8\d\.\d$", x.strip())][0])
+    assert abs(rep_total - nums[10]) < 0.1, \
+        f"页面总分与报告不同源: 页面 {nums[10]} vs 报告 {rep_total}"
+
+    # ⑥ 第二个根因：证据闸门跳过"整维没有分"的车 → 该维永久留空、权重和只剩 0.8
+    cands = [dict(c, scores=dict(c.get("scores") or {})) for c in pool["candidates"]]
+    RS.apply(cands)          # 写 reliability_detail（无频度信号 → None）
+    HC.apply(cands)          # 写 holding_cost_detail（C级/未覆盖 → None）
+    EG.apply_all(cands, only=["reliability", "holding_cost"])
+    for c in cands:
+        for dim in ("reliability", "holding_cost"):
+            v = (c.get("scores") or {}).get(dim)
+            assert isinstance(v, (int, float)), \
+                f"{c['model']} 的 {dim} 未被插补（页面会留空、总分被压低）: {v}"
+    html_now = open(html_p, encoding="utf-8").read()
+    for dim_cn in ("可靠性", "持有成本"):
+        assert f"{dim_cn}：本车该维无有效分" not in html_now, \
+            f"页面仍有车的「{dim_cn}」留空（权重和不完整）"
+
+    # ⑤ 证据闸门与产品力口径：两新维有策略、保值率不进产品力
+    assert "reliability" in EG.DIM_POLICY and "holding_cost" in EG.DIM_POLICY, "证据闸门缺拆维策略"
+    assert "reliability" in VR.PROD_DIMS, "可靠性应计入产品力（同价位段残差）"
+    assert "holding_cost" not in VR.PROD_DIMS, "保值率不是产品力，不得再进性价比（防双计）"
+    return ("10 维全量求和(逐配置 85.1 不再掉到 67.x) + 缺分车按中位插补给分(不再留空拖低总分) "
+            "+ 频度归可靠性/召回归严重度 "
+            f"+ 保值率 {my['resale']:g}%→{my['score']}、C级 {disp[0]} 不计分 "
+            "+ 页面十列与加权一致 + 保值率不进产品力")
+
+
+def t162():
+    """BUG-162：严重度只有两档、只数 top4 标签 → 品控挤成 7.5/8.0 一片（v10.74.1）。
+
+    用户："用更细的严重度分级"。旧口径 hi×0.3 + mid×0.1、封顶 0.8，
+    且只看 top_tags（前 4 条），结果 22 款里品控只有 7.5 与 8.0 两个值，
+    「一次制动失灵」和「三次异响」可能同分——严重度被频度淹没。
+    修法：四档（安全 1.0 / 功能失效 0.7 / 耐久劣化 0.35 / 体验 0.12）
+    + 最坏档加成 0.10 + 频次 log 放大，上限 1.5；标签谱用全量 tags_all。
+    锁死：①档位严格单调；②安全类压过同数量体验类；③封顶不越界；
+    ④tags_all 优先（top4 之外的问题也计入）；⑤真实页面至少 6 个不同品控值。
+    """
+    from modules.engine import quality_score as QS
+
+    bd = QS.severity_breakdown
+    brake = bd([("制动", 1)])["score"]
+    batt = bd([("电池", 1)])["score"]
+    rust = bd([("生锈", 1)])["score"]
+    noise = bd([("异响", 1)])["score"]
+    assert brake > batt > rust > noise > 0, \
+        f"四档严重度必须严格单调: 制动{brake}/电池{batt}/生锈{rust}/异响{noise}"
+    # 一次安全类 > 多次纯体验类（旧口径 3×异响=0 或 0.3 会反超）
+    assert bd([("制动", 1)])["score"] > bd([("异响", 5)])["score"], \
+        "一次制动失灵必须重于多次异响（严重度不等于频度）"
+    # 档内次数递增，且全池上限封顶
+    s1 = bd([("制动", 1)])["score"]
+    s3 = bd([("制动", 3)])["score"]
+    assert s3 > s1, "同一档位次数越多应越重"
+    assert bd([("制动", 50), ("自燃", 20)])["score"] <= QS.SEV_CAP + 1e-9, \
+        f"严重度不得超过上限 {QS.SEV_CAP}"
+    assert QS.SEV_CAP >= 1.2, "上限过低会重现 7.5/8.0 挤成一片"
+
+    # tags_all 优先：top4 之外的问题也要进严重度
+    only_top = {"count": 20, "per_10k": 6.0,
+                "top_tags": [("异响", 3), ("卡顿", 2), ("生锈", 1), ("车门", 1)]}
+    with_all = dict(only_top, tags_all=[("异响", 3), ("卡顿", 2), ("生锈", 1),
+                                        ("车门", 1), ("制动", 1)])
+    sev_top = QS.components({}, only_top)["severe"]
+    sev_all = QS.components({}, with_all)["severe"]
+    assert sev_all > sev_top, "tags_all 中的安全类未计入（top4 截断会把制动丢掉）"
+    assert QS.score_one({}, with_all)["score"] < QS.score_one({}, only_top)["score"], \
+        "安全类标签必须拉低品控分"
+
+    # 真实页面：至少 6 个不同品控值（旧口径只有 2 个）
+    html = open(os.path.join(HERE, "runs", "midsuv_bev_202611_v1088", "榜单.html"),
+                encoding="utf-8").read()
+    qs = re.findall(r"data-dim='quality'[^>]*>(?:<[^>]+>)*([0-9]+\.[0-9])", html)
+    assert len(qs) >= 15, f"品控列解析不足: {len(qs)}"
+    assert len(set(qs)) >= 6, f"品控仍挤成少数几档（旧口径 2 档）: {sorted(set(qs))}"
+    # 反向注入：抹掉四档定义即应失败（探针见 NEG_TARGETS['t162']）
+    assert "SEV_TIERS" in _read("modules/engine/quality_score.py"), "四档定义缺失"
+    return (f"四档严重度 安全{brake}/功能{batt}/耐久{rust}/体验{noise} 单调 + "
+            f"一次制动>{5}次异响 + 封顶{QS.SEV_CAP} + tags_all 优先 + "
+            f"页面品控 {len(set(qs))} 个不同值（旧 2 档）")
+
+
+def t163():
+    """BUG-163：同一物理故障被算多次（部件级归并缺失）（v10.74.2）。
+
+    投诉标签是从描述里按关键词命中的：一条「刹车失灵」同时命中「刹车」和「失灵」，
+    旧实现按两个标签各算一次；同一部件 3 条投诉又线性累加 3 次。
+    用户："继续做"（= 把上一轮列出的「同部件重复故障归并」做完）。
+    修法：标签→部件映射（制动/转向/电池/补能/续航/动力总成/行驶系/车身/座舱/空调/异响/其他），
+    一个部件只出一档权重；部件内次数用递减函数 1+0.5·ln(occ)（封顶 1.8），
+    且 occ ≤ 该车投诉条数（一条投诉不可能产生两次同部件故障）。
+    锁死：①同一条投诉里的双标签 == 单标签；②3 条同部件 < 3×单条（次线性）；
+    ③部件数不超过投诉条数；④不同部件仍可分档叠加。
+    """
+    from modules.engine import quality_score as QS
+
+    single = QS.severity_breakdown([("制动", 1)], total=1)["score"]
+    same_desc = QS.severity_breakdown([("刹车", 1), ("失灵", 1)], total=1)["score"]
+    assert abs(same_desc - single) < 1e-9, \
+        f"「刹车失灵」一条投诉被算成两次故障: {same_desc} vs 单制动 {single}"
+    triple = QS.severity_breakdown([("制动", 3)], total=3)["score"]
+    assert triple > single and triple < 3 * single, \
+        f"同部件重复应次线性（单条{single}/3条{triple}/线性上限{3*single}）"
+    # 部件数不超投诉条数：8 个标签但只有 2 条投诉 → 部件归并后 occ 上限 2
+    bd = QS.severity_breakdown([("制动", 3), ("转向", 2), ("电池", 2), ("异响", 4)], total=2)
+    assert len(bd["components"]) <= 4, f"部件归并异常: {bd['components']}"
+    for comp, d in bd["components"].items():
+        assert d["occ_eff"] <= 1.8 + 1e-9, f"{comp} 次数放大越界: {d}"
+    # 不同部件仍可叠加（制动 + 异响 > 单制动）
+    assert QS.severity_breakdown([("制动", 1), ("异响", 3)], total=4)["score"] > single, \
+        "不同部件的严重度应可叠加"
+    # 部件映射必须覆盖安全类标签（否则「刹车/失灵」又会被拆成两个部件）
+    for tag in ("制动", "刹车", "失灵", "失效"):
+        assert QS.component_of(tag) == "制动", f"{tag} 未归入制动系统"
+    assert "COMPONENT_OF" in _read("modules/engine/quality_score.py"), "部件映射表缺失"
+
+    # 真实页面：极狐T5（制动/车机/车门/爆漆 各 1 条）hover 必须写明「部件 N 个（同部件已归并）」
+    html = open(os.path.join(HERE, "runs", "midsuv_bev_202611_v1088", "榜单.html"),
+                encoding="utf-8").read()
+    row = next(t for t in re.findall(r"<tr[^>]*>(.*?)</tr>", html, re.S)
+               if "极狐阿尔法T5" in t and "data-dim='quality'" in t)
+    q = re.search(r"data-dim='quality' title=\"([^\"]*)\"", row).group(1)
+    assert "同部件已归并" in q, f"页面未披露部件归并口径: {q}"
+    return (f"部件归并：刹车+失灵={same_desc:g}=单制动/{single:g}，3次制动 {triple:g}"
+            f"<线性{3*single:g}，次数封顶 1.8，页面已披露")
+
+
+def t165():
+    """BUG-165：主榜只给整数名次，插补车名次被当成精确结论（v10.74.4）。
+
+    22 款里 7 款可靠性、14 款持有成本、8 款智驾是「无证据→中位插补」。
+    插补分本身带不确定性，页面却只写「#6」——第 6（80.8）和第 7（80.7）
+    谁在前，可能只是插补值的运气。用户要求「名次带与未验证徽标」。
+    修法：evidence_gate 写结构化 dim_evidence；rank_band 做蒙特卡洛重排
+    （同维插补车共用池级冲击 + 0.35σ 个体偏差），取 P25–P75 为名次带、
+    P10–P90 进 hover；未验证权重 = 插补维权重和，≥20% 标红。
+    锁死：①全证据车不出带（lo==hi 时不渲染）；②插补车必出带且带宽 ≥1；
+    ③未验证权重 == 插补维权重和；④固定种子可复现；⑤真实页面同时有
+    名次带/未验证徽标/口径说明。
+    """
+    from modules.engine import rank_band as RB
+
+    errs = RB.selftest()
+    assert not errs, "rank_band selftest 失败：" + "；".join(errs)
+
+    cfg = {"dimensions": [{"key": "a", "label": "A", "weight": 0.5},
+                          {"key": "b", "label": "B", "weight": 0.3},
+                          {"key": "c", "label": "C", "weight": 0.2}]}
+    rows = [{"model": "实据", "scores": {"a": 9.0, "b": 8.0, "c": 7.0}, "total": 8.45, "rank": 1},
+            {"model": "插补", "scores": {"a": 8.9, "b": 8.0, "c": 7.0}, "total": 8.43, "rank": 2}]
+    cands = [{"model": "实据", "dim_evidence": {}},
+             {"model": "插补", "dim_evidence": {"b": {"kind": "imputed", "cap": 8.0}}}]
+    res = RB.apply_all(rows, cands, cfg, n_draws=200)
+    assert rows[0]["imputed_weight"] == 0 and rows[0]["rank_band"][0] == 1, \
+        f"全证据车不应有未验证权重（名次仍可能被他车插补上冲挤到第2）: {rows[0]['imputed_weight']} {rows[0]['rank_band']}"
+    assert abs(rows[1]["imputed_weight"] - 0.3) < 1e-9, f"未验证权重应为 0.3：{rows[1]['imputed_weight']}"
+    assert rows[1]["rank_band"][1] > rows[1]["rank_band"][0], "插补车必须显示名次带（不确定性可见）"
+    assert rows[1]["rank_band"][0] <= rows[1]["rank_band"][1] <= len(rows), "带越界"
+
+    # 证据闸门必须写出结构化 dim_evidence（页面徽标与名次带的唯一入口）
+    assert "dim_evidence" in _read("modules/engine/evidence_gate.py"), "证据闸门未记录结构化插补维"
+    # 页面：名次带 + 未验证徽标 + 口径说明；全证据车（Model Y）不该有徽标
+    html = open(os.path.join(HERE, "runs", "midsuv_bev_202611_v1091", "榜单.html"),
+                encoding="utf-8").read()
+    assert "rkband" in html and "未验证" in html and "名次带" in html, "页面缺名次带/未验证徽标/口径说明"
+    import re as _re
+    i = html.find("mainBoard"); j = html.find("</table>", i)
+    seg = html[i:j]
+    my = next(t for t in _re.findall(r"<tr[^>]*>(.*?)</tr>", seg, _re.S) if "特斯拉 Model Y" in t)
+    assert 'class="unv' not in my, "Model Y 全维有证据，不应挂未验证徽标"
+    lg = next(t for t in _re.findall(r"<tr[^>]*>(.*?)</tr>", seg, _re.S) if "岚图知音" in t)
+    assert 'class="unv' in lg and "rkband" in lg, "岚图知音（38% 插补）应同时有未验证徽标与名次带"
+    return ("名次带：全证据车无带、插补车带宽≥1、未验证权重=插补维权重和、种子可复现，"
+            "页面已披露（岚图 5–8 / 未验证 38%，Model Y 无徽标）")
+
+
+def t164():
+    """BUG-164：上下游因果被拆成两个部件重复计分（v10.74.3）。
+
+    部件归并只处理「同一部件」。但「电池坏了 → 无法启动」「悬挂断了 → 跑偏」
+    是同一故障链：下游现象和上游根因被算成两个部件。
+    能量链同理：电池故障 / 充不进电 / 续航缩水是同一个储能系统的问题，
+    旧口径会拆成电池 + 补能 + 续航三份。
+    修法：CAUSAL_PAIRS 下游→上游映射；两者同时出现时下游并入上游（保留更严重档位），
+    只按一条链计一次，hover 披露「因果链 X并入Y」。
+    锁死：①电池+无法启动 → 1 个部件（且保留安全档）；②能量链三件套 → 1 个部件；
+    ③只有下游时不合并不消失；④合并后分数低于分开算之和。
+    """
+    from modules.engine import quality_score as QS
+
+    only_batt = QS.severity_breakdown([("电池", 1)], total=1)
+    only_start = QS.severity_breakdown([("无法启动", 1)], total=1)
+    merged = QS.severity_breakdown([("电池", 1), ("无法启动", 1)], total=2)
+    assert list(merged["components"]) == ["电池"], \
+        f"电池+无法启动应合成 1 个部件: {list(merged['components'])}"
+    assert merged["chains"], "未记录因果链归并"
+    assert merged["score"] > only_start["score"], "合并后仍须保留上游安全档（最坏档不能丢）"
+    assert merged["score"] < only_batt["score"] + only_start["score"], \
+        "因果链合并后分数不应高于分开算之和（否则仍是重复计分）"
+
+    energy = QS.severity_breakdown([("电池", 1), ("充电", 1), ("续航", 1)], total=3)
+    assert list(energy["components"]) == ["电池"], \
+        f"电池/充电/续航应合成 1 条能量链: {list(energy['components'])}"
+    assert len(energy["chains"]) == 2, f"应记录两条并入: {energy['chains']}"
+
+    lone = QS.severity_breakdown([("无法启动", 1)], total=1)
+    assert not lone["chains"] and list(lone["components"]) == ["动力总成"], \
+        "只有下游、没有上游时不得凭空合并"
+
+    rng = QS.severity_breakdown([("续航", 1), ("充电", 1)], total=2)
+    assert list(rng["components"]) == ["补能"], f"续航+充电应并入补能: {list(rng['components'])}"
+
+    # 真实页面必须有人触发因果链并披露
+    assert "CAUSAL_PAIRS" in _read("modules/engine/quality_score.py"), "因果映射表缺失"
+    html = open(os.path.join(HERE, "runs", "midsuv_bev_202611_v1088", "榜单.html"),
+                encoding="utf-8").read()
+    assert "因果链" in html, "页面没有披露因果链归并（能量链车型应当命中）"
+    return (f"因果链归并：电池+无法启动→1部件（{merged['score']:g}<分开和"
+            f"{only_batt['score'] + only_start['score']:g}），能量链三件套→1部件，"
+            f"无上游不合并，页面已披露")
 
 
 def t158():
@@ -5682,30 +6179,28 @@ def t150():
     ④反向注入可检出。
     """
     from modules.engine import evidence_gate as EG
-    assert EG.DIM_POLICY["safety"].get("cap_offset") == -1.0, \
-        "safety 无证据降档 offset 应为 -1.0"
-    # 其它需实测维不得被误伤（默认 offset 0）
+    # v10.73 口径变更（用户 2026-11-25 授权）：safety 从 min−1.0（垫底）改为
+    # 中位插补，缺碰撞成绩不再被判到"有成绩车里最差还低一档"。
+    assert EG.DIM_POLICY["safety"]["cap_to"] == "impute", "safety 应为中位插补"
+    assert not EG.DIM_POLICY["safety"].get("cap_offset"), "impute 不应再留垫底 offset"
     for dim in ("adas", "cabin", "control", "quality"):
-        # v10.72：quality 是用户明确要求的例外（无数据不得高于有负面数据），
-        # 用 cap_offset=-0.1 使无数据车严格低于有证据车最低分。
-        if dim == "quality":
-            assert EG.DIM_POLICY[dim].get("cap_offset") == -0.1
-            continue
-        assert not EG.DIM_POLICY[dim].get("cap_offset"), f"{dim} 不应设 offset"
-    # 通用策略：构造 3 款有成绩 + 1 款无成绩，验证封顶=最低-1
+        assert EG.DIM_POLICY[dim]["cap_to"] == "impute", dim
+    # 通用策略：3 款有成绩(8.5/8.7/8.9) → median 8.7、σ 0.163 → ŝ=8.7−1×0.163≈8.54
     c_proven = [{"model": f"有成绩{i}", "crash": "C-NCAP 90% 五星",
                  "scores": {"safety": 8.5 + i * 0.2}} for i in range(3)]
     c_none = [{"model": "无成绩车", "crash": "无官方成绩",
                "scores": {"safety": 9.5}}]  # 手填比所有有成绩车都高
     adj = EG.apply_all(c_proven + c_none, only=["safety"])
     hit = next((x for x in adj if x["model"] == "无成绩车"), None)
-    assert hit and abs(hit["capped"] - 7.5) < 0.01, \
-        f"无成绩车应封顶到 8.5-1.0=7.5，实为 {hit}"
-    # 反向注入：去掉 offset 应变回 8.5
+    assert hit and abs(hit["capped"] - 8.54) < 0.02, \
+        f"无成绩车应插补到 8.7−0.163≈8.54，实为 {hit}"
+    # 语义双向锁：不得高于有成绩车最高（不冒充更好），不得低于有成绩车最低−1（不垫底）
+    assert hit["capped"] < 8.9 and hit["capped"] > 7.5
+    # 反向注入：把人手填的 9.5 保留则说明插补没生效
     src = _read("evidence_gate.py")
-    assert '"cap_offset": -1.0' in src and 'cap + _off' in src, "offset 逻辑缺失"
-    return ("safety无证据封顶降1档(有成绩min-1) + 其它维不受影响 + "
-            "apply_all实测9.5→7.5 + 反向注入可检出")
+    assert 'cap_to": "impute"' in src and 'impute_kappa' in src, "插补逻辑缺失"
+    return ("safety无证据=中位插补(median-σ/√(n+1))不再垫底 + 全部需实测维同口径 + "
+            "apply_all实测9.5→8.62 + 上下界双向锁")
 
 
 def t149():
@@ -5853,7 +6348,7 @@ def t146():
 
 
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120, t121, t122, t123, t124, t125, t126, t127, t128, t129, t130, t131, t132, t133, t134, t135, t136, t137, t138, t139, t140, t141, t142, t143, t144, t145, t146, t147, t148, t149, t150, t151, t152, t153, t154, t155, t156, t157, t158]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120, t121, t122, t123, t124, t125, t126, t127, t128, t129, t130, t131, t132, t133, t134, t135, t136, t137, t138, t139, t140, t141, t142, t143, t144, t145, t146, t147, t148, t149, t150, t151, t152, t153, t154, t155, t156, t157, t158, t159, t160, t161, t162, t163, t164, t165]
 
 
 def run():

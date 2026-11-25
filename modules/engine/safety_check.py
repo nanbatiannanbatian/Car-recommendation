@@ -147,11 +147,15 @@ def check(cands, table=None):
                            "fix": f"表内分数与规则复算不一致；运行 "
                                   f"`python3 safety_check.py --recompute --apply` 统一口径（{rule}）"})
 
-    # B. 举证单调性：有实锤车最低 >= 无实锤车最高
-    # 2026-11-21 修：原来只比对 official_safety_scores.json（8 款老车），本池一款都不在表里
-    # → 检查直接跳过，于是「MONA L05 零实锤却 8.6、比 C-NCAP 86.7% 的 bZ5 还高」没被拦。
-    # 现在直接读 cands 的 crash 字段（含自动映射分），并用「最高」而非「中位」——
-    # 无实锤的车一辆都不许高于任何有实锤的车。
+    # B. 举证单调性（v10.73 口径变更）：无实锤车不得高于「有实锤车中位」
+    # 旧口径是"有实锤最低 >= 无实锤最高"——等价于"没成绩的车必须排在所有有成绩车之后"，
+    # 用户 2026-11-25 明确否掉："没有数据要比有数据的低，即使是差评，是不是有点不合理"。
+    # 新口径与 evidence_gate 的"中位插补 + 不确定性折扣"一致：
+    #   缺证据=未知，落点在中位偏保守一侧（ŝ=median−σ/√(n+1)），
+    #   因此硬约束只需保证"无实锤者不得越过有实锤车中位"（不冒充更好），
+    #   不再要求它低于每一辆有成绩车（那是把未知判成最差）。
+    # 2026-11-21 修（保留）：直接读 cands 的 crash 字段（含自动映射分），
+    # 不依赖 official_safety_scores.json 的老车清单。
     from modules.engine import crash_systems as _CS2
     proven_vals, unproven_vals = [], []
     for c in cands:
@@ -162,12 +166,12 @@ def check(cands, table=None):
     no_score_vals = unproven_vals
     if proven_vals and unproven_vals:
         max_nos = round(max(unproven_vals), 1)
-        min_off = min(proven_vals)
-        if min_off < max_nos:
+        med_off = round(statistics.median(proven_vals), 2)
+        if med_off < max_nos:
             issues.append({"type": "evidence_monotonicity", "model": "(全池)",
-                           "actual": f"有实锤最低{min_off} < 无实锤最高{max_nos}",
-                           "expected": f"有实锤最低>={max_nos}（无实锤者不得高于任何实锤车）",
-                           "fix": "跑 safety_check.evidence_cap() 封顶，或核对有实锤车是否被误降权"})
+                           "actual": f"有实锤中位{med_off} < 无实锤最高{max_nos}",
+                           "expected": f"有实锤中位>={max_nos}（无实锤者不得高于实锤中位）",
+                           "fix": "跑 evidence_gate.apply_all(only=['safety']) 中位插补，或核对有实锤车是否被误降权"})
     return {"checked": checked, "official_min": min(official_vals) if official_vals else None,
             "no_score_median": round(statistics.median(no_score_vals), 1) if no_score_vals else None,
             "has_score": has_score_n, "mapped": checked,

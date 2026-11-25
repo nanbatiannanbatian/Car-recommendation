@@ -131,6 +131,15 @@ NEG_TARGETS = {
     "t145": ["def fetch_page", "def _fetch_config_json"],
     # v10.51.2：底盘采集通用化（抹掉通用化入口→自动发现/全库补齐断言 FAIL）
     "t146": ["def fill_all", "def discover_article_urls"],
+    # v10.74.0：拆维回归——抹掉「按 cfg 全量维建权重」的写法，
+    # 回到旧 8 维白名单（总分凭空掉 15+ 分），t161 必须 FAIL。
+    "t161": ['Wc = {d["key"]: float(d["weight"])'],
+    # v10.74.1：抹掉四档严重度定义，品控又退回两档挤成 7.5/8.0 → t162 必须 FAIL。
+    "t162": ["SEV_TIERS"],
+    # v10.74.2：抹掉部件映射表，同一物理故障又被算多次 → t163 必须 FAIL。
+    "t163": ["COMPONENT_OF"],
+    # v10.74.3：抹掉因果映射表，上下游又被拆成两个部件 → t164 必须 FAIL。
+    "t164": ["CAUSAL_PAIRS"],
 }
 
 # 数据断言型：测试名 -> (文件路径, 车型/键, 篡改模式)

@@ -503,6 +503,68 @@ def _display_crash_all(cand: dict, compact: bool = False) -> str:
     return " / ".join(parts)
 
 
+def dim_formula_tip(row: dict, key: str, label: str, weight: float,
+                    value: float | None) -> str:
+    """「总分构成」单个维度数字的悬停说明：把这一格是怎么算出来的摊开。
+
+    用户要求（2026-11-25）："鼠标点到每一个数字上把计算公式都显示出来，
+    让用户看到为什么这么打分"。所以这里只写可复核的算式 + 已核验依据，
+    不写泛泛的形容词；没有依据的维度明确说"按官方参数规则推算"，不编造。
+
+    公式：贡献分 = 维分 × 权重 × 10（权重已按未排除维度归一）。
+    """
+    if not isinstance(value, (int, float)):
+        return f"{label}：本车该维无有效分，未参与加权（权重已归一到其余维度）"
+    w = float(weight or 0)
+    contrib = float(value) * w * 10
+    parts = [f"{label} {float(value):g}｜公式：{float(value):g} × {w * 100:.1f}% × 10 = "
+             f"{contrib:.1f} 分（占满分100的 {contrib:.0f} 分）"]
+    note = (row.get("dim_notes") or {}).get(key)
+    if note:
+        parts.append("依据：" + note)
+    else:
+        parts.append("依据：按官方参数规则推算（本车暂无逐条取证说明）")
+    bd = row.get("best_trim_detail") or {}
+    ds = [d for d in (bd.get("deltas") or []) if isinstance(d, dict) and d.get("dim") == key]
+    if ds:
+        parts.append("配置差异：" + "；".join(
+            f"{str(x.get('why') or '')[:40]} {float(x.get('delta') or 0):+.2f}" for x in ds[:3]))
+    # 涉及证据封顶的（无碰撞成绩/无品控样本）必须在这格里讲清，否则分数看着像实测
+    for rsn in (row.get("score_cap_reasons") or []):
+        if isinstance(rsn, str) and rsn.startswith(key):
+            parts.append("封顶说明：" + rsn)
+            break
+    return "｜".join(parts)
+
+
+def total_formula_tip(row: dict, dims: list) -> str:
+    """「加权分」单元格的悬停说明：逐维贡献 + 修正项，加总等于页面上的总分。"""
+    sc = row.get("scores") or {}
+    tot = row.get("total")
+    adv = row.get("adjust")
+    parts = []
+    s = 0.0
+    for d in dims or []:
+        k, w = d.get("key"), float(d.get("weight") or 0)
+        v = sc.get(k)
+        if not isinstance(v, (int, float)):
+            continue
+        c = float(v) * w * 10
+        s += c
+        parts.append(f"{d.get('label') or k} {float(v):g}×{w * 100:.1f}%={c:.1f}")
+    formula = " + ".join(parts) if parts else "（无有效维度分）"
+    total_s = f"{tot:.1f}" if isinstance(tot, (int, float)) else "—"
+    core = f"Σ(维分×权重)×10 = {s:.1f}"
+    if isinstance(adv, (int, float)) and abs(adv) > 1e-9:
+        core += f"，再 + 修正 {float(adv):+.1f} = {total_s}"
+    elif isinstance(tot, (int, float)) and abs(s - float(tot)) > 0.05:
+        core += (f"；页面总分 {total_s} 取「评分配置分」（车系基准 + 配置差异重算），"
+                 f"与车系加权 Σ 差 {float(tot) - s:+.1f}")
+    else:
+        core += f"，无修正项 = {total_s}"
+    return f"加权分 {total_s}｜公式：{core}｜逐维贡献：{formula}"
+
+
 def main_cell(key: str, row: dict, cand: dict, grade: str = "") -> str:
     """主榜单表单元格取值（两版渲染器共用，避免各写一份漂移）。"""
     fr = row.get("fact_ref") or {}

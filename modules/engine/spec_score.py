@@ -242,6 +242,51 @@ def _band_points(value: float, bands: list, key: str, cmp: str = "min"):
     return None
 
 
+# 同一硬件事实只许计一次的「单一账本」分组（v10.73）。
+# 补能能力：800V 平台是快充的使能条件，两者不是两份收益；只允许计一次。
+SINGLE_CREDIT_GROUPS = {"补能": ("快充", "高压平台")}
+
+
+def charging_credit(t: float | None, vv: float | None, R: dict) -> dict:
+    """补能能力的唯一出口（v10.73 结构性防双计）。
+
+    这是快充分与平台分**唯一**的产生地，别处不许再对 charge/platform_v 加分。
+    不变式（代码层面强制，不靠注释）：快充时间与平台电压同时存在时，
+    平台分必为 0.0 —— 同一份「补能硬件」只许贡献一次。
+    """
+    charge_pts = charge_label = None
+    if t is not None:
+        cr = R.get("charge") or {}
+        hit = _band_points(t, cr.get("bands") or [], "max_min", "max")
+        if hit:
+            charge_pts, charge_label = float(hit[0]), hit[1]
+        else:
+            charge_pts, charge_label = float(cr.get("over_35", -0.4)), ">35min"
+    plat_raw, plat_label = 0.0, ""
+    if vv is not None:
+        hit = _band_points(vv, (R.get("voltage") or {}).get("bands") or [], "min_v", "min")
+        plat_raw, plat_label = hit if hit else (
+            float((R.get("voltage") or {}).get("default", 0.0)), "")
+    plat_pts = None if vv is None else (0.0 if t is not None else plat_raw)
+    return {"charge_pts": charge_pts, "charge_label": charge_label,
+            "plat_pts": plat_pts, "plat_raw": plat_raw, "plat_label": plat_label}
+
+
+def check_single_credit(parts: list) -> str | None:
+    """单一账本校验：同组内多于一项拿到正分 → 返回违规说明（否则 None）。
+
+    在 powertrain_parts 出口强制调用；另由 score_audit/回归复用，
+    保证以后谁新增「平台加分」「补能二次加分」都会当场报错而不是静默双计。
+    """
+    vals = {name: float(pts) for name, pts, _txt in parts}
+    for group, members in SINGLE_CREDIT_GROUPS.items():
+        credited = [m for m in members if vals.get(m, 0.0) > 0]
+        if len(credited) > 1:
+            detail = ", ".join(f"{m}={vals[m]:g}" for m in credited)
+            return f"同一硬件双计：{group}组内 {'+'.join(credited)} 同时计分（{detail}）"
+    return None
+
+
 def powertrain_parts(s):
     """三电各加减项的**分解**（规则唯一出处，score_powertrain 与 rule_adjust 共用）。
 
@@ -253,21 +298,28 @@ def powertrain_parts(s):
     """
     R = _pt_rules()
     parts = []
-    # ── 高压平台：连续档（900V > 800V），兼容旧布尔调用方 ────────────────
+    # ── 补能（快充 + 高压平台）：走 charging_credit 单一出口 ──────────────
+    # 【v10.73 双计修正（用户 2026-11-25「小鹏G6 三电为什么这么高」，随后追加
+    #  「用代码层面修改确保以后不出错」）】
+    # 800V 是快充能力的**使能条件**，不是独立收益——本文件第 367 行注释自己就写着
+    # "800V 高压平台只是使能条件"。旧版却把"平台档 +0.4"与"快充 12min +1.1"
+    # 同时计分：G6 一台 800V+5C 的车在同一硬件事实上拿 1.5 分，是 BUG-096 同类双计。
+    # 现在分与文案都只在 charging_credit 里产生，出口再跑 check_single_credit 硬校验；
+    # 有快充 → 平台必 0 分（只披露）；无快充 → 平台作补能代理计分（缺数据 ≠ 差）。
+    t = _n(s.get("charge_10_80_min"))
     vv = _n(s.get("platform_v"))
     if vv is None and s.get("platform_800v") is True:
         vv = 800.0  # 只有布尔时按 800V 处理（旧单测/外部兼容）
-    if vv is not None:
-        hit = _band_points(vv, (R.get("voltage") or {}).get("bands") or [], "min_v", "min")
-        pts, label = hit if hit else (float((R.get("voltage") or {}).get("default", 0.0)), "")
-        parts.append(("高压平台", pts, f"{vv:g}V {label} +{pts:g}"))
-    # ── 快充：≤8min 单列闪充档 ────────────────────────────────────────
-    t = _n(s.get("charge_10_80_min"))
-    if t is not None:
-        cr = R.get("charge") or {}
-        hit = _band_points(t, cr.get("bands") or [], "max_min", "max")
-        pts, label = hit if hit else (float(cr.get("over_35", -0.4)), ">35min")
-        parts.append(("快充", pts, f"10–80% {t:g}min {label} +{pts:g}"))
+    cc = charging_credit(t, vv, R)
+    if t is not None and cc["charge_pts"] is not None:
+        parts.append(("快充", cc["charge_pts"], f"10–80% {t:g}min {cc['charge_label']} +{cc['charge_pts']:g}"))
+    if vv is not None and cc["plat_pts"] is not None:
+        if t is not None:
+            parts.append(("高压平台", float(cc["plat_pts"]),
+                          f"{vv:g}V {cc['plat_label']} 不计分（快充已单列，同一硬件不双计）"))
+        else:
+            parts.append(("高压平台", cc["plat_pts"],
+                          f"{vv:g}V {cc['plat_label']} +{cc['plat_pts']:g}（无快充数据，作补能代理）"))
     cell = str(s.get("cell_brand") or "")
     ct = cell_tier_of(cell, s.get("cell_route"))
     if ct["tier"] != "unknown":
@@ -353,7 +405,35 @@ def powertrain_parts(s):
         else:
             pts = float((R.get("cooling") or {}).get("other_known", -0.2))
             parts.append(("冷却", pts, f"{cool} {pts:g}"))
+    # 【出口强制校验】同一硬件只许计一次：谁把平台分/快充分改成同时为正，
+    # 这里立刻抛错（而不是静默生成一个虚高的三电分）。
+    _viol = check_single_credit(parts)
+    if _viol:
+        raise RuntimeError(f"三电规则双计违规（代码错误，非数据问题）：{_viol}")
     return parts
+
+
+def powertrain_single_credit_audit(specs: list) -> dict:
+    """批量体检：逐配置跑 powertrain_parts 的单一账本校验（供 score_audit/门禁）。
+
+    返回 {"checked": n, "violations": [], "platform_proxy": n, "platform_muted": n}
+    —— platform_proxy=无快充数据、平台作代理计分的配置数；
+       platform_muted=有快充数据、平台被置 0 的配置数（应远大于 0，否则保护失效）。
+    """
+    out = {"checked": 0, "violations": [], "platform_proxy": 0, "platform_muted": 0}
+    for s in specs or []:
+        if not isinstance(s, dict):
+            continue
+        parts = powertrain_parts(s)   # 双计会在此 raise
+        out["checked"] += 1
+        t = _n(s.get("charge_10_80_min"))
+        plat = next((p for p in parts if p[0] == "高压平台"), None)
+        if plat:
+            if t is not None and float(plat[1]) == 0.0:
+                out["platform_muted"] += 1
+            elif t is None and float(plat[1]) > 0:
+                out["platform_proxy"] += 1
+    return out
 
 
 # 三电维的**子维度分组**（v10.15.5 扩为三组，用户诉求「三电=电池+电机+电控」）。
@@ -437,10 +517,20 @@ def powertrain_soft_score(raw: float) -> float:
 # 硬顶，海狮06EV/小鹏G6 又顶到 10.0。同一把尺子：knee 9.3 以下原样，以上渐近 9.5。
 MAIN_PT_KNEE = 9.3
 MAIN_PT_CAP = 9.5
+# v10.73 实测闸门（用户 2026-11-25「小鹏G6 三电 9.5 这么高合理吗」）：
+# 9.0 以上是"三电能效第一梯队"的结论，必须有一手实测达成率背书（L3 实测）。
+# 只有官方 CLTC + 官方电耗的车，即使参数/规则分很高，上界压到 9.0——
+# 这不是扣分，是"没有实测不得声称第一梯队"（与 CR 小样本不给最高评一致）。
+MAIN_PT_UNVERIFIED_CAP = 9.0
 
 
-def main_board_powertrain_cap(score: float) -> float:
-    """主榜车系三电分软上限：消除效率+达成率叠加后的满分，单调保序。"""
+def main_board_powertrain_cap(score: float, measured: bool = True) -> float:
+    """主榜车系三电分软上限：消除效率+达成率叠加后的满分，单调保序。
+
+    measured=False（无一手实测达成率）：上界压到 9.0。
+    """
+    if not measured:
+        return round(min(float(score), MAIN_PT_UNVERIFIED_CAP), 2)
     return round(soft_ceiling(float(score), MAIN_PT_CAP, MAIN_PT_KNEE), 2)
 
 

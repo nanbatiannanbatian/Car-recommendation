@@ -137,12 +137,21 @@ def apply(cands: list[dict], fixed_median: float | None = None) -> dict:
       子榜与全价位榜共用同一锚点 → 同车同分；达成率仍是车自身物理量，不随池变。
     """
     phys = _physics_map()
-    ach_map, basis_map = {}, {}
+    ach_map, basis_map, kind_map = {}, {}, {}
     for c in cands:
         ach, basis = estimate_achievement(c, phys)
         if ach is not None:
             ach_map[c["model"]] = ach
             basis_map[c["model"]] = basis
+            # v10.73：区分证据强度——independent（独立实测）/ owner（车主口碑）/ model（物理估算）。
+            # 三电 9.0+ 闸门只认 independent：车主口碑的达成率反映的是驾驶习惯与路况，
+            # 不是统一工况实测，不能据此声称"三电能效第一梯队"。
+            if "independent_test" in basis:
+                kind_map[c["model"]] = "independent"
+            elif "up_review" in basis:
+                kind_map[c["model"]] = "owner"
+            else:
+                kind_map[c["model"]] = "model"
     applied, skipped = [], []
     use_fixed = isinstance(fixed_median, (int, float))
     if use_fixed or len(ach_map) >= MIN_PEERS:
@@ -163,6 +172,7 @@ def apply(cands: list[dict], fixed_median: float | None = None) -> dict:
             c["range_achievement"] = {"status": "applied", "achievement": round(ach, 3),
                                       "median": round(med, 3), "delta": delta,
                                       "before": old, "after": scores.get("powertrain"),
+                                      "kind": kind_map.get(m) or "model",
                                       "basis": basis_map[m]}
             applied.append({"model": m, "ach": round(ach, 3), "delta": delta})
     else:

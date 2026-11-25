@@ -16,28 +16,30 @@
   （中型纯电 SUV），故只按价格档分组；经销商体验全缺、保值率仅 3/20 款有数据，
   v10.49 起保值率不再混进 value，改为独立事实展示（residual_values.json 单一源）。
 
-  v10.47 定性为「质价比」：每万元买到的产品力，全池一把尺子、不分价位档。
-  用户指出分档=不同车不同标准，且本池实测 pf 与价格无关（≤17万 pf=8.17 /
-  >22万 pf=8.03；Hedonic 回归系数 b=-0.0118≈0，残差法退化为纯产品力排名、失效），
-  故放弃分档与 Hedonic，改用全池统一锚。
+  v10.47 曾定性为「质价比」：每万元买到的产品力，全池一把尺子、不分价位档。
+  但 v10.72 实测出反例：本池最低价的小鹏 G6（17.68 万）value 直接 9.0、排全榜第 2，
+  而它的空间/品控/安全都在中下游——「便宜」本身被当成了优点，越像清库降价分越高。
+  同时把 11 万级与 28 万级强行放在一把尺子上比「每万元」，跨档不可比。
 
+  v10.73（用户授权）改回「同价位段残差」：先按评分配置价分档，再与本档中位比。
   落地为：
     · 产品力 pf = 其余七维（剔除 value 自身，避免重复计分）按权重归一的加权分；
     · 每万元产品力 ppw = pf / 评分配置价（v10.45 根因修复：旧版用 price_guide[0]
       区间最低价，与产品力的评分配置口径错配，Model Y 26.35后驱价配28.85长续航
       产品力 → value 虚高 9.54，note 却写"性价比三车最低"）；
-    · value = NEUTRAL + gain × (ppw / 全池 ppw 均值 − 1)，clamp 到 ±cap；
-      基准 8.0 中性，高者加分、低者扣分。
-  即：全池统一标准——单位价格买到的产品力高于全池均值 → 加分，低于 → 扣分。
-  因 pf 几乎不随价格涨，质价比天然偏向低价车（便宜车买到的每万元产品力更高），
-  这是口径的必然结果、不是 bug，页面与报告必须如实向用户写明。
+    · value = NEUTRAL + gain × (ppw / 本档 ppw 中位 − 1)，clamp 到 ±cap；
+      基准 8.0 中性，高于本档中位加分、低于扣分；档内 <3 款回退全池中位（审计标
+      anchor_scope=pool_fallback）。
+  这与 J.D. Power「同级组均值距离」的原意一致：同级=同价位段，而不是全市场。
+  口径边界（页面须写明）：档内仍会奖励「同档更便宜且产品力不减」，这是性价比的
+  本义，不是低价偏置；跨档不可比，要看绝对产品力请用纯产品力榜。
 
-跨榜一致：全池 ppw 均值属榜内统计锚，子榜必须从全价位榜固定快照取（anchor_pool
-  的 value_bins.pool_mean），否则子池均值漂移会让同车 value 变分。全榜自身本池现算。
+跨榜一致：锚点属榜内统计量，子榜必须从全价位榜固定快照取（anchor_pool 的
+  value_bins.bins/pool_mean），否则子池中位漂移会让同车 value 变分。全榜自身本池现算。
 
 契约：
   product_strength(cand, weights=None) -> float | None
-  fit_bins(cands, weights=None) -> {"bins": {label: ppw_mean}, "detail": [...]}
+  fit_bins(cands, weights=None) -> {"bins": {label: ppw_median}, "detail": [...]}
   apply(cands, weights=None, fixed_bins=None) -> report
   selftest() -> int
 """
@@ -54,23 +56,31 @@ HERE = str(paths.ROOT)
 
 # 七维产品力（剔除 value 自身）：与 categories/<category>.json 的 dimensions 同源，
 # 缺省值仅用于 selftest / 外部未传权重时；pipeline 必须传 cfg 权重。
-PROD_DIMS = ("powertrain", "safety", "adas", "space", "control", "cabin", "quality")
-DEFAULT_W = {"powertrain": 0.25, "safety": 0.177, "adas": 0.08, "space": 0.131,
-             "control": 0.075, "cabin": 0.07, "quality": 0.095}
+# 产品力（剔除 value 自身；v10.74 起含 reliability，但**不含 holding_cost**——
+# 保值率是持有成本维度，不是产品力；把它塞进 pf 会让同一件事在性价比和持有成本各算一次）
+PROD_DIMS = ("powertrain", "safety", "reliability", "adas", "space", "control", "cabin", "quality")
+DEFAULT_W = {"powertrain": 0.21, "safety": 0.18, "reliability": 0.12, "adas": 0.05, "space": 0.11,
+             "control": 0.04, "cabin": 0.03, "quality": 0.06}
 
 # 固定价格档边界（万元）——写死为模块常量，跨榜一致，不随子池漂移。
 BIN_EDGES = (15.0, 20.0, 25.0)
 BIN_LABELS = ("≤15万", "15-20万", "20-25万", ">25万")
 
 NEUTRAL = 8.0   # 与 J.D. Power「同级均值=80分」对齐（10 分制 8.0）
-# v10.48 重标定：GAIN 从 12 降到 3。
-# 12 是分档时代标的（档内 ppw 波动小，偏离 10%→±1.2）；v10.47 改全池统一锚后
-# 全池 ppw 差 2.4 倍（0.231~0.565），GAIN=12 让 18/20 款触顶、分数挤成 9.5/6.5 两坨
-# （极狐T5 ppw0.535 与 海狮06 0.501 都被压成 9.5，差异消失）。
-# GAIN=3：0 款触顶、value 分布 6.6~8.9，T5 正确高于海狮06，Model Y 仍底部。
-GAIN = 3.0      # ppw 相对全池均偏离 ≈30% → ±0.9 分（跨月稳定，不触顶）
+# v10.73 口径变更（用户 2026-11-25：「小鹏G6 性价比 9.0 全榜第 2 高，是不是不合理」→ 授权按建议改）
+#
+# 旧口径（v10.47→v10.72）：全池统一锚 —— value = 8 + 3×(ppw/全池均 − 1)，分母是价格。
+# 后果（本池实测）：G6 是全榜最低价（17.68 万），ppw 0.479 对全池均 0.44 → 直接顶到 9.0，
+# 而它的空间/品控/安全都在中下游。等于把"便宜"本身当成性价比优点 ——
+# 越像清库降价，分越高；同时把 11 万级和 28 万级放在同一把尺子上比"每万元"。
+#
+# 新口径：同价位档残差 —— 先按评分配置价分档（≤15/15-20/20-25/>25 万，边界写死跨榜一致），
+# value = 8 + GAIN×(ppw/本档 ppw 中位 − 1)。语义变成"同一个价位里，谁给的产品力更多"，
+# 低价不再自动加分（价低但产品力也低的，ppw 不会高）；跨档不可比（也不再被贵车档均值拖抬）。
+# 档内不足 MIN_PEERS 款时回退全池均（并在 basis 里写明 band→pool 回退，可审计）。
+GAIN = 3.0      # 档内 ppw 相对档中位偏离 ≈30% → ±0.9 分（跨月稳定，不触顶）
 CAP = 1.5       # 单维调整封顶，与 experience 单维 ±1.5 一致
-MIN_PEERS = 2   # 档内少于 2 款不设该档均值，回退全池均值
+MIN_PEERS = 3   # 档内少于 3 款不设该档中位，回退全池（2 款时中位就是两点中点，噪声太大）
 
 
 def _weights(weights: dict | None) -> dict:
@@ -92,12 +102,18 @@ def product_strength(cand: dict, weights: dict | None = None) -> float | None:
     w = _weights(weights)
     # 优先用入池时的原始分快照（pipeline 写入），避免中途规则增量/联网回填让 pf 漂移；
     # 无快照时回退当前 scores（selftest / 外部直调）。
-    s = cand.get("_value_pf_base") or cand.get("scores") or {}
-    vals = {d: s.get(d) for d in w}
-    if any(not isinstance(v, (int, float)) for v in vals.values()):
+    # v10.74：入池快照拍摄时还没有 reliability（那时质量/可靠性维还没算），
+    # 逐维回退到当前 scores——否则「缺任一维返回 None」会让全池 value 全部跳过。
+    s = cand.get("_value_pf_base") or {}
+    cur = cand.get("scores") or {}
+    vals = {d: (s.get(d) if isinstance(s.get(d), (int, float)) else cur.get(d)) for d in w}
+    have = [d for d in w if isinstance(vals[d], (int, float))]
+    # v10.74：允许缺 1–2 维（如 value 计算时点早于 reliability 落分），按已有维归一；
+    # 缺得更多才判"产品力不可算"（不猜、不插补）。
+    if len(have) < max(4, len(w) - 2):
         return None
-    tw = sum(w.values())
-    return round(sum(float(vals[d]) * w[d] for d in w) / tw, 6)
+    tw = sum(w[d] for d in have)
+    return round(sum(float(vals[d]) * w[d] for d in have) / tw, 6)
 
 
 def _ppw(cand: dict, weights: dict | None = None,
@@ -124,7 +140,11 @@ def _ppw(cand: dict, weights: dict | None = None,
 
 def fit_bins(cands: list[dict], weights: dict | None = None,
              price_map: dict | None = None) -> dict:
-    """从本池拟合各价格档 ppw 均值（全价位榜用；子榜改用 fixed_bins 快照）。"""
+    """从本池拟合各价格档的 ppw 中位（v10.73 起锚点=档中位，不再用均值）。
+
+    中位而非均值：档内只有 3~8 款，均值会被单款极端值（如清库价低配）拽走；
+    中位对离群稳健，也就不会被"最便宜那款"定义整档标准。
+    """
     by_bin: dict[str, list[float]] = {}
     detail = []
     for c in cands:
@@ -132,13 +152,16 @@ def fit_bins(cands: list[dict], weights: dict | None = None,
         if b and ppw is not None:
             by_bin.setdefault(b, []).append(ppw)
         detail.append({"model": c.get("model"), "bin": b, "pf": pf, "ppw": ppw})
-    bins = {}
+    bins, bins_n = {}, {}
     for label in BIN_LABELS:
         vals = by_bin.get(label) or []
+        bins_n[label] = len(vals)
         if len(vals) >= MIN_PEERS:
-            bins[label] = round(statistics.mean(vals), 6)
+            bins[label] = round(statistics.median(vals), 6)
     all_ppw = [d["ppw"] for d in detail if d["ppw"] is not None]
-    return {"bins": bins, "pool_mean": round(statistics.mean(all_ppw), 6) if all_ppw else None,
+    return {"bins": bins, "bins_n": bins_n,
+            "pool_mean": round(statistics.median(all_ppw), 6) if all_ppw else None,
+            "pool_mean_ppw": round(statistics.mean(all_ppw), 6) if all_ppw else None,
             "detail": detail}
 
 
@@ -159,12 +182,12 @@ def apply(cands: list[dict], weights: dict | None = None,
         b, pf, ppw = _ppw(c, weights, price_map)
         if b is None or ppw is None:
             continue
-        # v10.47 根因修复：统一质价比——全池一个锚（pool_mean），不再按价位档分档。
-        # 理由：本池七维产品力 pf 与价格几乎无关（实测 ≤17万 pf=8.17 / >22万 pf=8.03，
-        # Hedonic 回归系数 b=-0.0118≈0），分档只会让"贵车档均值低→贵车被抬分"，
-        # 且同一辆车落在不同档 get 不同 value = 不同标准。统一锚 = 每万元产品力
-        # 对全池均值的距离，全池一把尺子，Model Y(28.85万, ppw0.272)→6.5 触底。
-        anchor = pool_mean
+        # v10.73 根因修复：锚点从"全池一个均"改回"同价位档中位"。
+        # 旧口径把便宜本身当优点：G6 是全榜最低价，ppw 对全池均 +8% 就够到 9.0，
+        # 与它中下游的空间/品控/安全不对称；跨档比"每万元"也等于用贵车的价格当惩罚。
+        # 现口径：同一价位段内比产品力/价格的残差，价低但产品力同样低的不会占便宜。
+        anchor = bins.get(b) or pool_mean
+        scope = "band" if bins.get(b) else "pool_fallback"
         if not anchor or anchor <= 0:
             continue
         scores = c.setdefault("scores", {})
@@ -183,19 +206,24 @@ def apply(cands: list[dict], weights: dict | None = None,
         c["value_residual"] = {
             "status": "applied", "bin": b, "pf": round(pf, 3), "ppw": ppw,
             "price_used": _used_price, "price_basis": "scoring_trim" if (price_map or {}).get(c.get("model")) else "range_min",
-            "bin_mean_ppw": round(anchor, 6), "anchor_scope": "pool", "before": before, "after": final,
+            "bin_mean_ppw": round(anchor, 6), "anchor_scope": scope,
+            "band_n": (fit.get("bins_n") or {}).get(b) if not fixed_bins else None,
+            "pool_anchor_ppw": pool_mean, "before": before, "after": final,
             "delta": round(delta, 3),  # v10.49：保值率已剔除，residual_delta 不再进 value
             "source": "fixed_anchor" if fixed_bins else "pool_fit",
-            "basis": (f"质价比（全池统一，不含保值）：每万元产品力 {ppw:.3f} / 全池均 {anchor:.3f}"
-                      f" → {delta:+.2f}；中性 {NEUTRAL:g}"),
+            "basis": (f"同价位段残差（不含保值）：本档 {b} 每万元产品力 {ppw:.3f} / 本档中位 "
+                      f"{anchor:.3f}→{delta:+.2f}"
+                      + ("" if scope == "band" else "（本档样本不足，回退全池中位）")
+                      + f"；中性 {NEUTRAL:g}"),
         }
         applied.append({"model": c.get("model"), "bin": b, "before": before,
                         "after": final, "delta": round(delta, 3)})
     return {"status": "applied" if applied else "skipped", "n": len(cands),
             "covered": len(applied), "bins": bins, "pool_mean": pool_mean,
             "source": "fixed_anchor" if fixed_bins else "pool_fit",
-            "method": (f"质价比法（全池统一）：每万元产品力（分母=评分配置价）相对全池均值的距离"
-                       f"（gain={GAIN:g}, cap=±{CAP:g}, 中性={NEUTRAL:g}，不分价位档）"),
+            "method": (f"同价位段残差：每万元产品力（分母=评分配置价）相对『本价位档中位』的距离"
+                       f"（gain={GAIN:g}, cap=±{CAP:g}, 中性={NEUTRAL:g}；档界 ≤15/15-20/20-25/>25 万，"
+                       f"档内 <{MIN_PEERS} 款回退全池中位）"),
             "applied": applied}
 
 
@@ -249,21 +277,29 @@ def selftest() -> int:
     r = apply([c_hi, c_lo], w)
     assert r["covered"] == 2
     assert c_hi["scores"]["value"] > c_lo["scores"]["value"], "同档高产品力应价值分更高"
-    # 3a) v10.47 根因：全池统一锚——不同价位档的车共用同一个 pool_mean，
-    # 不再"高档均值低→贵车被抬分"。构造跨档两车：贵车 ppw 更低应 value 更低。
-    c_cheap = {"model": "便宜车", "price_guide": [10.0],
-               "scores": {**base["scores"], "powertrain": 9}}
-    c_pricey = {"model": "贵车", "price_guide": [30.0],
-                "scores": dict(base["scores"])}  # pf 更低 + 价更高 → ppw 必更低
-    _rr = apply([c_cheap, c_pricey], w)
-    assert _rr["covered"] == 2
-    _anchor_used = {c["model"]: c["value_residual"]["bin_mean_ppw"]
-                    for c in (c_cheap, c_pricey)}
-    assert _anchor_used["便宜车"] == _anchor_used["贵车"], \
-        f"全池统一锚必须同值: {_anchor_used}"
-    assert all(c["value_residual"]["anchor_scope"] == "pool" for c in (c_cheap, c_pricey))
-    assert c_cheap["scores"]["value"] > c_pricey["scores"]["value"], \
-        "统一锚下每万元产品力高者（便宜车）value 应更高"
+    # 3a) v10.73 口径：同价位档残差——每档用自己的中位做锚，跨档不可比。
+    # 构造 3 款 ≤15万（价 10，pf 8 → ppw 0.8）+ 3 款 >25万（价 30，pf 8 → ppw 0.2667）：
+    # 各自档内都在中位上 → 全部 ≈ 8.0，低价不再自动加分（旧口径下便宜档会被抬到 9.5）。
+    _cheap = [{"model": f"便宜{i}", "price_guide": [10.0], "scores": dict(base["scores"])}
+              for i in range(3)]
+    _pricey = [{"model": f"贵{i}", "price_guide": [30.0], "scores": dict(base["scores"])}
+               for i in range(3)]
+    _rr = apply(_cheap + _pricey, w)
+    assert _rr["covered"] == 6
+    _anch = {c["model"]: (c["value_residual"]["bin_mean_ppw"], c["value_residual"]["anchor_scope"])
+             for c in _cheap + _pricey}
+    assert _anch["便宜0"][1] == "band" and _anch["贵0"][1] == "band", f"档内≥3款应用本档锚: {_anch}"
+    assert abs(_anch["便宜0"][0] - 0.8) < 1e-6 and abs(_anch["贵0"][0] - 0.2667) < 1e-3, \
+        f"各档锚应互不相同: {_anch}"
+    for c in _cheap + _pricey:
+        assert abs(c["scores"]["value"] - NEUTRAL) <= 0.02, \
+            f"档内处于中位应得中性 {NEUTRAL}，低价不得自动加分: {c['model']}={c['scores']['value']}"
+    # 3a-2) 档内更低价的低产品力车不得占便宜：价 9 但 pf 7.2（ppw 同为 0.8）
+    _c_cheap_low = {"model": "便宜低配", "price_guide": [9.0],
+                    "scores": {k: (7.2 if k in PROD_DIMS else v) for k, v in base["scores"].items()}}
+    _r_low = apply([_c_cheap_low], w, fixed_bins=_rr)
+    assert abs(_c_cheap_low["scores"]["value"] - NEUTRAL) <= 0.05, \
+        f"价低但产品力同样低不得加分: {_c_cheap_low['scores']['value']}"
     # 3b) v10.45 根因：price_map（评分配置价）必须覆盖 price_guide[0]（区间最低价）。
     # Model Y 类：区间最低价配车系产品力 → ppw 虚高。给配置价后 ppw 必须按配置价算，
     # 且低配价、高配价两车 ppw 不同（证明 price_map 真生效、不是摆设）。
