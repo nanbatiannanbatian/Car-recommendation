@@ -679,6 +679,10 @@ def render(data, summary, title, as_of):
     # ---- 逐配置下拉对比（v9.7.0）
     if "trim_compare" in ids:
         tb = meta.get("trim_board") or {}
+        # v10.74.6：插补列需要知道「在算的有哪些维、中文叫什么」，统一从 meta.dimensions 取
+        _wkeys = [d.get("key") for d in (meta.get("dimensions") or [])]
+        _dlab = {d.get("key"): (d.get("label") or d.get("key"))
+                 for d in (meta.get("dimensions") or [])}
         if tb:
             H.append('<h2>逐配置对比 <span>点车型展开 · 同车不同配置的相对差别</span></h2>')
             # v10.24.0：示例从本池数据动态取（此前写死具体车型及各项分值，换榜即错、
@@ -716,6 +720,16 @@ def render(data, summary, title, as_of):
                     flag = " ★" if t.get("name") == best else ""
                     why = "、".join((t.get("reasons") or {}).get("powertrain") or []) or "基准配置（无配置级差异）"
                     note = t.get("note") or ""
+                    # v10.74.6：插补列写清「缺哪几维」，并区分「配置级缺参数」与「车系级无证据」
+                    _miss = [k for k in _wkeys if k != "value" and not isinstance(sc.get(k), (int, float))]
+                    _miss_txt = "、".join(_dlab.get(k, k) for k in _miss) or "无"
+                    _imp_tip = (f"配置级插补 {len(_miss)} 维（{_miss_txt}）：该配置缺这些维的参数，"
+                                f"按同车系基准分/规则推算，只作同车对比。"
+                                "车系级「无一手证据」的插补见总分构成的 ≈ 标记，两者不是一回事。")
+                    _marks = "".join(
+                        "<span class='imp' title='车系级插补：该维无一手证据'>≈</span>"
+                        if (r.get("dim_evidence") or {}).get(k, {}).get("kind") == "imputed" else ""
+                        for k in ("adas",))
                     cell_val = str(t.get("cell_supplier") or "未披露")
                     if t.get("cell_inherited"):
                         cell_val += '<span class="flag flag-est" title="车系级电芯，未逐配置核验">车系</span>'
@@ -732,10 +746,11 @@ def render(data, summary, title, as_of):
                              f"<td>{_kwh_cell(t, r.get('note'))}</td>"
                              f"<td class='ref'>{cell_val}</td>"
                              f"<td class='ref'>{e(charge_val)}</td>"
-                             f"<td>{num(sc.get('powertrain'))}</td><td>{num(sc.get('adas'))}</td>"
+                             f"<td>{num(sc.get('powertrain'))}</td>"
+                             f"<td>{num(sc.get('adas'))}{_marks}</td>"
                              f"<td>{num(sc.get('value'))}</td>"
                              f"<td><span class='score'>{e(t.get('total'))}</span></td>"
-                             f"<td style='color:#b8860b'>{e(t.get('n_imputed'))}维</td>"
+                             f"<td style='color:#b8860b'><span title=\"{e(_imp_tip)}\">{e(t.get('n_imputed'))}维</span></td>"
                              f"<td class='ref' style='font-size:11px'>{e(why)}"
                              f"{'<br><i>'+e(note)+'</i>' if note else ''}</td></tr>")
                 H.append('</tbody></table>')
@@ -974,6 +989,18 @@ document.addEventListener('change',function(ev){
         H.append('<div class="rule">主榜（8 维含性价比）仍是唯一权威排序；本榜只回答「不看价格谁的产品力更强」。'
                  '<b>与性价比的关系</b>：产品力更强但价格拖累 → 标「被性价比拖累」；靠价格优势上位 → 标「靠性价比抬升」。</div>')
         tbpp = meta.get("trim_board") or {}
+        # v10.74.6：产品力口径的未验证权重（剔除性价比后重归一化）——主榜徽标含性价比，
+        # 这里必须换分母，否则「产品力 7 维」的榜挂着含 value 的 38%，两套口径打架。
+        _wp = {d.get("key"): float(d.get("weight") or 0) for d in (meta.get("dimensions") or [])}
+        _pw_keys = [k for k in _wp if k != "value"]
+        _pw_sum = sum(_wp[k] for k in _pw_keys) or 1.0
+        _rowmap = {x.get("model"): x for x in rows}
+        _plab = {d.get("key"): (d.get("label") or d.get("key"))
+                 for d in (meta.get("dimensions") or [])}
+        H.append('<div class="rule">车名后的「未验证 x%」是本榜口径：产品力只算'
+                 f'<b>{len(_pw_keys)} 维</b>（剔除性价比后重归一化），x% 表示这几维里有多少权重来自插补；'
+                 '≤20% 灰、≥20% 红。主榜的徽标按含性价比的 10 维算，两个数字不同是分母不同，不是矛盾。'
+                 '名次带在打分主榜看（本榜只回答「不看价格谁更强」）。</div>')
         H.append('<div class="rule">下拉框切换配置后，本榜产品力分（剔除性价比的 7 维）实时重算并重排；'
                  '与主榜/总分构成联动。标签按主榜当前名次实时重算，鼠标悬停可看原始数字。</div>')
         H.append('<table id="powerBoard"><thead><tr><th>#</th><th>车型</th><th>产品力分</th>'
@@ -985,8 +1012,21 @@ document.addEventListener('change',function(ev){
             td = tbpp.get(mdl) or {}
             sel = trim_selector(mdl, td.get("trims") or [],
                                 td.get("best_trim"), show_price=False, width=150)
+            _rw = _rowmap.get(mdl) or {}
+            _ev = _rw.get("dim_evidence") or {}
+            _imp_keys = [k for k in _pw_keys if (_ev.get(k) or {}).get("kind") == "imputed"]
+            _iw = sum(_wp[k] for k in _imp_keys)
+            _ipct = int(round(_iw / _pw_sum * 100))
+            _plist = "、".join(_plab.get(k, k) for k in _imp_keys) or "无"
+            _ibadge = ""
+            if _ipct > 0:
+                _itip = (f"未验证 {_ipct}%（产品力 {len(_pw_keys)} 维口径）：插补维＝{_plist}。"
+                         "这部分没有一手数据，按有证据车中位−1σ 插补；缺证据不等于该车差，"
+                         "但也不能当成实测。主榜徽标按含性价比的 10 维算，数字会不同。")
+                _ibadge = (f'<span class="unv{" heavy" if _iw / _pw_sum >= 0.2 else ""}" '
+                           f'title="{e(_itip)}">未验证 {_ipct}%</span>')
             H.append(f"<tr data-model='{e(mdl)}'><td class='c-prank'>{it.get('power_rank')}</td>"
-                     f"<td class='name'>{e(mdl)}{sel}</td>"
+                     f"<td class='name'>{e(mdl)}{_ibadge}{sel}</td>"
                      f"<td class='c-power'><span class='score'>{num(it.get('power_score'), 2)}</span></td>"
                      f"<td class='c-mainrank'>#{e(it.get('main_rank'))}</td>"
                      f"<td class='{dcls} c-delta'>"

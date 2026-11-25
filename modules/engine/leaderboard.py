@@ -310,6 +310,9 @@ def score_rows(cands: list[dict], cfg: dict, weights: list[float] | None = None)
             # 显示「这一维凭什么给这个分」。旧版这些说明都留在候选池里，
             # 页面拿到的是 row → 用户只能看到一个裸分数，无法复核。
             "dim_notes": _dim_notes(c),
+            # v10.74.6：插补维明细透传（≈ 标记的唯一来源）——报告与页面同源，
+            # 不能让 markdown 说「插补」而 HTML 只有虚线圈、两边对不上。
+            "dim_evidence": c.get("dim_evidence") or {},
             "score_cap_reasons": c.get("score_cap_reasons") or [],
             "lifecycle_status": (c.get("lifecycle") or {}).get("status")
                                 if isinstance(c.get("lifecycle"), dict) else None,
@@ -1677,6 +1680,35 @@ def top_table(cands: list[dict], cfg: dict, weights: list[float] | None = None,
     else:
         L.append(f"- 同档组：**{'；'.join(spans)}**。同组内换权重就会换位，不要按名次选车。")
     L.append("")
+    L.append("")
+    # v10.74.6：十维分明细（与页面「总分构成」同一把尺：≈=插补）。
+    # 旧报告只给加权分，读者无法判断 80.8 里有多少是实测、多少是插补——
+    # 与页面 v10.74.5 的逐格 ≈ 口径必须一致，否则两个交付物互相打脸。
+    _dims = _active_dims(cfg)
+    if _dims:
+        L.append(f"### {len(_dims)} 维分明细（≈＝该维无一手证据、插补值）")
+        L.append("")
+        L.append("| 名次 | 车型 | " + " | ".join(str(d.get("label") or d.get("key")) for d in _dims)
+                 + " | 加权分 |")
+        L.append("|---|---|" + "---|" * len(_dims) + "---|")
+        _n_imp = 0
+        for i, r in enumerate(ranked, start=1):
+            ev = r.get("dim_evidence") or {}
+            cells = []
+            for d in _dims:
+                k = d.get("key")
+                v = (r.get("scores") or {}).get(k)
+                mark = "≈" if (ev.get(k) or {}).get("kind") == "imputed" else ""
+                if mark:
+                    _n_imp += 1
+                cells.append(("—" if not isinstance(v, (int, float)) else f"{float(v):.1f}") + mark)
+            L.append(f"| {i} | {r['model']} | " + " | ".join(cells) + f" | {r['total']:.1f} |")
+        L.append("")
+        L.append(f"> ≈＝该维没有一手证据，按「有证据车中位 − 1×σ」插补（**缺证据不判劣，"
+                 f"但也不能当成测出来的分数**）；本表（前 {len(ranked)} 名）共 {_n_imp} 个插补格。"
+                 "三电/空间/性价比是纸面可判定维，永不带 ≈。"
+                 "页面「总分构成」同一口径（虚线下划线＋≈，悬停看锚点与样本数）。")
+        L.append("")
     L.append("> 证据 A＝有官方碰撞成绩；B＝上市半年以上、口碑样本够；C＝新上市或样本不足。"
              "C 级车型的名次只说明「参数表打得好看」，不构成推荐。")
     L.append("> 「气囊 侧/帘/中」＝前排侧气囊 / 前后排头部气帘 / 前排中央（远端）气囊，"
