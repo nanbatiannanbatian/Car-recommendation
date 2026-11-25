@@ -50,7 +50,14 @@ DIM_POLICY = {
                    "why": "车机实测/车主反馈（流畅度不是屏幕尺寸）"},
     "control":    {"need": "experience", "cap_to": "median", "min_proven": 3,
                    "why": "麋鹿/底盘实测（悬架形式说明不了调校）"},
-    "quality":    {"need": "pph",        "cap_to": "median", "min_proven": 3, "force": True,
+    # v10.72 根因修复（用户："不能没有数据的比有一些负面数据的打分还高"）：
+    # 旧 cap_to=median + force=True 把无数据车统一标定到"有证据车中位"，
+    # 而有真实负面数据的车（海狮06EV 6.56、零跑C11 5.61）低于中位 →
+    # 无数据车反而更高。严格用 min + offset=-0.1：无数据车 = 有数据车最低 -0.1，
+    # 满足硬不变量"无数据不得高于有负面数据"。这是"缺数据不冒充更好"的直接编码，
+    # 不是"缺数据判劣"——有负面数据的车本就该比无数据车低。
+    "quality":    {"need": "pph",        "cap_to": "min", "cap_offset": -0.1,
+                   "min_proven": 3, "force": True,
                    "why": "PPH/投诉样本（故障率必须靠真实样本，没样本≠没问题）"},
     # ---- 以下为纸面可判定维度，明确不封顶 ----
     "space":      {"need": "params", "cap_to": None,
@@ -71,7 +78,18 @@ def _has_crash(c) -> bool:
 
 
 def _has_pph(c) -> bool:
-    return bool(c.get("ah_pph_usable")) and int(c.get("ah_review_users") or 0) >= PPH_MIN_USERS
+    if bool(c.get("ah_pph_usable")) and int(c.get("ah_review_users") or 0) >= PPH_MIN_USERS:
+        return True
+    # v10.72：车质网投诉明细（≥5条且算出每万台密度）也是质量硬证据。
+    # 旧版只看 PPH，导致"PPH样本14不足但有11条投诉/2156每万台"的海狮07EV
+    # 被当"无证据"force 到中位，反而高于真正有PPH数据的低分车。
+    # 投诉明细由 quality_score.apply 写进 c.quality_detail.complaint。
+    d = c.get("quality_detail") or {}
+    comp = d.get("complaint") or {}
+    # 只要 >=5 条投诉就算有证据——密度(per_10k)因销量缺失算不出不影响
+    # "有负面数据"这个事实（岚图知音 6 条投诉但销量缺→旧版 gate_has=False
+    # 被当无数据 force 到 q25，反而高于 PPH210 的极狐T5）。
+    return int(comp.get("count") or 0) >= 5
 
 
 def _experience_models(lib) -> dict:
@@ -126,7 +144,12 @@ def apply_all(cands, experience_lib=None, policy=None, only=None, anchor=None) -
             return False
 
         # 固定锚点快照优先：全价位榜算好的 cap 直接用，不再从子池重算
+        # v10.72：quality 规则已从 median 改为 q25，旧锚点（median 口径）失效——
+        # 若沿用会破"无数据不得高于有负面数据"不变量。quality 强制动态重算，
+        # 待全价位榜重出后锚点快照自然更新为新口径。
         fixed = anchor.get(dim)
+        if dim == "quality":
+            fixed = None
         if fixed and isinstance(fixed.get("capped"), (int, float)):
             cap = float(fixed["capped"])
             anchor_label = fixed.get("anchor") or f"全价位榜锚点（{fixed.get('n', '?')} 款）"
@@ -142,6 +165,16 @@ def apply_all(cands, experience_lib=None, policy=None, only=None, anchor=None) -
             if cap_to == "min":
                 cap = min(v for _, v in proven)
                 anchor_label = min(proven, key=lambda x: x[1])[0]
+            elif cap_to == "q25":
+                # v10.72：下四分位——无数据车低于75%有数据车，但不等于最差
+                # （min 会把无数据车压到全池最低，违反"缺数据不判劣"；
+                #  median 又让无数据车高于有负面数据的车）。
+                sv = sorted(v for _, v in proven)
+                pos = 0.25 * (len(sv) - 1)
+                lo = int(pos)
+                hi = min(lo + 1, len(sv) - 1)
+                cap = round(sv[lo] + (sv[hi] - sv[lo]) * (pos - lo), 2)
+                anchor_label = f"有证据车下四分位（{len(proven)} 款）"
             else:                         # median
                 cap = round(statistics.median([v for _, v in proven]), 2)
                 anchor_label = f"有证据车中位（{len(proven)} 款）"

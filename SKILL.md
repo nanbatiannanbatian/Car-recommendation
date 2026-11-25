@@ -13,7 +13,7 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 10.71.0
+version: 10.72.0
 author: "nanbatiannanbatian"
 ---
 
@@ -263,6 +263,19 @@ HTML/报告用 `--as-of <YYYYMM>` 标注事实列数据月，禁止停在"—"�
 - 已核验的领域快照（如 `runs/midsedan_bev_1218_202610/candidates_allprice.json` 25款）可作候选，**分数一律复用其中已核验的 `scores`**，不许用 Agent 补采分顶替。
 - "销量榜 Top" ≠ 候选全集：只能做候选发现器，绝不直接当入池名单（会系统性漏车）。
 - 用 `runs/` 下无指纹快照必须 `--force-stale`，并在报告显著标注"过期/强制出榜"。
+
+**①a-3 四维评分根因修复（v10.72，用户四问）**
+- **space 硬数据规则**：`space_score.py` 从轴距/后备箱按统一公式算分（基准8.5@2915mm/576L，
+  每10mm/50L ±0.1，clamp[8.0,9.3]）；缺参数不猜、标 unverified。根治"Model Y 轴距/尾箱
+  都更大却比海狮06EV低1分""无参数车反而9.3最高"。pipeline 自动跑（--no-space-score 关）。
+- **PPH 方向修正**：PPH=百车故障数（越高越差），旧 `(100-pph)/100` 把56故障算成加分。
+  改为以可用样本中位151为零点、`(151-pph)×0.008`，低故障加分/高故障扣分，样本 n/(n+50) 收缩保留。
+- **quality 封顶顺序**：evidence_gate 的 quality 封顶原先在 QS.apply 之前跑（读不到 quality_detail，
+  所有车一刀切4.19）；移到 QS.apply 之后，能识别"有投诉明细但PPH样本不足"的车。
+- **无数据不得高于有负面数据**：quality cap_to 从 median 改 min + cap_offset=-0.1，
+  无数据车严格低于任何有证据车。`_has_pph` 纳入投诉明细（≥5条即算证据，密度算不出不影响事实）。
+- **多碰撞成绩**：`multi_evidence_score.fuse` 已记录全部一手测评（crash_fusion.all_scores），
+  展示层展开；评分仍取 fuse 最严格主分，不重复加分（防突破10分制）。
 
 **①a-2 安全/质量分不许手填绕过规则（v10.71，用户"尚界H5安全为什么这么高/品控为什么这么差"）**
 - **安全分按官方映射**：有 C-NCAP/C-IASI 成绩的 safety 必须按 `safety_scores.json` 的

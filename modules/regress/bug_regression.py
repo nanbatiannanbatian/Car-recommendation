@@ -2140,13 +2140,15 @@ def t081():
     for d in no_cap:
         assert EG.DIM_POLICY[d]["cap_to"] is None, f"{d} 不该封顶"
 
-    # 2) quality 用中位（不是最低）：有样本的车分数低是因为问题被暴露，不是「合格线」
-    assert EG.DIM_POLICY["quality"]["cap_to"] == "median"
+    # 2) quality 用 min（v10.72 口径变更）：用户明确要求"没数据的不能比有负面数据的还高"。
+    #    旧中位让无数据车 5.71 > PPH210 的极狐T5 5.15，违反该不变量；
+    #    现在无数据车 = 有证据车最低 -0.1，严格低于任何有负面数据的车。
+    assert EG.DIM_POLICY["quality"]["cap_to"] == "min"
     assert EG.DIM_POLICY["safety"]["cap_to"] == "min"
 
     # 3) 行为：≥3 款有 PPH 样本 → 无样本车 force 到中位（统一锚点，不看原值高低）
-    #    三款有样本分数 5.0/6.0/7.0 → 中位 6.0；T6 手填 6.09 曾比被封到 6.74 的还低，
-    #    force 的意义正是「填低填高都是没依据，一律同尺度」，故填得低的也应上修到 6.0。
+    #    三款有样本分数 5.0/6.0/7.0 → min-0.1=4.9；无数据车统一标定到该值，
+    #    严格低于最低的有证据车（5.0），满足"无数据不得高于有负面数据"。
     cands = [
         {"model": "有PPH1", "ah_pph_usable": True, "ah_review_users": 80,
          "scores": {"quality": 5.0, "space": 9.0}},
@@ -2161,10 +2163,10 @@ def t081():
     ]
     adj = EG.apply_all(cands, experience_lib={"entries": []}, only=("quality",))
     got = {a["model"]: a["capped"] for a in adj}
-    assert got == {"零样本": 6.0, "填得低": 6.0}, got
+    assert got == {"零样本": 4.9, "填得低": 4.9}, got  # v10.72: min-0.1
     assert [c["scores"]["quality"] for c in cands[:3]] == [5.0, 6.0, 7.0], "有样本的被改"
     # force：填低(3.5→6.0)上修、填高(8.0→6.0)下压，同一无依据状态同一尺度
-    assert cands[3]["scores"]["quality"] == 6.0 and cands[4]["scores"]["quality"] == 6.0
+    assert cands[3]["scores"]["quality"] == 4.9 and cands[4]["scores"]["quality"] == 4.9  # min-0.1
     assert all(a.get("forced") for a in adj), "quality 应 force 而非仅封顶"
     # 空间不在 only 里 → 不被压
     assert cands[3]["scores"]["space"] == 9.3
@@ -3895,11 +3897,15 @@ def t111():
     # 1) PPH 按样本量收缩：同 pph 样本越大越接近原始幅度（单调），且披露写明口径。
     small = Q._pph_adjust({"ah_pph_usable": True, "ah_pph": 127, "ah_review_users": 44})
     large = Q._pph_adjust({"ah_pph_usable": True, "ah_pph": 127, "ah_review_users": 200})
-    assert abs(small[0] - (-0.27 * 44 / 94)) < 0.02, f"小样本未按 n/(n+50) 收缩: {small}"
-    assert large[0] < small[0] < 0, f"样本越大惩罚越接近满额（更负）: small={small} large={large}"
+    # v10.72 口径变更：PPH=百车故障数（越高越差），旧公式 (100-pph)/100 把
+    # PPH56 算成正向加分——基准100完全错位。新公式以可用样本中位151为零点：
+    # PPH127 <151 反而略加分（低于平均故障率），PPH>151 才扣分。
+    # 小样本 n/(n+50) 收缩语义保留（样本越大越接近原始幅度）。
+    assert abs(small[0] - ((151 - 127) * 0.008 * 44 / 94)) < 0.02, f"小样本未按 n/(n+50) 收缩: {small}"
+    assert large[0] > small[0] > 0, f"PPH127低于中位→加分，样本越大越接近原始幅度: small={small} large={large}"
     assert "n/(n+50)" in small[1], "PPH 披露未写样本收缩口径"
     d = Q.score_one({"ah_pph_usable": True, "ah_pph": 127, "ah_review_users": 44}, {})
-    assert d["score"] == 7.87, f"乐道口径品控应 7.87（旧满扣为 7.73）: {d['score']}"
+    assert d["score"] == 8.09, f"乐道口径品控应 8.09（v10.72 PPH基准151，PPH127低于中位略加分）: {d['score']}"
 
     # 2) 逐配置激光雷达：配置名不含关键词但结构化字段 adas_lidar=1 必须识别。
     ref = {"name": "乐道L60 2026款 60kWh Pro", "adas_lidar": 0}
@@ -5335,6 +5341,45 @@ def t151():
             "t016真比对 + 闸门fail-close + 反向注入可检出")
 
 
+def t157():
+    """BUG-157：四项评分维度根因（v10.72，用户四问）。
+
+    用户："特斯拉的空间为什么这么差" / "海狮的品控这么差合理吗" /
+    "多条碰撞成绩怎么办" / "不能没有数据的比有一些负面数据的打分还高"。
+    根因四项：
+      ① space 无算分规则纯手填——Model Y 轴距2890/尾箱822L 手填8.0，
+         海狮06EV 2820/757L 手填9.0，物理数据不支持；无参数的MONA反而9.3。
+      ② PPH=百车故障数（越高越差），旧公式 (100-pph)/100 把56故障算成加分，
+         基准100完全错位；应以可用样本中位151为零点。
+      ③ evidence_gate 的 quality 封顶在 QS.apply 之前跑，读不到 quality_detail，
+         所有车被当"无PPH证据"一刀切封顶（4.19）。
+      ④ quality cap_to=median 让无数据车5.71 > PPH210的极狐T5 5.15。
+    修法：space_score 硬数据规则；PPH_BASELINE=151方向修正；quality 封顶
+    移到 QS.apply 之后；quality cap_to=min + offset=-0.1（严格低于有证据车）。
+    多碰撞成绩：fuse 已有全部成绩审计，展示层展开；评分仍取最严格主分不重复计。
+    """
+    from modules.engine import space_score as SP, quality_score as QS, evidence_gate as EG
+    src_p = _read("pipeline.py")
+    assert "space_score as" in src_p and "空间硬数据" in src_p, "space规则未接pipeline"
+    assert "质量证据封顶" in src_p, "quality封顶未在QS之后"
+    # ① space 硬数据方向
+    fake = {"大": {"wheelbase_mm": 2950, "trunk_l": 900},
+            "小": {"wheelbase_mm": 2820, "trunk_l": 500}}
+    v1, _ = SP.score("大", fake); v2, _ = SP.score("小", fake)
+    assert v1 > v2, f"space硬数据方向错: {v1} vs {v2}"
+    assert SP.score("缺", fake)[0] is None, "缺物理参数应不猜"
+    # ② PPH方向
+    lo = QS._pph_adjust({"ah_pph_usable": True, "ah_pph": 53, "ah_review_users": 80})[0]
+    hi = QS._pph_adjust({"ah_pph_usable": True, "ah_pph": 233, "ah_review_users": 80})[0]
+    assert lo > 0 > hi, f"PPH低故障应加分/高故障应扣分: {lo} / {hi}"
+    # ③④ quality封顶策略
+    assert EG.DIM_POLICY["quality"]["cap_to"] == "min"
+    assert EG.DIM_POLICY["quality"].get("cap_offset") == -0.1
+    return ("space按轴距+后备箱硬数据算(缺数据不猜) + PPH百车故障数方向修正 "
+            + "+ quality封顶移到QS之后(能识别投诉证据) + 无数据严格低于有负面数据 "
+            + "+ 多碰撞成绩展示展开(评分取最严格主分不重复计)")
+
+
 def t156():
     """BUG-156：手工 safety/quality 分绕过规则（v10.71）。
 
@@ -5576,6 +5621,11 @@ def t150():
         "safety 无证据降档 offset 应为 -1.0"
     # 其它需实测维不得被误伤（默认 offset 0）
     for dim in ("adas", "cabin", "control", "quality"):
+        # v10.72：quality 是用户明确要求的例外（无数据不得高于有负面数据），
+        # 用 cap_offset=-0.1 使无数据车严格低于有证据车最低分。
+        if dim == "quality":
+            assert EG.DIM_POLICY[dim].get("cap_offset") == -0.1
+            continue
         assert not EG.DIM_POLICY[dim].get("cap_offset"), f"{dim} 不应设 offset"
     # 通用策略：构造 3 款有成绩 + 1 款无成绩，验证封顶=最低-1
     c_proven = [{"model": f"有成绩{i}", "crash": "C-NCAP 90% 五星",
@@ -5738,7 +5788,7 @@ def t146():
 
 
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120, t121, t122, t123, t124, t125, t126, t127, t128, t129, t130, t131, t132, t133, t134, t135, t136, t137, t138, t139, t140, t141, t142, t143, t144, t145, t146, t147, t148, t149, t150, t151, t152, t153, t154, t155, t156]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120, t121, t122, t123, t124, t125, t126, t127, t128, t129, t130, t131, t132, t133, t134, t135, t136, t137, t138, t139, t140, t141, t142, t143, t144, t145, t146, t147, t148, t149, t150, t151, t152, t153, t154, t155, t156, t157]
 
 
 def run():

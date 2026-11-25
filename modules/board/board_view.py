@@ -400,6 +400,23 @@ MAIN_COL_LABELS = {
 }
 
 
+
+def _display_crash_all(cand: dict) -> str:
+    """碰撞成绩全展示：主成绩 + fuse/SSOT 记录的并列成绩（v10.72）。"""
+    from modules.engine import crash_systems as _CS
+    main = _CS.display_short(cand.get("crash"))
+    fusion = cand.get("crash_fusion") or {}
+    scores = [x.get("display") for x in (fusion.get("all_scores") or [])
+              if isinstance(x, dict) and x.get("display")]
+    scores += [x for x in (cand.get("crash_secondary") or []) if x]
+    extras = []
+    seen = set()
+    for x in scores:
+        if x and x != main and x not in seen:
+            seen.add(x); extras.append(x)
+    return (main + " / " + " / ".join(extras)) if extras and main not in ("—", "在测") else main
+
+
 def main_cell(key: str, row: dict, cand: dict, grade: str = "") -> str:
     """主榜单表单元格取值（两版渲染器共用，避免各写一份漂移）。"""
     fr = row.get("fact_ref") or {}
@@ -432,8 +449,7 @@ def main_cell(key: str, row: dict, cand: dict, grade: str = "") -> str:
     if key == "tier":
         return str(row.get("tier") or "")
     if key == "crash":
-        from modules.engine import crash_systems as _CS
-        return _CS.display_short(cand.get("crash"))
+        return _display_crash_all(cand)
     if key == "evidence":
         return str(row.get("evidence_status") or cand.get("evidence_status") or row.get("evidence") or "—")
     if key == "period":

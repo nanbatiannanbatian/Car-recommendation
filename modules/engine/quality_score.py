@@ -18,6 +18,9 @@ BASE = 8.0
 LOW = 3.0
 HIGH = 9.5
 
+PPH_BASELINE = 151.0  # 可用样本百车故障数中位（两侧榜单22+20款实测分布）
+PPH_SLOPE = 0.008      # 每高于/低于中位1个PPH扣分/加分（保守，质量仅占10%权重）
+
 HIGH_TAGS = {"转向", "制动", "刹车", "电池", "失灵", "失效", "无法启动", "无法充电"}
 MID_TAGS = {"充电", "车机", "黑屏", "续航", "悬挂", "变速箱", "生锈", "爆漆"}
 
@@ -102,7 +105,14 @@ def _pph_adjust(c: dict) -> tuple[float, str]:
     if not c.get("ah_pph_usable"):
         return 0.0, "PPH 样本不足，中性处理"
     pph = float(c.get("ah_pph") or 0)
-    raw = _clamp((100.0 - pph) / 100.0, -1.5, 1.0)  # v9.7.0 正向空间0.6→1.0
+    # v10.72 根因修复：PPH = 百车故障数（越高越差），旧公式 (100-pph)/100
+    # 把"每百车56个故障"算成 +0.24 加分——基准100完全错位（百车故障100已是
+    # 极差水平），且 PPH=0（零故障）反而因样本不足拿不到分。
+    # 新公式按项目既定口径 references/燃油混动打分口径.md 的
+    # "9.9 − 0.0135×PPH" 方向：以可用样本 PPH 中位 151 为零点，
+    # 低于中位加分、高于中位扣分；斜率取 0.008（比 0.0135 保守，
+    # 因本模块 BASE=8.0 且质量只占10%权重），范围 [-1.5, +0.8]。
+    raw = _clamp((PPH_BASELINE - pph) * PPH_SLOPE, -1.5, 0.8)
     n = int(c.get("ah_review_users") or 0)
     # v10.16.2（用户举证：乐道L60 PPH样本仅44却按满额扣0.27）：
     # 样本≥30 就满额生效会让小样本噪声直接变成扣分，而样本不足的车反而拿中性8.0，
@@ -110,8 +120,8 @@ def _pph_adjust(c: dict) -> tuple[float, str]:
     # 样本越大越接近原始幅度，44样本只按约47%计入，消除小样本过度惩罚。
     shrink = n / (n + 50.0) if n > 0 else 0.0
     adj = raw * shrink
-    return adj, (f"汽车之家 PPH {pph:g}（口碑样本 {n}，按 n/(n+50) 收缩 "
-                 f"{shrink:.2f}），调整 {adj:+.2f}")
+    return adj, (f"汽车之家 PPH {pph:g}（百车故障数，中位基准 {PPH_BASELINE:g}，样本 {n} "
+                 f"按 n/(n+50) 收缩 {shrink:.2f}），调整 {adj:+.2f}")
 
 
 def _recall_penalty(c: dict) -> tuple[float, str]:

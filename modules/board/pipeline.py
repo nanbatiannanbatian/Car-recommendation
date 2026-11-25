@@ -143,6 +143,7 @@ def main():
     ap.add_argument("--allow-discontinued", action="store_true", help="允许已停产停售车参与(默认硬拦;须在报告说明原因)")
     ap.add_argument("--skip-discovery-gate", action="store_true", help="跳过候选发现门禁(须在报告说明为何池外高销量车无需判定)")
     ap.add_argument("--skip-lifecycle-gate", action="store_true", help="跳过生命周期症状门禁(须在报告说明为何销量骤降车无需核验)")
+    ap.add_argument("--no-space-score", action="store_true", help="不按硬数据重算space分(默认按轴距+后备箱算)")
     ap.add_argument("--skip-consistency-gate", action="store_true", help="跳过条目内一致性门禁(须在报告说明为何note与结构字段矛盾不是错误)")
     ap.add_argument("--skip-sibling-gate", action="store_true", help="跳过同源车评分一致性门禁(须在报告说明为何无据差异合理)")
     ap.add_argument("--skip-safety-gate", action="store_true", help="跳过安全分严谨性门禁(须在报告说明为何成绩映射分可偏离)")
@@ -426,6 +427,7 @@ def main():
               + "、".join(f"{x['model']} {x['score']:g}" for x in _sa[:6])
               + ("…" if len(_sa) > 6 else "") + "）")
 
+
     # 表分同步（2026-11-21）：映射表里的车，候选池必须对齐表分，否则「表里 8.7、榜上 8.9」两套数
     _st_sync = SFC.sync_table_scores_to_pool(cands)
     if _st_sync:
@@ -502,11 +504,28 @@ def main():
         print(f"[主榜三电软上限] {len(_pt_capped)} 款满分/近满分收敛：" +
               "、".join(f"{x['model']} {x['prev']:g}→{x['to']:g}" for x in _pt_capped[:5]))
 
+    # v10.72 根因修复：space 从"纯手填"改为"硬数据规则算"（用户"特斯拉空间为什么差"）。
+    # 旧版 evidence_gate 把 space 标"纸面可判定、不封顶"，却没有任何算分规则——
+    # 手填的 Model Y(轴距2890/尾箱822L) 8.0 低于 海狮06EV(2820/757L) 9.0，
+    # 物理数据不支持。现在有轴距+后备箱的按公式覆盖，缺数据的标 unverified
+    # 保留原值（不猜），并在报告披露。必须在 evidence_gate 之前（space 不封顶）。
+    from modules.engine import space_score as _SSP
+    if not getattr(a, "no_space_score", False):
+        _space_rows = _SSP.apply(cands)
+        if _space_rows:
+            print(f"[空间硬数据] 按轴距+后备箱算 {len(_space_rows)} 款 space 分（"
+                  + "、".join(f"{x['model']}→{x['score']:g}" for x in _space_rows[:4])
+                  + "）")
+
     from modules.engine import evidence_gate as EG
     if getattr(a, "no_evidence_cap", False):
         _ev_adj = []
     else:
-        _ev_adj = EG.apply_all(cands, anchor=(_anchor or {}).get("evidence_cap"))
+        # v10.72：quality 封顶必须在 QS.apply（算 quality_detail）之后——
+        # 此前 EG 在 L524 先跑，读不到 quality_detail，所有车被当"无PPH证据"
+        # force 到同一 cap（4.19），有负面数据的车也被误封顶。
+        _ev_adj = EG.apply_all(cands, anchor=(_anchor or {}).get("evidence_cap"),
+                               only=[d for d in EG.DIM_POLICY if d != "quality"])
     _ev_sum = EG.summarize(_ev_adj)
     _cap_adj = [x for x in _ev_adj if x["dim"] == "safety"]
     _dim_cap = [x for x in _ev_adj if x["dim"] != "safety"]
@@ -1168,6 +1187,13 @@ def main():
 
     if a.quality:
         cands, _ = QS.apply(cands, cdata)
+        # v10.72：quality 证据封顶放在 QS.apply 之后（此时 quality_detail 已生成，
+        # _has_pph 能识别"有投诉明细但PPH样本不足"的车，不再一律 force）。
+        _q_adj = EG.apply_all(cands, only=["quality"])
+        if _q_adj:
+            print(f"[质量证据封顶] {len(_q_adj)} 款无质量证据车标定到 "
+                  f"{_q_adj[0]['capped']:g}（有证据车最低-0.1，"
+                  "确保无数据不高于有负面数据）")
         parts += ["---", "", QS.report(cands), ""]
         summary["quality"] = QS.coverage(cands)
         summary["quality"]["complaints_auto"] = bool(_auto_cdata)
@@ -1411,6 +1437,17 @@ def main():
                 # 强行改用 graded_by_model 会让 HTML 总分与 report 打架（实测 23/28 变动），
                 # 故此处保持原取数，维度落差作为已知边界另案处理。
                 cands_for_html = [c for c in cands if c.get("model") in _passed] if _passed else cands
+                # v10.72：多体系碰撞成绩"全部展示"——把 fuse 的一手测评全部并进
+                # crash 字段（事实层合并），任何渲染路径都能显示；评分仍取 fuse 的
+                # 最严格主分，不重复计分。只改展示字符串，不动 safety 分。
+                for _hc in cands_for_html:
+                    _fus = _hc.get("crash_fusion") or {}
+                    _all = [x.get("display") for x in (_fus.get("all_scores") or [])
+                            if isinstance(x, dict) and x.get("display")]
+                    _main = str(_hc.get("crash") or "")
+                    _extras = [x for x in _all if x and x not in _main]
+                    if _extras and _main:
+                        _hc["crash"] = _main + " / " + " / ".join(_extras)
                 # v10.9.0：电池来源联网核验（research 唯一出口）——事实库缺电芯的车
                 # 逐台联网查线索；查不到/仅线索的写入候选 _cell_verify，页面电池来源栏
                 # 显示「—（原因）」。绝不把搜索线索当事实回填（实跑会串配置）。
