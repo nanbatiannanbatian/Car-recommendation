@@ -2077,3 +2077,35 @@ v10.74.5 只做了主榜「总分构成」逐格 ≈，其余出口仍看不出�
 ### 验收
 - bug 回归 **166/166**（新增 BUG-168）；失败回测 **120/120**；铁律 **10/10**。
 - 新页 `runs/midsuv_bev_202611_v1095/榜单.html`。
+
+## v10.74.8 · 产品力口径统一到 8 维（用户：「产品力榜是不是要 9 维」）（2026-11-25）
+
+### 问题
+- 拆维后 `board_v2.product_power_board` 只剔 `value`，在 10 维配置下算出 **9 维**（含
+  `holding_cost`），页面/报告文案却还写着 8 维时代遗留的「7 维」「8 维」。
+- 更深一层：产品力总榜把「三年保值率」算进「产品够不够强」，与 v10.74.0 定的
+  「持有成本不进产品力、不与性价比双计」矛盾；性价比列的 pf（`value_residual.PROD_DIMS`）
+  一直是 8 维（剔 value、剔 holding_cost）。两个「产品力」不是同一把尺。
+- 附带错误：逐配置 `power_score` 只剔 value，而配置级 `sc` 没有 holding_cost，
+  该维按 0 计入分母 → 配置产品力被系统性压低。
+
+### 修法
+- `board_v2.product_power_board`：剔除集合改为 value + holding_cost，可用
+  `policy.product_board.excluded_dimensions` / `exclude_holding_cost` 覆盖；note 与
+  `meta.primary` 维数全部动态。
+- `rank_band.apply_product`：同样剔 value + holding_cost（8 维蒙特卡洛，权重重归一化）。
+- `trim_annotate` 的逐配置 `power_score`：同口径剔两维，不再拿 0 当持有成本分。
+- 页面/报告文案全部改动态：lede、质价比段、产品力榜三条规则、`board_view` desc、
+  `leaderboard` 跨榜提示、`board_v2` 报告头、`pipeline.scope_note`。
+- `value_residual` 文档串从「七维」改为「产品力维（剔 value、剔 holding_cost）」。
+
+### 结果（v1096 / 同一池 22 款）
+- 产品力榜：极氪7X 登顶，阿维塔07 #2，**Model Y #1→#3**（旧 9 维里保值率 9.5 给它加成）；
+  小鹏G6 #10→#13、宋L EV #13→#16。
+- 未验证徽标：乐道 23%→15%，启源 64%→60%，宋Ultra/岚图/海狮 43%→38%——持有成本
+  14 款插补被剔出分母，徽标不再被它抬高。
+- 主榜总分、名次、名次带不变（主榜仍 10 维全方面）。
+
+### 验收
+- bug 回归 **167/167**（新增 BUG-169）；失败回测 **120/120**；铁律 **10/10**。
+- 新页 `runs/midsuv_bev_202611_v1096/榜单.html`。

@@ -1305,7 +1305,7 @@ def main():
                 nm: round(float(a["rank_mean"]), 1)
                 for nm, a in (_rob.get("per_alt") or {}).items()
                 if a.get("rank_mean") is not None},
-            "scope_note": ("本榜8维衡量产品力而非市场热度：品牌力/超充网络/保值预期/售后覆盖"
+            "scope_note": ("本榜按全部维衡量产品力而非市场热度：品牌力/超充网络/保值预期/售后覆盖"
                            "未单列计分。可能出现产品力排第5但全球销量第一（如Model3）——"
                            "不是算法错也不是市场错，是二者回答的问题不同。算法间高度相关"
                            "只说明共享偏见、不代表结论正确。"),
@@ -1545,7 +1545,7 @@ def main():
                     print(f"[名次带] 覆盖 {len(rb['models'])} 款；带宽≥3 名 "
                           f"{len(_wide)} 款" + ("：" + "、".join(_wide[:6]) if _wide else ""))
                     # v10.74.7：纯产品力榜单独一套（剔除性价比后重归一化），
-                    # 徽标与名次带都按产品力口径，避免拿主榜 10 维百分比冒充 7 维榜。
+                    # 徽标与名次带都按产品力口径，避免拿主榜 10 维百分比冒充产品力 8 维榜。
                     _pp = data_v2.get("product_power_board") or {}
                     if _pp.get("items"):
                         rbp = RB.apply_product(_pp["items"], cands_for_html, cfg_v2)

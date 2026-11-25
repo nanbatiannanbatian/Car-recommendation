@@ -71,11 +71,11 @@ BLOCKS = [
     {"id": "fact_coverage", "title": "事实列覆盖披露", "when": "has_fact_cols",
      "desc": "哪些事实字段有数据、哪些「—」未采集，不以估计值填充"},
     {"id": "main_board", "title": "打分主榜", "when": "always",
-     "desc": "8维加权总分唯一排序；行内事实参考列不计分"},
+     "desc": "加权总分唯一排序（当前 10 维）；行内事实参考列不计分"},
     {"id": "trim_compare", "title": "逐配置对比（下拉）", "when": "has_trim_board",
      "desc": "每车展开看各配置单独算分；标注插补维度，只作同车配置相对对比"},
     {"id": "score_breakdown", "title": "总分构成（维度明细）", "when": "has_dimensions",
-     "desc": "每车8维原始分+权重，让用户看穿总分怎么来的"},
+     "desc": "每车逐维原始分+权重，让用户看穿总分怎么来的"},
     {"id": "tiers", "title": "三档分级", "when": "has_tiers",
      "desc": "能不能买/要不要取舍/现在该不该看——与名次两套逻辑"},
     {"id": "product_power", "title": "纯产品力总榜", "when": "has_product_power",
@@ -729,7 +729,7 @@ def pool_criteria_text(cfg: dict, label: str = "", as_of: str = "") -> str:
 def method_boundary_text() -> list[str]:
     """方法与边界的固定披露文案（两版共用，避免各写一份漂移）。"""
     return [
-        "打分公式：加权分 = Σ(8维原始分 × 权重) × 10 + adjust；adjust 仅来自第三方实测证据且带封顶。",
+        "打分公式：加权分 = Σ(逐维原始分 × 权重) × 10 + adjust；adjust 仅来自第三方实测证据且带封顶。",
         "稳健性：10 种 MCDA × 6 套权重，同档组＝名次区间重叠，换算法/权重会换位；"
         "τ 均值低时不要按逐名排序选车。",
         "三档是「能不能买」、主榜名次是「谁更强」，两套逻辑；证据 C 的名次只说明参数表好看。",

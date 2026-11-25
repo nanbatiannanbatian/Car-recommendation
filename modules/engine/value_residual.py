@@ -23,7 +23,7 @@
 
   v10.73（用户授权）改回「同价位段残差」：先按评分配置价分档，再与本档中位比。
   落地为：
-    · 产品力 pf = 其余七维（剔除 value 自身，避免重复计分）按权重归一的加权分；
+    · 产品力 pf = 其余产品力维（剔除 value 自身与 holding_cost，避免与性价比双计）按权重归一的加权分；
     · 每万元产品力 ppw = pf / 评分配置价（v10.45 根因修复：旧版用 price_guide[0]
       区间最低价，与产品力的评分配置口径错配，Model Y 26.35后驱价配28.85长续航
       产品力 → value 虚高 9.54，note 却写"性价比三车最低"）；
@@ -54,7 +54,7 @@ import paths
 
 HERE = str(paths.ROOT)
 
-# 七维产品力（剔除 value 自身）：与 categories/<category>.json 的 dimensions 同源，
+# 产品力维（剔除 value 自身与 holding_cost）：与 categories/<category>.json 的 dimensions 同源，
 # 缺省值仅用于 selftest / 外部未传权重时；pipeline 必须传 cfg 权重。
 # 产品力（剔除 value 自身；v10.74 起含 reliability，但**不含 holding_cost**——
 # 保值率是持有成本维度，不是产品力；把它塞进 pf 会让同一件事在性价比和持有成本各算一次）
@@ -98,7 +98,7 @@ def price_bin(price: float | None) -> str | None:
 
 
 def product_strength(cand: dict, weights: dict | None = None) -> float | None:
-    """七维产品力（剔除 value 自身）按权重归一加权；缺任一维返回 None 不插补。"""
+    """产品力维（剔除 value 自身与 holding_cost）按权重归一加权；缺任一维返回 None 不插补。"""
     w = _weights(weights)
     # 优先用入池时的原始分快照（pipeline 写入），避免中途规则增量/联网回填让 pf 漂移；
     # 无快照时回退当前 scores（selftest / 外部直调）。

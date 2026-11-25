@@ -182,7 +182,7 @@ def dim_breakdown(r: dict, tb_entry: dict, dims: list) -> str:
     if note:
         parts.append(f"<li style='color:#7b8590'>车系取证：{e(note[:180])}</li>")
     return ("<details style='margin:6px 0'><summary style='cursor:pointer'>"
-            f"展开 {e(r.get('model'))} 的维度子项依据（8 维分怎么来的）</summary>"
+            f"展开 {e(r.get('model'))} 的维度子项依据（{len(dims)} 维分怎么来的）</summary>"
             "<ul style='font-size:12px;line-height:1.7;margin:8px 0 8px 18px'>"
             + "".join(parts) + "</ul></details>") if parts else ""
 
@@ -362,6 +362,12 @@ def render(data, summary, title, as_of):
     except (OSError, ValueError, ImportError):
         _narr = {}
     rows = data.get("main_board", [])
+    # v10.74.8：维数不再写死——拆出可靠性/持有成本后主榜已是 10 维，产品力榜
+    # 是「全部维 − 性价比 − 持有成本」=8 维。旧文案（8 维/七维/9 维）都是旧口径遗留。
+    _n_dim = len(meta.get("dimensions") or []) or 8
+    # v10.74.8：产品力口径 = 全部维 − 性价比 − 持有成本（与 value_residual.PROD_DIMS 同一把尺）。
+    _excl_prod = {"value", "holding_cost"}
+    _n_prod = len([d for d in (meta.get("dimensions") or []) if d.get("key") not in _excl_prod]) or (_n_dim - 2)
     # v10.67.2：多碰撞成绩兜底注入（按 model 从 summary 补回 crash_fusion/crash_secondary），
     # 避免「数据层有全部成绩、列里只有主成绩」的老断点。实现收在 board_view，单测同源。
     try:
@@ -380,7 +386,7 @@ def render(data, summary, title, as_of):
 <div class="kicker">CAR-RECOMMENDATION · 统一榜单引擎 · 数据月 {e(as_of)}</div>
 <h1>{e(title)} <em>可信排行榜</em></h1>
 <div class="meta"><span>候选 <b>{len(rows)}</b> 款</span>
-<span>主榜口径 <b>{e(meta.get('primary', '8维加权打分榜'))}</b></span>
+<span>主榜口径 <b>{e(meta.get('primary', '加权打分榜'))}</b></span>
 <span>生成 <b>{datetime.now().strftime('%Y-%m-%d %H:%M')}</b></span></div>"""
     H = [head]
 
@@ -443,14 +449,14 @@ def render(data, summary, title, as_of):
 
     # ---- lede（注册区块，文案统一在 board_view）
     if "lede" in ids:
-        H.append('<p class="lede">打分主榜是唯一权威名次来源（8 维加权）；事实指标降级为'
+        H.append(f'<p class="lede">打分主榜是唯一权威名次来源（{_n_dim} 维加权）；事实指标降级为'
                  '<b>参考列 · 不计分</b>；纯产品力榜为并列辅助视角，不改主榜名次。</p>'
                  '<div class="rule"><b>三条规则：</b>① 主榜＝打分榜，唯一权威名次；'
                  '② kWh、电耗、电芯、月销等＝参考列，<b>只看不计分</b>；'
                  '③ 「不看价格比产品力」看纯产品力榜（全价位混排时价格越高性价比分天然越低，见下方提示）。</div>'
                  '<div class="rule" style="background:#f0f6f8;border-left-color:#1f6f8b">'
                  '<b>质价比（性价比列）怎么算：</b>每万元买到的产品力 '
-                 '= 七维产品力（剔除价格本身）÷ 该车评分配置指导价，'
+                 f'= {_n_prod} 维产品力（剔除价格与持有成本）÷ 该车评分配置指导价，'
                  '<b>同价位段内比、不跨档比</b>——先按指导价分档（≤15/15-20/20-25/>25 万），'
                  '与<b>本档每万元产品力的中位</b>比：高于档内中位加分、低于扣分（8.0 为中性，'
                  '按偏离幅度平滑给分、极端才封顶 ±1.5）。'
@@ -524,7 +530,7 @@ def render(data, summary, title, as_of):
         H.append('<div class="stability-tip"><b>怎么读这张榜：</b>同档位内各行已用底色分组——'
                  '<b>第二档是「按偏好取舍组」，组内名次会随算法权重变动，请勿严格按数字先后选车</b>，'
                  '结合档位、评价与逐配置对比做决定。' + _tau_txt + '。'
-                 '「唯一名次」只在本榜 8 维规则内成立，不是购车唯一结论。' + _cross_band_txt + '</div>')
+                 '「唯一名次」只在本榜 ' + str(_n_dim) + ' 维规则内成立，不是购车唯一结论。' + _cross_band_txt + '</div>')
         # v10.15.7：智驾低权重原因说明（用户："智驾占比太高，高速差别不大、城区不好用、开一年后城区一般不开"。
         # 调查证实"高装车低使用"，但智驾仍是门槛项，故保留非零权重。只在智驾权重≤10%的榜显示，
         # 避免污染跨能源榜(能源中性 13.5%)。权重从 meta.dimensions 动态读取，不写死 8%；
@@ -964,7 +970,7 @@ document.addEventListener('change',function(ev){
                 _g = _tcb.get(m)
                 if _g and _g != _tcn[k]:
                     _nm += ('<span class="xboard-tier" title="档位按本榜候选池判定，'
-                            '跨榜不可直接比较；跨榜请直接比较总分与八维分">'
+                            '跨榜不可直接比较；跨榜请直接比较总分与逐维分">'
                             + f"全榜{e(_g)}</span>")
                 # v9.7.52：强推荐名单复用主表循环前已收集的 _strong/_strong_reason
                 if k == "T2" and m in _strong:
@@ -978,7 +984,7 @@ document.addEventListener('change',function(ev){
         H.append("</div>")
         H.append('<div class="rule"><b>跨榜档位口径：</b>上面的「家族命中 / 进前三」'
                  '按本榜候选池判定，不是绝对分数线；同一台车在不同价位榜可能档位不同，'
-                 '跨榜请直接比总分与八维分。</div>')
+                 '跨榜请直接比总分与逐维分。</div>')
         if _strong:
             H.append('<div class="rule"><b>强推荐说明（与第一档共同构成"可优先看"清单）：</b>'
                      '第二档带「强推荐」的车，有权威碰撞实锤、总分高、无硬风险——'
@@ -997,20 +1003,21 @@ document.addEventListener('change',function(ev){
 
     # ---- 纯产品力总榜
     if "product_power" in ids:
-        H.append("<h2>纯产品力总榜 <span>辅助榜 · 剔除性价比、全池混排 · 不改主榜任何名次</span></h2>")
-        H.append('<div class="rule">主榜（8 维含性价比）仍是唯一权威排序；本榜只回答「不看价格谁的产品力更强」。'
-                 '<b>与性价比的关系</b>：产品力更强但价格拖累 → 标「被性价比拖累」；靠价格优势上位 → 标「靠性价比抬升」。</div>')
+        H.append("<h2>纯产品力总榜 <span>辅助榜 · 剔除性价比与持有成本 · 全池混排 · 不改主榜任何名次</span></h2>")
+        H.append(f'<div class="rule">主榜（{_n_dim} 维含性价比）仍是唯一权威排序；本榜只回答「不看价格谁的产品力更强」。'
+                 '<b>与性价比的关系</b>：产品力更强但价格拖累 → 标「被性价比拖累」；靠价格优势上位 → 标「靠性价比抬升」。'
+                 f'本榜剔除两类「钱」的维度：性价比（value）与持有成本（三年保值率），只留 {_n_prod} 维产品能力——'
+                 '否则保值率高的车会在「产品强不强」上白拿一分，同一件事还会和性价比各算一次。</div>')
         tbpp = meta.get("trim_board") or {}
-        # v10.74.6：产品力口径的未验证权重（剔除性价比后重归一化）——主榜徽标含性价比，
-        # 这里必须换分母，否则「产品力 7 维」的榜挂着含 value 的 38%，两套口径打架。
+        # v10.74.6/8：产品力口径的未验证权重（剔除 value + 持有成本后重归一化）——
+        # 主榜徽标按全部维算，这里必须换分母，否则两个「产品力」口径打架。
         _wp = {d.get("key"): float(d.get("weight") or 0) for d in (meta.get("dimensions") or [])}
-        _pw_keys = [k for k in _wp if k != "value"]
+        _pw_keys = [k for k in _wp if k not in _excl_prod]
         _pw_sum = sum(_wp[k] for k in _pw_keys) or 1.0
         H.append('<div class="rule">车名后的「未验证 x%」是本榜口径：产品力只算'
-                 f'<b>{len(_pw_keys)} 维</b>（剔除性价比后重归一化），x% 表示这几维里有多少权重来自插补；'
-                 '≤20% 灰、≥20% 红。主榜的徽标按含性价比的 10 维算，两个数字不同是分母不同，不是矛盾。'
-                 '名次带在打分主榜看（本榜只回答「不看价格谁更强」）。</div>')
-        H.append('<div class="rule">下拉框切换配置后，本榜产品力分（剔除性价比的 7 维）实时重算并重排；'
+                 f'<b>{len(_pw_keys)} 维</b>（剔除性价比与持有成本后重归一化），x% 表示这几维里有多少权重来自插补；'
+                 f'≤20% 灰、≥20% 红。主榜的徽标按含全部 {_n_dim} 维算，两个数字不同是分母不同，不是矛盾。</div>')
+        H.append(f'<div class="rule">下拉框切换配置后，本榜产品力分（剔除性价比与持有成本的 {_n_prod} 维）实时重算并重排；'
                  '与主榜/总分构成联动。标签按主榜当前名次实时重算，鼠标悬停可看原始数字。</div>')
         H.append('<table id="powerBoard"><thead><tr><th>#</th><th>车型</th><th>产品力分</th>'
                  '<th>主榜名次</th><th>与性价比的关系</th><th>价格</th></tr></thead><tbody>')
@@ -1371,7 +1378,7 @@ def selftest():
     """契约自检：注册表必要区块一个不少；多段数据下两版渲染器展示同一组区块。"""
     from modules.board import board_view as BV
     data = {
-        "meta": {"title": "T", "primary": "8维加权打分榜", "fact_cols_scored": False,
+        "meta": {"title": "T", "primary": "加权打分榜", "fact_cols_scored": False,
                  "dimensions": [{"key": "powertrain", "label": "三电", "weight": .6},
                                 {"key": "value", "label": "性价比", "weight": .4}],
                  "fact_reference_columns": [{"key": "price", "label": "指导价"},

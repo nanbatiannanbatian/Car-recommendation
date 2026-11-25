@@ -189,6 +189,7 @@ CASES = [
     ("BUG-166", "维度格子看不出是插补分:22款10维里86个格是无证据插补,页面上和实测分长得一模一样→总分构成逐格虚线下划线+≈上标,悬停写「插补分≠实测」与锚点,hover口径与名次带同源", "v10.74.5"),
     ("BUG-167", "插补标记只做了主榜总分构成:纯产品力榜沿用含性价比的10维百分比(分母口径不符)、逐配置表只有「插补N维」不说缺哪维、report.md完全看不出来→产品力按7维重归一化+逐配置悬停列缺维并区分配置级/车系级+报告新增十维分明细表(≈同源)", "v10.74.6"),
     ("BUG-168", "产品力榜没有名次带+逐配置要悬停才知道插补:产品力名次同样是插补值运气,却只给整数;#6/#7差0.1无人知道→apply_product单独做7维蒙特卡洛(权重重归一化)+产品力名次带P25–P75+折叠标题直接点名「车系级插补N维」", "v10.74.7"),
+    ("BUG-169", "产品力口径混进了「钱」的维度:拆维后产品力总榜只剔性价比得9维(含holding_cost),与「持有成本不进产品力」及性价比pf的8维(PROD_DIMS)自相矛盾,保值率高的车在「产品强不强」白拿分→产品力统一8维(剔value+holding_cost),总榜/名次带/徽标/逐配置power_score同一把尺,文案不再写死7/8/9维", "v10.74.8"),
 ]
 
 
@@ -5822,6 +5823,49 @@ def t168():
             "逐配置标题点名插补维")
 
 
+def t169():
+    """BUG-169：产品力口径混进「钱」的维度（v10.74.8）。
+
+    用户问「产品力榜是不是要 9 维」暴露：拆出可靠性/持有成本后，总榜只剔了
+    性价比，算出 9 维（含 holding_cost），与 v10.74.0「持有成本不进产品力」、
+    以及性价比 pf 一直用的 8 维（value_residual.PROD_DIMS）自相矛盾。后果是
+    保值率高的车在「产品强不强」上白拿一分，同一件事在性价比和持有成本各算一次。
+    修法：产品力口径 = 全部维 − 性价比 − 持有成本（当前 8 维），总榜 / 名次带 /
+    徽标 / 逐配置 power_score 全部同一把尺；页面与报告不再写死 7/8/9 维。
+    锁死：①总榜键集与 PROD_DIMS 完全一致；②v1096 规则写 8 维并点名持有成本；
+    ③乐道产品力徽标 15%（旧 9 维口径 23%）、Model Y 掉到第 3；④页面无 9 维口径。
+    """
+    import json as _j
+    from modules.engine.value_residual import PROD_DIMS
+    cfg = _j.load(open(str(paths.cat("car_midsuv_bev.json")), encoding="utf-8"))
+    dims = [d["key"] for d in cfg["dimensions"]]
+    prod = [k for k in dims if k not in ("value", "holding_cost")]
+    assert len(prod) == len(PROD_DIMS) == 8, f"产品力应 8 维，实际 {len(prod)}/{len(PROD_DIMS)}"
+    assert set(prod) == set(PROD_DIMS), f"总榜与性价比 pf 维度不一致: {set(prod)^set(PROD_DIMS)}"
+    src = _read("modules/board/board_v2.py")
+    assert "exclude_holding_cost" in src and '"holding_cost"' in src, \
+        "product_power_board 未剔除持有成本"
+    s = _j.load(open(os.path.join(HERE, "runs", "midsuv_bev_202611_v1096",
+                                  "summary.json"), encoding="utf-8"))
+    rbp = (s.get("rank_band_product") or {}).get("models") or {}
+    assert len(rbp) == 22, f"产品力名次带应覆盖 22 款，实际 {len(rbp)}"
+    ld = float((rbp.get("乐道L60") or {}).get("imputed_weight") or 0)
+    assert abs(ld - 0.15) < 0.02, f"乐道产品力徽标应≈15%（8 维口径），实际 {ld:.2%}"
+    qy = float((rbp.get("长安启源Q06") or {}).get("imputed_weight") or 0)
+    assert abs(qy - 0.60) < 0.03, f"启源产品力徽标应≈60%，实际 {qy:.2%}"
+    assert (rbp.get("特斯拉 Model Y") or {}).get("p50") == 3, \
+        "剔掉保值率后 Model Y 产品力应掉到第 3（旧 9 维口径是第 1）"
+    html = open(os.path.join(HERE, "runs", "midsuv_bev_202611_v1096", "榜单.html"),
+                encoding="utf-8").read()
+    assert "只留 8 维产品能力" in html, "产品力榜未写明 8 维口径"
+    assert "持有成本（三年保值率）" in html, "产品力榜未点名剔除持有成本"
+    assert "产品力只算<b>8 维</b>" in html, "徽标分母未写 8 维"
+    assert "10 维加权" in html, "主榜口径未写 10 维"
+    assert "产品力只算<b>9 维</b>" not in html and "剔除性价比的 7 维" not in html, \
+        "页面仍有旧维数文案"
+    return "产品力 8 维（剔 value+holding_cost）与性价比 pf 同尺，乐道 15%/启源 60%"
+
+
 def t167():
     """BUG-167：插补标记只做了主榜总分构成（v10.74.6）。
 
@@ -6465,7 +6509,7 @@ def t146():
 
 
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120, t121, t122, t123, t124, t125, t126, t127, t128, t129, t130, t131, t132, t133, t134, t135, t136, t137, t138, t139, t140, t141, t142, t143, t144, t145, t146, t147, t148, t149, t150, t151, t152, t153, t154, t155, t156, t157, t158, t159, t160, t161, t162, t163, t164, t165, t166, t167, t168]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120, t121, t122, t123, t124, t125, t126, t127, t128, t129, t130, t131, t132, t133, t134, t135, t136, t137, t138, t139, t140, t141, t142, t143, t144, t145, t146, t147, t148, t149, t150, t151, t152, t153, t154, t155, t156, t157, t158, t159, t160, t161, t162, t163, t164, t165, t166, t167, t168, t169]
 
 
 def run():

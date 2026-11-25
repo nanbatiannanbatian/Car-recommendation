@@ -6,7 +6,7 @@
 旧链路里「事实榜」(kWh/万元、电耗单独排序) 和「打分榜」是两套并列产物，用户容易混。
 v2 把它们收敛成一套：
 
-  1. 主榜 = 打分榜（8 维加权），这是唯一权威名次来源。
+  1. 主榜 = 打分榜（全部维度加权，当前 10 维），这是唯一权威名次来源。
   2. 事实指标（kWh、kWh/万元、电耗、续航、电芯、800V、销量）作为「参考列」贴在主榜每行，
      明确标注「参考·不计分」——它们帮助理解，但绝不参与加权。
   3. 价位段子榜 = 把同一份主榜分数按预算分组的展示视图。它复用主榜分数，
@@ -32,9 +32,10 @@ v2 把它们收敛成一套：
 
 纯产品力总榜（v8.3.3，并列辅助榜）
 ------------------------------------
-`product_power_board()`：剔除性价比维度（value），其余 7 维按原权重归一化×10，
+`product_power_board()`：剔除性价比（value）与持有成本（holding_cost）两类「钱」的维度，
+其余产品力维按原权重归一化×10（当前 8 维，与 value_residual.PROD_DIMS 同一把尺），
 全池混排、不分价位段（目的正是跨价位直接比产品力）。回答「不看价格谁的产品力更强」。
-纪律：这是【辅助榜】，与主榜并列展示，主榜（8维含性价比）仍是唯一权威排序，
+纪律：这是【辅助榜】，与主榜并列展示，主榜（全维含性价比）仍是唯一权威排序，
 本榜绝不改动主榜任何名次；两榜各自的分数、名次、口径都分开标注，避免混淆。
 rank_delta = 主榜名次 - 产品力名次；正数=剔除性价比后名次上升（性价比拖累了它），
 负数=剔除性价比后名次下降（它靠性价比抬升了主榜名次）。
@@ -360,17 +361,27 @@ def segmented_summary(rows: list[dict], cands: list[dict], policy: dict,
 # ---------------------------------------------------------------- 纯产品力总榜（并列辅助榜）
 def product_power_board(rows: list[dict], cands: list[dict], cfg: dict,
                         policy: dict | None = None) -> dict:
-    """纯产品力总榜：剔除性价比(value)，其余7维按原权重归一化×10，全池混排。
+    """纯产品力总榜：剔除性价比(value)，其余各维按原权重归一化×10，全池混排。
 
+    v10.74.8：维数跟随品类配置（当前 10 维剔 value + holding_cost → 8 维）。旧注释写「7 维」
+    是 8 维时代的遗留——拆出可靠性/持有成本后没跟着改；只剔 value 得 9 维又会把保值率
+    算进「产品强不强」，与「持有成本不进产品力」的既定口径矛盾，本版一并修正。
     - 与主榜并列的【辅助榜】，回答「不看价格谁的产品力更强」。
-    - 纪律：主榜（8维含性价比）仍是唯一权威排序；本榜不改主榜任何名次、分数、权重。
+    - 纪律：主榜（全维含性价比）仍是唯一权威排序；本榜不改主榜任何名次、分数、权重。
     - 全池混排、不分价位段——因为目的正是跨价位直接比产品力。
     - rank_delta = 主榜名次 - 产品力名次；正=剔除性价比后名次上升，负=靠性价比抬升。
     """
     W = {d["key"]: d["weight"] for d in cfg["dimensions"]}
     pb_cfg = (policy or {}).get("product_board", {})
     value_key = pb_cfg.get("excluded_dimension", "value")
-    keys = [k for k in W if k != value_key]
+    # v10.74.8：产品力口径要剔除「性价比」和「持有成本」两类**钱**的维度。
+    # 只剔 value 会算出 9 维，等于把三年保值率算进「产品强不强」——与 v10.74.0
+    # 定的「持有成本不进产品力 pf、避免和性价比双计」自相矛盾；而性价比列的 pf
+    # 一直是 8 维（value_residual.PROD_DIMS），两个「产品力」必须是同一把尺。
+    excl = set(pb_cfg.get("excluded_dimensions") or [value_key])
+    if pb_cfg.get("exclude_holding_cost", True) and "holding_cost" in W:
+        excl.add("holding_cost")
+    keys = [k for k in W if k not in excl]
     tw = sum(W[k] for k in keys)
     if tw <= 0:
         raise RuntimeError("产品力维度权重合计为0，无法归一化")
@@ -405,7 +416,9 @@ def product_power_board(rows: list[dict], cands: list[dict], cfg: dict,
         it["rank_delta"] = (it["main_rank"] - i) if it["main_rank"] is not None else None
     return {
         "excluded_dimension": value_key,
-        "note": "辅助榜：剔除性价比/7维归一化×10/全池混排；主榜8维全方面仍是唯一权威排序",
+        "excluded_dimensions": sorted(excl),
+        "note": (f"辅助榜：剔除{'、'.join(sorted(excl))}/{len(keys)}维归一化×10/全池混排；"
+                 f"主榜{len(W)}维全方面仍是唯一权威排序"),
         "n": len(items),
         "items": items,
     }
@@ -583,7 +596,7 @@ def build(cands: list[dict], cfg: dict, policy: dict,
     return {
         "meta": {
             "title": policy.get("title", "统一榜单"),
-            "primary": "8维加权打分榜（唯一权威名次）",
+            "primary": f"{len(cfg.get('dimensions') or [])}维加权打分榜（唯一权威名次）",
             "fact_cols_scored": False,
             "band_reuses_score": True,
             "n": len(rows),
@@ -727,7 +740,7 @@ def render_md(data: dict, summary: dict | None = None) -> str:
     L = [f"# {meta.get('title', '统一榜单')}", ""]
 
     if "lede" in ids:
-        L += ["> 名次来源：**8维加权打分榜（唯一主榜）**。kWh/万元、电耗等为『参考·不计分』列；"
+        L += [f"> 名次来源：**{len(meta.get('dimensions') or [])}维加权打分榜（唯一主榜）**。kWh/万元、电耗等为『参考·不计分』列；"
               "纯产品力榜为并列辅助视角，不改主榜名次。", ""]
 
     if "fact_coverage" in ids:

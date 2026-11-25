@@ -129,13 +129,16 @@ def apply_all(rows, cands, cfg, n_draws: int = N_DRAWS, seed: int = SEED) -> dic
     }
 
 
-def apply_product(items, cands, cfg, n_draws: int = N_DRAWS, seed: int = SEED) -> dict:
-    """v10.74.7：纯产品力榜的名次带 + 未验证权重（分母＝剔除性价比后重归一化）。
+def apply_product(items, cands, cfg, n_draws: int = N_DRAWS, seed: int = SEED,
+                  exclude=("value", "holding_cost")) -> dict:
+    """v10.74.7：纯产品力榜的名次带 + 未验证权重（分母＝产品力口径重归一化）。
 
-    产品力榜只算非 value 维，若套主榜的 10 维徽标就是两套口径；
-    这里用同一套蒙特卡洛，但只对产品力维抽样，输出与页面产品力榜同源。
+    v10.74.8：产品力口径 = 全部维 − 性价比 − 持有成本（与 value_residual.PROD_DIMS
+    的 8 维同一把尺）。旧实现只剔 value 得 9 维，把保值率算进「产品强不强」，
+    与 v10.74.0「持有成本不进产品力」的既定口径矛盾。
     """
-    prod_dims = [d for d in (cfg.get("dimensions") or []) if d.get("key") != "value"]
+    prod_dims = [d for d in (cfg.get("dimensions") or [])
+                 if d.get("key") not in set(exclude)]
     if not prod_dims or not items:
         return {"models": {}, "note": "无产品力榜"}
     cands_by_model = {c.get("model"): c for c in (cands or [])}
@@ -155,7 +158,7 @@ def apply_product(items, cands, cfg, n_draws: int = N_DRAWS, seed: int = SEED) -
         it["rank_band_p10p90"] = [v.get("p10"), v.get("p90")]
         it["imputed_weight"] = v.get("imputed_weight", 0)
         it["rank_band_note"] = v.get("note") or ""
-    res["note"] = ("产品力榜名次带（剔除性价比的 %d 维）；徽标分母同口径重归一化。"
+    res["note"] = ("产品力榜名次带（剔除性价比与持有成本后的 %d 维）；徽标分母同口径重归一化。"
                    % len(prod_dims))
     return res
 

@@ -1381,7 +1381,7 @@ def tier_report(cands: list[dict], cfg: dict, weights: list[float] | None = None
     L.append("")
     L.append("> **跨榜档位口径**：上表「家族命中 / 进前三」以**本榜候选池**为范围，"
              "不是绝对分数线。同一款车在不同价位榜里因对手集合变化而档位不同，"
-             "属正常现象、不代表数据矛盾；档位只在本榜内可比，跨榜请直接看总分与八维分。")
+             "属正常现象、不代表数据矛盾；档位只在本榜内可比，跨榜请直接看总分与逐维分。")
     L.append("")
 
     def _line(r, tier_cn=None):

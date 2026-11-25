@@ -411,7 +411,7 @@ def annotate_all(cands: list[dict], cfg: dict) -> dict:
             # v10.17.0：逐配置 value 与车系级同口径——用价格残差法重算，杜绝
             # 「车系级 value 已被 value_residual 改成残差分，逐配置却仍按 kWh/万元
             # 加 delta，再被 with_config_scores 覆盖回去」的口径分叉（曾致宋Ultra
-            # 跨榜 value 9.5 vs 8.6）。配置价 t.price、产品力用本配置七维（剔 value）。
+            # 跨榜 value 9.5 vs 8.6）。配置价 t.price、产品力用本配置剔除 value 与 holding_cost 后的维。
             _vinfo = c.get("value_residual") or {}
             _bmean = _vinfo.get("bin_mean_ppw")
             if isinstance(_bmean, (int, float)) and t.get("price") and t["price"] > 0:
@@ -433,8 +433,10 @@ def annotate_all(cands: list[dict], cfg: dict) -> dict:
             # 不污染每个配置的置信度。只有基准完全无法解析（ref=None）才降置信。
             if ref is None:
                 conf = "low"
-            # 产品力分：剔除 value 的 7 维按原权重归一化×10（与 product_power_board 同口径）
-            pp_keys = [k for k in Wc if k != "value"]
+            # 产品力分：剔除 value + holding_cost 后的产品力维按原权重归一化×10
+            # （v10.74.8：与 product_power_board、value_residual.PROD_DIMS 同一把尺）
+            _pp_excl = {"value", "holding_cost"}
+            pp_keys = [k for k in Wc if k not in _pp_excl]
             pp_tw = sum(Wc[k] for k in pp_keys)
             pp_score = round(sum(sc.get(k, 0) * Wc[k] for k in pp_keys) / pp_tw * 10, 2) if pp_tw else None
             trims.append({
