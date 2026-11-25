@@ -78,6 +78,61 @@ def check(cands, table=None):
                "source": c.get("safety_score_source") or ""}
         (auto_mapped if rec["source"] else unmapped).append(rec)
 
+    # A3（v10.71 根因修复）：有"星级"但无得分率的车，分数不得高于
+    # 池内"有得分率且按公式可复算"车的中位 +0.3。
+    # 2026-11-24 事故：尚界H5 crash 只写"C-NCAP五星"（无得分率），
+    # 手工 safety 拍到封顶 9.3，恰好压过第1名 0.2 分；而同池有得分率的车
+    # 92.7%→9.0、91.2%→9.0、93.5%→9.2，只有 95%→9.3 才到封顶。
+    # A 分支只查表内车、A2 只报缺口，导致这类"无得分率却满分"无人拦。
+    # 注意：不自动改分（尊重"分数等人定"的历史决定），只把异常暴露成门禁 issue。
+    from modules.engine import crash_systems as _CS3
+    pct_mapped = []   # 有得分率的车的公式映射分
+    star_only = []    # 只有星级无得分率的车
+    for c in cands:
+        parsed = _CS3.parse_score(c.get("crash"))
+        if not parsed:
+            continue
+        actual = (c.get("scores") or {}).get("safety")
+        if actual is None:
+            continue
+        if parsed.get("score") is not None:
+            spec = (table.get("systems") or {}).get(parsed.get("system_cn"), {}).get("map_spec")
+            if spec:
+                try:
+                    want, _ = score_from_crash(spec, parsed)
+                    if want is not None:
+                        pct_mapped.append(float(want))
+                except Exception:
+                    pass
+        else:
+            # 只有星级/等级无得分率：先看 safety 是否等于该体系的公式映射分。
+            # 若相等，说明是 apply_auto_scores 按官方等级规则给的（如 C-IASI G→9.0），
+            # 属于有据分，不放行检查；只有"手工拍分≠公式分"才需核验。
+            spec = (table.get("systems") or {}).get(parsed.get("system_cn"), {}).get("map_spec")
+            formula = None
+            if spec:
+                try:
+                    formula, _ = score_from_crash(spec, parsed)
+                except Exception:
+                    pass
+            if formula is not None and abs(float(actual) - float(formula)) <= 0.05:
+                continue  # 按官方规则映射，有据
+            star_only.append((c.get("model"), float(actual), parsed.get("display") or "",
+                              formula))
+    if pct_mapped and star_only:
+        ceiling = round(statistics.median(pct_mapped) + 0.3, 1)
+        for model, actual, disp, formula in star_only:
+            if actual > ceiling:
+                issues.append({
+                    "type": "star_only_overcap", "model": model,
+                    "actual": actual, "expected": f"≤{ceiling}",
+                    "fix": (f"{model} 的碰撞记录只有星级/等级({disp})无得分率，"
+                            f"safety={actual} 非官方公式映射"
+                            f"（{formula if formula is not None else '无公式'}），"
+                            f"且高于有得分率车映射中位+0.3={ceiling}；"
+                            "补齐 crash 的官方得分率并按 map_spec 复算，或下调分数"),
+                })
+
     # C. 表内分数必须等于公式复算（口径统一）。
     # 2026-11-21 用户选 A 方案：表里 8 条人工分与同一公式算出来的不一致
     # （90.8%→8.9 / 90.6%→8.5 / 91.3%→9.1，公式应是 8.7/8.6/8.8），

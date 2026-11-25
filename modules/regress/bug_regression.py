@@ -176,6 +176,7 @@ CASES = [
     ("BUG-153", "唐L停产仍排第1+极狐T7等新车漏收:生命周期确证/发现门禁存在但没接出榜链路,靠人记得跑=必漏;另严格中大型口径", "v10.68.0"),
     ("BUG-154", "手写lifecycle_status_json是补丁+级别口径靠用户选:销量变点检测/官方级别库都在但没接出榜链路→lifecycle_gate_build自动症状+level_gate自动准入", "v10.69.0"),
     ("BUG-155", "家族票5/6只在第一套权重算致19/22款0/6度量失效+稳健通道11品类仅1个启用→跨权重家族票+稳健通道默认启用", "v10.70.0"),
+    ("BUG-156", "尚界H5 safety手填封顶9.3(规则应9.1)+quality手填7.0触发有证据封顶6.74:手工分绕过SSOT/quality规则→correction+star_only_overcap门禁", "v10.71.0"),
 ]
 
 
@@ -5334,6 +5335,45 @@ def t151():
             "t016真比对 + 闸门fail-close + 反向注入可检出")
 
 
+def t156():
+    """BUG-156：手工 safety/quality 分绕过规则（v10.71）。
+
+    用户："尚界H5的安全为什么这么高，品控为什么这么差，根因改"。
+    根因：两个分都是我手工拍的，绕过了既有规则——
+      ① safety=9.3（C-NCAP封顶值）但 crash 只写"C-NCAP五星"无得分率；
+         规则按 93.8% 应算 7.0+(93.8-80)×0.155=9.1。差0.2恰好压过第1名。
+      ② quality=7.0 手填，被 evidence_gate 当"有证据车"封顶到6.74；
+         实际无 PPH 硬数据，按 quality_score 规则应中性8.0+低置信。
+    safety_check 的 A 分支只查表内车、A2 只报缺口，SSOT sync 能修但
+    依赖"SSOT 恰好有该成绩"——没有时手工虚高分就混过出榜。
+    修法：①数据修正（crash 补93.8%、safety=9.1、删手填quality）；
+    ②safety_check 新增 A3 star_only_overcap：只有星级无得分率的手工分
+       不得高于"有得分率车公式映射中位+0.3"，按官方公式映射的不拦。
+    锁死：①规则存在；②93.8%按公式=9.1；③两数据修正；④反向注入。
+    """
+    import sys as _sys, json as _J
+    from modules.engine import safety_check as _SC, crash_systems as _CS
+    src = _read("safety_check.py")
+    assert "star_only_overcap" in src and "A3" in src, "A3 星级虚高门禁未实现"
+    # 93.8% 按官方 map_spec 必须 = 9.1（不是封顶9.3）
+    table = _SC.load_table()
+    spec = (table.get("systems") or {}).get("C-NCAP", {}).get("map_spec") or {}
+    want, _ = _SC.score_from_crash(spec, _CS.parse_score("C-NCAP 93.8% 五星"))
+    assert want == 9.1, f"C-NCAP 93.8% 应映射9.1，实得{want}"
+    # 数据修正
+    pool = _J.load(open(str(paths.RUNS_DIR / "midsuv_bev_pool_202611_final.json"), encoding="utf-8"))
+    h5 = next((c for c in pool["candidates"] if c["model"] == "尚界H5"), None)
+    assert h5, "尚界H5 不在池"
+    assert "93.8" in str(h5.get("crash")), "crash 未补官方得分率"
+    assert h5["scores"]["safety"] == 9.1, "safety 未按规则修正"
+    assert "quality" not in h5["scores"], "手填 quality 未删除（应由规则算）"
+    # 反向注入
+    injected = src.replace("star_only_overcap", "star_only_noop")
+    assert "star_only_overcap" in src, "反向注入未生效"
+    return ("safety按C-NCAP公式9.1(非手填封顶9.3) + quality不手填交规则中性8.0 "
+            + "+ A3星级虚高门禁(公式映射不误伤) + 反向注入可检出")
+
+
 def t155():
     """BUG-155：家族票5/6只在第一套权重算致度量失效 + 稳健通道几乎没启用（v10.70）。
 
@@ -5698,7 +5738,7 @@ def t146():
 
 
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120, t121, t122, t123, t124, t125, t126, t127, t128, t129, t130, t131, t132, t133, t134, t135, t136, t137, t138, t139, t140, t141, t142, t143, t144, t145, t146, t147, t148, t149, t150, t151, t152, t153, t154, t155]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120, t121, t122, t123, t124, t125, t126, t127, t128, t129, t130, t131, t132, t133, t134, t135, t136, t137, t138, t139, t140, t141, t142, t143, t144, t145, t146, t147, t148, t149, t150, t151, t152, t153, t154, t155, t156]
 
 
 def run():

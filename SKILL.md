@@ -13,7 +13,7 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 10.70.0
+version: 10.71.0
 author: "nanbatiannanbatian"
 ---
 
@@ -263,6 +263,18 @@ HTML/报告用 `--as-of <YYYYMM>` 标注事实列数据月，禁止停在"—"�
 - 已核验的领域快照（如 `runs/midsedan_bev_1218_202610/candidates_allprice.json` 25款）可作候选，**分数一律复用其中已核验的 `scores`**，不许用 Agent 补采分顶替。
 - "销量榜 Top" ≠ 候选全集：只能做候选发现器，绝不直接当入池名单（会系统性漏车）。
 - 用 `runs/` 下无指纹快照必须 `--force-stale`，并在报告显著标注"过期/强制出榜"。
+
+**①a-2 安全/质量分不许手填绕过规则（v10.71，用户"尚界H5安全为什么这么高/品控为什么这么差"）**
+- **安全分按官方映射**：有 C-NCAP/C-IASI 成绩的 safety 必须按 `safety_scores.json` 的
+  map_spec 复算（C-NCAP 93.8%→9.1，不是手填封顶9.3）；`safety_check` 新增 A3
+  `star_only_overcap`：只有星级无得分率的手工分不得高于"有得分率车公式映射中位+0.3"，
+  按官方公式映射的车不误伤。SSOT 会自动覆盖 crash/safety，但依赖"SSOT 恰好有该成绩"，
+  A3 是缺成绩时的兜底。
+- **质量分不手填**：无 PPH 硬数据的车不手填 quality，交给 `quality_score` 按
+  "无数据=中性8.0+低置信"算；手填会被 evidence_gate 误当"有证据车"封顶到中位6.74，
+  造成"品控差"的假象。
+- 已知边界（非本版引入）：无数据车8.0 > 有投诉数据车7.8，是 quality_score v10.16.2
+  的既有设计（防"有数据者被罚、无数据者中性"的不对称），口径变更须用户拍板。
 
 **①a-1 稳健第一档口径（v10.70，用户"5/6是不是太高"）**
 - **跨权重家族票**：第一档判据的"独立算法家族命中"改用 `family_hits_all`——
