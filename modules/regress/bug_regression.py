@@ -190,6 +190,7 @@ CASES = [
     ("BUG-167", "插补标记只做了主榜总分构成:纯产品力榜沿用含性价比的10维百分比(分母口径不符)、逐配置表只有「插补N维」不说缺哪维、report.md完全看不出来→产品力按7维重归一化+逐配置悬停列缺维并区分配置级/车系级+报告新增十维分明细表(≈同源)", "v10.74.6"),
     ("BUG-168", "产品力榜没有名次带+逐配置要悬停才知道插补:产品力名次同样是插补值运气,却只给整数;#6/#7差0.1无人知道→apply_product单独做7维蒙特卡洛(权重重归一化)+产品力名次带P25–P75+折叠标题直接点名「车系级插补N维」", "v10.74.7"),
     ("BUG-169", "产品力口径混进了「钱」的维度:拆维后产品力总榜只剔性价比得9维(含holding_cost),与「持有成本不进产品力」及性价比pf的8维(PROD_DIMS)自相矛盾,保值率高的车在「产品强不强」白拿分→产品力统一8维(剔value+holding_cost),总榜/名次带/徽标/逐配置power_score同一把尺,文案不再写死7/8/9维", "v10.74.8"),
+    ("BUG-170", "查排行榜没有统一入口:每次问某车卖得怎样/某价位有哪些车都要重新联网翻四张销量榜,慢且不可复现,月份还可能拿错(接口对未发布月份静默回退)→新增 sales_index 全车型索引(最近已发布月×车型×能源类型),缓存优先、核对 months 元信息、过期月自动删", "v10.74.9"),
 ]
 
 
@@ -5866,6 +5867,88 @@ def t169():
     return "产品力 8 维（剔 value+holding_cost）与性价比 pf 同尺，乐道 15%/启源 60%"
 
 
+def t170():
+    """BUG-170：查排行榜没有统一入口（v10.74.9）。
+
+    用户要求：「生成一份最近月份有销量榜的所有车型以及能源类型信息，以后问排行榜
+    先找这个表；每次先找到最近出销量的月份，有缓存直接查，没有就抓取缓存，过期删除。」
+    修法：`modules/board/sales_index.py` 每月一份 `data/gen/sales_index/<YYYYMM>.json`
+    （666 款×能源类型）+ `index.json`；命中缓存不联网；只保留最近 3 个月。
+    锁死：①能源判定优先级（榜单口径 > 候选池标注 > 未细分）；②目标月未发布必须报错，
+    不能把接口回退到的旧月当新月缓存；③prune 只留最近 3 个月；④离线命中缓存。
+    """
+    import json as _j
+    import shutil
+    import tempfile
+    from modules.board import sales_index as S
+    from modules.research import fetch_dcd_sales as D
+
+    fake = {
+        "1": [{"series_id": 1, "series_name": "星愿", "brand": "吉利银河", "sales": 50000,
+               "rank": 1, "min_price": 6.18, "max_price": 9.18},
+              {"series_id": 2, "series_name": "元UP", "brand": "比亚迪", "sales": 28514,
+               "rank": 2, "min_price": 6.68, "max_price": 9.98}],
+        "2": [{"series_id": 3, "series_name": "宋Pro DM", "brand": "比亚迪", "sales": 20000,
+               "rank": 1, "min_price": 10.0, "max_price": 14.0}],
+        "3": [{"series_id": 4, "series_name": "小米澎程N70", "brand": "小米汽车", "sales": 14545,
+               "rank": 1, "min_price": 15.0, "max_price": 18.0}],
+        "all": [{"series_id": 5, "series_name": "轩逸", "brand": "东风日产", "sales": 30000,
+                 "rank": 3, "min_price": 9.0, "max_price": 13.0}],
+    }
+    orig = D.fetch_all
+    tmp = tempfile.mkdtemp(prefix="salesidx_")
+    orig_dir = S.CACHE_DIR
+    try:
+        D.fetch_all = lambda month, ne, hard_limit=1200: (
+            fake.get(ne or "all") or [], [{"month": 202601}, {"month": 202512}])
+        d = S.build_month(202601, verbose=False)
+        assert len(d["models"]) == 5, f"应 5 款，实际 {len(d['models'])}"
+        by = {m["name"]: m for m in d["models"]}
+        assert by["星愿"]["energy"] == "BEV" and by["星愿"]["sales_bev"] == 50000
+        assert by["宋Pro DM"]["energy"] == "PHEV"
+        assert by["小米澎程N70"]["energy"] == "EREV"
+        assert by["轩逸"]["energy"] == "FUEL_OR_HEV", "只在全部榜且池里没有 → 必须标未细分不硬猜"
+        assert "未细分" in by["轩逸"]["energy_label"]
+        # ② 目标月未发布：接口回退到 202512，必须报错而不是缓存错月
+        D.fetch_all = lambda month, ne, hard_limit=1200: (
+            fake.get(ne or "all") or [], [{"month": 202512}])
+        try:
+            S.build_month(202602, verbose=False)
+        except S.SalesIndexError as e:
+            assert "未发布" in str(e) or "尚未发布" in str(e), f"错误信息应点名未发布：{e}"
+        else:
+            raise AssertionError("目标月未发布时 build_month 必须抛错")
+        # ③ 过期清理：只留最近 3 个月
+        D.fetch_all = orig
+        S.CACHE_DIR = __import__("pathlib").Path(tmp)
+        for ym in (202507, 202508, 202601, 202602):
+            (S.CACHE_DIR / f"{ym}.json").write_text(
+                _j.dumps({"month": ym, "month_label": str(ym),
+                          "models": [{"name": "X"}], "by_energy": {"BEV": 1}}),
+                encoding="utf-8")
+        S._refresh_index(keep=3)
+        removed = S.prune(keep=3, verbose=False)
+        left = sorted(p.stem for p in S.CACHE_DIR.glob("*.json") if p.stem.isdigit())
+        assert len(left) == 3, f"应只留 3 个月，实际 {left}"
+        assert "202507.json" in removed, f"最老月份未删除：{removed}"
+        idx = _j.load(open(S.CACHE_DIR / "index.json", encoding="utf-8"))
+        assert idx["latest"] == 202602 and len(idx["months"]) == 3
+    finally:
+        D.fetch_all = orig
+        S.CACHE_DIR = orig_dir
+        shutil.rmtree(tmp, ignore_errors=True)
+    # ④ 真实缓存离线命中（若本机已建索引）
+    real = orig_dir / "index.json"
+    if real.exists():
+        kept = _j.load(open(real, encoding="utf-8"))
+        assert kept.get("latest"), "index.json 应指向最新月"
+        assert len(kept.get("months") or []) <= 3, "缓存月数超上限"
+        mfile = orig_dir / f"{kept['latest']}.json"
+        md = _j.load(open(mfile, encoding="utf-8"))
+        assert len(md["models"]) > 300, f"全车型索引过小：{len(md['models'])}"
+    return "销量索引：能源四级判定/未发布月报错/只留3个月，缓存离线可查"
+
+
 def t167():
     """BUG-167：插补标记只做了主榜总分构成（v10.74.6）。
 
@@ -6509,7 +6592,7 @@ def t146():
 
 
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120, t121, t122, t123, t124, t125, t126, t127, t128, t129, t130, t131, t132, t133, t134, t135, t136, t137, t138, t139, t140, t141, t142, t143, t144, t145, t146, t147, t148, t149, t150, t151, t152, t153, t154, t155, t156, t157, t158, t159, t160, t161, t162, t163, t164, t165, t166, t167, t168, t169]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120, t121, t122, t123, t124, t125, t126, t127, t128, t129, t130, t131, t132, t133, t134, t135, t136, t137, t138, t139, t140, t141, t142, t143, t144, t145, t146, t147, t148, t149, t150, t151, t152, t153, t154, t155, t156, t157, t158, t159, t160, t161, t162, t163, t164, t165, t166, t167, t168, t169, t170]
 
 
 def run():

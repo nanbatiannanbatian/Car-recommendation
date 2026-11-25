@@ -13,7 +13,7 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 10.74.8
+version: 10.74.9
 author: "nanbatiannanbatian"
 ---
 
@@ -124,6 +124,30 @@ paths.py       全项目路径唯一事实源（ROOT/cat()/gen()）+ 生成物�
    届时仍必须遵守本条：实现放在 `modules/research/` 内并注册源链。
 6. `layout_regress.EXCEPTIONS` 只用于**包间依赖方向**的个别登记，**对网络出口不适用**：
    往例外表里塞网络豁免也不会生效（`scan_network_egress` 不读它），这一点由回归 t077 验证。
+
+## ⛔ 第负一步：查排行榜先查「销量索引」（2026-11-25 用户要求，强制）
+
+用户原话：「生成一份最近月份有销量榜的所有车型以及能源类型信息。以后问排行榜信息先找这个表里找信息。
+每次用户提问，先找最近出销量的是哪个月份，然后看是不是已经有信息了，有的话直接查，没有的话查出来缓存，过期数据删除。」
+
+**任何「卖得怎样 / 有哪些车 / 排行榜 / 某价位有什么」的问题，先查索引，再决定要不要出榜。**
+
+```
+python -m modules.board.sales_index                                  # 确保最新月缓存 + 概况
+python -m modules.board.sales_index --query 小米 --energy 纯电        # 按关键词/能源查
+python -m modules.board.sales_index --month 202609                   # 指定月份（缓存优先）
+python -m modules.board.sales_index --refresh                        # 强制重抓
+```
+
+- 落盘：`data/gen/sales_index/<YYYYMM>.json`（全车型：`rank_all` / `energy` / 分口径销量 / 指导价区间）
+  与 `index.json`（最新月 + 月清单）。每月一份，**缓存命中不联网**。
+- 月份口径：先探测「最近一个**已发布**月份」。懂车帝接口对未发布月份会**静默回退**到最近可用月，
+  所以必须核对返回的 `months` 元信息，不能拿非空响应当目标月（`build_month` 会直接报错）。
+  本地已有上一月数据，就不再联网探测（上个月是理论上限）。
+- 过期删除：只保留最近 `KEEP_MONTHS=3` 个月，更早的月份文件自动删除（`--prune` 可手动触发）。
+- 能源类型判定优先级：① 当月纯电/插混/增程榜命中（榜单口径）② 候选池人工标注 `tags.power`
+  ③ 只在「全部榜」且池里没有 → 标「燃油/油混（未细分）」，**不硬猜**。
+- 销量仍是**事实列、不计分**：索引只用于回答"有哪些车、卖多少、什么能源"，打分与名次仍走第零步的榜型流程。
 
 ## ⛔ 第零步：接到排行指令，先判榜型再出榜（2026-11-20 用户明确要求，强制）
 
