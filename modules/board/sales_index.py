@@ -28,7 +28,8 @@
   ③ 只在「全部榜」出现且池里没有 → FUEL_OR_HEV（燃油/油混，榜单未细分，不硬猜）。
 
 用法：
-    python -m modules.board.sales_index                 # 确保缓存 + 打印概况
+    python -m modules.board.sales_index                 # 开发仓：确保缓存 + 打印概况
+    python -m modules.sales_index                       # 发布包：同一模块（扁平结构）
     python -m modules.board.sales_index --ensure        # 只确保最新月缓存
     python -m modules.board.sales_index --query 小米     # 查车型（自动确保缓存）
     python -m modules.board.sales_index --query 元up --energy BEV

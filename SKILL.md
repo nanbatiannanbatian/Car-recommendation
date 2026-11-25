@@ -133,8 +133,9 @@ paths.py       全项目路径唯一事实源（ROOT/cat()/gen()）+ 生成物�
 **任何「卖得怎样 / 有哪些车 / 排行榜 / 某价位有什么」的问题，先查索引，再决定要不要出榜。**
 
 ```
-python -m modules.board.sales_index                                  # 确保最新月缓存 + 概况
-python -m modules.board.sales_index --query 小米 --energy 纯电        # 按关键词/能源查
+python -m modules.board.sales_index   # 开发仓：确保最新月缓存 + 概况
+python -m modules.sales_index         # 发布包（modules 已扁平化，同一模块）
+python -m modules.board.sales_index --query 小米 --energy 纯电   # 按关键词/能源查
 python -m modules.board.sales_index --month 202609                   # 指定月份（缓存优先）
 python -m modules.board.sales_index --refresh                        # 强制重抓
 ```
@@ -148,6 +149,7 @@ python -m modules.board.sales_index --refresh                        # 强制重
 - 能源类型判定优先级：① 当月纯电/插混/增程榜命中（榜单口径）② 候选池人工标注 `tags.power`
   ③ 只在「全部榜」且池里没有 → 标「燃油/油混（未细分）」，**不硬猜**。
 - 销量仍是**事实列、不计分**：索引只用于回答"有哪些车、卖多少、什么能源"，打分与名次仍走第零步的榜型流程。
+- **不随包**：`data/gen/sales_index/` 与导出的 `runs/销量索引_*.csv` 都在打包排除区，首次查询自动建（发布包实测可用）。
 
 ## ⛔ 第零步：接到排行指令，先判榜型再出榜（2026-11-20 用户明确要求，强制）
 
