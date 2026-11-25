@@ -1540,17 +1540,27 @@ def main():
                     from modules.engine import rank_band as RB
                     rb = RB.apply_all(data_v2.get("main_board") or [], cands_for_html, cfg_v2)
                     summary["rank_band"] = rb
-                    # 名次带要进 summary.json（机读对比/回归用）——summary 文件在 HTML 段之前
-                    # 已写过一次，这里补写一次，避免"页面有带、JSON 没有"两套真相。
+                    _wide = [f"{m} {v['lo']}–{v['hi']}" for m, v in rb["models"].items()
+                             if v["hi"] - v["lo"] >= 3]
+                    print(f"[名次带] 覆盖 {len(rb['models'])} 款；带宽≥3 名 "
+                          f"{len(_wide)} 款" + ("：" + "、".join(_wide[:6]) if _wide else ""))
+                    # v10.74.7：纯产品力榜单独一套（剔除性价比后重归一化），
+                    # 徽标与名次带都按产品力口径，避免拿主榜 10 维百分比冒充 7 维榜。
+                    _pp = data_v2.get("product_power_board") or {}
+                    if _pp.get("items"):
+                        rbp = RB.apply_product(_pp["items"], cands_for_html, cfg_v2)
+                        summary["rank_band_product"] = rbp
+                        _pwide = [f"{m} {v['lo']}–{v['hi']}" for m, v in rbp["models"].items()
+                                  if (v.get("hi") or 0) - (v.get("lo") or 0) >= 3]
+                        print(f"[名次带·产品力] 覆盖 {len(rbp['models'])} 款；带宽≥3 名 "
+                              f"{len(_pwide)} 款")
+                    # 两套名次带都算完再落盘：summary 文件在 HTML 段之前写过一次，
+                    # 这里补写，避免「页面有带、JSON 没有」两套真相（v10.74.7 修）。
                     try:
                         json.dump(summary, open(sp, "w", encoding="utf-8"),
                                   ensure_ascii=False, indent=2)
                     except Exception:                  # noqa: BLE001
                         pass
-                    _wide = [f"{m} {v['lo']}–{v['hi']}" for m, v in rb["models"].items()
-                             if v["hi"] - v["lo"] >= 3]
-                    print(f"[名次带] 覆盖 {len(rb['models'])} 款；带宽≥3 名 "
-                          f"{len(_wide)} 款" + ("：" + "、".join(_wide[:6]) if _wide else ""))
                 except Exception as _rbex:                 # 不阻断出榜
                     import traceback as _tb2
                     _tb2.print_exc(file=sys.stderr)

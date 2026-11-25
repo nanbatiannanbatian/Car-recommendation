@@ -311,7 +311,7 @@ def band_html(r):
     return f'<span class="rkband{" wide" if width >= 3 else ""}" title="{e(tip)}">{lo}–{hi}</span>'
 
 
-def unf_html(r):
+def unf_html(r, scope="总分"):
     """v10.74.4：「未验证 x%」徽标 —— 总分里有多少权重来自无证据插补。"""
     w = r.get("imputed_weight")
     if not isinstance(w, (int, float)) or w <= 0:
@@ -319,7 +319,7 @@ def unf_html(r):
     pct = int(round(float(w) * 100))
     heavy = float(w) >= 0.20
     tip = (f"未验证 {pct}%：{r.get('rank_band_note') or ''}。"
-            f"这部分权重没有一手数据，按「有证据车中位 −1σ」插补，"
+            f"这 {pct}% 的{scope}权重没有一手数据，按「有证据车中位 −1σ」插补，"
             f"不等于该车真的差，也不能当成实测结论。")
     return (f'<span class="unv{" heavy" if heavy else ""}" title="{e(tip)}">'
             f'未验证 {pct}%</span>')
@@ -708,9 +708,15 @@ def render(data, summary, title, as_of):
                 if not td or not td.get("trims"):
                     continue
                 best = td.get("best_trim")
+                # v10.74.7：车系级插补维在折叠标题上直接点名，不必先悬停才知道
+                _evr = r.get("dim_evidence") or {}
+                _cimp = [k for k, v in _evr.items() if (v or {}).get("kind") == "imputed"]
+                _cimp_txt = ("　·　车系级插补 " + str(len(_cimp)) + " 维（"
+                             + "、".join(_dlab.get(k, k) for k in _cimp) + "，见 ≈）") if _cimp else ""
                 H.append(f'<details style="margin:4px 0;border:1px solid var(--line);border-radius:8px;padding:8px 12px">'
                          f'<summary style="cursor:pointer"><b>{e(r["model"])}</b> '
-                         f'（{e(best)} · {td["n_trims"]} 配置，最高 {e(td.get("best_total"))}）</summary>')
+                         f'（{e(best)} · {td["n_trims"]} 配置，最高 {e(td.get("best_total"))}）'
+                         f'<span style="font-size:11px;color:#8a5a1f">{_cimp_txt}</span></summary>')
                 H.append('<table style="margin-top:8px"><thead><tr><th>配置</th><th>指导价(万)</th>'
                          '<th>电量kWh</th><th>电芯</th><th>电压/快充</th><th>三电</th><th>智驾</th>'
                          '<th>性价比</th><th>配置总分</th><th>插补</th>'
@@ -889,7 +895,13 @@ function sortPower(){
     var av=ae?parseFloat(ae.textContent)||0:0,bv=be?parseFloat(be.textContent)||0:0;
     return bv-av;});
   rs.forEach(function(r,i){tb.appendChild(r);
-    var pr=r.querySelector('.c-prank');if(pr)pr.textContent=i+1;
+    var pr=r.querySelector('.c-prank');if(pr){
+      // v10.74.7：产品力名次带同样只改名次数字，带随预览失效置「带—」
+      var pk=pr.querySelector('.rk');
+      if(pk){pk.textContent=(i+1);}else{pr.innerHTML='<span class="rk">'+(i+1)+'</span>';}
+      var pb2=pr.querySelector('.rkband');
+      if(pb2){pb2.textContent='带—';pb2.className='rkband';pb2.title='切换配置后名次带不适用（带基于车系基准分与插补维不确定性）';}
+    }
     var mr=mainRankOf(r.getAttribute('data-model'));
     if(mr!=null){
       var mc=r.querySelector('.c-mainrank');if(mc)mc.textContent='#'+mr;
@@ -994,9 +1006,6 @@ document.addEventListener('change',function(ev){
         _wp = {d.get("key"): float(d.get("weight") or 0) for d in (meta.get("dimensions") or [])}
         _pw_keys = [k for k in _wp if k != "value"]
         _pw_sum = sum(_wp[k] for k in _pw_keys) or 1.0
-        _rowmap = {x.get("model"): x for x in rows}
-        _plab = {d.get("key"): (d.get("label") or d.get("key"))
-                 for d in (meta.get("dimensions") or [])}
         H.append('<div class="rule">车名后的「未验证 x%」是本榜口径：产品力只算'
                  f'<b>{len(_pw_keys)} 维</b>（剔除性价比后重归一化），x% 表示这几维里有多少权重来自插补；'
                  '≤20% 灰、≥20% 红。主榜的徽标按含性价比的 10 维算，两个数字不同是分母不同，不是矛盾。'
@@ -1012,20 +1021,16 @@ document.addEventListener('change',function(ev){
             td = tbpp.get(mdl) or {}
             sel = trim_selector(mdl, td.get("trims") or [],
                                 td.get("best_trim"), show_price=False, width=150)
-            _rw = _rowmap.get(mdl) or {}
-            _ev = _rw.get("dim_evidence") or {}
-            _imp_keys = [k for k in _pw_keys if (_ev.get(k) or {}).get("kind") == "imputed"]
-            _iw = sum(_wp[k] for k in _imp_keys)
-            _ipct = int(round(_iw / _pw_sum * 100))
-            _plist = "、".join(_plab.get(k, k) for k in _imp_keys) or "无"
-            _ibadge = ""
-            if _ipct > 0:
-                _itip = (f"未验证 {_ipct}%（产品力 {len(_pw_keys)} 维口径）：插补维＝{_plist}。"
-                         "这部分没有一手数据，按有证据车中位−1σ 插补；缺证据不等于该车差，"
-                         "但也不能当成实测。主榜徽标按含性价比的 10 维算，数字会不同。")
-                _ibadge = (f'<span class="unv{" heavy" if _iw / _pw_sum >= 0.2 else ""}" '
-                           f'title="{e(_itip)}">未验证 {_ipct}%</span>')
-            H.append(f"<tr data-model='{e(mdl)}'><td class='c-prank'>{it.get('power_rank')}</td>"
+            _pb = ((summary or {}).get("rank_band_product") or {}).get("models") or {}
+            _pv = _pb.get(mdl) or {}
+            _iw = float(_pv.get("imputed_weight") or 0)
+            _ipct = int(round(_iw * 100))
+            _itip = (f"未验证 {_ipct}%（产品力 {len(_pw_keys)} 维口径）："
+                     f"{_pv.get('note') or ''}。这部分没有一手数据，按有证据车中位−1σ 插补；"
+                     "缺证据不等于该车差，但也不能当成实测。主榜徽标按含性价比的 10 维算，数字会不同。")
+            _ibadge = (f'<span class="unv{" heavy" if _iw >= 0.20 else ""}" '
+                       f'title="{e(_itip)}">未验证 {_ipct}%</span>') if _pv and _ipct > 0 else ""
+            H.append(f"<tr data-model='{e(mdl)}'><td class='c-prank'>{it.get('power_rank')}{band_html(it)}</td>"
                      f"<td class='name'>{e(mdl)}{_ibadge}{sel}</td>"
                      f"<td class='c-power'><span class='score'>{num(it.get('power_score'), 2)}</span></td>"
                      f"<td class='c-mainrank'>#{e(it.get('main_rank'))}</td>"

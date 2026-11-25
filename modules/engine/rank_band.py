@@ -59,6 +59,8 @@ def apply_all(rows, cands, cfg, n_draws: int = N_DRAWS, seed: int = SEED) -> dic
         return {"models": {}, "note": "无上榜车"}
     dims = cfg.get("dimensions") or []
     weights = {d.get("key"): float(d.get("weight") or 0) for d in dims}
+    tot_w = sum(weights.values()) or 1.0
+    weights = {k: v / tot_w for k, v in weights.items()}   # v10.74.7：产品力榜 7 维同样适用
     cands_by_model = {c.get("model"): c for c in (cands or [])}
     imps = {r.get("model"): imputed_of(cands_by_model.get(r.get("model"))) for r in rows}
     sigmas = {d: _sigma(rows, cands_by_model, d, None) for d in weights}
@@ -125,6 +127,37 @@ def apply_all(rows, cands, cfg, n_draws: int = N_DRAWS, seed: int = SEED) -> dic
                  "带窄说明该名次靠的是实测数据，带宽说明名次可以被插补值的运气改写。"
                  "纸面可判定维度不参与抽样。"),
     }
+
+
+def apply_product(items, cands, cfg, n_draws: int = N_DRAWS, seed: int = SEED) -> dict:
+    """v10.74.7：纯产品力榜的名次带 + 未验证权重（分母＝剔除性价比后重归一化）。
+
+    产品力榜只算非 value 维，若套主榜的 10 维徽标就是两套口径；
+    这里用同一套蒙特卡洛，但只对产品力维抽样，输出与页面产品力榜同源。
+    """
+    prod_dims = [d for d in (cfg.get("dimensions") or []) if d.get("key") != "value"]
+    if not prod_dims or not items:
+        return {"models": {}, "note": "无产品力榜"}
+    cands_by_model = {c.get("model"): c for c in (cands or [])}
+    rows = []
+    for it in items:
+        m = it.get("model")
+        c = cands_by_model.get(m) or {}
+        rows.append({"model": m, "total": it.get("power_score"),
+                     "scores": c.get("scores") or {},
+                     "rank": it.get("power_rank")})
+    res = apply_all(rows, cands, {"dimensions": prod_dims,
+                                  "label": "产品力"}, n_draws=n_draws, seed=seed)
+    for it in items:
+        m = it.get("model")
+        v = res["models"].get(m) or {}
+        it["rank_band"] = [v.get("lo", it.get("power_rank")), v.get("hi", it.get("power_rank"))]
+        it["rank_band_p10p90"] = [v.get("p10"), v.get("p90")]
+        it["imputed_weight"] = v.get("imputed_weight", 0)
+        it["rank_band_note"] = v.get("note") or ""
+    res["note"] = ("产品力榜名次带（剔除性价比的 %d 维）；徽标分母同口径重归一化。"
+                   % len(prod_dims))
+    return res
 
 
 def selftest() -> list[str]:
