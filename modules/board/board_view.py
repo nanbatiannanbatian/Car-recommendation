@@ -401,20 +401,106 @@ MAIN_COL_LABELS = {
 
 
 
-def _display_crash_all(cand: dict) -> str:
-    """碰撞成绩全展示：主成绩 + fuse/SSOT 记录的并列成绩（v10.72）。"""
+def inject_crash_fusion(rows: list, summary: dict | None) -> int:
+    """v10.67.2：把 summary 里的多碰撞成绩补回主榜行（渲染层兜底）。
+
+    背景：数据层一直有全部成绩（pipeline summary.crash_fusion / crash_multi_scores），
+    但 score_rows 只透传 crash，渲染层拿到的 cand 其实是 row → 「碰撞成绩」列
+    只剩主成绩，展开逻辑静默失效。这里按 model 从 summary 补齐，返回补了几行。
+    上游已透传（row 自带 crash_fusion）时不覆盖，避免两处口径打架。
+    """
+    if not isinstance(summary, dict) or not rows:
+        return 0
+    fus = {x["model"]: x for x in (summary.get("crash_fusion") or [])
+           if isinstance(x, dict) and x.get("model")}
+    multi = {x["model"]: x.get("scores") for x in (summary.get("crash_multi_scores") or [])
+             if isinstance(x, dict) and x.get("model")}
+    n = 0
+    for r in rows:
+        m = r.get("model")
+        if not r.get("crash_fusion") and fus.get(m):
+            r["crash_fusion"] = fus[m]
+            n += 1
+        if not r.get("crash_secondary") and multi.get(m):
+            prim = r.get("crash") or ""
+            sec = [s for s in (multi[m] or []) if s and s != prim]
+            if sec:
+                r["crash_secondary"] = sec
+    return n
+
+
+def _crash_label(x) -> str:
+    """把一条并列成绩归一成文本：crash_secondary 在不同来源里既可能是字符串，
+    也可能是 {"display"/"label"/"text"/"score"} 字典（sync_safety_scores 落的是字典）。
+    v10.72.1：字典直接进 set/比较会 TypeError: unhashable type: 'dict'，
+    把整页渲染打断，历史页面因此退回「只有主成绩」。
+    """
+    if x is None:
+        return ""
+    if isinstance(x, str):
+        return x.strip()
+    if isinstance(x, dict):
+        for k in ("display", "label", "text", "crash", "name"):
+            v = x.get(k)
+            if isinstance(v, str) and v.strip():
+                return v.strip()
+        return ""
+    return str(x).strip()
+
+
+_CRASH_SYS = re.compile(r"^(C-IASI|C-NCAP|Euro\s*NCAP|Euro-NCAP|E-NCAP|IIHS|NHTSA|ANCAP|中保研|中汽研)")
+
+
+def _crash_sys(label: str) -> str:
+    m = _CRASH_SYS.match(label or "")
+    return (m.group(1).upper().replace(" ", "") if m else "")
+
+
+def _display_crash_all(cand: dict, compact: bool = False) -> str:
+    """碰撞成绩全展示：主成绩 + fuse/SSOT 记录的并列成绩（v10.72）。
+
+    v10.72.1 两处补丁：
+      ① crash_secondary 元素可能是字典（sync_safety_scores 口径），直接 set/比较会 TypeError；
+      ② 同一体系重复列示（fusion 记「C-IASI G+（三指数最低…）」、multi_scores 记「C-IASI G」）
+         要按体系去重，先到的（fusion，信息更全）为准，否则一列里出现 C-IASI G+ / C-IASI G
+         同一体系两个不同等级，读者只会觉得数据打架。
+    compact=True 供表格单元格用：去掉括号补充说明压宽度，完整文本留给 title 悬浮。
+    """
     from modules.engine import crash_systems as _CS
     main = _CS.display_short(cand.get("crash"))
     fusion = cand.get("crash_fusion") or {}
-    scores = [x.get("display") for x in (fusion.get("all_scores") or [])
-              if isinstance(x, dict) and x.get("display")]
-    scores += [x for x in (cand.get("crash_secondary") or []) if x]
-    extras = []
-    seen = set()
-    for x in scores:
-        if x and x != main and x not in seen:
-            seen.add(x); extras.append(x)
-    return (main + " / " + " / ".join(extras)) if extras and main not in ("—", "在测") else main
+    raw = [x.get("display") for x in (fusion.get("all_scores") or [])
+           if isinstance(x, dict) and x.get("display")]
+    raw += [x for x in (cand.get("crash_secondary") or []) if x]
+    # v10.72.1：排序按「融合裁决的最严格主分」打头，而不是 SSOT 回流的 crash 字段——
+    # sync_safety_scores 在 fuse 之后按体系优先级重写了 crash，会出现页面第一眼展示
+    # C-NCAP 91.2%，而评分取的是更严格的 C-IASI G+，读者会以为打分口径和展示不一致。
+    head = main
+    _fp = _crash_label(fusion.get("primary"))
+    if _fp:
+        _fp_short = _CS.display_short(_fp) or _fp
+        if _fp_short != main:
+            head = _fp_short
+    parts, seen, sys_seen = [], set(), set()
+    # 主成绩字段（SSOT 回流）必须保底出现：fusion 主分与它不同体系时两者都要展示
+    for x in [head, main] + raw:
+        s = _crash_label(x)
+        if not s or s in seen:
+            continue
+        y = _crash_sys(s)
+        if y and y in sys_seen:
+            continue
+        seen.add(s)
+        if y:
+            sys_seen.add(y)
+        parts.append(s)
+    if not parts:
+        return main
+    if len(parts) == 1:
+        return main if main not in ("—", "在测") else parts[0]
+    if compact:
+        parts = [(re.sub(r"[（(][^（()）]*[）)]", "", s).strip() or s) for s in parts]
+    return " / ".join(parts)
 
 
 def main_cell(key: str, row: dict, cand: dict, grade: str = "") -> str:

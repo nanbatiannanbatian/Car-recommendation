@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -61,18 +62,41 @@ def load_phys() -> dict:
     return out
 
 
+def _num(v):
+    """把参数页原样文本转成数值：支持「678-1758」「678~1758L」「822/1758」这类区间。
+
+    v10.72.1：参数页后备箱常写成区间（放倒座椅后），旧版直接 float() 会 ValueError
+    把整条出榜链路打断（space_score 是 pipeline 的必经步骤）。区间取中位，
+    既不是最大也不是最小，避免把「放倒」值当成常规容积。
+    """
+    if isinstance(v, (int, float)):
+        return float(v)
+    if v is None:
+        return None
+    s = str(v).replace(",", "").strip()
+    nums = re.findall(r"[0-9]+(?:\.[0-9]+)?", s)
+    if not nums:
+        return None
+    vals = [float(x) for x in nums]
+    if len(vals) >= 2 and re.search(r"[-~～/至到]", s):
+        return round((min(vals) + max(vals)) / 2, 1)
+    return vals[0]
+
+
 def score(model: str, phys: dict | None = None) -> tuple[float | None, str]:
     phys = phys if phys is not None else load_phys()
     p = phys.get(model) or {}
-    wb, tk = p.get("wheelbase_mm"), p.get("trunk_l")
+    wb, tk = _num(p.get("wheelbase_mm")), _num(p.get("trunk_l"))
     if wb is None or tk is None:
         return None, f"{model} 轴距/后备箱缺一（不猜，返回空）"
     wb, tk = float(wb), float(tk)
+    tk_raw = p.get("trunk_l")
     dw = (wb - WB_MEDIAN) / WB_STEP
     dt = (tk - TRUNK_MEDIAN) / TRUNK_STEP
     raw = BASE + (dw + dt) * STEP_SCORE
     val = round(max(LOW, min(HIGH, raw)), 1)
-    return val, (f"轴距{wb:g}mm({dw:+.1f}档) + 后备箱{tk:g}L({dt:+.1f}档) "
+    tk_note = f"{tk:g}" if isinstance(tk_raw, (int, float)) else f"{tk:g}（{tk_raw} 取中位）"
+    return val, (f"轴距{wb:g}mm({dw:+.1f}档) + 后备箱{tk_note}L({dt:+.1f}档) "
                  f"→ {raw:.2f} clamp[{LOW},{HIGH}] = {val}")
 
 

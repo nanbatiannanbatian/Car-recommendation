@@ -1815,3 +1815,16 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
 - 多碰撞成绩：项目已有 `multi_evidence_score.fuse` 把全部一手测评写进 crash_fusion.all_scores，展示层展开；评分仍取 fuse 最严格主分（跨体系取最严格），**不重复加分**——多体系都测过已体现在"取最严格"的保守性上，再叠加会突破10分制。曾试加 +0.2 交叉验证 bonus，发现与 fuse 冲突后撤销。
 - 回归：3个测试按新口径正式更新（BUG-081 quality median→min、BUG-111 PPH新基准、BUG-150 quality offset例外），不是掩盖失败——口径变更后同步测试。bug154/154+layout16/16+midsuv52/52 全绿。BUG-157 锁死四项。
 - 踩坑：①改 board_view 的 crash 分支时用大块 Edit 吞掉了 main_cell 里 voltage_v 三级取数（BUG-138），从仓库恢复后改用模块级 helper 精确插入；②quality cap 在 min/q25 之间反复验证不变量，最终 min-0.1 满足"无数据严格低于有负面数据"。
+
+
+## v10.72.1 「碰撞成绩」列真展开多成绩（2026-11-25 用户追问渲染断点）
+- 用户："主榜'碰撞成绩'列目前仍只显示主成绩——数据层已有全部成绩（在 summary 的 crash_fusion 里），但渲染链路没把字段传到那一列，我改的展开逻辑因数据传递断点没生效。这个问题修复好。"
+- 诚实前提：v10.72.0 只改了 `multi_evidence_score.fuse` 的写入与 `board_view._display_crash_all` 的实现，**真页面上的那一列从来没调用过它**，所以"已修"是假象。
+- 三处断点（逐层验证）：
+  ① `leaderboard.score_rows()` 生成主榜行时只透传 crash/safety_basis/safety_confidence，crash_fusion/crash_secondary 全丢——渲染层拿到的是 row 不是 candidate，读两次都是 None。
+  ② `render_board_html.crash_cell(r, cand)` 是"碰撞成绩"列的**唯一出口**，它只读 `cand["crash"]`、`CS.parse_score` 出单条规范 display，完全绕过 `_display_crash_all`。这是用户看到"只有主成绩"的直接原因（主表分支 L527 走的是 crash_cell，不是 main_cell）。
+  ③ `sync_safety_scores.sync` 在 fuse 之后按体系优先级重写 crash 字段，于是页面第一眼是 C-NCAP 91.2%，而评分取的是更严格的 C-IASI G+——展示与打分口径不一致。
+- 修法：score_rows 透传三个字段；新增 `board_view.inject_crash_fusion(rows, summary)` 按 model 从 summary.crash_fusion / crash_multi_scores 兜底注入（旧 board 数据也能救）；render() 入口调用它；crash_cell 改为统一走 `_display_crash_all(compact=True)` 并在 title 留完整文本；`_crash_label` 把字典型成绩归一成文本（旧版 `x not in set()` 撞 `unhashable type: dict`，整个 HTML 渲染被 except 吞掉）；同体系去重（fusion 的 C-IASI G+ 与 multi_scores 的 C-IASI G 不再并列）；排序以融合裁决的最严格主分打头，SSOT 主成绩保底展示。
+- 顺带修掉两条挡住端到端验证的既有缺陷：`space_score.score` 对参数页区间文本（`trunk_l='678-1758'`）直接 float() 抛 ValueError 打断整条 pipeline → 新增 `_num()` 取区间中位并写进 note；pipeline 的 HTML 渲染 except 只打一行 type/msg → 补完整 traceback（正是这种吞栈让断点藏了整整一版）。
+- 端到端验证（真数据、真页面）：中大型纯电SUV 重出，22 款主榜中 2 款双成绩正常并列——理想i6 `C-IASI G+ / C-NCAP 91.2%`、小米YU7 `C-IASI G+ / C-NCAP 93.5%`，与 summary 的 multi=2 完全对齐；其余 20 款维持单成绩，无成绩车仍是"—（缺权威，非不安全）"。验证页留在 `runs/verify_crash_col_202611/榜单.html`（该次重跑走 `--force-stale`，分数为当前代码口径，与旧页 84.7/84.2 不同属正常重算，未覆盖既有榜单）。
+- 回归：新增 BUG-158/t158（透传、crash_cell 真展开、字典成绩归一、同体系去重、summary 兜底注入、反向注入、源码级锁定），并补上 v10.72.0 漏登记的 BUG-157 用例条目——CASES/TESTS 原来靠 zip 配对，少一条会把标签错配到别人的测试上。bug156/156 全绿，负向回测 116/116 检出。

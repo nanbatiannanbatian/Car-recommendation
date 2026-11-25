@@ -177,6 +177,8 @@ CASES = [
     ("BUG-154", "手写lifecycle_status_json是补丁+级别口径靠用户选:销量变点检测/官方级别库都在但没接出榜链路→lifecycle_gate_build自动症状+level_gate自动准入", "v10.69.0"),
     ("BUG-155", "家族票5/6只在第一套权重算致19/22款0/6度量失效+稳健通道11品类仅1个启用→跨权重家族票+稳健通道默认启用", "v10.70.0"),
     ("BUG-156", "尚界H5 safety手填封顶9.3(规则应9.1)+quality手填7.0触发有证据封顶6.74:手工分绕过SSOT/quality规则→correction+star_only_overcap门禁", "v10.71.0"),
+    ("BUG-157", "四项评分维度根因(特斯拉空间差/海狮品控差/多碰撞成绩/无数据反超):space纯手填无规则+PPH方向算反+quality封顶跑在QS之前+无数据车cap_to=median反超→space硬数据/PPH基准151/封顶后移/无数据严格低", "v10.72.0"),
+    ("BUG-158", "多碰撞成绩只到数据层没到列:score_rows只透传crash+crash_cell只读单条,渲染拿到的是row不是cand→crash_fusion/crash_secondary读不到,展开逻辑静默失效→透传+crash_cell走展开+summary兜底注入", "v10.72.1"),
 ]
 
 
@@ -5380,6 +5382,69 @@ def t157():
             + "+ 多碰撞成绩展示展开(评分取最严格主分不重复计)")
 
 
+def t158():
+    """BUG-158：多碰撞成绩只到数据层，没到「碰撞成绩」列（v10.72.1）。
+
+    用户确认："主榜'碰撞成绩'列目前仍只显示主成绩——数据层已有全部成绩
+    （在 summary 的 crash_fusion 里），但渲染链路没把字段传到那一列，
+    我改的展开逻辑因数据传递断点没生效。"
+    根因：`multi_evidence_score.fuse` 确实往 candidate 写了 crash_fusion、
+    `sync_safety_scores` 写了 crash_secondary，但 `leaderboard.score_rows`
+    只透传 crash/safety_basis；渲染层拿到的是 row（不是 cand），
+    所以 `_display_crash_all` 读两次都是 None → 永远只出主成绩。
+    修法三层：① score_rows 透传两个字段；② board_view.inject_crash_fusion
+    按 model 从 summary 兜底注入（旧 board 数据也能救）；③ 渲染入口调用它。
+    锁死：透传、展开、兜底注入、反向注入（去掉字段必须退回单成绩）。
+    """
+    from modules.engine import leaderboard as _L
+    from modules.board import board_view as _BV
+    cfg = {"dimensions": [{"key": "safety", "weight": 0.2}, {"key": "space", "weight": 0.8}]}
+    fusion = {"model": "测试车", "primary": "C-NCAP 92.3%",
+              "all_scores": [{"display": "C-NCAP 92.3%", "score": 8.9, "basis": "cncap"},
+                             {"display": "C-IASI 3G", "score": 9.2, "basis": "ciasi"}]}
+    cand = {"model": "测试车", "price": 15.0, "scores": {"safety": 8.0, "space": 9.0},
+            "crash": "C-NCAP 92.3%", "crash_fusion": fusion, "crash_secondary": ["Euro NCAP 五星"]}
+    row = _L.score_rows([cand], cfg)[0]
+    # ① 透传
+    assert row.get("crash_fusion") == fusion, "score_rows 未透传 crash_fusion（渲染层读不到全部成绩）"
+    assert row.get("crash_secondary") == ["Euro NCAP 五星"], "score_rows 未透传 crash_secondary"
+    # ② 展开
+    cell = _BV.main_cell("crash", row, row)
+    for s in ("C-NCAP 92.3%", "C-IASI 3G", "Euro NCAP 五星"):
+        assert s in cell, f"单元格缺成绩 {s}: {cell}"
+    assert " / " in cell, f"未按并列格式展开: {cell}"
+    # ③ 兜底注入（row 没有字段、summary 有）
+    bare = {"model": "测试车", "crash": "C-NCAP 92.3%", "total": 88.0, "scores": {}, "rank": 1}
+    n = _BV.inject_crash_fusion([bare], {"crash_fusion": [fusion]})
+    assert n == 1 and _BV.main_cell("crash", bare, bare) == "C-NCAP 92.3% / C-IASI 3G", \
+        f"summary 兜底注入失效: {n} / {_BV.main_cell('crash', bare, bare)}"
+    # ④ 反向注入：没有字段就只能出主成绩（证明展开真的依赖数据，不是写死文案）
+    blank = {"model": "测试车", "crash": "C-NCAP 92.3%", "total": 88.0, "scores": {}, "rank": 1}
+    assert _BV.main_cell("crash", blank, blank) == "C-NCAP 92.3%", "反向注入未生效（疑似写死）"
+    # ⑤ 真正的可见出口 crash_cell（列唯一出口）必须走展开，不能绕过
+    from modules.board import render_board_html as _RH
+    html = _RH.crash_cell(bare, bare)
+    assert "C-NCAP 92.3%" in html and "C-IASI 3G" in html, f"crash_cell 未展开并列成绩: {html}"
+    assert 'title="C-NCAP 92.3% / C-IASI 3G"' in html, f"title 未带完整成绩: {html}"
+    # ⑥ 字典型 crash_secondary 不许把渲染打断（旧版 set() 直接 TypeError）
+    d = {"model": "测试车", "crash": "C-NCAP 92.3%", "crash_secondary": [{"display": "C-IASI 3G"}],
+         "total": 88.0, "scores": {}, "rank": 1}
+    assert _BV.main_cell("crash", d, d) == "C-NCAP 92.3% / C-IASI 3G", "字典型并列成绩未归一"
+    # ⑦ 同体系去重：fusion 已给「C-IASI G+（…）」时不再叠一条「C-IASI G」
+    e = {"model": "测试车", "crash": "C-NCAP 91.2%",
+         "crash_fusion": {"all_scores": [{"display": "C-IASI G+（三指数最低：车内乘员）"}],
+                          "primary": "C-IASI G+（三指数最低：车内乘员）"},
+         "crash_secondary": ["C-IASI G"]}
+    cell_e = _BV.main_cell("crash", e, e)
+    assert cell_e.count("C-IASI") == 1, f"同体系重复列示未去重: {cell_e}"
+    # 源码锁定：透传字段不许再被删、渲染必须调兜底、碰撞列必须走展开
+    assert '"crash_fusion": c.get("crash_fusion")' in _read("leaderboard.py"), "leaderboard 透传被删"
+    assert "inject_crash_fusion" in _read("render_board_html.py"), "渲染入口未接兜底注入"
+    assert "_display_crash_all" in _read("render_board_html.py"), "crash_cell 又绕过展开逻辑"
+    return ("score_rows透传crash_fusion/crash_secondary + 碰撞列crash_cell真展开"
+            " + 字典成绩归一 + 同体系去重 + summary兜底注入 + 反向注入可检出")
+
+
 def t156():
     """BUG-156：手工 safety/quality 分绕过规则（v10.71）。
 
@@ -5788,7 +5853,7 @@ def t146():
 
 
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120, t121, t122, t123, t124, t125, t126, t127, t128, t129, t130, t131, t132, t133, t134, t135, t136, t137, t138, t139, t140, t141, t142, t143, t144, t145, t146, t147, t148, t149, t150, t151, t152, t153, t154, t155, t156, t157]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120, t121, t122, t123, t124, t125, t126, t127, t128, t129, t130, t131, t132, t133, t134, t135, t136, t137, t138, t139, t140, t141, t142, t143, t144, t145, t146, t147, t148, t149, t150, t151, t152, t153, t154, t155, t156, t157, t158]
 
 
 def run():

@@ -226,6 +226,13 @@ def score_rows(cands: list[dict], cfg: dict, weights: list[float] | None = None)
             "crash": c.get("crash"),
             "safety_basis": c.get("safety_basis"),
             "safety_confidence": c.get("safety_confidence"),
+            # v10.67.2：多成绩也必须透传，否则"碰撞成绩"列只能显示主成绩。
+            # 数据层早就有（multi_evidence_score.fuse 写 crash_fusion、
+            # sync_safety_scores 写 crash_secondary），但 score_rows 不带这两个字段，
+            # 渲染层拿到的是 row 而不是 cand → 展开逻辑静默失效。这里补齐。
+            "crash_fusion": c.get("crash_fusion"),
+            "crash_secondary": c.get("crash_secondary"),
+            "crash_source": c.get("crash_source"),
             # v10.28.0：月销口径字段透传给页面 hover 说明（只读，不进打分）。
             # 趋势月销=近N月中位数/新车取较大值；sales_scope 标纯电单独 vs 车系合计上界；
             # sales_note 记异常原因（出口集中/促销透支等），都在候选池已核验。

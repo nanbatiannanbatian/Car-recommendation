@@ -1492,6 +1492,10 @@ def main():
                 open(hp, "w", encoding="utf-8").write(doc)
                 print(f"[ok] {hp}")
         except Exception as ex:
+            # v10.72.1：渲染异常只打一行 type/msg 时排查全靠猜（多碰撞列断点就是这样漏掉的），
+            # 这里补完整栈，出问题时一眼看到是哪一行。
+            import traceback as _tb
+            _tb.print_exc(file=sys.stderr)
             print(f"[warn] HTML 渲染跳过（不影响榜单）：{type(ex).__name__}: {ex}", file=sys.stderr)
 
 

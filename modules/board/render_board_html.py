@@ -227,15 +227,23 @@ def crash_cell(r: dict, cand: dict) -> str:
     v10.16.4（用户确认方案 A）：成绩只在这一列显示，数字统一取 crash_systems.parse_score
     的规范 display（与 safety 打分、徽标旧逻辑解耦），避免车名徽标抓错分项。
     权威判定同样复用 crash_systems 唯一真相源，与 safety_check 一致。
+
+    v10.72.1 根因修复：这一列原来只读 cand["crash"]（单条主成绩），完全绕过了
+    `_display_crash_all` —— 所以数据层有全部成绩、渲染链路怎么改都不见效。
+    现在统一从这里取「主成绩 / 并列成绩」：单元格用压缩文本（去括号说明），
+    title 里保留完整文本供悬浮查看。
     """
     from modules.engine import crash_systems as CS
+    from modules.board import board_view as BV
     crash = str(cand.get("crash") or "")
+    full = BV._display_crash_all(cand)
+    shown = BV._display_crash_all(cand, compact=True)
     parsed = CS.parse_score(crash)
     if parsed:
-        return f'<span class="flag flag-crash" title="{e(crash)}">{e(parsed["display"])}</span>'
+        return f'<span class="flag flag-crash" title="{e(full)}">{e(shown)}</span>'
     basis = str(r.get("safety_basis") or "")
     if CS.is_official(basis) or ("抽车" in crash) or ("在测" in crash) or ("测试中" in crash):
-        return f'<span class="flag flag-crash">{e(CS.display_short(crash))}</span>'
+        return f'<span class="flag flag-crash" title="{e(full)}">{e(shown)}</span>'
     return ('<span class="flag flag-warn" title="无中保研(C-IASI)/中汽研(C-NCAP)/Euro NCAP/IIHS 可查的权威碰撞成绩；'
             '安全分基于配置与口碑，非实测实锤；不等于不安全，但证据等级较低">—（缺权威，非不安全）</span>')
 
@@ -312,6 +320,12 @@ def render(data, summary, title, as_of):
     except (OSError, ValueError, ImportError):
         _narr = {}
     rows = data.get("main_board", [])
+    # v10.67.2：多碰撞成绩兜底注入（按 model 从 summary 补回 crash_fusion/crash_secondary），
+    # 避免「数据层有全部成绩、列里只有主成绩」的老断点。实现收在 board_view，单测同源。
+    try:
+        BV.inject_crash_fusion(rows, summary)
+    except Exception:
+        pass
     bands = data.get("band_subboards", [])  # v10.29.0：仅用于跨价位提示判 multi_band，不再渲染子榜
     pp = data.get("product_power_board", {})
     title = title or meta.get("title") or "统一榜单"
