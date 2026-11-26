@@ -191,6 +191,7 @@ CASES = [
     ("BUG-168", "产品力榜没有名次带+逐配置要悬停才知道插补:产品力名次同样是插补值运气,却只给整数;#6/#7差0.1无人知道→apply_product单独做7维蒙特卡洛(权重重归一化)+产品力名次带P25–P75+折叠标题直接点名「车系级插补N维」", "v10.74.7"),
     ("BUG-169", "产品力口径混进了「钱」的维度:拆维后产品力总榜只剔性价比得9维(含holding_cost),与「持有成本不进产品力」及性价比pf的8维(PROD_DIMS)自相矛盾,保值率高的车在「产品强不强」白拿分→产品力统一8维(剔value+holding_cost),总榜/名次带/徽标/逐配置power_score同一把尺,文案不再写死7/8/9维", "v10.74.8"),
     ("BUG-170", "查排行榜没有统一入口:每次问某车卖得怎样/某价位有哪些车都要重新联网翻四张销量榜,慢且不可复现,月份还可能拿错(接口对未发布月份静默回退)→新增 sales_index 全车型索引(最近已发布月×车型×能源类型),缓存优先、核对 months 元信息、过期月自动删", "v10.74.9"),
+    ("BUG-171", "跨能源页把不可比的名次当结论:统一8维的分数刻度在不同能源上并不等价,却排成一列,读者当「谁更强」→出「选能源版」:只留11项用车条件+能源形式适配,删掉跨能源打分榜/三档/子榜/产品力/三榜/稳健性,具体车型引导去看单能源榜,且不点名最强车型", "v10.75.1"),
 ]
 
 
@@ -3561,40 +3562,39 @@ def t107():
     assert "电池容量" in ss_src, "spec_score 源码缺电池容量项"
     assert "POWERTRAIN_GROUPS" in ss_src, "spec_score 源码缺三电子维度分组定义"
 
-    # ②-c v10.74 配方 v3（用户 2026-11-25「可靠性/持有成本拆成独立维度」后落地，10 维）：
-    #     原「质量与品控」一格按信号归属切成两格：可靠性=故障频度（投诉密度/PPH），
-    #     质量与品控=严重度（安全类占比/召回处置）；三年保值率单列持有成本。
-    #     证据依赖维（安全 18% + 可靠性 12% + 品控 6% + 持有成本 8% = 44%）
-    #     与参数可采维（44%）持平，修正「配置表漂亮的车天然占优」的机制性偏置。
-    #     v10.73 的 8 维数字（0.23/0.20/0.15…）已被本轮显式取代，
-    #     口径变更理由写进 references/evolution.md，不再用旧数字锁死。
+    # ②-c v10.74 配方 v3 拆维；v10.75.0 配方 v4：持有成本退出计分（9 维，用户 2026-11-26 拍板）
+    #     原「质量与品控」按信号切成两格：可靠性=故障频度，质量与品控=严重度/召回；
+    #     三年保值率不像产品能力、且只有 8/22 有同口径数据（其余插补），故不再计分，
+    #     只在 TCO 与逐车取证依据里展示。8 个点按比例归入其余 9 维（权重和仍=1）。
     cfg_bev = json.loads(_read("categories/car_midsuv_bev.json"))
     wm = {d["key"]: d["weight"] for d in cfg_bev["dimensions"]}
     assert abs(sum(wm.values()) - 1.0) < 1e-9, \
         f"纯电榜 {len(wm)} 维权重和应=1，实际 {sum(wm.values())}"
-    # ②-c-2 v10.74 配方 v3（用户 2026-11-25「可靠性/持有成本拆独立维」后落地，10 维）：
-    #     可靠性只吃故障频度、质量与品控只吃严重度/召回，持有成本只吃三年保值率。
-    assert len(wm) == 10, f"纯电榜应为 10 维（拆出 reliability/holding_cost），实际 {len(wm)}"
-    assert "reliability" in wm and "holding_cost" in wm, f"拆维缺失，实际 dims={list(wm)}"
-    exp_w = {"powertrain": 0.21, "safety": 0.18, "reliability": 0.12, "quality": 0.06,
-             "space": 0.11, "value": 0.12, "holding_cost": 0.08, "adas": 0.05,
-             "control": 0.04, "cabin": 0.03}
+    assert len(wm) == 9, f"纯电榜应为 9 维（持有成本退出计分），实际 {len(wm)}: {list(wm)}"
+    assert "reliability" in wm and "holding_cost" not in wm, \
+        f"拆维/退分不符，实际 dims={list(wm)}"
+    exp_w = {"powertrain": 0.228, "safety": 0.196, "reliability": 0.130, "quality": 0.065,
+             "space": 0.120, "value": 0.130, "adas": 0.054, "control": 0.044, "cabin": 0.033}
     bad = {k: (wm.get(k), v) for k, v in exp_w.items() if abs(wm.get(k, -1) - v) > 1e-9}
-    assert not bad, f"v10.74 十维配方不符（维度: 实际/期望）: {bad}"
+    assert not bad, f"v10.75 九维配方不符（维度: 实际/期望）: {bad}"
     assert wm["reliability"] > wm["quality"], \
         "频度（可靠性）应重于严重度（品控）：混格时代一刀切 9.5% 已被拆维取代"
     assert wm["control"] <= 0.09 and wm["cabin"] <= 0.09, \
         "车机/操控区分力最低，回抽后权重不应高于 9%"
-    # 机制性偏置门禁：证据依赖维（安全+可靠性+品控+持有成本）≥ 参数可采维（三电+空间+性价比+智驾+操控+车机）的 0.6 倍
+    # 机制性偏置门禁：证据依赖维（安全+可靠性+品控）≥ 参数可采维（三电+空间+性价比+智驾+操控+车机）的 0.6 倍
     param_w = (wm["powertrain"] + wm["space"] + wm["value"]
                + wm["adas"] + wm["control"] + wm["cabin"])
-    evid_w = wm["safety"] + wm["reliability"] + wm["quality"] + wm["holding_cost"]
+    evid_w = wm["safety"] + wm["reliability"] + wm["quality"]
     assert evid_w >= 0.6 * param_w, \
         f"证据依赖维 {evid_w:.3f} 仍被参数维 {param_w:.3f} 压制（配置表漂亮即高分）"
-    # AHP 矩阵必须与 10 维同构，否则一致性/CR 校验会静默按旧 8×8 跑
+    # AHP 矩阵必须与 9 维同构，否则一致性/CR 校验会静默按旧矩阵跑
     ahp = cfg_bev.get("ahp_matrix") or []
-    assert len(ahp) == 10 and all(len(r) == 10 for r in ahp), \
-        f"ahp_matrix 应为 10×10，实际 {len(ahp)}×{len(ahp[0]) if ahp else 0}"
+    assert len(ahp) == 9 and all(len(r) == 9 for r in ahp), \
+        f"ahp_matrix 应为 9×9，实际 {len(ahp)}×{len(ahp[0]) if ahp else 0}"
+    # 持有成本只展示：页面取证依据必须仍有「三年保值率 %（仅展示·不计分）」
+    assert "三年保值率" in _read("modules/board/render_board_html.py"), \
+        "持有成本退出计分后，页面必须保留保值率事实展示"
+
     # 承载逻辑：三电仍是第一权重（电池占纯电 BOM 30-50%），安全次之
     assert wm["powertrain"] >= max(wm.values()) and wm["safety"] >= wm["quality"], \
         "三电应为第一权重、安全不低于品控（纯电价值结构）"
@@ -5559,7 +5559,7 @@ def t160():
 
 
 def t161():
-    """BUG-161：拆维后总分凭空掉分 + 频度/严重度归属 + 保值率单列（v10.74.0）。
+    """BUG-161：拆维后总分凭空掉分 + 频度/严重度归属（v10.74.0；v10.75.0 改为 9 维）。
 
     用户："可靠性和持有成本拆成独立维度做了，页面增加，三年保值率接进打分。"
     症状：页面「总分构成」加权分列全车偏低（Model Y 67.0 vs 报告 84.8）。
@@ -5567,10 +5567,10 @@ def t161():
     W 是模块级旧 8 维常量——新增 reliability/holding_cost 被白名单滤掉，
     于是逐配置总分只按 8 维求和（权重和 0.80）再 ×10，凭空少 15+ 分，
     且 board_v2 又用它覆盖主榜 total，页面排序与报告不同源。
-    锁死：①权重必须按 cfg 全量维（含新维）求和，不靠旧常量白名单；
+    锁死：①权重必须按 cfg 全量维求和，不靠旧常量白名单；
     ②频度只进可靠性、召回只进严重度，同一事件不得两算；
-    ③保值率 C 级只看不计分、不进产品力（不双计性价比）；
-    ④页面真的出 10 维列，且总分与 10 维加权一致；⑤反向注入可检出。
+    ③保值率 C 级只看不计分、不进产品力、且 v10.75.0 起完全退出计分（主榜 9 维）；
+    ④页面真的出 9 维列，且总分与 9 维加权一致；保值率仍以事实列展示；⑤反向注入可检出。
     """
     from modules.engine import quality_score as QS
     from modules.engine import reliability_score as RS
@@ -5620,73 +5620,66 @@ def t161():
     cfg = json.loads(_read("categories/car_midsuv_bev.json"))
     wc = {x["key"]: float(x["weight"]) for x in cfg["dimensions"]}
     assert set(wc) == {"powertrain", "safety", "reliability", "quality", "space",
-                       "value", "holding_cost", "adas", "control", "cabin"}, f"维度集异常: {set(wc)}"
-    scores10 = {"powertrain": 8.57, "safety": 9.0, "reliability": 8.5, "quality": 7.5,
-                "space": 8.7, "value": 8.29, "holding_cost": 9.5, "adas": 6.0,
-                "control": 9.2, "cabin": 8.1}
-    assert abs(TA.weighted_total(scores10, wc) - 85.1) < 0.3, \
-        f"10 维加权总分应≈85.1（页面曾算出 67.3），实际 {TA.weighted_total(scores10, wc)}"
+                       "value", "adas", "control", "cabin"}, f"维度集异常: {set(wc)}"
+    scores9 = {"powertrain": 8.57, "safety": 9.0, "reliability": 8.5, "quality": 7.5,
+               "space": 8.7, "value": 8.29, "adas": 6.0,
+               "control": 9.2, "cabin": 8.1}
+    assert abs(TA.weighted_total(scores9, wc) - 84.3) < 0.3, \
+        f"9 维加权总分应≈84.3，实际 {TA.weighted_total(scores9, wc)}"
     pool = json.load(open(os.path.join(HERE, "runs", "midsuv_bev_pool_202611_final.json"),
                           encoding="utf-8"))
     cand = next(x for x in pool["candidates"] if x["model"].startswith("特斯拉 Model Y"))
-    ann = TA.annotate_all([dict(cand, scores=scores10)], cfg)["特斯拉 Model Y"]
+    ann = TA.annotate_all([dict(cand, scores=scores9)], cfg)["特斯拉 Model Y"]
     bt = next(t for t in ann["trims"] if t["name"] == ann["best_trim"])
-    # 真正的不变式：逐配置总分 = 该配置全 10 维按 cfg 权重加权（不许任何维被滤掉）
+    # 真正的不变式：逐配置总分 = 该配置全 9 维按 cfg 权重加权（不许任何维被滤掉）
     assert abs(bt["total"] - TA.weighted_total(bt["scores"], wc)) < 0.15, \
         f"逐配置总分未按全量维求和: {bt['total']} vs {TA.weighted_total(bt['scores'], wc)}"
-    only8 = sum(bt["scores"].get(k, 0) * wc[k] for k in
-                ("powertrain", "safety", "quality", "space", "value", "adas", "control", "cabin")) * 10
-    assert bt["total"] - only8 > 3, \
-        f"旧 8 维白名单会少算 {bt['total'] - only8:.1f} 分，本测试失去防护意义"
     assert bt["total"] > 80, f"Model Y 逐配置总分仍异常偏低: {bt['total']}"
 
-    # ④ 页面：10 维列 + 标题 + 总分与 10 维加权一致
-    html_p = os.path.join(HERE, "runs", "midsuv_bev_202611_v1082", "榜单.html")
-    assert os.path.exists(html_p), "缺少十维出榜产物"
+    # ④ 页面：9 维列 + 标题 + 总分与 9 维加权一致；保值率仍在事实列展示
+    html_p = os.path.join(HERE, "runs", "midsuv_bev_202611_v1097", "榜单.html")
+    assert os.path.exists(html_p), "缺少 9 维出榜产物（v1097）"
     html = open(html_p, encoding="utf-8").read()
-    assert "10 维原始分" in html, "总分构成标题未随维度数变化"
-    assert "可靠性" in html and "持有成本" in html, "页面缺拆维后的两列"
+    assert "9 维原始分" in html, "总分构成标题未随维度数变化"
+    assert "可靠性" in html, "页面缺拆维后的可靠性列"
+    assert "三年保值率" in html and "仅展示·不计分" in html, "保值率未以事实列展示"
     rows = [t for t in re.findall(r"<tr[^>]*>(.*?)</tr>", html, re.S)
-            if "Model Y" in t and len(re.findall(r"[0-9]\.\d", t)) >= 11]
+            if "Model Y" in t and "取「评分配置分」" in t]
     assert rows, "总分构成表找不到 Model Y 行"
     row = rows[0]
     txt = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", row)).strip()
-    nums = [float(x) for x in re.findall(r"[0-9]+\.\d", txt)][-11:]
-    assert len(nums) == 11, f"行内应有 10 维 + 总分，实际 {nums}"
-    # 页面总分取「评分配置分」（含逐配置 delta），与车系加权 Σ 有意不同但必须披露；
-    # 关键是页面总分与报告同源（旧白名单下这里会差 15+ 分）
+    nums = [float(x) for x in re.findall(r"[0-9]+\.\d", txt)][-10:]
+    assert len(nums) == 10, f"行内应有 9 维 + 总分，实际 {nums}"
     assert "取「评分配置分」" in row, "页面总分口径未披露（配置锚 vs 车系加权）"
-    rep = open(os.path.join(HERE, "runs", "midsuv_bev_202611_v1082", "report.md"),
+    rep = open(os.path.join(HERE, "runs", "midsuv_bev_202611_v1097", "report.md"),
                encoding="utf-8").read()
-    rep_line = next(l for l in rep.splitlines() if "特斯拉 Model Y" in l and l.startswith("| 1 |"))
+    rep_line = next(l for l in rep.splitlines() if "特斯拉 Model Y" in l and l.startswith("| 3 |"))
     rep_total = float([x.strip() for x in rep_line.split("|") if x.strip() and
                        re.match(r"^8\d\.\d$", x.strip())][0])
-    assert abs(rep_total - nums[10]) < 0.1, \
-        f"页面总分与报告不同源: 页面 {nums[10]} vs 报告 {rep_total}"
+    assert abs(rep_total - nums[9]) < 0.1, \
+        f"页面总分与报告不同源: 页面 {nums[9]} vs 报告 {rep_total}"
 
-    # ⑥ 第二个根因：证据闸门跳过"整维没有分"的车 → 该维永久留空、权重和只剩 0.8
+    # ⑥ 第二个根因：证据闸门跳过"整维没有分"的车 → 该维永久留空、权重和不满
     cands = [dict(c, scores=dict(c.get("scores") or {})) for c in pool["candidates"]]
     RS.apply(cands)          # 写 reliability_detail（无频度信号 → None）
-    HC.apply(cands)          # 写 holding_cost_detail（C级/未覆盖 → None）
-    EG.apply_all(cands, only=["reliability", "holding_cost"])
+    HC.apply(cands)          # 持有成本已退出计分，但仍算事实（C级/未覆盖 → None）
+    EG.apply_all(cands, only=["reliability"])
     for c in cands:
-        for dim in ("reliability", "holding_cost"):
-            v = (c.get("scores") or {}).get(dim)
-            assert isinstance(v, (int, float)), \
-                f"{c['model']} 的 {dim} 未被插补（页面会留空、总分被压低）: {v}"
+        v = (c.get("scores") or {}).get("reliability")
+        assert isinstance(v, (int, float)), \
+            f"{c['model']} 的 reliability 未被插补（页面会留空、总分被压低）: {v}"
     html_now = open(html_p, encoding="utf-8").read()
-    for dim_cn in ("可靠性", "持有成本"):
-        assert f"{dim_cn}：本车该维无有效分" not in html_now, \
-            f"页面仍有车的「{dim_cn}」留空（权重和不完整）"
+    assert "可靠性：本车该维无有效分" not in html_now, \
+        "页面仍有车的「可靠性」留空（权重和不完整）"
 
     # ⑤ 证据闸门与产品力口径：两新维有策略、保值率不进产品力
     assert "reliability" in EG.DIM_POLICY and "holding_cost" in EG.DIM_POLICY, "证据闸门缺拆维策略"
     assert "reliability" in VR.PROD_DIMS, "可靠性应计入产品力（同价位段残差）"
     assert "holding_cost" not in VR.PROD_DIMS, "保值率不是产品力，不得再进性价比（防双计）"
-    return ("10 维全量求和(逐配置 85.1 不再掉到 67.x) + 缺分车按中位插补给分(不再留空拖低总分) "
+    return ("9 维全量求和(逐配置 84.3 不再掉到 67.x) + 缺分车按中位插补给分(不再留空拖低总分) "
             "+ 频度归可靠性/召回归严重度 "
             f"+ 保值率 {my['resale']:g}%→{my['score']}、C级 {disp[0]} 不计分 "
-            "+ 页面十列与加权一致 + 保值率不进产品力")
+            "+ 页面九列与加权一致 + 保值率只展示不入分")
 
 
 def t162():
@@ -5947,6 +5940,44 @@ def t170():
         md = _j.load(open(mfile, encoding="utf-8"))
         assert len(md["models"]) > 300, f"全车型索引过小：{len(md['models'])}"
     return "销量索引：能源四级判定/未发布月报错/只留3个月，缓存离线可查"
+
+
+def t171():
+    """BUG-171：跨能源页把不可比的名次当结论（v10.75.1）。
+
+    用户 2026-11-26：「不同能源形式的环境加分页面是不是删掉打分榜好，就保留环境条件
+    以及能源形式的推荐，让用户找具体的能源形式榜单」，并拍板「直接出选能源版」。
+    修法：新增 `build_energy_form_guide.py`，只服务端渲染 11 项用车条件 + 能源形式适配
+    （最适配/可考虑/次选/不建议 + 样本数 + 家族明细），不列任何跨能源车型名次，
+    不点名池内最强车，末尾引导去对应能源的单能源榜。
+    锁死：①不调用 sections_html（不会带出任何排名区块）；②页内无「打分主榜/综合分排名」；
+    ③有「具体车型去哪看」与单能源榜引导；④_narrative 不出现「最强一款」。
+    """
+    from modules.board import build_energy_form_guide as G
+    src = _read("modules/board/build_energy_form_guide.py")
+    assert "sections_html" not in src, "选能源版不得调用跨能源区块渲染（会带出排名表）"
+    for bad in ("main_board", "tiers", "band_subboards", "product_power", "three_board"):
+        assert f'"{bad}"' not in src, f"选能源版仍引用排名区块 {bad}"
+    assert "不排名" in src and "单能源榜" in src, "选能源版未写明不排名/去单能源榜"
+    # 形式结论不得点名最强车型
+    forms = [{"power": "PHEV", "n": 11, "avg": 85.2, "avg_adj": 1.0, "hard": 0,
+              "bad": 0, "label": "最适配", "members": []},
+             {"power": "BEV", "n": 8, "avg": 83.7, "avg_adj": 0.4, "hard": 1,
+              "bad": 2, "label": "可考虑", "members": []},
+             {"power": "FUEL", "n": 2, "avg": 80.0, "avg_adj": 0.0, "hard": 0,
+              "bad": 0, "label": "样本不足", "members": []}]
+    narr = G._narrative(forms)
+    assert "最适配" in narr and "插混" in narr, f"形式结论异常: {narr}"
+    assert "最强" not in narr and "第一" not in narr, f"形式结论不得点名最强车: {narr}"
+    assert "单能源榜" in narr, "形式结论未引导去看单能源榜"
+    # 真实产物若已生成，锁死页面结构
+    p = os.path.join(HERE, "runs", "midsuv_202610_选能源版.html")
+    if os.path.exists(p):
+        html = open(p, encoding="utf-8").read()
+        assert "能源形式适配" in html and "具体车型去哪看" in html, "选能源版缺核心区块"
+        assert "打分主榜" not in html and "综合分排名" not in html, "选能源版仍残留排名区块"
+        assert "纯电榜" in html and "插混榜" in html, "缺单能源榜入口"
+    return "选能源版：条件+形式适配+单榜导航，无跨能源名次、无最强车点名"
 
 
 def t167():
@@ -6592,7 +6623,7 @@ def t146():
 
 
 TESTS = [t001, t002, t003, t004, t005, t006, t007, t008,
-         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120, t121, t122, t123, t124, t125, t126, t127, t128, t129, t130, t131, t132, t133, t134, t135, t136, t137, t138, t139, t140, t141, t142, t143, t144, t145, t146, t147, t148, t149, t150, t151, t152, t153, t154, t155, t156, t157, t158, t159, t160, t161, t162, t163, t164, t165, t166, t167, t168, t169, t170]
+         t009, t010, t011, t012, t013, t014, t015, t016, t017, t018, t019, t020, t021, t022, t023, t024, t025, t026, t027, t028, t029, t030, t031, t032, t033, t034, t035, t036, t037, t038, t039, t040, t041, t042, t043, t044, t045, t046, t047, t048, t049, t050, t051, t052, t053, t054, t055, t056, t057, t058, t059, t060, t061, t062, t063, t064, t065, t066, t067, t068, t069, t070, t071, t072, t073, t074, t075, t076, t077, t078, t079, t080, t081, t082, t083, t084, t085, t086, t087, t088, t089, t090, t091, t092, t093, t094, t095, t096, t097, t098, t099, t100, t101, t102, t103, t104, t105, t106, t107, t108, t109, t110, t111, t112, t113, t114, t116, t118, t119, t120, t121, t122, t123, t124, t125, t126, t127, t128, t129, t130, t131, t132, t133, t134, t135, t136, t137, t138, t139, t140, t141, t142, t143, t144, t145, t146, t147, t148, t149, t150, t151, t152, t153, t154, t155, t156, t157, t158, t159, t160, t161, t162, t163, t164, t165, t166, t167, t168, t169, t170, t171]
 
 
 def run():

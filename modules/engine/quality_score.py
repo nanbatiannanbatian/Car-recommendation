@@ -433,7 +433,7 @@ def coverage(cands: list[dict]) -> dict:
 def report(cands: list[dict]) -> str:
     cov = coverage(cands)
     lines = [
-        "# 质量与品控（10 维榜中的严重度维）",
+        "# 质量与品控（严重度维，频度归可靠性）",
         "",
         "> 本维度只进综合打分榜；配置级事实榜不改名次。车型级、10 分制，当前权重见品类配置 **6%**"
         "（v10.74 拆维后：频度归「可靠性」，本维只吃问题性质的严重度）。",

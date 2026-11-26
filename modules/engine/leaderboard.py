@@ -1709,6 +1709,27 @@ def top_table(cands: list[dict], cfg: dict, weights: list[float] | None = None,
                  "三电/空间/性价比是纸面可判定维，永不带 ≈。"
                  "页面「总分构成」同一口径（虚线下划线＋≈，悬停看锚点与样本数）。")
         L.append("")
+    # v10.75.0：持有成本退出计分，但三年保值率仍是可查事实（只展示、不入任何分数）
+    try:
+        from modules.engine import experience_score as _ES
+        from modules.contracts.model_names import canon as _canon
+        _vals = (_ES.load_residual_values() or {}).get("values") or {}
+        _rv = {_canon(k): v for k, v in _vals.items() if isinstance(v, (int, float))}
+    except Exception:
+        _rv = {}
+    _rates = [(r["model"], _rv.get(_canon(r["model"]))) for r in ranked]
+    if any(isinstance(x[1], (int, float)) for x in _rates):
+        L.append("### 三年保值率（仅展示·不计分）")
+        L.append("")
+        L.append("> 保值率是持有成本的市场结果，不是产品能力；v10.75.0 起完全退出计分，"
+                 "无同口径数据的车如实留空、不插补。")
+        L.append("")
+        L.append("| 车型 | 三年保值率 | 说明 |")
+        L.append("|---|---|---|")
+        for m, rate in _rates:
+            L.append(f"| {m} | " + (f"{float(rate):g}% | 仅展示" if isinstance(rate, (int, float))
+                                    else "— | 无同口径数据") + " |")
+        L.append("")
     L.append("> 证据 A＝有官方碰撞成绩；B＝上市半年以上、口碑样本够；C＝新上市或样本不足。"
              "C 级车型的名次只说明「参数表打得好看」，不构成推荐。")
     L.append("> 「气囊 侧/帘/中」＝前排侧气囊 / 前后排头部气帘 / 前排中央（远端）气囊，"
