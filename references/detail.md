@@ -1340,7 +1340,7 @@ safety sd 为 0.000 / 0.050 / 0.075 / 0.260，18% 权重失效；而月度已改
 ### 4 新增：202610 燃油/混动四榜（紧凑型/中型 × 轿车/SUV）
 
 四个新模块：`ice_sales.py`（销量）、`build_ice_pool.py`（候选池）、
-`ice_scoring.py`（代理分）、`ice_board.py`（报告），配置 `categories/car_ice_phev.json`。
+`ice_scoring.py`（代理分）、`ice_board.py`（报告），配置内置品类 `car_ice_phev`（代码化随包）。
 
 - **动力分类互斥完备**：懂车帝 `new_energy_type` `0=燃油/HEV`、`1=纯电`、`2=插混`、
   `3=增程`、`4=一车多动力未拆车系名`。入池 `0+2+3`（388 款），排除 `1+4`（278 款）；

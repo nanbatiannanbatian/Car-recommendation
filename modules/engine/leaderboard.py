@@ -48,12 +48,26 @@ CAT_DIR = str(paths.CAT_DIR)
 
 # ---------------------------------------------------------------- 配置
 def list_categories() -> list[str]:
-    if not os.path.isdir(CAT_DIR):
-        return []
-    return sorted(f[:-5] for f in os.listdir(CAT_DIR) if f.endswith(".json"))
+    # 内置配置（代码化随包）与 categories/ 目录成员合并展示，新装包 --list 不漏品类。
+    from modules.contracts.builtin_categories import BUILTIN as _BUILTIN
+    names = set(_BUILTIN)
+    if os.path.isdir(CAT_DIR):
+        names.update(f[:-5] for f in os.listdir(CAT_DIR) if f.endswith(".json"))
+    return sorted(names)
 
 
 def load_category(cid: str) -> dict:
+    # 内置配置（纯规则，代码化随包）优先：新装包无 categories/ 目录时仍可用。
+    # 返回浅拷贝防调用方改配置污染全局；嵌套结构用 deepcopy 彻底隔离。
+    try:
+        from modules.contracts.builtin_categories import BUILTIN as _BUILTIN
+    except ImportError:
+        _BUILTIN = {}
+    if cid in _BUILTIN:
+        import copy
+        cfg = copy.deepcopy(_BUILTIN[cid])
+        cfg["_id"] = cid
+        return cfg
     path = str(paths.cat(cid + ".json"))
     if not os.path.exists(path):
         raise FileNotFoundError(f"未找到品类配置：{path}")

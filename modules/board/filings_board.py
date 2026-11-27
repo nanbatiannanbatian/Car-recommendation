@@ -83,12 +83,27 @@ def norm(s):
 
 
 def infer_power(name, note):
-    """从车名/tech 文本推断能源（申报库无 power 字段）。"""
+    """从车名/tech 文本推断能源（申报库无 power 字段）。
+
+    v10.75 修复：原版只认「纯电/BEV」字面词，若申报条目写「宁德时代电池+5C超充」
+    而不写「纯电」会被推断为 None，筛选逻辑「推断不到时保留」会把纯电车混进
+    纯燃油/油混榜的申报区（实例：αS5=极狐阿尔法S5 纯电轿车混入纯油榜）。
+    补电池/补能/电机特征词识别；HEV/PHEV/EREV 关键词优先，避免「48V轻混+电池」
+    被误判为纯电。
+    """
     t = (name or "") + " " + (note or "")
-    if "纯电" in t or "BEV" in t.upper(): return "BEV"
-    if "增程" in t or "EREV" in t.upper(): return "EREV"
-    if "插混" in t or "PHEV" in t.upper(): return "PHEV"
-    if "油混" in t or "HEV" in t.upper(): return "HEV"
+    tu = t.upper()
+    # 混动/增程优先（「48V轻混+电池」「插混+电池」不能被判成纯电）
+    if "增程" in t or "EREV" in tu: return "EREV"
+    if "插混" in t or "插电" in t or "PHEV" in tu: return "PHEV"
+    if "油混" in t or "HEV" in tu or "双擎" in t or "轻混" in t: return "HEV"
+    if "纯电" in t or "BEV" in tu: return "BEV"
+    # 无「纯电」字面但含纯电强特征（电池供应商/超充/续航里程/驱动电机/kWh）
+    bev_marks = ("超充", "快充", "宁德时代电池", "磷酸铁锂", "三元锂", "kwh",
+                 "驱动电机", "单电机", "双电机", "电机总功率", "前备厢", "cltc")
+    if any(m.lower() in t.lower() for m in bev_marks):
+        if "续航" in t or "km" in t.lower() or "电池" in t or "电机" in t:
+            return "BEV"
     return None
 
 
@@ -274,9 +289,18 @@ if __name__ == "__main__":
         assert st_live["stale"] is False, "联网核实到当天应消除告警"
         assert st_live["days"] == 0, "联网核实当天 days 应为 0"
         print("FRESHNESS GATE OK: verified_as_of=今天 -> stale=False; 本地缓存 days=", st_old["days"])
+        # 能源推断回归：无「纯电」字面但含电池/超充特征的车必须判 BEV，
+        # 否则会混进纯燃油榜申报区（αS5=极狐阿尔法S5 真实踩坑）
+        assert infer_power("αS5", "192线激光雷达+5C超充；宁德时代电池") == "BEV", \
+            "αS5 应判 BEV（电池/超充特征），不能漏判混入纯油榜"
+        assert infer_power("某车", "48V轻混+电池") == "HEV", "轻混不得误判纯电"
+        assert infer_power("某车", "插混+电池+续航") == "PHEV", "插混不得误判纯电"
+        assert infer_power("汽油中型车", "2.0T 涡轮增压") is None, "纯燃油不得误判纯电"
         fs = load_filings(verified_as_of=a.verified_as_of)
         jy = next((f for f in fs if "家越07纯电" in f["model"]), None)
         assert jy and jy["power"] == "BEV", "家越07纯电版申报数据/能源缺失"
+        a5 = next((f for f in fs if f["model"] == "αS5"), None)
+        assert a5 and a5["power"] == "BEV", "αS5 能源推断失败（纯电轿车混入纯油榜）"
         assert jy["ref_car"] == "MG 07 纯电", "参考车关系丢失"
         rs = ref_scores(jy["ref_car"])
         assert rs and rs["value"] >= 9.0, "MG07参考分异常"

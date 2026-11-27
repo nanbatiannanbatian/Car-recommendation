@@ -587,7 +587,7 @@ def main():
         "（设计上限 22%，v6.6 已由漂移的 24% 回调至该值；此处从配置实配值动态读取，"
         "不再在模板里写死百分比）。回调对四榜 Top10 交集无影响（10/10），"
         "仅影响个别靠销量撑档的车型是否进第 1 档——见下方三档分级。"
-        "旧 24% 配置留档 `categories/car_ice_phev.json.bak-24pct`。", "",
+        "旧 24% 配置留档（历史快照，不随包）。", "",
         f"> **插补比例要说清**：space / control / cabin / quality 四维真实覆盖均只有 "
         f"{audit['coverage'].get('space', 0)}/{audit['n_rows']}（{_cov_pct:.1f}%），"
         f"其余 {audit['imputed'].get('space', 0)} 款靠同榜中位插补。"

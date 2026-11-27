@@ -190,7 +190,8 @@ def main():
     log(f"=== 月度出榜 {ym}（{note}）===", logf)
 
     if not os.path.exists(a.baseline):
-        raise SystemExit(f"基准候选池不存在：{a.baseline}")
+        hint = paths.missing_hint("baseline_car_ev.json")
+        raise SystemExit(f"基准候选池不存在：{a.baseline}\n{hint}")
 
     # 1 基准池 → 当月副本
     base = os.path.join(mdir, "candidates_base.json")

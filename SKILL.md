@@ -13,7 +13,7 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 10.75.1
+version: 10.76.0
 author: "nanbatiannanbatian"
 ---
 
@@ -69,14 +69,19 @@ paths.py       全项目路径唯一事实源（ROOT/cat()/gen()）+ 生成物�
 - `build_release.EXCLUDE_ALL_JSON` 总闸门：**所有 `.json` 都不打包**（包解压后 1929KB）。
 - `sync_to_repo.SKIP_SUFFIX` 含 `.json`：**GitHub 仓库不再存任何 JSON**（v10.6.0 从仓库删除 43 个 JSON）。
   用户 2026-11-21 明确："上传 GitHub 的时候不上传 JSON 文件。" 新增 JSON 自动被两处总闸门排除。
-- **新装包数据获取**（v10.6.0 起）：
-  1. 人工事实库（气囊/物理参数/基线池/manual trims 等 41 个 JSON）：仓库与发布包都不带，
-     需从数据分发渠道单独获取（或按 `bootstrap_data.py --check` 的命令逐项联网重建可重建项）。
+- **新装包数据获取**（v10.76.0 定稿，2026-11-27 用户拍板）：
+  1. **运行时自动建空骨架**：`pipeline.py` 启动即调 `modules/data/runtime_data.ensure_skeleton()`——
+     缺 `categories/`、根目录安全成绩库等就自动写**结构合法、不含任何车辆事实**的空骨架
+     （带 `_runtime_skeleton` 标记），保证零 JSON 新装包不崩、能出榜。幂等，绝不覆盖已有真库。
+  2. **数据未就绪要显式告知**：骨架态下依赖人工库的门禁（碰撞展示/级别/完整性/一致性/安全分等）
+     统一经 `runtime_data.gate_degraded()` 降级为告警（真库存在时恒硬拦，不能拿骨架态绕过质量门禁）；
+     产物目录写 `数据未就绪提示.md`，列清每项是空骨架及重建命令，并声明"仅供流程验证，不是可信结论"。
+  3. `python3 -m modules.data.runtime_data --check` 查看骨架清单与重建命令；
+     `python3 bootstrap_data.py --apply` 重建生成物（trims/ice_crash/cell_facts）。
+     用户按提示联网/人工补回真库后重跑，所有门禁自动恢复硬拦。
      `modules/research/data_bootstrap.py` 已停用（原从 GitHub 补回，仓库已无 JSON 数据源）。
-  2. `python3 bootstrap_data.py --apply` —— 重建 3 个生成物（trims/ice_crash/cell_facts），
-     每项都有命令、联网标记与前置说明；`--check` 体检。
-- 旧判据（`paths.GENERATED_JSON` 可重建 / `CURATED_JSON` 人工事实库必须随包）保留作**数据分类**，
-  但不再决定打包：现在统一由总闸门排除、由 data_bootstrap + bootstrap_data 两条链路补回。
+- 旧判据（`paths.GENERATED_JSON` 可重建 / `paths.CURATED_JSON` 人工事实库）保留作**数据分类**，
+  但不再决定打包：统一由总闸门排除；空骨架层兜底运行时、bootstrap 重建生成物、用户按需补人工库。
   本地源码树与 GitHub 仓库仍保留全部 JSON（回归测试与补回源都靠它们）。
 
 **为什么这么分**（可独立发布性）：`research` 与 `physics` 是真正的独立 skill（取数检索 / 续航估算），
@@ -296,7 +301,7 @@ HTML/报告用 `--as-of <YYYYMM>` 标注事实列数据月，禁止停在"—"�
 **凡是"正式排行榜"（A/B 两类都算），一律走下面这一套，不许另起炉灶、不许写简版脚本、不许自拼榜单表格。** 前车之鉴：2026-11-20 图快写了 `build_bev_midsedan_202610.py` 简版，只从销量榜 Top 挑 9 款、丢 15 款车型、丢全部区块、还用 Agent 临时补采分顶替已核验正式分 → 用户质疑"少了很多项、排名完全不一样、只有9款"。**这类简版今后一律禁止。**
 
 **① 候选池（唯一来源，不许临时拼）**
-- 权威母池 = `categories/baseline_car_ev.json`（人工维护基准源）；出榜候选优先用 `categories/` 下**已打指纹**的池（`score_fingerprint.py --stamp`，带 `_generated_by`）。
+- 权威母池 = 纯电基线人工池（baseline_car_ev，人工维护基准源）。**数据文件不随发布包分发**，需从数据分发渠道单独获取（新装包按 `bootstrap_data.py --check` 确认可重建项）；出榜候选优先用 `categories/` 下**已打指纹**的池（`score_fingerprint.py --stamp`，带 `_generated_by`）。
 - 已核验的领域快照（如 `runs/midsedan_bev_1218_202610/candidates_allprice.json` 25款）可作候选，**分数一律复用其中已核验的 `scores`**，不许用 Agent 补采分顶替。
 - "销量榜 Top" ≠ 候选全集：只能做候选发现器，绝不直接当入池名单（会系统性漏车）。
 - 用 `runs/` 下无指纹快照必须 `--force-stale`，并在报告显著标注"过期/强制出榜"。

@@ -176,6 +176,20 @@ def main():
                          "正常出子榜必须开锚点池，否则同车跨榜分数不一致）")
     a = ap.parse_args()
 
+    # v10.76.0：发布包零 JSON，新装包解压后 categories/ 与 data/gen/ 都不存在。
+    # 先建结构合法的空骨架（幂等，绝不覆盖已有数据），保证后续读取链路不崩；
+    # "数据未初始化"状态会被下面的门禁识别并显式降级，而不是误判成回流链路坏了。
+    from modules.data import runtime_data as RT
+    _rt = RT.ensure_skeleton(verbose=True)
+    _degraded_gates: list[str] = []   # 骨架态降级的门禁清单 → 产物提示文件
+
+    def _degrade(lib: str, gate: str) -> bool:
+        """统一骨架态降级判定：真库存在时恒 False，门禁照旧硬拦。"""
+        if RT.gate_degraded(lib, gate):
+            _degraded_gates.append(f"{gate}（依赖 {lib}，空骨架）")
+            return True
+        return False
+
     cfg = L.load_category(a.category)
     errs = L.validate(cfg)
     if errs:
@@ -409,11 +423,17 @@ def main():
     # 碰撞展示门禁（v10.5.0）：有权威成绩来源却仍显示「—/在测」= 回流链路失效
     # （车名归一化漂移/字段改名/新数据源没接），必须硬拦，不许只在报告里写「有成绩」。
     _display_leaks = FS.crash_display_leaks(cands)
-    if _display_leaks:
+    # v10.76.0：区分「数据未初始化」与「有数据但回流坏了」。
+    # 新装包的安全成绩库是刚建的空骨架，无法回流——这不是回流链路故障，
+    # 必须显式告知用户"骨架态不校验"，绝不是静默跳过；真库缺成绩仍照旧硬拦。
+    if _display_leaks and _degrade("safety_scores.json", "碰撞展示门禁"):
+        print(f"[碰撞展示门禁] {len(_display_leaks)} 款成绩暂不可回流，本次未校验展示。")
+    elif _display_leaks:
         sys.exit("碰撞展示门禁：以下车型有可核验权威碰撞成绩，但页面仍无成绩显示：\n"
                  + "\n".join(f"  - {x['model']}：{x['sources']}" for x in _display_leaks)
                  + "\n→ 查 facts_sync 的成绩回流与 model_names.canon，不许改渲染层绕过。")
-    print(f"[碰撞展示门禁] 全池 {len(cands)} 款，有成绩来源但未显示 0 款")
+    else:
+        print(f"[碰撞展示门禁] 全池 {len(cands)} 款，有成绩来源但未显示 0 款")
 
     # 成绩→分数自动映射（2026-11-21）：表外但有碰撞成绩的车，按 official_safety_scores.json
     # 的 map_spec 算出 safety 分。不映射等于成绩白采（safety 仍按无成绩车插补）。
@@ -595,7 +615,9 @@ def main():
     if _exp_gaps:
         _gap_lines = [f"  - {g['model']}({g['dim']}/{g['kind']}) 来源:{g.get('source','候选池文本')}"
                       f" — {g['fix']}" for g in _exp_gaps]
-        if not getattr(a, "skip_experience_gap", False):
+        if _degrade("experience_facts.json", "体验证据缺口门禁"):
+            pass
+        elif not getattr(a, "skip_experience_gap", False):
             sys.exit("体验证据缺口门禁：以下车型有实测文本但证据库无条目（会被误判零实测封顶）：\n"
                      + "\n".join(_gap_lines[:8])
                      + "\n→ 用 research.fill_experience.extract_driving_evidence 提取候选证据，"
@@ -632,7 +654,10 @@ def main():
     _allow_cls = ((cfg.get("gates") or {}).get("class") or {}).get("allow") or []
     if _allow_cls:
         _lvl = _LG.audit(cands, _allow_cls)
-        if _lvl["rejected"] or _lvl["unverified"]:
+        if (_lvl["rejected"] or _lvl["unverified"]) and _degrade("levels.json", "级别口径门禁"):
+            bad = _lvl["rejected"] + _lvl["unverified"]
+            print(f"[级别口径门禁] {len(bad)} 款无官方级别缓存，骨架态未校验（候选池自带 cls 原样采用）。")
+        elif _lvl["rejected"] or _lvl["unverified"]:
             bad = _lvl["rejected"] + _lvl["unverified"]
             sys.exit("级别口径门禁：以下候选不符合本榜官方级别口径：\n"
                      + "\n".join(f"  {x['model']}：{x['reason']}" for x in bad[:12])
@@ -649,7 +674,9 @@ def main():
     _lrev = data.get("lifecycle_reviewed") or {}
     if _lrev and not getattr(a, "skip_lifecycle_gate", False):
         _unverified = [r for r in (_lrev.get("reviewed") or []) if not r.get("status")]
-        if _unverified:
+        if _unverified and _degrade("lifecycle_status.json", "生命周期症状门禁"):
+            print(f"[生命周期症状门禁] {len(_unverified)} 款未核验，骨架态未拦截。")
+        elif _unverified:
             sys.exit("生命周期症状门禁：以下车销量骤降但未核验，不得出榜：\n"
                      + "\n".join(f"  {r.get('model')}（{r.get('detected')}）："
                                  f"{r.get('values')} {r.get('reasons', [''])[0]}"
@@ -689,7 +716,8 @@ def main():
         if str(_st.get("status") or "").lower() in ("discontinued", "stopped"):
             _dead.append((_c.get("model"), _st.get("date") or "?",
                           _st.get("successor") or "", str(_st.get("note") or "")[:60]))
-    if _dead and not getattr(a, "allow_discontinued", False):
+    if _dead and not getattr(a, "allow_discontinued", False) \
+            and not _degrade("lifecycle_status.json", "生命周期确证门禁"):
         sys.exit("生命周期门禁：以下候选已停产停售，不得进主榜（lifecycle_status.json 确证）：\n"
                  + "\n".join(f"  {m}（{d}停产；继任{s}）：{n}" for m, d, s, n in _dead)
                  + "\n→ 从候选池移出+写进 pool_excluded，或确认已复产并更新 lifecycle_status.json。"
@@ -711,7 +739,7 @@ def main():
         _ur = TC.check_universe(a.candidates, _univ, data.get("pool_excluded", []))
         # v10.62 根因修复：清单格式读不到车名必须硬拦。
         # 旧版只查 not_covered，names 字段清单被读成 0 款→静默跳过→漏收腾势N8 没被拦。
-        if _ur.get("error"):
+        if _ur.get("error") and not _degrade(f"universe_{a.category}.json", "完整性门禁"):
             sys.exit("完整性门禁：权威清单读取失败（拒绝静默跳过）：" + _ur["error"] +
                      f"\n→ 清单路径 {_univ}；应含 names/models 车名数组。")
         if _ur.get("available") and _ur.get("not_covered"):
@@ -727,7 +755,8 @@ def main():
     # 因为此前只有"铁律"没有可执行校验。铁律=自然语言提示，会忘；门禁=代码，不会漏。
     from modules.engine import cross_verify as XV
     _ic = XV.check_internal_consistency(cands)
-    if not _ic["passed"] and not a.skip_consistency_gate:
+    if not _ic["passed"] and not a.skip_consistency_gate \
+            and not _degrade("safety_scores.json", "内部一致性门禁"):
         lines = [f"  - {x['model']}：note「{x['note']}」 vs crash「{x['crash']}」" for x in _ic["conflicts"]]
         sys.exit("内部一致性门禁：note 文案与结构字段自相矛盾：\n" + "\n".join(lines) +
                  "\n→ 修数据（更新/删除冲突文案），不许只改展示绕过。"
@@ -791,7 +820,8 @@ def main():
     # 各体系不可跨体系套同一得分率公式，映射表见 official_safety_scores.json。
     from modules.engine import safety_check as SFC
     _sc = SFC.check(cands)
-    if not _sc["passed"] and not a.skip_safety_gate:
+    if not _sc["passed"] and not a.skip_safety_gate \
+            and not _degrade("official_safety_scores.json", "安全分严谨性门禁"):
         lines = [f"  - [{x['type']}] {x['model']}: {x['actual']} → 应 {x['expected']}" for x in _sc["issues"]]
         sys.exit("安全分严谨性门禁：\n" + "\n".join(lines) +
                  "\n→ 按 official_safety_scores.json 映射表统一有成绩车的安全分与 basis。"
@@ -817,7 +847,7 @@ def main():
     # （007GT 曾分数改8.8/basis改euro_ncap，文本却还写"无官方碰撞成绩"）。
     from modules.engine import evidence_consistency as EC
     _ec = EC.check(cands)
-    if not _ec["passed"]:
+    if not _ec["passed"] and not _degrade("official_safety_scores.json", "证据文本一致性门禁"):
         lines = [f"  - [{x['rule']}] {x['model']}: {x['basis']} / {x['text']}" for x in _ec["issues"]]
         sys.exit("证据文本一致性门禁：以下车的证据文本与结构化字段矛盾：\n" + "\n".join(lines) +
                  "\n→ 按结构化字段(safety_basis/scores)修正 score_evidence 文本，不许只改展示绕过。")
@@ -1582,6 +1612,15 @@ def main():
             import traceback as _tb
             _tb.print_exc(file=sys.stderr)
             print(f"[warn] HTML 渲染跳过（不影响榜单）：{type(ex).__name__}: {ex}", file=sys.stderr)
+
+    # v10.76.0 收尾：骨架态出榜必须留醒目的"数据未就绪"提示（不改榜单渲染层），
+    # 把本次降级的门禁逐条写进产物，用户一眼能看到"这是流程验证榜，不是可信结论"。
+    try:
+        _notice = RT.write_notice(a.out, _degraded_gates)
+        if _notice:
+            print(f"[数据骨架] ⚠ 空骨架出榜：已写 {_notice}；此为流程验证榜，不可作购车依据。")
+    except Exception as _nex:                          # 提示失败不影响榜单产物
+        print(f"[warn] 数据未就绪提示写入失败：{type(_nex).__name__}: {_nex}", file=sys.stderr)
 
 
 if __name__ == "__main__":

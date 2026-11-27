@@ -134,13 +134,51 @@ def cat(name: str) -> Path:
 
     生成物在 data/gen/ 缺失但 categories/ 还留着旧副本时回退旧副本
     （只在迁移期发生；打包后两者都不在，由调用方决定重建或报错）。
+
+    纯规则品类配置（builtin_categories.BUILTIN）：源码树保留 categories/*.json
+    供回归核对，发布包零 JSON——新装包首次调用时从内置 Python 常量物化到
+    data/gen/，让 paths.cat() 的所有直读调用方（board_v2/master_pool 等）
+    无需改代码即可工作。物化物是缓存，唯一可写源仍是 builtin_categories.py。
     """
     if name in GENERATED_JSON:
         p = GEN_DIR / name
         if not p.exists() and (CAT_DIR / name).exists():
             return CAT_DIR / name
         return p
-    return CAT_DIR / name
+    src = CAT_DIR / name
+    if src.exists():
+        return src
+    # 新装包：纯规则品类配置从代码物化（不写 categories/，回归路径语义不变）
+    try:
+        from modules.contracts.builtin_categories import BUILTIN
+    except ImportError:
+        BUILTIN = {}
+    cid = name[:-5] if name.endswith(".json") else name
+    if cid in BUILTIN:
+        dst = ensure_dir(GEN_DIR) / name
+        if not dst.exists():
+            import json as _json
+            with open(dst, "w", encoding="utf-8") as f:
+                _json.dump(BUILTIN[cid], f, ensure_ascii=False, indent=2)
+        return dst
+    # 人工事实库不进发布包：返回的路径仍缺失，提示文案由 missing_hint() 提供，
+    # 不在这里抛错（调用方可能只是探测路径），也不静默降级、不编造数据。
+    return src
+
+
+# 不进发布包的人工库：缺失时给用户的可执行提示（不伪造数据、不静默跳过）
+MISSING_HINTS = {
+    "baseline_car_ev.json": (
+        "纯电基线候选池不随发布包分发（人工核验数据，无法代码重建）。"
+        "请从数据分发渠道获取 baseline_car_ev.json 放到 categories/，"
+        "或用 --pool 指定你自己的在售候选池；年度/月度出榜必须有在售基线。"
+    ),
+}
+
+
+def missing_hint(name: str) -> str:
+    """返回缺失数据文件的可执行提示；没有登记则返回空串。"""
+    return MISSING_HINTS.get(name, "")
 
 
 def spec(name: str) -> dict:
