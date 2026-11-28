@@ -145,7 +145,7 @@ python3 ranking.py --protocol
 盖得/Consumer Reports 的护城河是**数字化测量**（残粉 0.2g、62dB、粒径分布），不是定性「好用」。`leaderboard.py` 证据层把来源分三级：**量化实测 > 一手 > 二手**——独立来源 + 正文有「数字+单位+测量语境」才算量化实测；有量化实测的维度 A 档门槛降一格（4→3 维），并联动 `evidence_gate`（第一权重维度须有一手及以上证据才进主榜）。`excluded_dims`（一手覆盖太薄的维度）不参与打分，剩余权重重归一化。**无量化实测支撑的维度不得写精确数值对比**（如「残粉少 0.3g」），只能做方向性判断。research.json 契约配套字段：`quant_measured: true|false`、`quant_metrics: {"残粉":"0.2g","噪音":"62dB"}`（见 research-collector/SKILL.md）。
 
 ```bash
-python3 leaderboard.py --coverage coffee_grinder_strict --candidates cands.json --research research.json
+python3 leaderboard.py --coverage car_ev --candidates cands.json --research research.json
 ```
 
 ## 品类无关排行榜引擎 leaderboard.py（v4.2）
@@ -154,7 +154,7 @@ python3 leaderboard.py --coverage coffee_grinder_strict --candidates cands.json 
 
 ```bash
 python3 leaderboard.py --list
-python3 leaderboard.py --validate coffee_grinder
+python3 leaderboard.py --validate car_midsuv_bev
 python3 leaderboard.py --slots car_ev            # 每个维度的一手证据源与缺口
 python3 leaderboard.py --render car_ev --candidates cands.json --top 10
 ```
@@ -165,12 +165,12 @@ python3 leaderboard.py --render car_ev --candidates cands.json --top 10
 |---|---|---|
 | `discovery.sources` | 候选从哪来（分级销量榜/类目榜/年度榜单） | **是** |
 | `gates` | 准入：级别/类型、动力、价格口径与带 | **是**（字段与 basis 全不同） |
-| `sales` | 销量口径与趋势化规则 | **是**（汽车=乘联会零售，咖啡机=平台评价数代理） |
+| `sales` | 销量口径与趋势化规则 | **是**（汽车=乘联会零售） |
 | `dimensions` | 维度、权重、每维的 `evidence` | 权重可借，evidence 必须重写 |
-| `boards` | 是否分榜（汽车分轿车/SUV，咖啡机单榜） | **是** |
+| `boards` | 是否分榜（汽车分轿车/SUV） | **是** |
 | `audit` | 越界/配置/促销价/单月定性检查 | 否（通用） |
 
-`--slots` 是这套引擎最有用的一个命令：它把每个维度的「一手证据源 / 厂商与二手口径 / 缺口」摊开，逼你承认哪些维度其实没证据。实测汽车 7 维里有 3 维（智驾、空间、操控）完全没有一手源，咖啡机的研磨质量有一手拆机实测但样本只有单台单次——这类缺口必须在榜上标出来，不能藏在评分里。
+`--slots` 是这套引擎最有用的一个命令：它把每个维度的「一手证据源 / 厂商与二手口径 / 缺口」摊开，逼你承认哪些维度其实没证据。实测汽车 7 维里有 3 维（智驾、空间、操控）完全没有一手源——这类缺口必须在榜上标出来，不能藏在评分里。
 
 **注意**：销量榜是「候选发现器 + 市场验证」，不是「产品评价器」。拿分级销量榜当候选来源是对的，拿它的名次当最终排名就错位了。
 
@@ -213,8 +213,7 @@ COPRAS 未被纳入：它在「全为效益型准则」时退化为加权和，�
 
 **Kendall τ 是关键读数**：τ≥0.9 说明名次是产品差异；τ<0.8 说明矩阵分辨力不足，
 此时「第 1 名是谁」不能作结论，只能说「这几款同档」。实测同一个引擎下：
-汽车轿车榜 τ=0.754（84.8 与 84.5 只差 0.3 分，算法一换就换位），
-磨豆机榜 τ=0.963（81.5 / 78.5 / 76.5 分档清楚，结论硬）。
+汽车轿车榜 τ=0.754（84.8 与 84.5 只差 0.3 分，算法一换就换位）。
 
 ### AHP 只作权重来源，不作聚合方法
 

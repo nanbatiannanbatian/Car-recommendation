@@ -11,7 +11,7 @@
 手搓的 urllib + Bing 正则解析，且在中国大陆网络下更稳定、更不易被反爬降权。
 
 推荐用法：在 WorkBuddy 对话中触发 research-collector（或 omni-debate 的「研究流程」）时说
-    「用 omni-debate 研究：1000-2000元意式磨豆机 Top10」
+    「用 omni-debate 研究：20万纯电SUV 推荐」
 本 agent（WorkBuddy）会先用 domain_search / WebFetch 联网检索、抓关键页、直接整理成
 research.json。本引擎已移除辩论/orchestrator，全程无 LLM 排序。
 额外的 OmniRoute 调用。详见 research-collector 的 SKILL.md「五步协议」。
@@ -24,14 +24,14 @@ OmniRoute（抽取应由 agent 在检索上下文里一次性完成）。如需�
 契约：research.json 的格式见本引擎 SKILL.md「统一证据采集」章节。
 依赖：仅标准库（--extract 为旧辩论引擎遗留，本包已移除，见下方提示）。
 用法：
-  python3 researcher.py --query "1000-2000元 意式磨豆机 推荐" --out runs/run1/research.json
+  python3 researcher.py --query "20万 纯电SUV 推荐" --out runs/run1/research.json
   python3 researcher.py --query "..." --backend baidu            # 链接列表级 research.json
   python3 researcher.py --list-sites                               # 列出 17 个站点级解析器
   python3 researcher.py --list-topics                              # 列出垂类画像与证据轨道
   python3 researcher.py --plan-sources --query "20万买SUV 看C-NCAP" --out runs/plan.json  # 判断门：先规划找哪些资料
-  python3 researcher.py --query "意式磨豆机" --site smzdm          # 单站点级解析（什么值得买）
-  python3 researcher.py --query "意式磨豆机" --sites smzdm,bilibili,jd   # 多站点并联检索
-  python3 researcher.py --query "意式磨豆机" --reviews             # 购物平台评价挖掘（负面证据）
+  python3 researcher.py --query "纯电SUV" --site smzdm          # 单站点级解析（什么值得买）
+  python3 researcher.py --query "纯电SUV" --sites smzdm,bilibili,jd   # 多站点并联检索
+  python3 researcher.py --query "纯电SUV" --reviews             # 购物平台评价挖掘（负面证据）
   python3 researcher.py --detect-ads runs/run1/research.json --inplace    # 广告/软广识别
   python3 researcher.py --score-authors runs/run1/research.json --inplace # 资料员评分（含广告降权）
 

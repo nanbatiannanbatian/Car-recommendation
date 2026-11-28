@@ -8,7 +8,7 @@ categories/<id>.json。换品类只换配置，不改代码。
 
   python3 leaderboard.py --list
   python3 leaderboard.py --validate car_ev
-  python3 leaderboard.py --slots coffee_grinder      # 看这个品类缺哪类证据源
+  python3 leaderboard.py --slots car_ev              # 看这个品类缺哪类证据源
   python3 leaderboard.py --render car_ev --candidates ../cands.json
 
 三类内容必须分开，混在一起就会出「拿销量榜当产品榜」这类错：
