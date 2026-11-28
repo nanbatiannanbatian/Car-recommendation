@@ -379,7 +379,90 @@ def strip_changelog(text: str, arc: str) -> str:
     head = text[:idx].rstrip()
     repo = "https://github.com/nanbatiannanbatian/Car-recommendation"
     return head + (f"\n\n---\n\n> **版本演进史（v9.0.0 起）不在 README 内**："
-                   f"完整逐版历史随包见 `references/evolution.md`，源码仓库 {repo} 亦有。\n")
+                   f"逐版要点随包见 `references/evolution.md`，源码仓库 {repo} 亦有完整逐版记录。\n")
+
+
+# v10.76.2：演进史发布包精简（源码树/GitHub 保留完整逐版记录）
+# 用户 2026-11-28 拍板「压缩演进史」解决 3MB 逼近问题。口径：
+#   - 每个 `## v...` 段保留「标题 + 第一句正文」，抹去逐条细节与验收清单；
+#   - 含活跃标识符（package_audit.LIVE_IDENTIFIERS）的行强制保留——包体检要求
+#     这些标识符在包内文档可达，删掉会让 package_audit 从 10/10 变 FAIL；
+#   - 文件头与「## 目录」段保留，但改写成精简版说明，避免误导"完整记录在本包"。
+# 从 package_audit 动态导入以消除双份清单漂移；该文件被排除出包，仅打包期在源码树用。
+try:
+    from modules.regress.package_audit import LIVE_IDENTIFIERS as _LIVE_IDS
+except Exception:                                    # 兜底：清单漂移时仍能打包，回归会拦
+    _LIVE_IDS = ("trim_coverage", "universe_build", "energy_router", "anchor_pool",
+                 "value_residual", "data_freshness", "score_fingerprint",
+                 "TIRE_PRESSURE_MULT", "TIRE_TYPE_MULT", "cell_gen", "evidence_soft",
+                 "field_sources", "NOT_IN_SOURCE_DETAIL", "EXPERIENCE_DIM_LABELS")
+
+
+def trim_evolution(text: str) -> str:
+    """把完整演进史压成「标题 + 首句 + 活跃标识符行」，源码树原文不动。"""
+    lines = text.splitlines()
+    # 头部：# 标题 + 引言 + ## 目录（到第一个 ## v 之前）
+    v_idx = next((i for i, l in enumerate(lines) if l.startswith("## v")), None)
+    if v_idx is None:
+        fail("evolution.md 结构升级：找不到 '## v' 版本段，需同步 trim_evolution 规则")
+    head = [
+        "# 版本演进史（发布包精简版：v9.0.0 – v10.x 逐版要点）",
+        "",
+        "> 本包只保留每个版本的**标题 + 第一句结论**及含活跃标识符的行，用于快速追溯"
+        "「这一版改了什么方向」。完整逐版细节（根因/方案/验收）见源码仓库的同一文件；"
+        "当前能力口径以 `SKILL.md` / `references/detail.md` 为准。",
+        "",
+        "## 目录",
+        "",
+        "- v9.x / v10.x 逐版要点，按版本号倒序排列；完整验收明细在源码仓库。",
+        "",
+    ]
+    kept: list[str] = []
+    cur_title: str | None = None
+    body_first = False
+    seen_id_lines: set[str] = set()
+
+    def flush() -> None:
+        if cur_title is not None:
+            kept.append(cur_title)
+            if _first_line:
+                kept.append(_first_line)
+            kept.extend(_id_lines)
+
+    for l in lines[v_idx:]:
+        if l.startswith("## v"):
+            flush()
+            cur_title, _first_line, body_first = l.strip(), "", False
+            _id_lines = []
+            continue
+        if cur_title is None:
+            continue
+        if not body_first and l.strip() and not l.startswith(("#", "---", ">")):
+            # 跳过子标题/分隔线/引言块，取真正的第一句正文作为版本结论
+            _first_line, body_first = l.strip(), True
+        if any(k in l for k in _LIVE_IDS) and l.strip() not in seen_id_lines:
+            seen_id_lines.add(l.strip())
+            _id_lines.append(l.rstrip())
+    flush()
+    out = "\n".join(head + kept).rstrip() + "\n"
+    if len(out.encode("utf-8")) >= len(text.encode("utf-8")) * 0.5:
+        fail(f"evolution 精简未生效（{len(out)} vs {len(text)} 字符），检查段落结构")
+    return out
+
+
+def _selftest_trim_evolution() -> None:
+    """根因回归：压缩必须省体积、保全部版本段、保原文中出现的活跃标识符。"""
+    src = (HERE / "references" / "evolution.md").read_text(encoding="utf-8")
+    out = trim_evolution(src)
+    assert len(out.encode("utf-8")) < len(src.encode("utf-8")) * 0.4, "压缩率不足 60%"
+    assert out.count("\n## v") == src.count("\n## v"), "版本段数丢失"
+    absent = [k for k in _LIVE_IDS if k in src and k not in out]
+    assert not absent, f"压缩后丢失包内必需活跃标识符：{absent}"
+    # 反向注入：删掉标识符行必须被检出（证明保留逻辑不是偶然）
+    probe = "## v9.9.9 · 探针\n### 方案\n- 首句结论\n- `universe_build` 被删前应保留\n"
+    assert "universe_build" in trim_evolution(src + probe), "标识符保留逻辑失效"
+    info(f"演进史压缩自测通过（{len(src.encode())//1024}KB→{len(out.encode())//1024}KB，"
+         f"{out.count(chr(10)+'## v')} 段，标识符全保留）")
 
 
 def rewrite_for_flat(text: str, arc: str) -> str:
@@ -440,6 +523,7 @@ def check_flat_no_collision(files):
 
 # ---- 7. 打包 -------------------------------------------------------------
 def build_zip(files):
+    _selftest_trim_evolution()
     if DIST.exists():
         shutil.rmtree(DIST)
     DIST.mkdir()
@@ -472,8 +556,12 @@ def build_zip(files):
                 text = strip_changelog(p.read_text(encoding="utf-8"), flat_rel)
                 z.writestr(arc, text)
                 uncompressed += len(text.encode("utf-8"))
+            elif flat_rel == "references/evolution.md":
+                # v10.76.2：演进史打包精简（源码/GitHub 完整版不动，仅 zip 内字节裁剪）
+                text = trim_evolution(p.read_text(encoding="utf-8"))
+                z.writestr(arc, text)
+                uncompressed += len(text.encode("utf-8"))
             else:
-                # v10.38.0：references/evolution.md 完整随包（不再滚动裁剪，自包含优先）
                 z.write(p, arc)
                 uncompressed += p.stat().st_size
     size = out.stat().st_size
