@@ -145,17 +145,53 @@ def check_readme_sections(readme: str, results: list, is_package: bool = True) -
                f"{len(readme.encode('utf-8'))/1024:.1f}KB")
 
 
+# ---- 检查 6：零 JSON 包——文档不得把数据写成"包内路径" ----------------------
+# 平台"文件质量检测"会把反引号/正文里的 `categories/<具体文件名>.json` 判为
+# "内置文件缺失"（2026-11-28 驳回 4 项即此因）。但 v10.6.0 起发布包零 JSON：
+# 这些数据运行时由 runtime_data.ensure_skeleton 建空骨架、用户按需联网重建。
+# 文档一律只写逻辑数据名（裸文件名）；命令行占位写 <运行时 categories 子目录>/xxx.json。
+ALL_PACKAGE_MD = (
+    "SKILL.md", "README.md", "MODULES.md", "PHEV_SCENE_GUIDE.md",
+    "references/detail.md", "references/evolution.md",
+    "references/燃油混动打分口径.md", "references/用车条件因素库.md",
+    "VDH_LIFECYCLE_RUNBOOK.md", "research/README.md",
+)
+CATEGORY_PATH_RE = re.compile(r"categories/([A-Za-z0-9_.-]+\.json)")
+
+
+def _category_path_hits(texts: dict[str, str]) -> list[str]:
+    hits = []
+    for name, text in texts.items():
+        for m in CATEGORY_PATH_RE.finditer(text):
+            hits.append(f"{name}:categories/{m.group(1)}")
+    return hits
+
+
+def check_no_bundled_category_paths(texts: dict[str, str], results: list) -> None:
+    hits = _category_path_hits(texts)
+    _check(results, f"零JSON文档无包内JSON路径(扫描{len(texts)}份md)", not hits,
+           "; ".join(hits[:10]) + ("…" if len(hits) > 10 else ""))
+
+
+def _selftest_category_paths() -> None:
+    """反向注入：故意塞一条违规写法，必须被检出。"""
+    assert _category_path_hits({"__probe__": "读 `categories/airbags.json`"}), \
+        "检查6 失效：违规包内路径未被检出"
+
+
 # ---- 运行 -------------------------------------------------------------------
 def audit_source() -> list[tuple[str, bool, str]]:
     """源码树体检（快速，钩子用）。"""
     results: list[tuple[str, bool, str]] = []
     texts = {Path(p).name: _read(HERE / p) for p in PACKAGE_MD}
+    all_texts = {p: _read(HERE / p) for p in ALL_PACKAGE_MD}
     names = {f.name for f in HERE.rglob("*") if f.is_file()}
     check_self_contained(texts, results)
     check_links(texts, names, results)
     check_doc_code(texts, {f.name for f in HERE.rglob("*.py")}, results)
     check_live_identifiers(texts, results)
     check_readme_sections(texts.get("README.md", ""), results, is_package=False)
+    check_no_bundled_category_paths(all_texts, results)
     return results
 
 
@@ -174,10 +210,17 @@ def audit_package(zip_path: Path) -> list[tuple[str, bool, str]]:
         check_doc_code(texts, {Path(n).name for n in names if n.endswith(".py")}, results)
         check_live_identifiers(texts, results)
         check_readme_sections(texts.get("README.md", ""), results, is_package=False)
+        all_texts = {}
+        for p in ALL_PACKAGE_MD:
+            arc = f"car-recommendation/{p}"
+            if arc in names:
+                all_texts[p] = z.read(arc).decode("utf-8", "ignore")
+        check_no_bundled_category_paths(all_texts, results)
     return results
 
 
 def run(strict: bool = False) -> int:
+    _selftest_category_paths()
     print("=" * 60)
     print("package_audit —— 发布包确定性体检")
     print("=" * 60)

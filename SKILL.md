@@ -13,7 +13,7 @@ examples_en:
   - "Build a trustworthy ranking of EV sedans priced 15-20万"
   - "Compare crash test scores and battery specs of these two cars"
   - "Verify a model's official class and guide price"
-version: 10.76.0
+version: 10.76.1
 author: "nanbatiannanbatian"
 ---
 
@@ -63,7 +63,7 @@ paths.py       全项目路径唯一事实源（ROOT/cat()/gen()）+ 生成物�
 
 **数据落盘规则**：读数据一律 `paths.cat("xxx.json")`——生成物自动指向 `data/gen/`，人工配置指向 `categories/`；
 写生成物用 `paths.gen("xxx.json")`。**禁止再写 `os.path.join(HERE, "categories", ...)`**（重构前散落 46 处，
-文件一进 `modules/` 全指错目录）。文档里出现的 `categories/trims.json` 是逻辑数据名，实际位置以此规则解析。
+文件一进 `modules/` 全指错目录）。文档里出现的 `trims.json` 等均为**逻辑数据名，不随包分发**：实际落在包目录的 categories 子目录（生成物按 paths 规则解析到 data/gen），首次运行自动建结构合法的空骨架，联网重建后才有真值；不要把文档里的裸文件名当成包内已有文件。
 
 **数据与代码分离（v10.6.0 用户最终决定）：发布包零 JSON，GitHub 仓库也零 JSON。**
 - `build_release.EXCLUDE_ALL_JSON` 总闸门：**所有 `.json` 都不打包**（包解压后 1929KB）。
@@ -222,7 +222,7 @@ python3 energy_router.py "<用户原始提问>"    # 返回 board_type/powers/ne
 - **全环境项回归（`env_options_test.js`，92项）**：遍历 11 项×每个选项，断言非中性选项至少对某车生效（软分/硬条件/续航/**TCO** 之一变化）、无 NaN/越界、关键硬条件阈值正确（无桩纯电−15/极寒低价−12/限牌油车−8/营运油车−10/over8纯电+1.0/单位充电不触发−15）、极端组合合法，并校验形式结论排序与画像自检。中性选项白名单需 hint 有据。**已抓出并修复**：`hold_years=over8` 曾漏实现（已补软调节）。
 - 出 B 类固定榜命令：`python3 build_midsuv_full.py`（中型SUV 12-18万，读候选池+补采分→构造 cars→注入区块→交互 HTML）；
   `python3 build_large_suv_bev.py`（**中大型纯电SUV 榜（v10.61.0，单形式池）**：官方二级分类=中大型SUV +
-  车系页有纯电分组 + 指导价低配 15–90 万；名单只写车名（`categories/universe_large_suv_bev.json`），
+  车系页有纯电分组 + 指导价低配 15–90 万；名单只写车名（`universe_large_suv_bev.json`），
   级别/价格/三电/参数全部由 `ah_series` 解析，8 维走 `param_score` 参数驱动，电耗优先「车重+风阻+迎风面积」
   物理估算、缺风阻才退回电量÷CLTC；安全维只在有官方碰撞判档（`official_safety_scores` / C-NCAP 得分率映射）时计权，
   无判档留空不加权；大型SUV（ES8/M8/M9/N9/L90/HL/N8L/9X/S09/LS9）与中型SUV 按官方级别明确不入。
@@ -231,7 +231,7 @@ python3 energy_router.py "<用户原始提问>"    # 返回 board_type/powers/ne
   指导价低配 6–16万；纯电三电完整才入榜，燃油/油混/插混/增程由 `build_ice_scores.py` 参数驱动 8 维**自动打分**，
   缺电量/CLTC 的纯电自动从汽车之家参数页补采，补不到才进「未入榜·待补采」。多形式池自动启用
   「前置条件→形式结论」区块并给形式适配结论；`--no-ice` 可退回纯电单形式榜，`--ice-refresh` 强制重抓）。
-  `python3 modules/research/build_ice_scores.py --universe categories/compact_sedan_universe.json`（**燃油/油混/插混打分数据集生成器**：
+  `python3 modules/research/build_ice_scores.py --universe <运行时 categories 子目录>/compact_sedan_universe.json`（**燃油/油混/插混打分数据集生成器**：
   汽车之家车系页（官方级别/能源类型/口碑/PPH）+ 参数页 var config → `modules/engine/param_score.py` 8 维 →
   `data/gen/ice_scores_compact.json`；`--fill-bev` 专补纯电三电。缓存 `runs/_ah_cache/<sid>.json` TTL 30 天。
   打分口径见 `references/燃油混动打分口径.md`，回归 `param_score_regress.py`）。
@@ -278,7 +278,7 @@ HTML/报告用 `--as-of <YYYYMM>` 标注事实列数据月，禁止停在"—"�
 **⛔ 销量异常必须联网查因并标注（2026-11-20 用户强制）**：某车销量骤降/骤升或明显异常时，
 **必须联网查明原因**（季度初出口集中/促销透支/换代改款清库/停产/营运车转B端等），
 并像"换代改款、停产"一样在页面显著标注，**不许把口径性低值当成"车不行"**。
-落地三处：① `categories/lifecycle_status.json` 加条目（status 用 active 等，不改档位；note 写异常原因+数据+来源）；
+落地三处：① `lifecycle_status.json` 加条目（status 用 active 等，不改档位；note 写异常原因+数据+来源）；
 ② 候选池 `note` 字段写含关键词的文案（主链路只读 `note`，**`trend_note` 是死字段，写了不会显示**）；
 ③ `render_board_html.py::risk_flags()` 与 `board_view.py::car_verdict()` 识别关键词
 （"销量口径异常/出口集中/季度初出口/促销透支"）→ 页面出"⚠销量口径异常"徽标 + 评价列说明。
@@ -287,7 +287,7 @@ HTML/报告用 `--as-of <YYYYMM>` 标注事实列数据月，禁止停在"—"�
 
 **出榜必附「待上市申报车型列表」**（2026-11-20 用户要求）：每次出榜，在主榜之后自动附一个申报表，
 只展示与本次榜单**同级别/同车身/同能源**的待上市车（问中型纯电SUV才显示家越07纯电版）。
-工具 `filings_board.py`：读 `categories/filings_notes.json`（申报库，含 `ref_car` 参考车关系），
+工具 `filings_board.py`：读 `filings_notes.json`（申报库，含 `ref_car` 参考车关系），
 用参考车 8 维产品力分 + 已知差异（车身/新车品控向中性收敛）推导**预估分区间**，
 对比主榜同级车给三档结论（值得等/可等可不急/不建议等）+ 依据。
 **申报车不进主榜**（无实际销量/官方价），标"预估·非官方核验"，帮用户回答"要不要等"。
@@ -470,7 +470,7 @@ python3 pipeline.py --category <categories/下的配置ID> \
 
 ### 七、实际续航物理估算能力
 - **【能力】`ev_range_model.py`（v2.0 功率式）单一事实源**：`P(v)=m·g·Crr·v + ½ρ·CdA·v³`，`场景电耗=(P/η+附件kW×1000)/(10·v)`，`有效续航=电量×可用SOC(0.94)÷电耗×100`。每车用自己的整备质量与 CdA（Cd×迎风面积），风阻按 v³ 展开；**空调以 kW 进入**（PTC 3–5kW、热泵按温度档 0.55/0.70/0.86 折算），因此低速吃亏、高速影响小——旧版「暖风乘数」正是冬季市区低估、冬季高速高估的根因。冬季两层拆分：电池活性（−10℃ +4%、−20℃ +9%、极寒 +16%）与暖风功率，互不重复计。全局标定 `CAL_G=1.14`（39 款「声明电耗+整备质量+Cd」车取 median(声明/物理@30km/h)），吸收工况开销而非逐车拟合。缺整备质量时按自家电耗回归反解（口径可查）、缺风阻按 CdA/吨中位，均在 steps 里标注。**engine.py 不再自抄一份系数**（旧版两套靠人肉对齐＝漂移温床），engine.js 是同源镜像、由 126 组等价回归守。校准锚点：市区 0.85–0.90 / 100km/h 0.70 / 120km/h 定速 0.55–0.60 / −10℃ 0.70（PTC 0.5–0.6、热泵 0.75）/ −20℃ 0.45（雪地再 −5~8pp），selftest 六场景对共识 ≤±8pp。胎压已建模（按原厂推荐不臆测），轮胎类型谨慎（unknown=1.0 不编造）；算不出标"无数据不估算"。不改主榜打分。
-- **【能力】热泵是「三态逐车事实」，不是默认参数**：事实表 `categories/heatpump_facts.json`（汽车之家参数页「空调/冰箱 → 热泵空调」config id=8417，纯电列过滤，●=有 / ○=选装→null / -=无，逐条 `source_url` 可核；参数页没有该条目就记 null，**不推断为无**）。所有榜的 builder 统一走 `EC.heatpump_of(model)`，不许各榜自己读 JSON 或各写默认。None → 「半热泵半 PTC」参与冬季续航并在页面披露。三态对续航是阶梯而不是开关：−10℃ 市区分档实测 热泵≈0.75 / 混合≈0.68 / PTC≈0.55–0.60。
+- **【能力】热泵是「三态逐车事实」，不是默认参数**：事实表 `heatpump_facts.json`（汽车之家参数页「空调/冰箱 → 热泵空调」config id=8417，纯电列过滤，●=有 / ○=选装→null / -=无，逐条 `source_url` 可核；参数页没有该条目就记 null，**不推断为无**）。所有榜的 builder 统一走 `EC.heatpump_of(model)`，不许各榜自己读 JSON 或各写默认。None → 「半热泵半 PTC」参与冬季续航并在页面披露。三态对续航是阶梯而不是开关：−10℃ 市区分档实测 热泵≈0.75 / 混合≈0.68 / PTC≈0.55–0.60。
 - **【口径】TCO 能源成本双口径并排**：`declared`＝声明电耗（CLTC/台架），`phys`＝物理年均电耗（与「有效续航」同源，含风阻 v³、暖风 kW、温度档、逐车热管理）。两套都进 TCO（`unit_energy` / `unit_energy_phys`、`energy_8y` / `energy_8y_phys`），页面两行展示并标明**下行才是实际电费**；盈亏平衡同时给两个点（`breakeven_km(..., basis="phys")` 会晚 10% 左右）。CLTC 普遍比真实低 15%–35%，只看上行会把纯电用车成本算便宜、把反超点算早。燃油/油混不做电耗物理化（显示「—」，油耗按 WLTC/工信部口径）。
 
 ### 当前明确不做/已废止（手册边界）

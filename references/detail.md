@@ -594,7 +594,7 @@ python3 monthly.py --skip-align       # 跳过汽车之家对齐（最慢、且�
   探测回退由 `monthly.py::probe_month()` 完成（**只探测上个月、上上个月两个月**——上上个月数据一定已发布，不需要再往前），出榜报告必须写明**销量口径月份**。
 - `--intake --month` 不写死历史值：`master_pool.py` 支持 `--month auto`（走探测），提问出榜默认用它；
   旧硬编码 `202610` 仅作离线复现示例，不代表"当前数据月"。
-| **候选池是复制，不是发现** | 自动发现新车需要判断官方二级分类与主力动力类型，目前没有可信自动源。候选池是人工维护的基准文件，月度只刷新销量/级别/价格。新增车型必须人工加进 `categories/baseline_car_ev.json` |
+| **候选池是复制，不是发现** | 自动发现新车需要判断官方二级分类与主力动力类型，目前没有可信自动源。候选池是人工维护的基准文件，月度只刷新销量/级别/价格。新增车型必须人工加进 `baseline_car_ev.json` |
 | **历史目录永不覆盖** | 每月一个 `<YYYYMM>/` 子目录，INDEX.md 存在即跳过（除非 `--force`）。归档可回溯，能算出档位变化 |
 
 ### 一个必须知道的坑：懂车帝动力细分榜漏车系
@@ -898,7 +898,7 @@ python3 filings.py --json f.json --md f.md      # 结构化输出
 |---|---|---|
 | 续航/电量/整备/通用名称 | 免购置税目录附件 | ✅ 自动，官方一手 |
 | 车长（SUV/MPV） | 型号编码第 2-3 位（GB/T 9417，6 类=车长分米） | ✅ 自动，±0.05m |
-| 车长（轿车）/价格/上市窗口/MPV 判定 | 新闻+官方口径 → `categories/filings_notes.json` | ⚠️ 人工+检索沉淀，每月增量 |
+| 车长（轿车）/价格/上市窗口/MPV 判定 | 新闻+官方口径 → `filings_notes.json` | ⚠️ 人工+检索沉淀，每月增量 |
 | 参数详情页 | `queryCpParamPage` | ❌ 滑块验证码，走不通 |
 
 **实测第 411 批（2026-10-16）**：解析 92 行 → 乘用车 21 行 → 15 款待上市。
@@ -929,7 +929,7 @@ ID.ERA 5X/ORA 5/菱智系列级别不符或 MPV。「备案 ≠ 入榜」，大�
 
 ```bash
 python3 thirdparty.py                            # 校验+列出证据库
-# 证据库：categories/thirdparty_tests.json（人工核验后入库，不自动抓视频）
+# 证据库：thirdparty_tests.json（人工核验后入库，不自动抓视频）
 ```
 
 能进，但**必须过四条硬规则**（config `thirdparty_policy` 同步维护）：
@@ -964,7 +964,7 @@ python3 notes_tool.py --add t.json                # 校验通过才合并入库
 python3 notes_tool.py --show                      # 覆盖率与 conf 分布
 ```
 
-数据落在 `categories/filings_notes.json`（key=备案通用名称）。校验规则写死在工具里：
+数据落在 `filings_notes.json`（key=备案通用名称）。校验规则写死在工具里：
 price_expect 必须是 [lo,hi] 数字区间、len_m ∈ 2.5–6.5、cls 必须是官方二级分类词表、
 **conf=A/B 必须给 url**（A=官方口径，B=双源一致，C=单一来源或推断）——
 没有来源的数据收不进去，这是防脏数据的第一道闸。
@@ -1083,7 +1083,7 @@ B站弹幕不取（情绪不是事实，本项目不碰弹幕/评论接口）；
 
 | 文件 | 作用 |
 |---|---|
-| `categories/airbags.json` | 按 trim 核验的三态配置库（true / false / **null=未核验**），每条带 source + url + date + quote；`policy` 写明 A1–A7 规则 |
+| `airbags.json` | 按 trim 核验的三态配置库（true / false / **null=未核验**），每条带 source + url + date + quote；`policy` 写明 A1–A7 规则 |
 | `airbags.py` | `validate / apply / coverage / report / --todo`；判「有无成绩」以 `cncap_scores.json` 为准 |
 | `pipeline.py` | `airbags.apply()` 放在 `thirdparty.apply()` 之后、闸门之前；报告尾部出事实表；`--no-airbags` 供回测对照 |
 | `leaderboard.py` | `top_table` 加「气囊 侧/帘/中」事实列；`review_report` 加提示级硬伤与未核验披露 |
@@ -1171,7 +1171,7 @@ safety 维 sd 从 0.35–0.44 掉到 0.07–0.26，**18% 权重实际失效**（
 
 ### 3 气囊库扩容
 
-`categories/airbags.json` 从 10 → **25 条（25/39，64.1%）**，新增 15 款按 trim 核验，
+`airbags.json` 从 10 → **25 条（25/39，64.1%）**，新增 15 款按 trim 核验，
 触发受限修正从 2 → 3 款（新增红旗天工05，+0.2）。补录纪律：
 
 - 只采信**逐项参数表**或官网「全系标配」声明；`source/url/date/quote/source_type` 必填。
@@ -1190,7 +1190,7 @@ safety 维 sd 从 0.35–0.44 掉到 0.07–0.26，**18% 权重实际失效**（
 ④ 覆盖率 10–30% 的维度方差由「有没有数据」决定，会劫持 MCDA 权重；
 ⑤ 制动/麋鹿跨媒体条件不统一，主观项无标准化口径。
 
-替代方案落成 `spec_facts.py` + `categories/spec_facts.json`：
+替代方案落成 `spec_facts.py` + `spec_facts.json`：
 
 | 处置 | 项数 | 维度 |
 |---|---|---|
@@ -1243,7 +1243,7 @@ safety sd 为 0.000 / 0.050 / 0.075 / 0.260，18% 权重失效；而月度已改
 
 ### 实现
 
-`categories/trims.json` + `trims.py`（架构复用 `spec_facts.py`）：
+`trims.json` + `trims.py`（架构复用 `spec_facts.py`）：
 
 - 按 trim 记录 `price / battery_kwh / battery_type / cell_supplier / cltc_km / charge /
   motor_kw / key_configs / group / note`；每条 entry 带 url + quote + date + launch_date。
@@ -1475,7 +1475,7 @@ v6.1/v6.2 报告写「第一档全空是因为没有官方碰撞证据」——*
 - 报告/HTML 表格新增「官方碰撞」列（L1 / 史 / —），附 `crash_evidence.md`。
 - 过时文案清零：成绩未入库、8.2%、第一档全空的错误解释、v6.1 版本号等均为 0 处。
 - 新产物：`funnel_sensitivity.md/.json`、`crash_evidence.md`、
-  `categories/ice_crash.json`、`ice_pool_full.json`。
+  `ice_crash.json`、`ice_pool_full.json`。
 - 纯电四榜与月度 202610 链路未动，未回归。
 
 ### 6 仍未做（有明确理由）
@@ -1494,7 +1494,7 @@ v6.1/v6.2 报告写「第一档全空是因为没有官方碰撞证据」——*
 ### 首选：`ev_cell_board.py`（严格版，2026-11-16 新增，结论以它为准）
 
 ```bash
-python3 build_cell_facts.py                      # 生成 categories/cell_facts.json（37 款逐车核验）
+python3 build_cell_facts.py                      # 生成 cell_facts.json（37 款逐车核验）
 python3 ev_cell_board.py --candidates <池.json> --out <目录>
 # → cell_board.json（四榜 + 逐车档位/桶内位次/销量判定）
 # → sensitivity_selfmade.json（自研并入一线的名次对照）
@@ -1505,7 +1505,7 @@ python3 ev_cell_board.py --candidates <池.json> --out <目录>
 2. **同价位度数**：不跨价位比绝对 kWh，用 **kWh/万元** 作二级键。⚠️ 别用「2 万分桶内的位次分位」当排序键——独占一桶的车会拿到 1/1 满分，首版就因此把 54kWh/10.53 万的贝塔 S3 顶到中型轿车第 1。
 3. **销量**：**硬门槛**，月销 <1000 移出推荐区单列「销量不足区」，1000–1500 标偏低。不用扣分——扣分只是降几名，低销量车仍在推荐位。
 
-**为什么另起脚本**：`ev_battery_board.py` 把 `cell_brand` 未披露的车一律压第 3 档 → 中型轿车 13 款里 11 款被压，**等于拿取证盲区罚车**（与气囊闸门同一个错误）。严格版先补事实：`categories/cell_facts.json` 37 条，每条带 url+quote+核验日期，记的是**评分配置对应的那一款电池**（同车系换配置可能换电芯）。
+**为什么另起脚本**：`ev_battery_board.py` 把 `cell_brand` 未披露的车一律压第 3 档 → 中型轿车 13 款里 11 款被压，**等于拿取证盲区罚车**（与气囊闸门同一个错误）。严格版先补事实：`cell_facts.json` 37 条，每条带 url+quote+核验日期，记的是**评分配置对应的那一款电池**（同车系换配置可能换电芯）。
 
 **实测（2026-10 数据月）**：四榜第 1 = 中型轿车 极狐贝塔S3（宁德 54kWh/10.53万，但绝对度数最低）、中大型轿车 长安启源A07（宁德 77.94）、中型SUV 大众ID.AURA T6（宁德·时代一汽 77.5/14.99，月销12,032）、中大型SUV 极狐阿尔法T7（宁德 84.8）。关键发现：① **MG 07 评分配置 610 版是上汽清陶半固态 67kWh**，只有 845 版才是宁德 91kWh——按「宁德/弗迪为佳」它落第 3 档；② 度数冠军大众与众09（91.96kWh 宁德）月销 69 台被门槛拦下；③ **自研是否算一线只影响中型轿车**：若算，风云A9 从第 8 到第 1（70.11kWh、5.40/万、月销5,859），其余三榜几乎不动。
 
@@ -1518,7 +1518,7 @@ python3 ev_battery_board.py --candidates <候选池.json> --out <目录>
 
 **规则（字典序）**：电池档 1（弗迪 / 宁德单源）> 2（二线 / 宁德混装 / **厂商自研**：吉利神盾·金砖、广汽弹匣；2026 LFP 6C/12C 已追平）> 3（未披露 / 新路线）；档内按「度数分位×0.7 + 销量分位×0.3 − 低销量扣分」；月销 &lt;800 扣 2.5、&lt;1500 扣 1。若你把自研视作一线，把脚本 `tier_of` 的自研分支改成 `return 1, ...` 即可。
 
-**数据边界（必读）**：① 只有电池品牌，**分不出宁德整包 / 宁德电芯**，统一「宁德系」、单源第 1 档、混装第 2 档；② `cell_brand` 未披露车在旧版被压第 3 档（**不代表电池差，只代表没核到**，严格版已补齐 37 款）；③ trims 少量无度数 → 标「缺」。配置见 `categories/ev_battery_profile.json`。
+**数据边界（必读）**：① 只有电池品牌，**分不出宁德整包 / 宁德电芯**，统一「宁德系」、单源第 1 档、混装第 2 档；② `cell_brand` 未披露车在旧版被压第 3 档（**不代表电池差，只代表没核到**，严格版已补齐 37 款）；③ trims 少量无度数 → 标「缺」。配置见 `ev_battery_profile.json`。
 
 实测（2026-11 EV 池）：与现榜 Kendall τ = 中型轿车 0.41 / 中型SUV 0.38 / 中大型轿车 **-0.33** / 中大型SUV 0.47——中大型轿车分歧最大（电池逻辑更看重宁德/大电池；吉利神盾自研在第 2 档、低销量车被下调）。
 
@@ -1534,13 +1534,13 @@ python3 ev_battery_board.py --candidates <候选池.json> --out <目录>
 
 手册旧标「等级图标未解码」是误解：C-IASI 结果发布稿（`ciasi.org.cn/news/show-N.html`）是**纯文字** G/G+/A/M/P。零依赖解码 5 分指数；「耐撞性与维修经济性」=官方可维修性事实列。
 ```bash
-python3 ciasi_text_decode.py --out categories/ciasi_decoded.json          # 全量刷新，自动向上探测新稿ID
+python3 ciasi_text_decode.py --out ciasi_decoded.json          # 全量刷新，自动向上探测新稿ID
 python3 ciasi_text_decode.py --cars "未来车A,未来车B" --merge              # 只救指定车（任意车型，不硬编码）
 python3 ciasi_text_decode.py --targets-from runs/xxx_pool.json --merge    # 自动找候选池数字图标车
 python3 ciasi_text_decode.py --selftest
 ```
 v10.5.0 起救回链路写进代码：出榜前若候选池有「数字图标/等级未文字化」且随包事实库没有该车文字等级，
-pipeline 自动调用本模块联网解码并合并回 `categories/ciasi_decoded.json`；已缓存车型不联网，失败只告警不阻断。
+pipeline 自动调用本模块联网解码并合并回 `ciasi_decoded.json`；已缓存车型不联网，失败只告警不阻断。
 出榜后还有展示门禁：任何有可核验成绩来源（候选池一手文字 / 新闻稿文字等级 / 权威库 / `cncap_scores.json`）
 但 `crash` 仍显示「—/在测」的车，直接拦下，不许只改文案绕过。
 实测 8 篇/30 款；早期稿只给分布不给逐车对应时标 `aggregate_only`（不猜）。只作事实列，**不进加权分**。
@@ -1571,7 +1571,7 @@ python3 swoiow_probe.py --selftest
 旧链路并行产出「事实榜」（只按 kWh/万元、电耗排序）和「打分榜」，用户混淆「哪个是排行」。
 用户明确决定：**以后所有排行、比较都以打分榜为准**。事实指标不再单独成榜。
 
-### 三条硬规则（已固化进 `board_v2.py` + `categories/rank_v2_policy.json`）
+### 三条硬规则（已固化进 `board_v2.py` + `rank_v2_policy.json`）
 1. **打分榜是唯一权威名次来源**。主榜 = 8 维加权（含品控 10%），直接复用 `leaderboard.score_rows`，
    不重写打分逻辑。所有「排行 / 前十 / 同级对比 / 比较榜」都从这里取名次。
 2. **事实指标降级为「参考·不计分」列**。kWh、kWh/万元、电耗、CLTC 续航、电芯、800V、月销
@@ -1595,7 +1595,7 @@ python3 board_v2.py --candidates <带scores候选池.json> --facts <事实参数
     --out <目录>
 # → board_v2_data.json（主榜+子榜+参考列） + board_v2.md
 ```
-策略与字段映射在 `categories/rank_v2_policy.json`（价位段边界、哪些是参考列、三榜问答指南），
+策略与字段映射在 `rank_v2_policy.json`（价位段边界、哪些是参考列、三榜问答指南），
 改口径改配置即可，不动代码。`--facts` 可选：不传则用候选池自带的事实字段。
 
 ### 验收（2026-11-19，中型纯电 SUV 全价位 12 款）
@@ -1613,7 +1613,7 @@ Kendall τ=0.913（10 算法×6 权重情景）。事实榜的零跑C11 kWh/万�
 **从未进池**——不是算错分，是根本没被纳入。根因：没有总池，每次出榜临时从某个 run
 目录捡一份候选池，覆盖全靠人记得。v8.0 把散落各 run 的候选池收敛成一份持久化总池。
 
-### 核心：一份总池 `categories/master_pool.json`
+### 核心：一份总池 `master_pool.json`
 所有搜索过/采集过/发现过的车都进池（含被排除的车，excluded 也留档），每款车带：
 - **可检索标签**：级别(cls)/动力(power)/车身(body)/品牌/价格(price_wan)/价位段/证据等级/生命周期；
 - **完整数据**：8 维 scores + adjust + 事实(kWh/电耗/续航/电芯) + 原始 candidate 记录（可直接喂 board_v2）；
@@ -1786,7 +1786,7 @@ python3 master_pool.py --intake --sales-cache dcd_snapshot.json --month 202610 \
 
 ### 网查确认闭环（用户要求的「对不上的网上找资料确认」）
 ```
-多源比对 → CONFLICT清单 → agent/人工联网核实 → 写 categories/verified_overrides.json
+多源比对 → CONFLICT清单 → agent/人工联网核实 → 写 verified_overrides.json
         → 重跑 cross_verify（verified_web 作为 rank100 覆盖）→ 冲突清零
 ```
 `verified_overrides.json` 每条必带 url/date/note，只写 ≥2 个独立权威源一致的值。
@@ -1811,7 +1811,7 @@ python3 cross_verify.py --selftest
 python3 master_pool.py --verify --dcd-cache 快照.json --verify-out 报告目录           # 全池核验，dry-run
 python3 master_pool.py --verify --verify-models 丰田bZ5 --apply                        # 单车核验+写回摘要
 python3 cross_verify.py --conflicts-only                                              # 只看冲突清单
-# 冲突 → 网查 → 写 categories/verified_overrides.json → 重跑冲突清零
+# 冲突 → 网查 → 写 verified_overrides.json → 重跑冲突清零
 ```
 `--apply` 时把核验摘要（conflicts/single_source/verified_fields）写回总池每车的 `verify` 字段，
 只加核验元数据、不动打分。
@@ -1837,7 +1837,7 @@ cross_verify selftest 6 项 + master_pool selftest 10 项全过。
   经核查均无独立事实榜章节，只有「全价位打分主榜 + 事实参考列 + 价位段子榜」。
 - 目录里 `中型纯电SUV全价位事实榜_202610.html`（11:48）是融合前的历史中间产物，非现行口径。
 
-### 三段规则（已固化进 `board_v2.py` + `categories/rank_v2_policy.json`）
+### 三段规则（已固化进 `board_v2.py` + `rank_v2_policy.json`）
 1. **先分段**：按 `price_bands`（默认 18/28 万切入门/主流/高端三段，或价格分位自动切）。
 2. **各段列前 10**：每段按主榜分数取前 `per_band` 名（**默认 10**，CLI `--per-band` 可调）。
    段内不足 10 款的按实际款数（如高端段 >28 万中型纯电常只有 1–2 款），如实标注、不硬凑。

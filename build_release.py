@@ -71,6 +71,10 @@ EXCLUDE_FILES = {                                     # 文件名精确排除
     # 只把它的产物 cost_params.py（参数结果 + 口径解释）随包；原始抓取资料另存 runs/_price_sources。
     # 这样以后参数换更准的来源，重跑 --emit 再打包即可，发布物始终只有「数值 + 口径」。
     "price_model.py",
+    # v10.76.1：package_audit.py 是开发者发布体检脚本（与 *_regress.py 同类），
+    # 历史上漏进发布包。SKILL.md 已声明「回归/检查脚本不随包发布」，排除它既符合
+    # 声明，也解决 3MB 超限（它在白名单里占 11.7KB）。
+    "package_audit.py",
 }
 EXCLUDE_GLOBS = ["*.bak", "*.bak-*", "*.tmp", "*.pyc", "*.orig",
                  # v6.0/v6.1 配置快照遗留，无任何代码/文档引用（已核实）；解压后共 223KB

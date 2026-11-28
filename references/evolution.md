@@ -52,7 +52,7 @@
 页面那句「未采集」掩盖的是输入遗漏。
 
 ### 修复（数据链路，非渲染）
-- 事实库提炼为 `categories/fact_library.json`（73 款：72 有 kWh、71 有电耗、39 有 CLTC），随包发布。
+- 事实库提炼为 `fact_library.json`（73 款：72 有 kWh、71 有电耗、39 有 CLTC），随包发布。
 - `board_view.load_fact_library()` 统一加载：显式 `--facts` 优先，否则自动用随包库。
 - `board_v2.py` CLI 与 `pipeline.py` 自动 HTML 链路都改为默认加载，不再漏喂。
 - selftest 加断言：事实库必须加载到 ≥50 款且有 kWh。
@@ -123,7 +123,7 @@ kWh/万元 作为既有参考项正常显示（如 MG 07 5.28、风云A9 5.40，
 - 已有候选池证据字段（宋L EV 悬挂偏硬、海狮06 暗光激活率低）
 
 ### 实现
-- 新增 `categories/experience_facts.json`：12 条证据 / 10 款车（adas 9、control 3），
+- 新增 `experience_facts.json`：12 条证据 / 10 款车（adas 9、control 3），
   每条含 platform/url/date/claim/direction/weight/source_type，来源分级独立实测>UP主>车主口碑>厂商。
 - 新增 `experience_score.py`：按来源权重加总、每维封顶 ±1.5，只调 adas/control，
   写入 `candidate.experience_adjust` 审计字段（前后分+逐条依据），无证据不插补。
@@ -188,7 +188,7 @@ A/B 矩阵 26 项、全部 selftest 通过。
 懂车帝开放平台有懂车分+全网舆情（需商务）、汽车之家无官方API但有第三方结构化口碑接口（付费）。
 
 ### 实现（用户指示"耗时就先做标识"）
-- 新增 `categories/data_sources.json`：13 个渠道逐条登记 status（integrated/partial/
+- 新增 `data_sources.json`：13 个渠道逐条登记 status（integrated/partial/
   available_needs_auth/ugc_needs_credentials/third_party_paid/legal_risk）、数据类型、接入条件、优先级。
 - 明确写出 `not_integrated_summary`：需商务/凭据的4项、合规风险不建议采集的3项、当前零覆盖的IVISTA。
 - selftest 加注册表完整性断言；不改分数、不改页面渲染。
@@ -207,7 +207,7 @@ A/B 矩阵 26 项、全部 selftest 通过。
 **保值率（真实的持有成本，确实漏了）** —— 用户确认只做保值率这一条。
 
 ### 实现
-- 新增 `categories/residual_values.json`：中国汽车流通协会×精真估《2026年6月报告》三年保值率，
+- 新增 `residual_values.json`：中国汽车流通协会×精真估《2026年6月报告》三年保值率，
   带来源URL。覆盖3款（Model Y 54.2% / 蔚来ES6 47.2% / 零跑C11 47%），其余无数据不插补。
 - 口径：delta = clamp((保值率 - 池内中位48%) / 8, ±1.0)，只调 value 维，
   不改其它7维、不改总分公式、不改产品力排序逻辑（保值率是市场结果不是产品力）。
@@ -266,7 +266,7 @@ Model Y value 6.5→7.28、总分 76.8→77.7、#17→#15；蔚来ES6 -0.10、�
 ### 实现
 - **档位**：build 新增 `tiers` 参数，从 `summary.tiers` 反查每车 T1/T2/T3 → 中文「第一/二/三档」写进
   main_board 行。CLI 与 pipeline 都传。落榜车（秦L EV）无档位正确。
-- **电压**：新建 `categories/battery_platform.json`（14 款，按**评分配置**判定电压——关键：
+- **电压**：新建 `battery_platform.json`（14 款，按**评分配置**判定电压——关键：
   MG 07 评分配置是 610 激光雷达版=400V 而非 845 版 800V；极狐S5 带内最低配 400V；
   红旗天工05 550青春版 400V 而非 850版 900V）。电压并入「电池来源」列显示「宁德时代 · 400V」。
   查不到的（极狐贝塔S3/大众与众07）标「未披露」不猜。
@@ -490,7 +490,7 @@ MG07 845版 87.9 #1、深蓝L06 87.8 #2（分差0.1，在算法噪声内）。
 - SKILL.md 顶部新增「⛔ 最高优先级铁律」章节（本文件最上方），写明每款车必须有 trims[] 逐配置数据。
 - 新增 `trim_coverage.py`：出榜前强制校验每款车都有逐配置数据，
   `python3 trim_coverage.py --candidates <候选池> --strict` 缺配置则 exit 1。
-- `categories/trims.json` 补齐 12 款车配置（8 款 auto_trims.py 自动解析 + 4 款网查手工补录：
+- `trims.json` 补齐 12 款车配置（8 款 auto_trims.py 自动解析 + 4 款网查手工补录：
   秦MAX EV/阿维塔06T/奥迪E5 Sportback/宝马i3），共 47 款在榜。
 - 2026-10 纯电中型轿车全价位榜重出：25 款全部有配置，75 个下拉框（25×3），25 个 details。
 
@@ -1083,9 +1083,9 @@ filings selftest OK（门禁+预估）、比较器 20/20、物理模型 selftest
 
 **问题**：出纯电中型 SUV 榜时，`trim_coverage.py` 报 7 款车「无电芯来源」，但其中 4 款（马自达EZ-60/丰田bZ5/零跑C11/蔚来ES6）在人工事实库里明明有 `cell_brand`。
 
-**根因（非补丁）**：`modules/engine/trim_coverage.py::check()` 把电芯事实库路径硬拼成 `os.path.join(os.path.dirname(TRIMS), "fact_library.json")` → 指向 `data/gen/`（可重建生成物目录），而真实人工库在 `categories/fact_library.json`（`paths.cat()` 解析）。这违反 SKILL.md「读数据一律 paths.cat()，禁止拼路径」的落盘规则——同一条规则在别的模块已代码化，此处漏改。
+**根因（非补丁）**：`modules/engine/trim_coverage.py::check()` 把电芯事实库路径硬拼成 `os.path.join(os.path.dirname(TRIMS), "fact_library.json")` → 指向 `data/gen/`（可重建生成物目录），而真实人工库在 `fact_library.json`（`paths.cat()` 解析）。这违反 SKILL.md「读数据一律 paths.cat()，禁止拼路径」的落盘规则——同一条规则在别的模块已代码化，此处漏改。
 
-**修复**：改用 `paths.cat("fact_library.json")`。`selftest()` 加两层回归：①正断言「配置级无电芯、车系事实库有电芯」的车不被误报 `no_cell`；②反向篡改把路径换回错误目录，同一辆车必须被检出。另 4 款（乐道L60/小鹏G6/蔚来ES6/Model Y）确实缺电芯事实，联网补录进 `categories/fact_library.json`（唯一可写源，带 URL+引文+口径冲突披露），非写进会被重建覆盖的 `data/gen/`。
+**修复**：改用 `paths.cat("fact_library.json")`。`selftest()` 加两层回归：①正断言「配置级无电芯、车系事实库有电芯」的车不被误报 `no_cell`；②反向篡改把路径换回错误目录，同一辆车必须被检出。另 4 款（乐道L60/小鹏G6/蔚来ES6/Model Y）确实缺电芯事实，联网补录进 `fact_library.json`（唯一可写源，带 URL+引文+口径冲突披露），非写进会被重建覆盖的 `data/gen/`。
 
 **验收**：修复后 21 款池误报 7→4（真缺），补录后 20 款池严格校验 20/20 全绿；`trim_coverage --selftest` 正反向都过；bug 回归 107/107、跨能源 20/20、结构 16/16 全绿。
 
@@ -1186,7 +1186,7 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
 - **"电池占比偏低"成立但幅度需校准**：40-50% 是**成本占比**（电池占整车BOM），不等于评价权重。真正对标权重的是：①消费者决策调研（尼尔森IQ 2026 中国）电池决策权重 **13.8%**，仅次于整车安全、高于智能化 8.7%/驾驶 8.6%；②业内评测体系三电普遍 25-30%（太平洋汽车5维法30%、义乌网六维法25%）。现状三电维 18%×电池组55%=**电池有效权重仅 9.9%**，明显低于上述区间。
 
 **改动（改根因配置，不动产物）**：
-- `categories/car_midsuv_bev.json` dimensions 权重：三电 0.18→**0.25**；回抽自区分力最低的维度——车机 0.09→0.07、操控 0.09→0.075、空间 0.126→0.116、性价比 0.117→0.107、品控 0.10→0.095、智驾 0.135→0.125；安全维持 0.162 不减（仅次三电）。8 维和=1.0。电池有效权重 9.9%→13.75%，对齐中国消费者调研。
+- `car_midsuv_bev.json` dimensions 权重：三电 0.18→**0.25**；回抽自区分力最低的维度——车机 0.09→0.07、操控 0.09→0.075、空间 0.126→0.116、性价比 0.117→0.107、品控 0.10→0.095、智驾 0.135→0.125；安全维持 0.162 不减（仅次三电）。8 维和=1.0。电池有效权重 9.9%→13.75%，对齐中国消费者调研。
 - **只改纯电榜**：跨能源榜动力总成对燃油是发动机+变速箱，非 40-50% 价值项，`build_energy_compare.DIMS` 维持能源中性 18%（比较器 t020 继续锁 0.18）。
 - 候选池重打指纹（`score_fingerprint --stamp`），指纹 6bc47e52→a7bb4896，报告头版本一致性保持。
 - `bug_regression.t107` 加权重锁死断言（纯电0.25/和=1/车机操控≤9%），并做反向注入验证——改回 0.18 会 FAIL。
@@ -1200,7 +1200,7 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
 **但辨析：使用率低≠权重该低**。麦肯锡 69% 视城市 NOA 为购车标配、智驾是门槛项，影响定价与保值率；本榜智驾分早 v10.15.2 已硬件封顶+2.0、可用性走实测证据（本池 10 条），非堆料打分。按当前权重智驾区分力 19.3%（第二高，标准差0.85），降权会削弱最能区分车型的维度。用户仍选降到 8%（体现实用性折扣）。
 
 **改动**：
-- `categories/car_midsuv_bev.json`：adas 0.125→**0.08**；腾出 4.5pp 平分给安全 0.162→0.177 / 空间 0.116→0.131 / 性价比 0.107→0.122（消费者高关注高使用维度）；三电 25% 不动（不推翻上轮结果）。8 维和=1.0。
+- `car_midsuv_bev.json`：adas 0.125→**0.08**；腾出 4.5pp 平分给安全 0.162→0.177 / 空间 0.116→0.131 / 性价比 0.107→0.122（消费者高关注高使用维度）；三电 25% 不动（不推翻上轮结果）。8 维和=1.0。
 - 页面提示（用户确认"接在怎么读这张榜后"）：`render_board_html.py` 在该提示条后加"⚠ 关于智驾权重（本榜 X%）："一段，动态读 `meta.dimensions`（不写死百分比），客观写两面——为何低（6.3% 开启率、31% 经常用、20% 不敢用、J.D. Power 48% 抱怨）+ 为何不清零（69% 标配门槛项、影响保值率、本榜非堆料打分）；仅当智驾权重 ≤10% 显示，避免污染跨能源榜（能源中性 13.5%）。
 - **根因修复（重要）**：发现页面表权重与打分/报告漂移——`pipeline.py` 渲染器一直硬编码 `car_ev_1218_quality.json`（18%/13.5%），而打分用 `--category` 配置（25%/8%），故 v10.15.6 改权重后报告显示 8%、页面表头却仍 13.5%，且新提示读 13.5% 被门槛抑制不显示。`board_v2.build` 只读 `cfg["dimensions"]`，改渲染器走当前 category 配置（`paths.cat(f"{a.category}.json")`，缺失回退旧通用配置兼容老榜），页面与打分/报告自此同源。这是补丁式改文案掩盖不了的真 bug。
 - 指纹重打 a7bb4896→968109d3；`bug_regression.t107` 加智驾权重锁死（0.08/三电0.25/三维各+1.5pp）、页面提示源码断言（存在/≤10%门槛/动态读取）、pipeline 同源断言（防硬编码回退），反向注入验证有效。
@@ -1217,7 +1217,7 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
 **离地间隙加分成立但需严谨落地**：纯电电池包平铺底盘，离地间隙比同级燃油 SUV 低 15~20mm，托底是热失控高频诱因；国标 GB38031-2025 新增底部撞击测试（35km/h 撞凸起硬物电池不起火不爆炸）并明确"离地间隙充足车型可豁免"——标准层面确认逻辑。按用户"按配置精确、不许打补丁、缺数据先补"的铁律，先网查 20 款车（新华网/汽车之家参数页/厂商官网/官方PDF/政府采购公告多源），发现数据三档：18 款可核验、2 款官方未公布（MONA L05/Q06 记 unknown 不推断）、5 款来源冲突取低值披露。同车型配置差异大（极氪7X 后驱197/四驱160、Model Y 后驱167/高性能147），故按候选池入榜配置取空载口径。
 
 **落地（照搬 airbags.py 合规范式，根因非补丁）**：
-- 新建 `categories/ground_clearance.json` SSOT：20 款逐车 trim + clearance_mm(空载) + source/url/quote + conflict 标记 + 裁决优先级（政府采购 > 汽车之家配置页 > 官网 > 第三方库 > 媒体问答）。
+- 新建 `ground_clearance.json` SSOT：20 款逐车 trim + clearance_mm(空载) + source/url/quote + conflict 标记 + 裁决优先级（政府采购 > 汽车之家配置页 > 官网 > 第三方库 > 媒体问答）。
 - 新建 `modules/engine/ground_clearance.py`：≥175mm +0.3 / 150~175 0 / <150 −0.3 / unknown 0；幂等(gc_delta)、来源校验、审计字段、报告章节与待补清单；**单调性保护**（调整后无成绩车 safety 不得高于有成绩车最低分，违反则正 delta 回缩并在报告披露）；只改 scores.safety 不碰 adjust（adjust 只平移总分不激活维度权重）。
 - 防重复计分：气囊/CTB 是"碰撞时结构防护"已被碰撞成绩吸收，离地间隙是"降低磕碰概率"机制不同；有官方成绩车照常计（底部撞击非现测项），不搞 airbags 那种"有成绩就 0"。
 - pipeline 接入：import + `--no-ground-clearance` 开关 + apply（airbags 后、安全门禁前）+ 报告节 + summary.ground_clearance。
@@ -1318,7 +1318,7 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
 - 新建 `modules/engine/value_residual.py`：产品力 pf = 其余七维（剔除 value 自身）按权重归一加权；ppw = pf/指导价；固定价格档（≤15/15-20/20-25/>25 万）；value = 中性8.0 + clamp((ppw/本档均−1)×12, ±1.5) + 保值率微调（有数据车）。`delta_for`（唯一公式）→ `value_for` → apply 单一真相源，消除两份公式漂移。`product_strength` 优先读入池原始分快照 `_value_pf_base`，避免中途联网回填让 pf 漂移。
 - `pipeline.py` 读候选池后即刻存 `_value_pf_base` 快照；在 sibling/安全门禁前调用 value_residual（此时七维主体已定稿）；新增 `--no-value-residual` A/B 开关；summary 写 value_residual 审计（含 applied 明细）。
 - `trim_annotate.annotate_all` 逐配置 value 改用 `value_for`（车系级 bmean + 入池 pf 基准 + 配置价），杜绝「车系级已残差、逐配置仍按 kWh/万元 delta，再被 with_config_scores 覆盖回旧分」的口径分叉（曾致宋Ultra 跨榜 9.5 vs 8.6）。
-- `anchor_pool` 增 `value_bins` 固定锚（全榜 summary 提取），categories/car_midsuv_bev.json 的 anchor_pool.path 刷新到 v19 且 modules 纳入 value_residual；子榜读全榜档均，保证同车跨榜同分。
+- `anchor_pool` 增 `value_bins` 固定锚（全榜 summary 提取），car_midsuv_bev.json 的 anchor_pool.path 刷新到 v19 且 modules 纳入 value_residual；子榜读全榜档均，保证同车跨榜同分。
 - `score_fingerprint.SCORE_CODE_FILES` 纳入 value_residual.py（改 value 公式老分判过期）。
 
 **踩坑（均已根因修）**：①逐配置重算用逐配置 sc 算 pf → ref 受子池影响漂移（深蓝S 9.5 vs 7.6）→改用入池稳定基准；②summarize 漏 pool_mean → anchor_pool 提取 value_bins 失败返 None →子榜本池拟合漂移；③apply 与 value_for 各写一份 delta 公式 →反向注入检不出 →抽 delta_for 共用。
@@ -1341,7 +1341,7 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
 **v10.20.2 冷却分档反转 + 锚点滞后根因**：用户质疑直冷+0.3>液冷+0.2 不对。业内调研「液冷稳、直冷快、无绝对优劣、液冷主流」，且快充已单独计分、冷却项再奖直冷=二次计价。改为液冷+0.3>直冷+0.2>风冷−0.2。反转后暴露潜伏缺陷：跨榜同分破裂（子榜 9 款高 0.1），根因是 `anchor_pool.path` 停在 v21 旧冷却中位 0.2。修为锚点路径前移 + 新增 BUG-120 锁死「锚点规则中位==当前规则分值」，防复发。
 
 **v10.21.0 删除经销商与指导价两张展示表**（用户「经销商和指导价的表格去了吧」，拍板彻底删除 + 同步推送）：这两块都是 v10.18.0 加的「仅展示不进分」区块，用户要求连根删除。删除清单（全链路、无死代码）：
-- 引擎/数据：`modules/engine/dealer_satisfaction.py`、`price_dual_view.py`、`categories/dealer_satisfaction.json`、`official_promotions.json` 四文件删除。
+- 引擎/数据：`modules/engine/dealer_satisfaction.py`、`price_dual_view.py`、`dealer_satisfaction.json`、`official_promotions.json` 四文件删除。
 - 展示：`board_view.py` 删两个 BLOCK 与 `has_dealer`/`has_price_dual` 判定（区块 22→20）；`render_board_html.py` 与 `board_v2.py` 删两段渲染。
 - 数据链：`pipeline.py` 删 `--no-price-dual-view` 开关、两份数据生成、summary 两字段、report 数据扩展披露两段、HTML meta 写入。
 - 指纹：`score_fingerprint.py` 移除 `price_dual_view.py` 监控项。
@@ -1369,7 +1369,7 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
 - 用户问「海豹06和极氪007三电差别具体体现在哪，二代闪充不会比极氪007差这么多，有问题根因改」+「不要硬编码，所有硬编码的地方都查出来改掉」。用户拍板：硬编码按收益大的方向改（不动打分阈值裸数字），海豹06从代码层切换27款并重跑看效果。
 - **根因一（快充单位解析只认英文 min）**：`trim_annotate.charge_minutes` 正则只匹配 `min`，配置文本写中文「分钟」即解析为 None → 快充项不进分。全库 22 条配置/10 款车受影响：海豹06GT「30-80% 9分钟」、海豹07EV 9分钟、极氪007GT 10.5分钟、蔚来ET5 36分钟、阿维塔06 10分钟、悦意08 20分钟、捷达M6 25分钟、艾尼氪V 20分钟等。同款车把 9min 写成 9分钟就凭空少一项分——这不是数据缺失是解析器漏识单位。修法：单位识别统一为 `min|分钟|minute`，折算口径不变（按区间宽度线性到等效 10-80%）。修复后：海豹06GT 9min→等效12.6min快充项+1.1、蔚来ET5 36min→等效50.4min项−0.4（此前漏扣也纠正）。
 - **根因二（海豹06EV 评分配置停在旧代 + 电压字段空）**：候选池评分配置是 2025款545旗舰（24min、无高压平台），而 2027款二代闪充（2026-08上市，全系800V原生闪充+第二代刀片，10-97% 9min）已在库却没被选上；自动采集条目 voltage_v 为空、charge 只写区间，导致高压平台 +1.0 与二代闪充快充项双丢失。修法（全部配置化，无车型名写死在代码）：
-  - 新建 `categories/score_trim_overrides.json`：显式登记评分配置裁决（from 545高配12.98 → to 2027款630智享13.29，含新浪汽车/汽车之家 URL+原文+日期）与字段补丁（voltage_v=800、charge 文本）。
+  - 新建 `score_trim_overrides.json`：显式登记评分配置裁决（from 545高配12.98 → to 2027款630智享13.29，含新浪汽车/汽车之家 URL+原文+日期）与字段补丁（voltage_v=800、charge 文本）。
   - 建池脚本 `runs/build_midsedan_pool_202611.py` 从配置读 overrides，只在现配置匹配 from 时幂等切换并留痕 `_score_trim_override`。
   - `trims_store.load()` 末尾统一注入 field_patch（只在字段缺失时填、附依据）——不让 data/gen 生成物成为第二可写副本，自动采集重跑不冲掉人工核验补丁。
   - 海豹06EV 三电 8.55→9.4（快充+0.52、240kW电机+0.4、800V项恢复）；人工基线 8.6 保留不重估，避免与规则增量双重计价。
@@ -1386,7 +1386,7 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
 ## v10.25.0 · 三电阈值彻底改（配置化 + 两处字段错配根因，2026-11-22）
 - 用户推翻上轮「打分阈值裸数字不动」的拍板：「要按照彻底改的方向，要动打分阈值，根因改」。用户四项全选：快充档重定档、电压改连续档、修功率字段错位、修电压误填快充字段；交付选「全量改+重出三榜」。
 - **业内调研依据（联网核验，2025-2026 中国市场）**：2026 年三电硬件（800V/5C/大电池/高峰值）快速平权下沉——800V 渗透率 1-5 月约 33%（盖世汽车），已是主流非领先；6C/兆瓦闪充做到 7-11min、主流 5C 12-18min（中国质量新闻网 2026 北京车展、新浪汽车）；GB/T 18488 峰值功率仅维持约 10s、水分约 70%。业内共识从「堆绝对参数」转向「达成率/衰减率/效率」（懂车帝 6+2 评测、C-AHI 2026、J.D. Power）。达成率/额定功率/效率MAP 本池结构化覆盖极低，本榜已用独立模块（range_achievement、powertrain_efficiency）计入，不从绝对档重复扣。
-- **根因一（阈值硬编码裸数字）**：六组分档写死在 `spec_score.powertrain_parts`，改档要动代码+回归+文档且无法审计当前生效版本。新建 `categories/powertrain_rules.json` 唯一可写源（六组 bands + 业内来源 URL），`spec_score` 经 `_pt_rules()` 读配置、`_band_points()` 统一判档；配置缺失回退内置同值保证离线不崩。档位调整：①快充 ≤8min 单列闪充档 +1.4 / ≤12 +1.1 / ≤18 +0.7 / ≤25 +0.3 / ≤35 0 / >35 −0.4（解决 7.2min 二代闪充与 11min 普通快充同为 +1.4 的失真）；②电压布尔 +1.0 改连续档 900V +0.6 / 800V +0.4 / 400V 0（`platform_v` 数值透传，兼容旧布尔调用按 800V）；③容量/续航/功率绝对值分档下调（90kWh 0.8→0.6、700km 0.8→0.6、300kW 1.2→0.8 等），跨价位可比性仍由 rule_adjust 中位锚解决，不引入价格分母双计。
+- **根因一（阈值硬编码裸数字）**：六组分档写死在 `spec_score.powertrain_parts`，改档要动代码+回归+文档且无法审计当前生效版本。新建 `powertrain_rules.json` 唯一可写源（六组 bands + 业内来源 URL），`spec_score` 经 `_pt_rules()` 读配置、`_band_points()` 统一判档；配置缺失回退内置同值保证离线不崩。档位调整：①快充 ≤8min 单列闪充档 +1.4 / ≤12 +1.1 / ≤18 +0.7 / ≤25 +0.3 / ≤35 0 / >35 −0.4（解决 7.2min 二代闪充与 11min 普通快充同为 +1.4 的失真）；②电压布尔 +1.0 改连续档 900V +0.6 / 800V +0.4 / 400V 0（`platform_v` 数值透传，兼容旧布尔调用按 800V）；③容量/续航/功率绝对值分档下调（90kWh 0.8→0.6、700km 0.8→0.6、300kW 1.2→0.8 等），跨价位可比性仍由 rule_adjust 中位锚解决，不引入价格分母双计。
 - **根因二（字段错配静默缺席，比阈值更大）**：①全库 64 处 `max_power_kw` 缺失但 `motor_kw` 有值（含 15 款入榜车，极氪007=370kW），`spec_from_trim` 只读 `max_power_kw` → 电机功率项缺席、有数据的车被当中性；②12 处 `charge` 字段被填成纯电压文本（极氪007 全系 '900V'、银河E5、腾势N7），快充项解析不出、电压只能从文本兜底。修法：`trims_store.load()` 读取层统一 `_normalize_field_aliases()`——功率从 motor_kw 回填（留 `_field_alias` 审计）、纯电压 charge 把电压提到 `voltage_v` 并清空 charge（快充时间确实未披露，不编造）；单一真相源，rule_adjust/trim_annotate/逐配置所有消费者自动受益。`trim_annotate.deltas_for` 的 c800 判定同步补 voltage_v 来源（否则归一后同车系高压 delta 丢失）。
 - 修复效果（逐项，评分配置层）：极氪007 三电项从 3 项（容量/续航/800V）→ 4 项且含 370kW 功率 +0.8、900V 连续档 +0.6——二代闪充与高压的客观差距终于进分；400V 车明确进 +0 项参与中位锚（有数据≠缺数据）。
 - 回归：新增 BUG-126（阈值配置化唯一源+≤8min/900V区分+子进程反向注入改配置即改分）、BUG-127（功率回填64处/电压分离12处+极氪007功率电压进分+审计留痕）；更新 t108（阈值下调后 raw≥10 从 65→14，前提阈值 50→10）、t123（快充项断言不再写死旧档分值）、t125（高压 +1.0→+0.4 并锁 platform_v=800）。全套 bug 125/125、反向注入 102/102、midsuv 46/46、layout 16/16、release 39/39、compare 20/20、router 32/32、derive 4/4、各 selftest 全绿。
@@ -1395,7 +1395,7 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
 ## v10.26.0 · 数据时效机制（阈值复核到期 + 新鲜度体检闭环，2026-11-22）
 - 用户问：「打分逻辑是不是可以不硬编码，比如 27 年以后厂家三电全部升级了，三电评分是不是就要修改了。是不是在 research 增加模块查询数据填入打分，然后这些数据每隔一个月就过期需要重新填入，你觉得怎么样好直接改」。
 - **判断（向用户讲透的架构分叉）**：用户直觉对一半。①打分逻辑已配置化（v10.25.0 的 powertrain_rules.json 六组唯一源），2027 三电升级改配置即可不改代码——但**缺「何时该改」的到期信号**，无人盯着就静默用 2026 档。②research 联网采集模块**早已存在**（fetch_specs/auto_trims/trim_ingest 等整套），数据带 date 字段，不用新增查询能力——缺的是统一体检。③「research 实时查数直接填分 + 每月自动重填」**不能走**：本榜铁律「无模型调用、同一输入必得同一输出、出榜只读快照」，实时联网进分会让同一天两次出榜结果不同、跨榜同分碎裂、回归无法稳定。正确闭环 = 体检发现过期 → 定向重采 → 人工核验落库 → 重打指纹 → 重出榜。
-- **改动一（阈值到期信号）**：`categories/powertrain_rules.json` 加 `review` 块（reviewed_at=2026-11-22 / review_interval_days=180 / next_review=2027-05-21 / trigger 触发条件 / why）。半年周期理由：阈值要看业内多源趋势，属结构性判断，逐月重审会把打分变噪声驱动；高频的销量/价格/优惠另有月度机制不在此表。版本 1.0→1.1。
+- **改动一（阈值到期信号）**：`powertrain_rules.json` 加 `review` 块（reviewed_at=2026-11-22 / review_interval_days=180 / next_review=2027-05-21 / trigger 触发条件 / why）。半年周期理由：阈值要看业内多源趋势，属结构性判断，逐月重审会把打分变噪声驱动；高频的销量/价格/优惠另有月度机制不在此表。版本 1.0→1.1。
 - **改动二（新鲜度体检模块）**：新建 `modules/research/data_freshness.py`，**纯读、不联网、不改任何数据文件、不改分**（AST 锁死不 import engine/board）。体检四类：①阈值复核到期（fresh/due/overdue，due=周期 80% 后提醒）；②车型三电参数采集日期（data/gen/trims.json 各车 date，默认 90 天过期，列出过期车+已采字段+重采命令）；③候选池指纹（只读 stamp，真判定交 score_fingerprint --check）；④申报库缓存（3 天，与 filings_board.STALE_DAYS 一致）。输出结构化 JSON + 人读刷新计划（4 类 kind：threshold_review/spec_refresh/filings_refresh/pool_restamp）。CLI：`--json`/`--strict`(overdue 退 2)/`--as-of YYYY-MM-DD`(模拟未来体检)/`--spec-days`。遵守 research 包契约（只返回 dict、不 import engine）。
 - **回归**：新增 BUG-128（review 元数据存在+周期合理+selftest 多场景+**纯读性 SHA256 前后比对**+三类反向注入：改 reviewed_at→overdue/去 review 块→unknown(不静默 fresh)/车型 date 过期→spec_refresh 计划+AST 锁不越界进打分层）。全套 bug 126/126、反向注入 102/102、midsuv 46/46、layout 16/16、release 39/39、compare 20/20、router 32/32、derive 4/4、各 selftest 全绿。
 - **零分数影响**：本次只加元数据+体检模块+回归，未动打分代码与权重配置——三候选池指纹 `--check` 均「一致」(48478d21)，v29 三榜分数不变，**不重出榜**。
@@ -1681,13 +1681,13 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
 - 边界：参数是**估算带而非报价**，页面标注「开发期估算结果，随包发布」；保险的地区/无赔款折扣、轮胎的渠道差异仍会造成个人偏差，用户可按自己报价替换——但替换只改 `price_model.py` 与 `cost_params.py`，不改公式。
 ## v10.61.0 中大型纯电SUV 榜（新榜 + 参数驱动纯电 8 维）（2026-11-24）
 - 用户诉求：`来一份中大型纯电SUV的前十排行榜`。此前三张榜（6-16万紧凑轿车 / 12-18万中型SUV / 12-14万五形式演示）都不覆盖这个级别+价格带，直接混进任何一张都会破坏该榜口径，因此独立建池。
-- 建池闸门（不猜级别、不猜价格）：名单只写车名（`categories/universe_large_suv_bev.json` → 23 个候选）；级别取汽车之家车系页官方二级分类 `level` 字段，必须等于「中大型SUV」；车系页必须有纯电分组（BEV 指导价 + 电池能量 + CLTC 三者齐全）。结果：**22 款入榜**，`ID.6 X` 因可用维 <5 进 gap，`唐EV/ID.6 CROZZ/Q6L e-tron/EQE SUV/锐歌/极星4/Eletre/Macan EV` 在汽车之家索引中不存在（宁漏不错，记录在 `name_not_in_index`）。按官方级别明确排除：大型SUV 10 款（ES8/M8/M9/N9/L90/HL/N9L/9X/S09/LS9）、中型SUV 7 款（ES6/L60/G7/7X/知音/宋L/海狮07）。
+- 建池闸门（不猜级别、不猜价格）：名单只写车名（`universe_large_suv_bev.json` → 23 个候选）；级别取汽车之家车系页官方二级分类 `level` 字段，必须等于「中大型SUV」；车系页必须有纯电分组（BEV 指导价 + 电池能量 + CLTC 三者齐全）。结果：**22 款入榜**，`ID.6 X` 因可用维 <5 进 gap，`唐EV/ID.6 CROZZ/Q6L e-tron/EQE SUV/锐歌/极星4/Eletre/Macan EV` 在汽车之家索引中不存在（宁漏不错，记录在 `name_not_in_index`）。按官方级别明确排除：大型SUV 10 款（ES8/M8/M9/N9/L90/HL/N9L/9X/S09/LS9）、中型SUV 7 款（ES6/L60/G7/7X/知音/宋L/海狮07）。
 - 打分：8 维走 `param_score.score_facts`（与紧凑榜燃油侧同一函数、同一套绝对锚点），比功率/轴距/后备厢/口碑/PPH 全部来自车系页；**安全维只在有官方碰撞判档时计权**——`official_safety_scores.car_scores` 优先，C-NCAP 得分率按官方映射 `7.0+(pct-80)×0.155` 封顶 9.3 兜底，本池命中 6 款（小米YU7 93.5 / 唐L 93.1 / 理想i6 91.2 / 智己LS6 90.7 / 阿维塔11 90.2 / 问界M7 95.0）；无判档留空、不加权、不插补。三电维过 `spec_score.main_board_powertrain_cap`（knee 9.3 → 渐近 9.5）避免多款并列满格。证据等级如实标 C（按参数规则推算，低置信，仅参考）。
 - 电耗口径：优先「车重 + 风阻 + 迎风面积」物理估算（项目既有 `EC.PHYS_A/B/C` 公式，风阻取参数页 pid 1370），缺风阻/尺寸才退回「电量÷CLTC」并在逐车标注——CLTC 反推普遍偏乐观（101.7kWh/835km → 12.2，物理估算约 15.5 kWh/100km）。
 - 单形式池的特殊处理：全池纯电，没有「纯电 vs 燃油」池内对象 → `breakeven_km_range` 返回 None，摘要区平衡里程显示「—」，页首额外注明「纯电相对燃油的平衡口径仍是约 1.5 万 km/年（区间 1.1–2.0 万，见方法区）」，避免读成「算不出」。
 - 产物：`runs/large_suv_bev_中大型纯电SUV_完整交互榜.html`（22 款 / 20 区块齐全 / 109KB）。默认画像下综合分前十：红旗天工08 94.8、智己LS7 94.6、腾势N8 94.1、小米YU7 92.7、理想i6 92.5、昊铂HT 92.3、唐L 92.2、长安启源E07 91.7、智己LS6 91.6、阿维塔11 90.2；形式结论单形式=纯电（均分 88.6）。
 - 诚实边界（写进页面与交付）：安全/智驾是「有判档才算」的维，22 款里只有 6 款有安全判档、8 款有品控（PPH），可用维中位 5/8；跨车比较是「在共同可判维度上」的名次，不等于整车结论。销量只作事实列（202611 单月、车系口径含所有能源），不进评价分。
-- 新增/改动文件：`modules/board/build_large_suv_bev.py`（新）、`build_large_suv_bev.py`（CLI 薄壳）、`categories/universe_large_suv_bev.json`（新，含 `excluded_verified` 与 `name_not_in_index` 台账）。零对既有打分/公式的改动，三张旧榜名次不受影响。SKILL 10.60.0→10.61.0，README 顶部版本行同步。
+- 新增/改动文件：`modules/board/build_large_suv_bev.py`（新）、`build_large_suv_bev.py`（CLI 薄壳）、`universe_large_suv_bev.json`（新，含 `excluded_verified` 与 `name_not_in_index` 台账）。零对既有打分/公式的改动，三张旧榜名次不受影响。SKILL 10.60.0→10.61.0，README 顶部版本行同步。
 
 ## v10.62.1 权威清单门禁+质量分全8双根因修复（2026-11-24）
 - 用户追问"腾势N8呢"→发现漏收，用户要求"为什么会漏掉，根因改"；随后又指出"质量分全8不合理，根因修复"。
@@ -1751,7 +1751,7 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
 - 用户拍板：「1 要（热泵做逐车事实字段）、2 不要（雪地路面不进页面条件）、3 都展示但说明物理口径才是我们算的真实续航」。
 - **① 热泵：从「默认参数」变成「三态逐车事实」**
   - 此前 67 车维表里「热泵」出现 0 次，全部落到 `mixed`（半热泵半 PTC）。但 −10℃ 三态是阶梯不是开关：热泵≈0.75、混合≈0.68、PTC≈0.55–0.60，热泵车被系统性低估 10 个点左右，而 −10℃ 档正好驱动「东北能不能买纯电」的硬条件 H2。
-  - 新建 `categories/heatpump_facts.json`：数据源＝汽车之家参数页「空调/冰箱 → 热泵空调」（config item id=8417）。解析要绕两坑：①该字段不在 `var config` 的 `paramtypeitems` 里，而在 `var option` 的 `result.configtypeitems`；②一车多动力车系（海狮06、秦PLUS、启源A06、极氪7X 等）必须按「能源类型」列过滤到纯电款型，否则 DM-i 的「无」会盖掉纯电的「有」。
+  - 新建 `heatpump_facts.json`：数据源＝汽车之家参数页「空调/冰箱 → 热泵空调」（config item id=8417）。解析要绕两坑：①该字段不在 `var config` 的 `paramtypeitems` 里，而在 `var option` 的 `result.configtypeitems`；②一车多动力车系（海狮06、秦PLUS、启源A06、极氪7X 等）必须按「能源类型」列过滤到纯电款型，否则 DM-i 的「无」会盖掉纯电的「有」。
   - 结果：77 款中 **64 款有据（全部「标配」）、0 款明确无、13 款未采到记 null**（参数页没有该条目时不推断为无）。逐条带 `source_url`，`evidence` 记「标配n/选装m/无k」。
   - 代码：`build_energy_compare` 提供 `load_heatpump_facts()/heatpump_of()` 单一入口，四个榜单 builder 全部改为 `EC.heatpump_of(model)`（此前「大 SUV 榜读不到、其它榜读维表」正是双源漂移的苗头，已收口）；`engine.py/js` 三态翻译不变（True→heatpump / False→ptc / None→mixed），但 steps 里必须写明「参数页核验」或「未采到→半热泵半PTC 默认」。
   - 数值效果（默认画像含 −10℃）：红旗天工08 408→442km、腾势N8 541→580km、小米YU7 492→533km、智己LS7 475→514km；中大型纯电 TOP10 十款全部有热泵事实，不再靠默认值。
@@ -1844,7 +1844,7 @@ bug 107/107、比较器 20/20、结构 16/16 全绿；powertrain_efficiency self
 - 性价比 `value_residual`：锚点改回「本档 ppw 中位」（`anchor = bins.get(b) or pool_mean`），
   档界 ≤15/15-20/20-25/>25 万写死；档内 <3 款回退全池中位并标 `anchor_scope=pool_fallback`；
   审计新增 `band_n` / `pool_anchor_ppw`，basis 文案改成「同价位段残差」；页面口径同步改写。
-- 权重（`categories/car_midsuv_bev.json`）：三电 23 / 安全 20 / 品控 15 / 空间 11.5 /
+- 权重（`car_midsuv_bev.json`）：三电 23 / 安全 20 / 品控 15 / 空间 11.5 /
   性价比 12.5 / 智驾 6 / 操控 6 / 车机 6（和=1）。新增门禁断言：证据维 ≥ 0.6×参数维、
   三电仍为第一权重、安全不低于品控。
 - 补能单一账本（`spec_score`）：新增 `charging_credit()`（快充分/平台分的唯一产生地，
@@ -2145,7 +2145,7 @@ v10.74.5 只做了主榜「总分构成」逐格 ≈，其余出口仍看不出�
 - 与产品力榜口径分裂：产品力榜早已剔除持有成本，主榜却算。
 
 ### 修法
-- `categories/car_midsuv_bev.json`：删除 holding_cost 维度，8 个点按比例归入其余 9 维，
+- `car_midsuv_bev.json`：删除 holding_cost 维度，8 个点按比例归入其余 9 维，
   配方 v4 = 三电 22.8 / 安全 19.6 / 可靠性 13.0 / 品控 6.5 / 空间 12.0 / 性价比 13.0 /
   智驾 5.4 / 操控 4.4 / 车机 3.3（和=1）；AHP 矩阵按新权重重建成 9×9；sliders「预算」只留 value。
 - 计算链路自动跟随 cfg：trim 逐配置总分、名次带、证据闸门、页面「总分构成」列全部变 9 维；

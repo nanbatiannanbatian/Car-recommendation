@@ -88,12 +88,12 @@ pip install -r requirements.txt        # 见仓库 README
 ```bash
 cd ~/.workbuddy/skills/omni-debate
 python lifecycle_fetch.py \
-  --manual   categories/lifecycle_status.json \
+  --manual   <运行时 categories 子目录>/lifecycle_status.json \
   --pool     /path/to/runs/car-ice-4boards/ice_pool_full.json \
   --pool     /path/to/runs/car-ev-4boards/candidates_trend.json \
   --dcd-status /path/to/vehicle-data-hub/dcd-status.json \
   --gonggao    /path/to/vehicle-data-hub/gonggao.json \
-  --out      categories/lifecycle_status.json \
+  --out      <运行时 categories 子目录>/lifecycle_status.json \
   --report   /path/to/runs/car-ice-4boards/lifecycle_autogen.md
 ```
 
@@ -129,8 +129,8 @@ python koubei_merge.py \
 - `--vdh-dir` 指向 vehicle-data-hub 的 `downloads/benchmark/`（缓存 `<车型>.json`，含懂车帝口碑/销量）。
   脚本容错读 `review_count / koubei_users / users / data.reviewCount` 等可能字段名。
 - 取多源**最大值不降级**（种子与真实不会互相压低）。
-- 若还没跑 vehicle-data-hub，可先用 `categories/koubei_seed.json`（种子估计值）占位：
-  `--seed categories/koubei_seed.json`（当前 v6.5 就是这层）。
+- 若还没跑 vehicle-data-hub，可先用 `koubei_seed.json`（种子估计值）占位：
+  `--seed <运行时 categories 子目录>/koubei_seed.json`（当前 v6.5 就是这层）。
 
 跑通后 ICE 池 `koubei_users≥30` 覆盖率会从 45.5%（种子）进一步抬升，评分期插补率
 （现为 36.9%）继续下降。
